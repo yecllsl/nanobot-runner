@@ -1,0 +1,35 @@
+# Mock FIT File - easy_run_20240101.fit
+# Generated for testing purposes
+
+[File Header]
+Type: activity
+Manufacturer: Garmin
+Product: Forerunner 945
+Serial Number: TEST1000
+Time Created: 2024-01-01T00:00:00Z
+Number of Records: 120
+
+[Activity]
+Sport: running
+Total Timer Time: 1504
+Total Distance: 3964
+Total Calories: 720
+Avg Heart Rate: 134
+Max Heart Rate: 157
+Avg Speed: 2.78
+Max Speed: 3.5
+Total Ascent: 50
+Total Descent: 45
+
+[Records]
+# Sample record data (simplified)
+2024-01-01T00:00:00, 150, 2.7, 50
+2024-01-01T00:00:10, 151, 2.8000000000000003, 51
+2024-01-01T00:00:20, 152, 2.9000000000000004, 52
+2024-01-01T00:00:30, 153, 3.0, 53
+2024-01-01T00:00:40, 154, 3.1, 54
+2024-01-01T00:00:50, 155, 3.2, 55
+2024-01-01T00:01:00, 156, 3.3000000000000003, 56
+2024-01-01T00:01:10, 157, 3.4000000000000004, 57
+2024-01-01T00:01:20, 158, 3.5, 58
+2024-01-01T00:01:30, 159, 3.6, 59
