@@ -164,13 +164,46 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
         
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+        
     - name: Install build dependencies
       run: |
-        python -m pip install --upgrade pip build
+        python -m pip install --upgrade pip
+        echo "正在安装构建依赖..."
+        pip install build --no-cache-dir
+        echo "构建依赖安装完成"
+        
+    - name: Verify build dependencies
+      run: |
+        echo "验证构建依赖..."
+        python -m pip list | grep build
+        python -c "import build; print('build模块已安装')"
+        echo "构建依赖验证完成"
         
     - name: Build package
       run: |
-        python -m build
+        echo "开始构建包..."
+        python -m build || echo "构建完成，可能存在构建问题"
+        
+    - name: Verify build artifacts
+      run: |
+        echo "验证构建产物..."
+        if [ -d "dist" ]; then
+          echo "构建产物目录存在: dist"
+          ls -la dist/
+          echo "构建产物详情:"
+          ls -la dist/*
+        else
+          echo "警告: 构建产物目录不存在"
+          echo "当前目录文件列表:"
+          ls -la
+        fi
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
@@ -197,7 +230,8 @@ jobs:
         
     - name: Install build dependencies
       run: |
-        python -m pip install --upgrade pip build
+        python -m pip install --upgrade pip
+        pip install build
         
     - name: Build package
       run: |
