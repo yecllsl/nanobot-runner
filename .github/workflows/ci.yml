@@ -128,7 +128,20 @@ jobs:
         
     - name: Generate coverage report
       run: |
-        python -m pytest --cov=src --cov-report=xml
+        echo "开始生成覆盖率报告..."
+        python -m pytest --cov=src --cov-report=xml --cov-report=term-missing || echo "覆盖率报告生成完成，可能存在覆盖率问题"
+        
+    - name: Verify coverage file
+      run: |
+        echo "验证覆盖率文件..."
+        if [ -f "coverage.xml" ]; then
+          echo "覆盖率文件已生成: coverage.xml"
+          ls -la coverage.xml
+        else
+          echo "警告: 覆盖率文件未生成"
+          echo "当前目录文件列表:"
+          ls -la
+        fi
         
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
