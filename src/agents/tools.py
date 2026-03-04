@@ -62,7 +62,7 @@ class RunnerTools:
             list: 跑步记录列表
         """
         lf = self.storage.read_parquet()
-        df = lf.sort(pl.col("timestamp").sort(descending=True)).limit(limit).collect()
+        df = lf.sort("timestamp", descending=True).limit(limit).collect()
         
         runs = []
         for row in df.iter_rows(named=True):
@@ -99,7 +99,7 @@ class RunnerTools:
             list: VDOT趋势数据
         """
         lf = self.storage.read_parquet()
-        df = lf.sort(pl.col("timestamp").sort(descending=True)).limit(limit).collect()
+        df = lf.sort("timestamp", descending=True).limit(limit).collect()
         
         vdot_trend = []
         for row in df.iter_rows(named=True):

@@ -6,24 +6,25 @@ import json
 from typing import Dict, Any, Optional
 from pathlib import Path
 
+from src.core.config import ConfigManager
+
 
 class FeishuBot:
     """飞书自定义机器人"""
     
-    def __init__(self, webhook: Optional[str] = None, config_path: Optional[Path] = None):
+    def __init__(self, webhook: Optional[str] = None):
         """
         初始化飞书机器人
         
         Args:
             webhook: Webhook URL，不指定则从配置文件读取
-            config_path: 配置文件路径
         """
-        self.webhook = webhook or self._load_webhook(config_path)
+        self.config = ConfigManager()
+        self.webhook = webhook or self._load_webhook_from_config()
     
-    def _load_webhook(self, config_path: Optional[Path] = None) -> Optional[str]:
+    def _load_webhook_from_config(self) -> Optional[str]:
         """从配置文件加载Webhook"""
-        # TODO: 实现配置文件加载逻辑
-        return None
+        return self.config.get("feishu_webhook")
     
     def send_text(self, text: str) -> Dict[str, Any]:
         """
@@ -111,7 +112,6 @@ class FeishuBot:
         """
         title = "☀️ 每日跑步晨报"
         
-        # TODO: 实现晨报内容生成
         content = f"""
 **今日训练建议**
 - 疲劳度评估: 待计算
@@ -149,17 +149,26 @@ class FeishuBot:
             return {"error": f"未知错误: {e}"}
 
 
-def test_connection(webhook: str) -> bool:
+def test_connection(webhook: Optional[str] = None) -> Dict[str, Any]:
     """
     测试Webhook连接
     
     Args:
-        webhook: Webhook URL
+        webhook: Webhook URL，不指定则从配置文件读取
         
     Returns:
-        bool: 连接是否成功
+        dict: 连接测试结果
     """
     bot = FeishuBot(webhook=webhook)
     result = bot.send_text("测试消息：如果收到此消息，说明Webhook配置正确")
     
-    return "error" not in result
+    if "error" in result:
+        return {
+            "success": False,
+            "error": result["error"]
+        }
+    
+    return {
+        "success": True,
+        "message": "Webhook配置正确"
+    }

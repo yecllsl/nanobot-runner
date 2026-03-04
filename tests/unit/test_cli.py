@@ -106,3 +106,80 @@ class TestCLIApp:
         # 但no_args_is_help=True时，无参数会显示帮助并退出，exit_code为0
         # 实际上Typer会返回exit_code=2，因为typer.Exit(code=0)被转换为SystemExit
         assert "help" in result.output.lower()
+
+
+class TestCLIImportFile:
+    """测试CLI导入文件命令"""
+
+    def test_import_data_file_success(self):
+        """测试成功导入单个文件"""
+        with patch.object(Path, 'exists', return_value=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'suffix', '.fit'), \
+             patch.object(Path, 'stem', 'test_run'), \
+             patch.object(import_service, 'import_file') as mock_import:
+            result = runner.invoke(app, ["import-data", "test.fit"])
+            assert result.exit_code == 0
+            mock_import.assert_called_once()
+
+    def test_import_data_file_with_force_flag(self):
+        """测试带force标志的导入"""
+        with patch.object(Path, 'exists', return_value=True), \
+             patch.object(Path, 'is_file', return_value=True), \
+             patch.object(Path, 'suffix', '.fit'), \
+             patch.object(Path, 'stem', 'test_run'), \
+             patch.object(import_service, 'import_file') as mock_import:
+            result = runner.invoke(app, ["import-data", "test.fit", "--force"])
+            assert result.exit_code == 0
+            mock_import.assert_called_once()
+
+
+class TestCLIStats:
+    """测试CLI统计命令"""
+
+    def test_stats_with_multiple_years(self):
+        """测试stats命令（多年份数据）"""
+        with patch.object(storage_manager, 'get_stats', return_value={
+            "total_records": 100,
+            "time_range": {"start": "2023-01-01", "end": "2024-12-31"},
+            "years": [2023, 2024]
+        }):
+            result = runner.invoke(app, ["stats"])
+            assert result.exit_code == 0
+            assert "2023" in result.output
+            assert "2024" in result.output
+
+    def test_stats_with_time_range(self):
+        """测试stats命令（带时间范围）"""
+        with patch.object(storage_manager, 'get_stats', return_value={
+            "total_records": 50,
+            "time_range": {"start": "2024-06-01", "end": "2024-06-30"},
+            "years": [2024]
+        }):
+            result = runner.invoke(app, ["stats"])
+            assert result.exit_code == 0
+            assert "2024-06-01" in result.output
+            assert "2024-06-30" in result.output
+
+
+class TestCLIChat:
+    """测试CLI聊天命令"""
+
+    def test_chat_with_exit_command(self):
+        """测试chat命令退出"""
+        result = runner.invoke(app, ["chat"])
+        assert result.exit_code == 0
+        assert "请输入您的问题" in result.output
+        assert "输入 'exit' 退出" in result.output
+
+
+class TestCLIVersion:
+    """测试CLI版本命令"""
+
+    def test_version_format(self):
+        """测试版本输出格式"""
+        result = runner.invoke(app, ["version"])
+        assert result.exit_code == 0
+        assert "Nanobot Runner" in result.output
+        assert "v" in result.output
+        assert "0.1.0" in result.output
