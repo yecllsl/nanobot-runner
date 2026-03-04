@@ -21,12 +21,12 @@ test = [
     "pytest-mock>=3.0.0",
 ]
 dev = [
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-    "bandit>=1.7.0",
-    "safety>=2.0.0",
-    "pre-commit>=3.0.0",
+    "black>=23.0.0,<24.0.0",
+    "isort>=5.12.0,<6.0.0",
+    "mypy>=1.0.0,<2.0.0",
+    "bandit>=1.7.0,<2.0.0",
+    "safety>=2.0.0,<3.0.0",
+    "pre-commit>=3.0.0,<4.0.0",
 ]
 
 [project.scripts]
@@ -68,14 +68,27 @@ profile = "black"
 multi_line_output = 3
 line_length = 88
 known_first_party = ["src"]
+addopts = ["--trailing-comma", "--force-grid-wrap=0", "--use-parentheses", "--ensure-newline-before-comments"]
 
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
 
 [tool.bandit]
-skips = ["B101"]
+skips = ["B101", "B601"]
 targets = ["src"]
 recursive = true
+exclude_dirs = ["tests", "docs"]
+
+[tool.safety]
+output = "json"
+ignore = []
