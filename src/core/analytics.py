@@ -1,7 +1,7 @@
 # 分析引擎
 # 基于Polars实现核心数据分析算法
 
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import polars as pl
 
@@ -40,7 +40,9 @@ class AnalyticsEngine:
         vdot = (0.0001 * (distance_m**1.06) * 24.6) / (time_s**0.43)
         return round(vdot, 2)
 
-    def calculate_tss(self, heart_rate_data: pl.Series, duration_s: float, ftp: int = 200) -> float:
+    def calculate_tss(
+        self, heart_rate_data: pl.Series, duration_s: float, ftp: int = 200
+    ) -> float:
         """
         计算训练压力分数（TSS）
 
@@ -88,7 +90,9 @@ class AnalyticsEngine:
                 "total_runs": df.height,
                 "total_distance": round(df["distance"].sum() / 1000, 2),  # 转换为公里
                 "total_duration": round(df["duration"].sum() / 3600, 2),  # 转换为小时
-                "avg_heart_rate": round(df["heart_rate"].mean(), 1) if "heart_rate" in df.columns else 0,
+                "avg_heart_rate": round(df["heart_rate"].mean(), 1)
+                if "heart_rate" in df.columns
+                else 0,
                 "avg_pace": self._calculate_avg_pace(df),
             }
             return stats
@@ -108,7 +112,7 @@ class AnalyticsEngine:
         try:
             total_distance = df["distance"].sum() / 1000  # 转换为公里
             total_duration = df["duration"].sum() / 60  # 转换为分钟
-            
+
             if total_distance <= 0:
                 return "0:00"
 
@@ -142,12 +146,14 @@ class AnalyticsEngine:
             trend_data = []
             for row in recent_df.iter_rows(named=True):
                 vdot = self.calculate_vdot(row["distance"], row["duration"])
-                trend_data.append({
-                    "date": row["timestamp"].strftime("%Y-%m-%d"),
-                    "vdot": vdot,
-                    "distance": row["distance"],
-                    "duration": row["duration"],
-                })
+                trend_data.append(
+                    {
+                        "date": row["timestamp"].strftime("%Y-%m-%d"),
+                        "vdot": vdot,
+                        "distance": row["distance"],
+                        "duration": row["duration"],
+                    }
+                )
 
             return trend_data
         except Exception as e:

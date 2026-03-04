@@ -2,7 +2,7 @@
 # 管理跑步数据的Parquet文件读写
 
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import polars as pl
 
@@ -42,7 +42,7 @@ class StorageManager:
         """
         if dataframe.is_empty():
             raise ValueError("数据框不能为空")
-        
+
         if year < 2000 or year > 2100:
             raise ValueError("年份必须在2000-2100范围内")
 
@@ -169,7 +169,7 @@ class StorageManager:
         try:
             filename = f"activities_{year}.parquet"
             filepath = self.data_dir / filename
-            
+
             if filepath.exists():
                 filepath.unlink()
                 return True

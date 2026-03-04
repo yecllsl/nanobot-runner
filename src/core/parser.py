@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import fitparse
 import polars as pl
@@ -75,7 +75,9 @@ class FitParser:
         except Exception as e:
             raise RuntimeError(f"解析FIT文件失败: {e}") from e
 
-    def _add_session_metadata(self, df: pl.DataFrame, session_data: Dict[str, Any]) -> pl.DataFrame:
+    def _add_session_metadata(
+        self, df: pl.DataFrame, session_data: Dict[str, Any]
+    ) -> pl.DataFrame:
         """
         添加会话元数据到数据框
 
@@ -157,13 +159,13 @@ class FitParser:
 
             # 尝试解析文件
             df = self.parse_file(filepath)
-            
+
             if df is None:
                 return {"valid": False, "error": "文件解析失败"}
 
             # 检查数据质量
             validation_result = self._validate_data_quality(df)
-            
+
             return {
                 "valid": True,
                 "record_count": df.height,
@@ -201,19 +203,25 @@ class FitParser:
                     time_diffs = timestamps.diff().drop_nulls()
                     if time_diffs.len() > 0:
                         avg_gap = time_diffs.mean()
-                        time_gaps = time_diffs.filter(pl.col("timestamp") > avg_gap * 2).len()
+                        time_gaps = time_diffs.filter(
+                            pl.col("timestamp") > avg_gap * 2
+                        ).len()
 
             return {
                 "missing_required_columns": missing_columns,
                 "null_counts": null_counts,
                 "time_gaps": time_gaps,
                 "total_records": df.height,
-                "data_quality_score": self._calculate_quality_score(df, missing_columns, null_counts),
+                "data_quality_score": self._calculate_quality_score(
+                    df, missing_columns, null_counts
+                ),
             }
         except Exception as e:
             raise RuntimeError(f"数据质量验证失败: {e}") from e
 
-    def _calculate_quality_score(self, df: pl.DataFrame, missing_columns: list, null_counts: dict) -> float:
+    def _calculate_quality_score(
+        self, df: pl.DataFrame, missing_columns: list, null_counts: dict
+    ) -> float:
         """
         计算数据质量分数
 
