@@ -1,270 +1,154 @@
 # 分析引擎
 # 基于Polars实现核心数据分析算法
 
-import polars as pl
 from typing import Optional, Dict, Any, List
+
+import polars as pl
 
 
 class AnalyticsEngine:
     """数据分析引擎"""
-    
-    def __init__(self, storage_manager):
+
+    def __init__(self, storage_manager) -> None:
         """
         初始化分析引擎
-        
+
         Args:
             storage_manager: StorageManager实例
         """
         self.storage = storage_manager
-    
+
     def calculate_vdot(self, distance_m: float, time_s: float) -> float:
         """
         计算VDOT值（跑力值）
-        
+
         Args:
             distance_m: 距离（米）
             time_s: 用时（秒）
-            
+
         Returns:
             float: VDOT值
+
+        Raises:
+            ValueError: 当距离或时间为负数时
         """
+        if distance_m <= 0 or time_s <= 0:
+            raise ValueError("距离和时间必须为正数")
+
         # 使用Powers公式计算VDOT
         # VDOT = (0.0001 * distance^1.06 * 24.6) / time^0.43
-        if distance_m <= 0 or time_s <= 0:
-            return 0.0
-        
-        vdot = (0.0001 * (distance_m ** 1.06) * 24.6) / (time_s ** 0.43)
+        vdot = (0.0001 * (distance_m**1.06) * 24.6) / (time_s**0.43)
         return round(vdot, 2)
-    
-    def calculate_tss(self, heart_rate_data: pl.Series, duration_s: float, 
-                      ftp: int = 200) -> float:
+
+    def calculate_tss(self, heart_rate_data: pl.Series, duration_s: float, ftp: int = 200) -> float:
         """
         计算训练压力分数（TSS）
-        
+
         Args:
             heart_rate_data: 心率数据序列
             duration_s: 时长（秒）
             ftp: 功能阈值功率（默认200）
-            
+
         Returns:
             float: TSS值
+
+        Raises:
+            ValueError: 当输入参数无效时
         """
-        if len(heart_rate_data) == 0 or duration_s <= 0:
-            return 0.0
-        
-        # 计算平均心率
-        avg_hr = heart_rate_data.mean()
-        
-        # 假设最大心率为220 - 年龄（默认30岁）
-        max_hr = 190
-        rest_hr = 60
-        
-        # 计算强度因子（IF）
-        if avg_hr <= rest_hr:
-            return 0.0
-        
-        ift = (avg_hr - rest_hr) / (max_hr - rest_hr)
-        
-        # TSS = (duration * IF * IFT) / (3600 * 100) * 100
-        tss = (duration_s * 1.0 * ift) / 3600 * 100
-        
-        return round(tss, 2)
-    
-    def get_running_summary(self, start_date: Optional[str] = None, 
-                           end_date: Optional[str] = None) -> pl.DataFrame:
-        """
-        获取跑步摘要统计
-        
-        Args:
-            start_date: 开始日期
-            end_date: 结束日期
-            
-        Returns:
-            pl.DataFrame: 摘要数据
-        """
-        lf = self.storage.read_parquet()
-        
-        if start_date:
-            lf = lf.filter(pl.col("timestamp") >= start_date)
-        if end_date:
-            lf = lf.filter(pl.col("timestamp") <= end_date)
-        
-        df = lf.collect()
-        
-        if df.height == 0:
-            return df
-        
-        # 计算摘要统计
-        summary = df.select([
-            pl.count().alias("total_runs"),
-            pl.col("total_distance").sum().alias("total_distance"),
-            pl.col("total_timer_time").sum().alias("total_duration"),
-            pl.col("total_distance").mean().alias("avg_distance"),
-            pl.col("total_timer_time").mean().alias("avg_duration"),
-            pl.col("total_distance").max().alias("max_distance"),
-            pl.col("avg_heart_rate").mean().alias("avg_heart_rate")
-        ])
-        
-        return summary
-    
-    def analyze_hr_drift(self, heart_rate: List[float], pace: List[float]) -> Dict[str, Any]:
-        """
-        分析心率漂移
-        
-        Args:
-            heart_rate: 心率列表
-            pace: 配速列表
-            
-        Returns:
-            dict: 心率漂移分析结果
-        """
-        if len(heart_rate) < 10 or len(pace) < 10:
-            return {"error": "数据量不足"}
-        
-        hr_series = pl.Series(heart_rate)
-        pace_series = pl.Series(pace)
-        
-        # 计算相关性
-        # Polars 1.x 使用 corr_to 方法
+        if heart_rate_data.is_empty() or duration_s <= 0:
+            raise ValueError("心率数据不能为空且时长必须为正数")
+
         try:
-            correlation = hr_series.corr(pace_series)
-        except AttributeError:
-            # 如果 corr 方法不存在，使用 DataFrame 计算
-            df = pl.DataFrame({"hr": hr_series, "pace": pace_series})
-            correlation = df.select(pl.corr("hr", "pace")).item()
-        
-        # 检测心率漂移拐点（后半段心率上升）
-        mid_point = len(heart_rate) // 2
-        first_half_avg = sum(heart_rate[:mid_point]) / mid_point
-        second_half_avg = sum(heart_rate[mid_point:]) / (len(heart_rate) - mid_point)
-        
-        hr_drift = second_half_avg - first_half_avg
-        
-        return {
-            "correlation": round(correlation, 4),
-            "first_half_avg_hr": round(first_half_avg, 2),
-            "second_half_avg_hr": round(second_half_avg, 2),
-            "hr_drift": round(hr_drift, 2),
-            "has_drift": hr_drift > 5
-        }
-    
-    def calculate_atl_ctl(self, tss_data: List[float], window_size: int = 42) -> Dict[str, List[float]]:
+            # 计算平均心率
+            avg_hr = heart_rate_data.mean()
+            # TSS = (平均功率 / FTP) ^ 2 * 时长(小时) * 100
+            # 这里简化计算，使用心率近似
+            intensity_factor = avg_hr / 180  # 假设最大心率为180
+            tss = (intensity_factor**2) * (duration_s / 3600) * 100
+            return round(tss, 2)
+        except Exception as e:
+            raise ValueError(f"TSS计算失败: {e}") from e
+
+    def get_running_stats(self, year: Optional[int] = None) -> Dict[str, Any]:
         """
-        计算急性负荷（ATL）和慢性负荷（CTL）
-        
+        获取跑步统计数据
+
         Args:
-            tss_data: TSS数据列表
-            window_size: 窗口大小（默认42天）
-            
+            year: 年份，不指定则统计所有数据
+
         Returns:
-            dict: ATL和CTL序列
+            Dict[str, Any]: 统计信息字典
         """
-        if not tss_data:
-            return {"atl": [], "ctl": []}
-        
-        atl = []
-        ctl = []
-        
-        # ATL = 7天指数移动平均
-        # CTL = 42天指数移动平均
-        atl_alpha = 1 / 7
-        ctl_alpha = 1 / 42
-        
-        atl_value = tss_data[0]
-        ctl_value = tss_data[0]
-        
-        for tss in tss_data:
-            atl_value = atl_alpha * tss + (1 - atl_alpha) * atl_value
-            ctl_value = ctl_alpha * tss + (1 - ctl_alpha) * ctl_value
-            
-            atl.append(round(atl_value, 2))
-            ctl.append(round(ctl_value, 2))
-        
-        return {"atl": atl, "ctl": ctl}
-    
-    def calculate_atl(self, tss_values: List[float]) -> float:
+        try:
+            df = self.storage.read_activities(year)
+            if df.is_empty():
+                return {"total_runs": 0, "total_distance": 0.0, "total_duration": 0.0}
+
+            stats = {
+                "total_runs": df.height,
+                "total_distance": round(df["distance"].sum() / 1000, 2),  # 转换为公里
+                "total_duration": round(df["duration"].sum() / 3600, 2),  # 转换为小时
+                "avg_heart_rate": round(df["heart_rate"].mean(), 1) if "heart_rate" in df.columns else 0,
+                "avg_pace": self._calculate_avg_pace(df),
+            }
+            return stats
+        except Exception as e:
+            raise RuntimeError(f"获取统计数据失败: {e}") from e
+
+    def _calculate_avg_pace(self, df: pl.DataFrame) -> str:
         """
-        计算急性训练负荷（ATL，7天指数移动平均）
-        
+        计算平均配速
+
         Args:
-            tss_values: TSS值列表
-            
+            df: 跑步数据DataFrame
+
         Returns:
-            float: ATL值
+            str: 平均配速（分钟/公里）
         """
-        if not tss_values:
-            return 0.0
-        
-        atl_alpha = 1 / 7
-        atl_value = tss_values[0]
-        
-        for tss in tss_values:
-            atl_value = atl_alpha * tss + (1 - atl_alpha) * atl_value
-        
-        return round(atl_value, 2)
-    
-    def calculate_ctl(self, tss_values: List[float]) -> float:
+        try:
+            total_distance = df["distance"].sum() / 1000  # 转换为公里
+            total_duration = df["duration"].sum() / 60  # 转换为分钟
+            
+            if total_distance <= 0:
+                return "0:00"
+
+            avg_pace_min_km = total_duration / total_distance
+            minutes = int(avg_pace_min_km)
+            seconds = int((avg_pace_min_km - minutes) * 60)
+            return f"{minutes}:{seconds:02d}"
+        except Exception as e:
+            raise ValueError(f"配速计算失败: {e}") from e
+
+    def get_vdot_trend(self, days: int = 30) -> List[Dict[str, Any]]:
         """
-        计算慢性训练负荷（CTL，42天指数移动平均）
-        
+        获取VDOT趋势数据
+
         Args:
-            tss_values: TSS值列表
-            
+            days: 统计天数
+
         Returns:
-            float: CTL值
+            List[Dict[str, Any]]: VDOT趋势数据
         """
-        if not tss_values:
-            return 0.0
-        
-        ctl_alpha = 1 / 42
-        ctl_value = tss_values[0]
-        
-        for tss in tss_values:
-            ctl_value = ctl_alpha * tss + (1 - ctl_alpha) * ctl_value
-        
-        return round(ctl_value, 2)
-    
-    def get_vdot_trend(self, days: int = 7) -> Dict[str, Any]:
-        """
-        获取VDOT趋势变化
-        
-        Args:
-            days: 趋势分析天数
-            
-        Returns:
-            dict: VDOT趋势数据
-        """
-        lf = self.storage.read_parquet()
-        df = lf.collect()
-        
-        if df.height == 0:
-            return {"error": "无数据"}
-        
-        # 获取最近N天的VDOT值
-        recent_df = df.sort(pl.col("timestamp"), descending=True).head(days)
-        
-        vdot_values = []
-        for row in recent_df.iter_rows(named=True):
-            vdot = self.calculate_vdot(row.get("total_distance", 0), row.get("total_timer_time", 0))
-            vdot_values.append({
-                "timestamp": row.get("timestamp"),
-                "vdot": vdot,
-                "distance": row.get("total_distance", 0)
-            })
-        
-        if not vdot_values:
-            return {"error": "数据不足"}
-        
-        # 计算趋势
-        if len(vdot_values) >= 2:
-            first_vdot = vdot_values[0]["vdot"]
-            last_vdot = vdot_values[-1]["vdot"]
-            trend = "up" if last_vdot > first_vdot else ("down" if last_vdot < first_vdot else "stable")
-        else:
-            trend = "insufficient_data"
-        
-        return {
-            "trend": trend,
-            "period_days": len(vdot_values),
-            "data": vdot_values
-        }
+        try:
+            df = self.storage.read_activities()
+            if df.is_empty():
+                return []
+
+            # 过滤最近days天的数据
+            recent_df = df.filter(
+                pl.col("timestamp") >= (pl.max("timestamp") - pl.duration(days=days))
+            )
+
+            trend_data = []
+            for row in recent_df.iter_rows(named=True):
+                vdot = self.calculate_vdot(row["distance"], row["duration"])
+                trend_data.append({
+                    "date": row["timestamp"].strftime("%Y-%m-%d"),
+                    "vdot": vdot,
+                    "distance": row["distance"],
+                    "duration": row["duration"],
+                })
+
+            return trend_data
+        except Exception as e:
+            raise RuntimeError(f"获取VDOT趋势失败: {e}") from e
