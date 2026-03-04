@@ -18,6 +18,7 @@ dependencies = [
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-mock>=3.0.0",
 ]
 dev = [
     "black>=23.0.0",
@@ -30,10 +31,6 @@ dev = [
 
 [project.scripts]
 nanobotrun = "src.cli:app"
-
-[[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
 
 [build-system]
 requires = ["hatchling"]
@@ -80,6 +77,5 @@ disallow_untyped_defs = true
 
 [tool.bandit]
 skips = ["B101"]
-
 targets = ["src"]
 recursive = true
