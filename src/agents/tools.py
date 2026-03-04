@@ -103,8 +103,8 @@ class RunnerTools:
         
         vdot_trend = []
         for row in df.iter_rows(named=True):
-            distance = row.get("distance", 0)
-            duration = row.get("duration", 0)
+            distance = row.get("total_distance", 0)
+            duration = row.get("total_timer_time", 0)
             
             if distance > 0 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)

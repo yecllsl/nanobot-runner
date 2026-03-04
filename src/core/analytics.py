@@ -97,12 +97,12 @@ class AnalyticsEngine:
         # 计算摘要统计
         summary = df.select([
             pl.count().alias("total_runs"),
-            pl.col("distance").sum().alias("total_distance"),
-            pl.col("duration").sum().alias("total_duration"),
-            pl.col("distance").mean().alias("avg_distance"),
-            pl.col("duration").mean().alias("avg_duration"),
-            pl.col("distance").max().alias("max_distance"),
-            pl.col("heart_rate").mean().alias("avg_heart_rate")
+            pl.col("total_distance").sum().alias("total_distance"),
+            pl.col("total_timer_time").sum().alias("total_duration"),
+            pl.col("total_distance").mean().alias("avg_distance"),
+            pl.col("total_timer_time").mean().alias("avg_duration"),
+            pl.col("total_distance").max().alias("max_distance"),
+            pl.col("avg_heart_rate").mean().alias("avg_heart_rate")
         ])
         
         return summary
@@ -181,3 +181,90 @@ class AnalyticsEngine:
             ctl.append(round(ctl_value, 2))
         
         return {"atl": atl, "ctl": ctl}
+    
+    def calculate_atl(self, tss_values: List[float]) -> float:
+        """
+        计算急性训练负荷（ATL，7天指数移动平均）
+        
+        Args:
+            tss_values: TSS值列表
+            
+        Returns:
+            float: ATL值
+        """
+        if not tss_values:
+            return 0.0
+        
+        atl_alpha = 1 / 7
+        atl_value = tss_values[0]
+        
+        for tss in tss_values:
+            atl_value = atl_alpha * tss + (1 - atl_alpha) * atl_value
+        
+        return round(atl_value, 2)
+    
+    def calculate_ctl(self, tss_values: List[float]) -> float:
+        """
+        计算慢性训练负荷（CTL，42天指数移动平均）
+        
+        Args:
+            tss_values: TSS值列表
+            
+        Returns:
+            float: CTL值
+        """
+        if not tss_values:
+            return 0.0
+        
+        ctl_alpha = 1 / 42
+        ctl_value = tss_values[0]
+        
+        for tss in tss_values:
+            ctl_value = ctl_alpha * tss + (1 - ctl_alpha) * ctl_value
+        
+        return round(ctl_value, 2)
+    
+    def get_vdot_trend(self, days: int = 7) -> Dict[str, Any]:
+        """
+        获取VDOT趋势变化
+        
+        Args:
+            days: 趋势分析天数
+            
+        Returns:
+            dict: VDOT趋势数据
+        """
+        lf = self.storage.read_parquet()
+        df = lf.collect()
+        
+        if df.height == 0:
+            return {"error": "无数据"}
+        
+        # 获取最近N天的VDOT值
+        recent_df = df.sort(pl.col("timestamp"), descending=True).head(days)
+        
+        vdot_values = []
+        for row in recent_df.iter_rows(named=True):
+            vdot = self.calculate_vdot(row.get("total_distance", 0), row.get("total_timer_time", 0))
+            vdot_values.append({
+                "timestamp": row.get("timestamp"),
+                "vdot": vdot,
+                "distance": row.get("total_distance", 0)
+            })
+        
+        if not vdot_values:
+            return {"error": "数据不足"}
+        
+        # 计算趋势
+        if len(vdot_values) >= 2:
+            first_vdot = vdot_values[0]["vdot"]
+            last_vdot = vdot_values[-1]["vdot"]
+            trend = "up" if last_vdot > first_vdot else ("down" if last_vdot < first_vdot else "stable")
+        else:
+            trend = "insufficient_data"
+        
+        return {
+            "trend": trend,
+            "period_days": len(vdot_values),
+            "data": vdot_values
+        }

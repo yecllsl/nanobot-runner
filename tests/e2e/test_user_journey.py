@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import json
+import polars as pl
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -90,10 +91,10 @@ class TestUserJourney:
         with patch.object(self.import_service, 'scan_directory') as mock_scan:
             mock_scan.return_value = list(fit_dir.glob("*.fit"))
             
-            with patch.object(self.import_service, 'process_file') as mock_process:
+            with patch.object(self.import_service, 'import_file') as mock_import:
                 # 模拟处理结果
-                mock_process.return_value = {
-                    "status": "success",
+                mock_import.return_value = {
+                    "status": "added",
                     "filepath": str(fit_dir / "test.fit"),
                     "records_processed": 100,
                     "fingerprint": "mock_fingerprint_123"
@@ -101,8 +102,8 @@ class TestUserJourney:
                 
                 # 执行导入
                 result = self.import_service.import_directory(fit_dir)
-                assert result["total_files"] == 4
-                assert result["success_count"] == 4
+                assert result["total"] == 4
+                assert result["added"] == 4
                 print("✓ 数据导入测试通过")
         
         # 步骤2: 数据分析计算
@@ -115,7 +116,7 @@ class TestUserJourney:
         print(f"✓ VDOT计算测试通过: {vdot_result}")
         
         # 测试TSS计算
-        heart_rate_data = [140, 145, 150, 155, 160]  # 模拟心率数据
+        heart_rate_data = pl.Series([140, 145, 150, 155, 160])  # 模拟心率数据
         tss_result = self.analytics_engine.calculate_tss(
             heart_rate_data, duration_s=1800, ftp=200
         )
@@ -151,7 +152,7 @@ class TestUserJourney:
         # 测试import命令
         try:
             result = subprocess.run([
-                sys.executable, "-m", "src.cli", "import", 
+                sys.executable, "-m", "src.cli", "import-data", 
                 str(fit_dir), "--help"
             ], capture_output=True, text=True, timeout=10)
             assert result.returncode == 0
@@ -172,10 +173,10 @@ class TestUserJourney:
         print("测试1: 无效文件路径处理")
         invalid_path = self.test_data_dir / "nonexistent"
         
-        with patch('src.core.importer.console') as mock_console:
+        with patch.object(self.import_service, 'console') as mock_console:
             result = self.import_service.import_directory(invalid_path)
-            assert result["total_files"] == 0
-            assert result["success_count"] == 0
+            assert result["total"] == 0
+            assert result["added"] == 0
             print("✓ 无效路径处理测试通过")
         
         # 测试2: 损坏文件处理
@@ -183,10 +184,10 @@ class TestUserJourney:
         corrupt_file = self.test_data_dir / "corrupt.fit"
         corrupt_file.write_text("invalid fit data")
         
-        with patch.object(self.import_service.parser, 'parse') as mock_parse:
+        with patch.object(self.import_service.parser, 'parse_file') as mock_parse:
             mock_parse.side_effect = Exception("Invalid FIT file format")
             
-            with patch('src.core.importer.console') as mock_console:
+            with patch.object(self.import_service, 'console') as mock_console:
                 result = self.import_service.import_file(corrupt_file)
                 # 应该能够优雅处理异常
                 print("✓ 损坏文件处理测试通过")

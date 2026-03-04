@@ -14,6 +14,7 @@ import pytest
 import tempfile
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import polars as pl
@@ -60,14 +61,19 @@ class TestRealWorkflow:
         for i in range(7):
             activity = {
                 'activity_id': f'run_202401{i+1:02d}',
-                'timestamp': f'2024-01-{i+1:02d}T08:00:00',
+                'timestamp': datetime(2024, 1, i+1, 8, 0, 0),  # 使用datetime类型
+                'source_file': f'test_{i}.fit',
+                'filename': f'test_{i}.fit',
+                'serial_number': f'TEST{i:04d}',
+                'time_created': datetime(2024, 1, i+1, 8, 0, 0),  # 使用datetime类型
+                'total_distance': float(5000 + i * 1000),  # 5km到11km，转换为float
+                'total_timer_time': float(1800 + i * 300),  # 30min到48min，转换为float
+                'total_calories': int(300 + i * 50),      # 300cal到600cal，转换为int
+                'avg_heart_rate': int(140 + i * 5),      # 140bpm到170bpm，转换为int
+                'max_heart_rate': int(160 + i * 5),       # 160bpm到190bpm，转换为int
+                'record_count': int(100 + i * 20),         # 记录数
                 'sport': 'running',
-                'total_distance': 5000 + i * 1000,  # 5km到11km
-                'total_timer_time': 1800 + i * 300,  # 30min到48min
                 'total_elapsed_time': 1820 + i * 300,
-                'avg_heart_rate': 140 + i * 5,      # 140bpm到170bpm
-                'max_heart_rate': 160 + i * 5,       # 160bpm到190bpm
-                'total_calories': 300 + i * 50,      # 300cal到600cal
                 'avg_speed': 2.7 + i * 0.1,          # 2.7m/s到3.3m/s
                 'max_speed': 3.5 + i * 0.1,          # 3.5m/s到4.1m/s
                 'total_ascent': 50 + i * 10,         # 50m到110m
@@ -76,6 +82,7 @@ class TestRealWorkflow:
                 'max_cadence': 185 + i * 2,         # 185spm到197spm
                 'training_effect': 3.0 + i * 0.2,   # 3.0到4.2
                 'avg_temperature': 20 + i,         # 20°C到26°C
+                'year': 2024  # 添加年份字段
             }
             activities_data.append(activity)
         
@@ -195,7 +202,7 @@ class TestRealWorkflow:
         
         # 3. 数据分析
         summary = self.analytics_engine.get_running_summary()
-        assert summary["total_runs"] == len(self.real_activities_df)
+        assert summary["total_runs"].item() == len(self.real_activities_df)
         
         # 4. 性能验证
         elapsed_time = time.time() - start_time

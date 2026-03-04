@@ -108,8 +108,8 @@ class TestPerformanceE2E:
         print("\n=== 复杂查询性能测试 ===")
         
         # 模拟复杂查询场景
-        with patch.object(self.storage_manager, 'load_activities') as mock_load:
-            mock_load.return_value = self.large_df
+        with patch.object(self.storage_manager, 'query_activities') as mock_query:
+            mock_query.return_value = self.large_df
             
             start_time = time.time()
             
@@ -206,8 +206,8 @@ class TestPerformanceE2E:
             # 模拟不同类型的操作
             if i % 3 == 0:
                 # 查询操作
-                with patch.object(self.storage_manager, 'load_activities') as mock_load:
-                    mock_load.return_value = self.large_df.head(1000)
+                with patch.object(self.storage_manager, 'query_activities') as mock_query:
+                    mock_query.return_value = self.large_df.head(1000)
                     result = self.storage_manager.query_activities(days=7)
                     operations.append(result)
             
@@ -252,8 +252,8 @@ class TestPerformanceE2E:
         def query_operation(thread_id):
             """查询操作线程"""
             try:
-                with patch.object(self.storage_manager, 'load_activities') as mock_load:
-                    mock_load.return_value = self.large_df.head(2000)
+                with patch.object(self.storage_manager, 'query_activities') as mock_query:
+                    mock_query.return_value = self.large_df.head(2000)
                     result = self.storage_manager.query_activities(days=thread_id + 1)
                     results.append((thread_id, 'query', 'success'))
             except Exception as e:

@@ -28,9 +28,9 @@ class TestAnalyticsIntegration:
             test_data = pl.DataFrame({
                 "activity_id": ["test_001", "test_002"],
                 "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
-                "distance": [5000.0, 10000.0],
-                "duration": [1800, 3600],
-                "heart_rate": [140, 150]
+                "total_distance": [5000.0, 10000.0],
+                "total_timer_time": [1800, 3600],
+                "avg_heart_rate": [140, 150]
             })
             
             # 保存数据
@@ -56,8 +56,8 @@ class TestAnalyticsIntegration:
             test_data = pl.DataFrame({
                 "activity_id": ["test_001", "test_002"],
                 "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
-                "distance": [5000.0, 10000.0],
-                "duration": [1800, 3600]
+                "total_distance": [5000.0, 10000.0],
+                "total_timer_time": [1800, 3600]
             })
             
             storage.save_to_parquet(test_data, 2024)

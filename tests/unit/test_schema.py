@@ -29,6 +29,9 @@ class TestParquetSchema:
         assert "distance" in schema
         assert "duration" in schema
         assert "heart_rate" in schema
+        assert "total_distance" in schema
+        assert "total_timer_time" in schema
+        assert "avg_heart_rate" in schema
 
     def test_get_required_fields(self):
         """测试获取必填字段"""
@@ -38,8 +41,8 @@ class TestParquetSchema:
         assert "timestamp" in required
         assert "source_file" in required
         assert "filename" in required
-        assert "distance" in required
-        assert "duration" in required
+        assert "total_distance" in required
+        assert "total_timer_time" in required
 
     def test_get_default_values(self):
         """测试获取默认值"""
@@ -57,25 +60,24 @@ class TestParquetSchema:
             "source_file": ["test.fit"],
             "filename": ["test"],
             "serial_number": ["TEST1000"],
-            "distance": [5000.0],
-            "duration": [1800],
-            "heart_rate": [140],
+            "total_distance": [5000.0],
+            "total_timer_time": [1800],
+            "avg_heart_rate": [140],
             "cadence": [180],
-            "steps": [0],
             "record_count": [1]
         })
         
         # 先标准化再验证
         normalized_df = ParquetSchema.normalize_dataframe(df)
         result = ParquetSchema.validate_dataframe(normalized_df)
-        assert result is True
+        assert result["valid"] is True
 
     def test_validate_dataframe_type_mismatch(self):
         """测试验证DataFrame类型不匹配"""
-        df = pl.DataFrame({"activity_id": [123]})
+        df = pl.DataFrame({"activity_id": [123], "timestamp": ["2024-01-01"], "source_file": ["test.fit"], "filename": ["test"], "total_distance": [5000.0], "total_timer_time": [1800]})
         
         result = ParquetSchema.validate_dataframe(df)
-        assert result is False
+        assert result["valid"] is False
 
     def test_normalize_dataframe_add_missing_columns(self):
         """测试标准化DataFrame添加缺失列"""
@@ -92,8 +94,8 @@ class TestParquetSchema:
         df = pl.DataFrame({
             "activity_id": ["test_123"],
             "timestamp": ["2024-01-01"],
-            "distance": ["1000"],
-            "duration": ["3600"]
+            "total_distance": ["1000"],
+            "total_timer_time": ["3600"]
         })
         
         normalized = ParquetSchema.normalize_dataframe(df)
@@ -105,7 +107,7 @@ class TestParquetSchema:
         df = pl.DataFrame()
         
         result = ParquetSchema.validate_dataframe(df)
-        assert result is True
+        assert result["valid"] is False  # 空DataFrame缺少必填字段
 
     def test_validate_dataframe_partial_columns(self):
         """测试验证部分列的DataFrame"""
@@ -115,7 +117,7 @@ class TestParquetSchema:
         })
         
         result = ParquetSchema.validate_dataframe(df)
-        assert result is True
+        assert result["valid"] is False  # 缺少必填字段
 
 
 class TestCreateActivityId:

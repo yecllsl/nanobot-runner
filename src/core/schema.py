@@ -19,10 +19,10 @@ class ParquetSchema:
         "time_created": pl.Datetime,
         "total_distance": pl.Float64,
         "total_timer_time": pl.Float64,
-        "total_calories": pl.Int32,
-        "avg_heart_rate": pl.Int32,
-        "max_heart_rate": pl.Int32,
-        "record_count": pl.Int32
+        "total_calories": pl.Int64,
+        "avg_heart_rate": pl.Int64,
+        "max_heart_rate": pl.Int64,
+        "record_count": pl.Int64
     }
     
     # 秒级记录字段
@@ -52,8 +52,8 @@ class ParquetSchema:
         "timestamp",
         "source_file",
         "filename",
-        "distance",
-        "duration"
+        "total_distance",
+        "total_timer_time"
     }
     
     # 默认值映射
@@ -91,7 +91,7 @@ class ParquetSchema:
         return cls.DEFAULT_VALUES.copy()
     
     @classmethod
-    def validate_dataframe(cls, df: pl.DataFrame) -> bool:
+    def validate_dataframe(cls, df: pl.DataFrame) -> dict:
         """
         验证DataFrame是否符合Schema
         
@@ -99,17 +99,34 @@ class ParquetSchema:
             df: 待验证的DataFrame
             
         Returns:
-            bool: 是否符合Schema
+            dict: 验证结果字典，包含'valid'和'messages'键
         """
         schema = cls.get_schema()
+        messages = []
+        is_valid = True
         
-        for col_name, col_type in schema.items():
-            if col_name in df.columns:
-                if not isinstance(df.schema[col_name], col_type):
-                    print(f"字段 {col_name} 类型不匹配: 期望 {col_type}, 实际 {df.schema[col_name]}")
-                    return False
+        # 只检查必填字段
+        for col_name in cls.REQUIRED_FIELDS:
+            if col_name not in df.columns:
+                msg = f"缺少必填字段: {col_name}"
+                messages.append(msg)
+                print(msg)
+                is_valid = False
+            elif not isinstance(df.schema[col_name], schema[col_name]):
+                msg = f"字段 {col_name} 类型不匹配: 期望 {schema[col_name]}, 实际 {df.schema[col_name]}"
+                messages.append(msg)
+                print(msg)
+                is_valid = False
         
-        return True
+        # 检查是否有额外字段（可选）
+        extra_fields = [col for col in df.columns if col not in schema]
+        if extra_fields:
+            msg = f"存在未定义的字段: {', '.join(extra_fields)}"
+            messages.append(msg)
+            print(msg)
+            # 不将额外字段视为错误，只记录警告
+        
+        return {"valid": is_valid, "messages": messages}
     
     @classmethod
     def normalize_dataframe(cls, df: pl.DataFrame) -> pl.DataFrame:

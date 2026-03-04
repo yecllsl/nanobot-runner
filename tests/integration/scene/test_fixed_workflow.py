@@ -8,6 +8,7 @@ import pytest
 import tempfile
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import polars as pl
@@ -51,11 +52,11 @@ class TestFixedWorkflow:
         for i in range(5):
             activity = {
                 'activity_id': f'run_202401{i+1:02d}',
-                'timestamp': pl.datetime(2024, 1, i+1, 8, 0, 0),  # 使用pl.datetime
+                'timestamp': datetime(2024, 1, i+1, 8, 0, 0),  # 使用标准datetime
                 'source_file': f'test_{i}.fit',
                 'filename': f'test_{i}.fit',
                 'serial_number': f'TEST{i:04d}',
-                'time_created': pl.datetime(2024, 1, i+1, 8, 0, 0),
+                'time_created': datetime(2024, 1, i+1, 8, 0, 0),  # 使用标准datetime
                 'total_distance': 5000.0 + i * 1000,
                 'total_timer_time': 1800.0 + i * 300,
                 'total_calories': 300 + i * 50,
@@ -202,11 +203,11 @@ class TestFixedWorkflow:
         for i in range(50):  # 减少数据量避免性能问题
             activity = {
                 'activity_id': f'run_{i:06d}',
-                'timestamp': pl.datetime(2024, 1, (i % 30) + 1, 8, 0, 0),
+                'timestamp': datetime(2024, 1, (i % 30) + 1, 8, 0, 0),  # 使用标准datetime
                 'source_file': f'test_{i}.fit',
                 'filename': f'test_{i}.fit',
                 'serial_number': f'TEST{i:04d}',
-                'time_created': pl.datetime(2024, 1, (i % 30) + 1, 8, 0, 0),
+                'time_created': datetime(2024, 1, (i % 30) + 1, 8, 0, 0),  # 使用标准datetime
                 'total_distance': 5000.0 + (i % 5000),
                 'total_timer_time': 1800.0 + (i % 1200),
                 'total_calories': 300 + (i % 200),

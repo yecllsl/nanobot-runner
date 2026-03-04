@@ -107,9 +107,9 @@ class TestAnalyticsEngine:
         engine = AnalyticsEngine(mock_storage)
         
         mock_df = pl.DataFrame({
-            "distance": [5000.0, 10000.0],
-            "duration": [1800, 3600],
-            "heart_rate": [140, 150]
+            "total_distance": [5000.0, 10000.0],
+            "total_timer_time": [1800, 3600],
+            "avg_heart_rate": [140, 150]
         })
         
         mock_lf = Mock()
@@ -143,9 +143,9 @@ class TestAnalyticsEngine:
         engine = AnalyticsEngine(mock_storage)
         
         mock_df = pl.DataFrame({
-            "distance": [5000.0],
-            "duration": [1800],
-            "heart_rate": [140]
+            "total_distance": [5000.0],
+            "total_timer_time": [1800],
+            "avg_heart_rate": [140]
         })
         
         mock_lf = Mock()
@@ -306,9 +306,9 @@ class TestAnalyticsEngineAdvanced:
         engine = AnalyticsEngine(mock_storage)
         
         mock_df = pl.DataFrame({
-            "distance": [5000.0],
-            "duration": [1800],
-            "heart_rate": [140]
+            "total_distance": [5000.0],
+            "total_timer_time": [1800],
+            "avg_heart_rate": [140]
         })
         
         mock_lf = Mock()
