@@ -140,6 +140,39 @@ class FitParser:
         except Exception as e:
             raise RuntimeError(f"解析目录失败: {e}") from e
 
+    def parse_file_metadata(self, filepath: Path) -> Dict[str, Any]:
+        """
+        解析FIT文件的元数据（仅解析file_id消息，不解析完整记录）
+
+        Args:
+            filepath: FIT文件路径
+
+        Returns:
+            Dict[str, Any]: 元数据字典
+        """
+        try:
+            if not filepath.exists():
+                raise FileNotFoundError(f"文件不存在: {filepath}")
+
+            if filepath.suffix.lower() != ".fit":
+                raise ValueError(f"文件格式无效，必须是.fit文件: {filepath}")
+
+            fit_file = fitparse.FitFile(str(filepath))
+
+            metadata: Dict[str, Any] = {
+                "filename": filepath.stem,
+                "filepath": str(filepath),
+            }
+
+            for msg in fit_file.get_messages("file_id"):
+                for data in msg:
+                    metadata[data.name] = data.value
+
+            return metadata
+
+        except Exception as e:
+            raise RuntimeError(f"解析FIT文件元数据失败: {e}") from e
+
     def validate_fit_file(self, filepath: Path) -> Dict[str, Any]:
         """
         验证FIT文件的有效性
@@ -157,21 +190,15 @@ class FitParser:
             if filepath.suffix.lower() != ".fit":
                 return {"valid": False, "error": "文件格式无效"}
 
-            # 尝试解析文件
-            df = self.parse_file(filepath)
-
-            if df is None:
-                return {"valid": False, "error": "文件解析失败"}
-
-            # 检查数据质量
-            validation_result = self._validate_data_quality(df)
-
-            return {
-                "valid": True,
-                "record_count": df.height,
-                "columns": df.columns,
-                "data_quality": validation_result,
-            }
+            try:
+                fit_file = fitparse.FitFile(str(filepath))
+                file_id_data = {}
+                for msg in fit_file.get_messages("file_id"):
+                    for data in msg:
+                        file_id_data[data.name] = data.value
+                return {"valid": True, "file_id": file_id_data}
+            except Exception as e:
+                return {"valid": False, "error": str(e)}
         except Exception as e:
             return {"valid": False, "error": str(e)}
 

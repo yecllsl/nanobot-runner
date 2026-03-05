@@ -157,6 +157,102 @@ class RunnerTools:
         # TODO: 实现基于TSS的训练负荷计算
         return {"message": "训练负荷计算功能待实现", "note": "需要先计算每条记录的TSS值"}
 
+    def query_by_date_range(
+        self,
+        start_date: str,
+        end_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        按日期范围查询跑步记录
+
+        Args:
+            start_date: 开始日期（格式：YYYY-MM-DD）
+            end_date: 结束日期（格式：YYYY-MM-DD）
+
+        Returns:
+            list: 跑步记录列表
+        """
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            return [{"error": "日期格式错误，应为 YYYY-MM-DD"}]
+
+        lf = self.storage.read_parquet()
+
+        filtered_lf = lf.filter(
+            pl.col("timestamp").is_between(start_dt, end_dt)
+        )
+
+        selected_lf = filtered_lf.select([
+            "timestamp",
+            "total_distance",
+            "total_timer_time",
+            "avg_heart_rate",
+            "avg_pace",
+        ])
+
+        df = selected_lf.sort("timestamp", descending=True).collect()
+
+        results = []
+        for row in df.iter_rows(named=True):
+            results.append({
+                "timestamp": str(row.get("timestamp", "N/A")),
+                "distance": round(row.get("total_distance", 0) / 1000, 2),
+                "duration": row.get("total_timer_time", 0),
+                "heart_rate": row.get("avg_heart_rate", "N/A"),
+                "pace": row.get("avg_pace", "N/A"),
+            })
+
+        return results
+
+    def query_by_distance(
+        self,
+        min_distance: float,
+        max_distance: Optional[float] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        按距离范围查询跑步记录
+
+        Args:
+            min_distance: 最小距离（公里）
+            max_distance: 最大距离（公里），None 表示无上限
+
+        Returns:
+            list: 跑步记录列表
+        """
+        min_meters = min_distance * 1000
+        max_meters = max_distance * 1000 if max_distance else None
+
+        lf = self.storage.read_parquet()
+
+        if max_meters:
+            distance_filter = pl.col("total_distance").is_between(min_meters, max_meters)
+        else:
+            distance_filter = pl.col("total_distance") >= min_meters
+
+        filtered_lf = lf.filter(distance_filter).select([
+            "timestamp",
+            "total_distance",
+            "total_timer_time",
+            "avg_heart_rate",
+            "avg_pace",
+        ])
+
+        df = filtered_lf.sort("timestamp", descending=True).collect()
+
+        results = []
+        for row in df.iter_rows(named=True):
+            results.append({
+                "timestamp": str(row.get("timestamp", "N/A")),
+                "distance": round(row.get("total_distance", 0) / 1000, 2),
+                "duration": row.get("total_timer_time", 0),
+                "heart_rate": row.get("avg_heart_rate", "N/A"),
+                "pace": row.get("avg_pace", "N/A"),
+            })
+
+        return results
+
 
 # 工具描述（供Agent使用）
 TOOL_DESCRIPTIONS = {
@@ -186,5 +282,19 @@ TOOL_DESCRIPTIONS = {
     "get_training_load": {
         "description": "获取训练负荷（ATL/CTL）",
         "parameters": {"days": "分析天数（默认42天）"},
+    },
+    "query_by_date_range": {
+        "description": "按日期范围查询跑步记录",
+        "parameters": {
+            "start_date": "开始日期（格式：YYYY-MM-DD）",
+            "end_date": "结束日期（格式：YYYY-MM-DD）",
+        },
+    },
+    "query_by_distance": {
+        "description": "按距离范围查询跑步记录",
+        "parameters": {
+            "min_distance": "最小距离（公里）",
+            "max_distance": "最大距离（公里，可选）",
+        },
     },
 }

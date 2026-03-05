@@ -50,7 +50,6 @@ class StorageManager:
             filename = f"activities_{year}.parquet"
             filepath = self.data_dir / filename
 
-            # 如果文件已存在，追加写入
             if filepath.exists():
                 existing_df = pl.read_parquet(filepath)
                 combined_df = pl.concat([existing_df, dataframe])
@@ -61,6 +60,41 @@ class StorageManager:
             return True
         except Exception as e:
             raise RuntimeError(f"保存Parquet文件失败: {e}") from e
+
+    def read_parquet(self, years: Optional[List[int]] = None) -> pl.LazyFrame:
+        """
+        使用LazyFrame读取Parquet数据（优化查询性能）
+
+        Args:
+            years: 要读取的年份列表，None表示读取所有年份
+
+        Returns:
+            pl.LazyFrame: 延迟加载的DataFrame
+
+        Raises:
+            FileNotFoundError: 当数据文件不存在时
+        """
+        try:
+            if years:
+                parquet_files = []
+                for year in years:
+                    filename = f"activities_{year}.parquet"
+                    filepath = self.data_dir / filename
+                    if filepath.exists():
+                        parquet_files.append(filepath)
+
+                if not parquet_files:
+                    return pl.LazyFrame()
+
+                return pl.concat([pl.scan_parquet(f) for f in parquet_files])
+            else:
+                parquet_files = list(self.data_dir.glob("activities_*.parquet"))
+                if not parquet_files:
+                    return pl.LazyFrame()
+
+                return pl.concat([pl.scan_parquet(f) for f in parquet_files])
+        except Exception as e:
+            raise RuntimeError(f"读取Parquet数据失败: {e}") from e
 
     def read_activities(self, year: Optional[int] = None) -> pl.DataFrame:
         """
@@ -177,3 +211,71 @@ class StorageManager:
                 return False
         except Exception as e:
             raise RuntimeError(f"删除年份数据失败: {e}") from e
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        获取存储统计信息
+
+        Returns:
+            dict: 统计信息
+        """
+        try:
+            years = self.get_available_years()
+            total_records = 0
+            
+            for year in years:
+                df = self.read_activities(year)
+                total_records += df.height
+
+            time_range = {}
+            if years:
+                df = self.read_activities()
+                if not df.is_empty():
+                    timestamps = df["timestamp"]
+                    time_range = {
+                        "start": str(timestamps.min()),
+                        "end": str(timestamps.max())
+                    }
+
+            return {
+                "total_records": total_records,
+                "years": years,
+                "time_range": time_range
+            }
+        except Exception as e:
+            return {"total_records": 0, "years": [], "time_range": {}, "error": str(e)}
+
+    def query_activities(self, years: Optional[List[int]] = None, 
+                        days: Optional[int] = None,
+                        min_distance: Optional[float] = None,
+                        min_heart_rate: Optional[int] = None) -> pl.DataFrame:
+        """
+        查询跑步活动数据（支持过滤）
+
+        Args:
+            years: 要查询的年份列表，None表示查询所有年份
+            days: 查询最近N天的数据，优先级高于years
+            min_distance: 最小距离过滤（米）
+            min_heart_rate: 最小心率过滤
+
+        Returns:
+            pl.DataFrame: 查询结果
+        """
+        lf = self.read_parquet(years)
+
+        if days is not None:
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            start_str = start_date.strftime("%Y-%m-%d")
+            end_str = end_date.strftime("%Y-%m-%d")
+
+            lf = lf.filter(pl.col("timestamp") >= start_str).filter(pl.col("timestamp") <= end_str)
+
+        if min_distance is not None:
+            lf = lf.filter(pl.col("total_distance") >= min_distance)
+
+        if min_heart_rate is not None:
+            lf = lf.filter(pl.col("avg_heart_rate") >= min_heart_rate)
+
+        return lf.collect()
