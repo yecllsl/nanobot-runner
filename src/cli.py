@@ -40,22 +40,24 @@ def import_data(
 
     try:
         config = ConfigManager()
-        storage = StorageManager(config)
-        indexer = IndexManager(config)
+        storage = StorageManager(config.data_dir)
+        indexer = IndexManager(config.index_file)
         parser = FitParser()
         importer = ImportService(parser, storage, indexer)
 
         if path_obj.is_file():
             console.print(f"[cyan]正在导入文件: {path}[/cyan]")
             result = importer.import_file(path_obj, force=force)
-            if result:
+            if result.get("status") == "added":
                 console.print(f"[green]✓ 导入成功[/green]")
-            else:
+            elif result.get("status") == "skipped":
                 console.print(f"[yellow]文件已存在，跳过导入[/yellow]")
+            else:
+                console.print(f"[red]导入失败: {result.get('message', '未知错误')}[/red]")
         elif path_obj.is_dir():
             console.print(f"[cyan]正在导入目录: {path}[/cyan]")
-            count = importer.import_directory(path_obj, force=force)
-            console.print(f"[green]✓ 导入完成，共 {count} 个文件[/green]")
+            stats = importer.import_directory(path_obj, force=force)
+            console.print(f"[green]✓ 导入完成，共 {stats['added']} 个文件新增[/green]")
 
     except Exception as e:
         console.print(f"[red]导入失败: {str(e)}[/red]")
@@ -73,7 +75,7 @@ def stats(
     """
     try:
         config = ConfigManager()
-        storage = StorageManager(config)
+        storage = StorageManager(config.data_dir)
 
         if year:
             years = [year]
