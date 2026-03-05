@@ -569,3 +569,120 @@ class TestFitParserAdvanced:
                 assert "test-run_" in result["filename"]
             finally:
                 os.unlink(temp_path)
+
+    def test_parse_directory_success(self):
+        """测试成功解析目录"""
+        import tempfile
+        import os
+        
+        parser = FitParser()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            mock_record = MockFitMessage(
+                "record",
+                [
+                    MockFitData("timestamp", "2024-01-01"),
+                    MockFitData("distance", 5000.0),
+                    MockFitData("duration", 1800),
+                    MockFitData("heart_rate", 140),
+                ],
+            )
+
+            mock_session = MockFitMessage(
+                "session",
+                [
+                    MockFitData("total_distance", 5000.0),
+                    MockFitData("total_elapsed_time", 1800),
+                ],
+            )
+
+            mock_fit_file = Mock()
+            mock_fit_file.get_messages.side_effect = lambda msg_type: {
+                "record": [mock_record],
+                "session": [mock_session],
+            }.get(msg_type, [])
+
+            with patch("fitparse.FitFile", return_value=mock_fit_file):
+                fit_file1 = tmp_path / "test1.fit"
+                fit_file1.touch()
+
+                try:
+                    result = parser.parse_directory(tmp_path)
+                    assert result is not None
+                finally:
+                    fit_file1.unlink()
+
+    def test_parse_directory_empty(self):
+        """测试空目录解析"""
+        import tempfile
+        
+        parser = FitParser()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            result = parser.parse_directory(tmp_path)
+            assert result is not None
+            assert result.height == 0
+
+    def test_parse_directory_not_exists(self):
+        """测试不存在的目录"""
+        parser = FitParser()
+
+        with pytest.raises(FileNotFoundError):
+            parser.parse_directory(Path("/nonexistent/directory"))
+
+    def test_parse_directory_not_a_directory(self):
+        """测试非目录路径"""
+        parser = FitParser()
+
+        with tempfile.NamedTemporaryFile() as tmp:
+            with pytest.raises(ValueError):
+                parser.parse_directory(Path(tmp.name))
+
+    def test_validate_fit_file(self):
+        """测试验证FIT文件"""
+        parser = FitParser()
+
+        mock_file_id = MockFitMessage(
+            "file_id",
+            [
+                MockFitData("serial_number", "TEST123"),
+                MockFitData("time_created", "2024-01-01"),
+            ],
+        )
+
+        mock_fit_file = Mock()
+        mock_fit_file.get_messages.side_effect = lambda msg_type: {
+            "file_id": [mock_file_id]
+        }.get(msg_type, [])
+
+        with patch("fitparse.FitFile", return_value=mock_fit_file):
+            with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
+                temp_path = Path(f.name)
+
+            try:
+                result = parser.validate_fit_file(temp_path)
+
+                assert "valid" in result
+                assert "file_id" in result
+            finally:
+                os.unlink(temp_path)
+
+    def test_validate_fit_file_corrupted(self):
+        """测试验证损坏的FIT文件"""
+        parser = FitParser()
+
+        with patch("fitparse.FitFile", side_effect=Exception("File corrupted")):
+            with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
+                temp_path = Path(f.name)
+
+            try:
+                result = parser.validate_fit_file(temp_path)
+
+                assert result["valid"] is False
+                assert "error" in result
+            finally:
+                os.unlink(temp_path)

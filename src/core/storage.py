@@ -267,10 +267,8 @@ class StorageManager:
             from datetime import datetime, timedelta
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
-            start_str = start_date.strftime("%Y-%m-%d")
-            end_str = end_date.strftime("%Y-%m-%d")
 
-            lf = lf.filter(pl.col("timestamp") >= start_str).filter(pl.col("timestamp") <= end_str)
+            lf = lf.filter(pl.col("timestamp") >= start_date).filter(pl.col("timestamp") <= end_date)
 
         if min_distance is not None:
             lf = lf.filter(pl.col("total_distance") >= min_distance)
