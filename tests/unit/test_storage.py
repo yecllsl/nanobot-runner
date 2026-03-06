@@ -45,6 +45,60 @@ class TestStorageManager:
             result = manager.save_to_parquet(test_data, 2024)
             assert result is True
 
+    def test_save_activities_alias(self):
+        """测试 save_activities 方法（save_to_parquet 的别名）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = StorageManager(data_dir=Path(tmpdir))
+
+            test_data = pl.DataFrame(
+                {
+                    "activity_id": ["test_001"],
+                    "timestamp": [datetime(2024, 1, 1)],
+                    "total_distance": [5000.0],
+                    "total_timer_time": [1800],
+                    "avg_heart_rate": [140],
+                }
+            )
+
+            result = manager.save_activities(test_data, 2024)
+            assert result is True
+
+    def test_save_to_parquet_empty_with_allow_empty_true(self):
+        """测试允许保存空数据框（allow_empty=True）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = StorageManager(data_dir=Path(tmpdir))
+
+            empty_data = pl.DataFrame(
+                {
+                    "activity_id": [],
+                    "timestamp": [],
+                    "total_distance": [],
+                    "total_timer_time": [],
+                    "avg_heart_rate": [],
+                }
+            )
+
+            result = manager.save_to_parquet(empty_data, 2024, allow_empty=True)
+            assert result is True
+
+    def test_save_to_parquet_empty_with_allow_empty_false(self):
+        """测试拒绝保存空数据框（allow_empty=False，默认）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = StorageManager(data_dir=Path(tmpdir))
+
+            empty_data = pl.DataFrame(
+                {
+                    "activity_id": [],
+                    "timestamp": [],
+                    "total_distance": [],
+                    "total_timer_time": [],
+                    "avg_heart_rate": [],
+                }
+            )
+
+            with pytest.raises(ValueError, match="数据框不能为空"):
+                manager.save_to_parquet(empty_data, 2024)
+
     def test_get_data_summary(self):
         """测试获取数据摘要"""
         with tempfile.TemporaryDirectory() as tmpdir:

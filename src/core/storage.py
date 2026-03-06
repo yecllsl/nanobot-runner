@@ -26,21 +26,24 @@ class StorageManager:
         except OSError as e:
             raise OSError(f"无法创建数据目录 {self.data_dir}: {e}") from e
 
-    def save_to_parquet(self, dataframe: pl.DataFrame, year: int) -> bool:
+    def save_to_parquet(self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False) -> bool:
         """
         保存数据到Parquet文件（按年份分片）
 
         Args:
             dataframe: Polars DataFrame数据
             year: 年份
+            allow_empty: 是否允许保存空数据框，默认False
 
         Returns:
             bool: 保存是否成功
 
         Raises:
-            ValueError: 当数据框为空或年份无效时
+            ValueError: 当数据框为空（且allow_empty=False）或年份无效时
         """
         if dataframe.is_empty():
+            if allow_empty:
+                return True
             raise ValueError("数据框不能为空")
 
         if year < 2000 or year > 2100:
@@ -60,6 +63,19 @@ class StorageManager:
             return True
         except Exception as e:
             raise RuntimeError(f"保存Parquet文件失败: {e}") from e
+
+    def save_activities(self, dataframe: pl.DataFrame, year: int) -> bool:
+        """
+        保存活动数据到Parquet文件（save_to_parquet的别名）
+
+        Args:
+            dataframe: Polars DataFrame数据
+            year: 年份
+
+        Returns:
+            bool: 保存是否成功
+        """
+        return self.save_to_parquet(dataframe, year)
 
     def read_parquet(self, years: Optional[List[int]] = None) -> pl.LazyFrame:
         """

@@ -21,6 +21,7 @@ import tempfile
 import shutil
 import subprocess
 import psutil
+import random
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -335,7 +336,7 @@ class AgentTestHelper:
     
     def handle_ambiguous_intent(self, query: str) -> str:
         """处理意图不明"""
-        return "意图不明: 请提供更具体的问题"
+        return "意图不明: 请提供更具体的问题，我会尽力为您提供帮助"
     
     def handle_beyond_capability(self, query: str) -> str:
         """处理超出能力范围"""
