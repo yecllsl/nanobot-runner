@@ -154,8 +154,7 @@ class RunnerTools:
         Returns:
             dict: 训练负荷数据
         """
-        # TODO: 实现基于TSS的训练负荷计算
-        return {"message": "训练负荷计算功能待实现", "note": "需要先计算每条记录的TSS值"}
+        return self.analytics.get_training_load(days)
 
     def query_by_date_range(
         self,
@@ -189,19 +188,23 @@ class RunnerTools:
             "total_distance",
             "total_timer_time",
             "avg_heart_rate",
-            "avg_pace",
         ])
 
         df = selected_lf.sort("timestamp", descending=True).collect()
 
         results = []
         for row in df.iter_rows(named=True):
+            # 计算配速（分钟/公里）
+            distance_km = row.get("total_distance", 0) / 1000
+            duration_minutes = row.get("total_timer_time", 0) / 60
+            pace = duration_minutes / distance_km if distance_km > 0 else 0
+            
             results.append({
                 "timestamp": str(row.get("timestamp", "N/A")),
-                "distance": round(row.get("total_distance", 0) / 1000, 2),
+                "distance": round(distance_km, 2),
                 "duration": row.get("total_timer_time", 0),
                 "heart_rate": row.get("avg_heart_rate", "N/A"),
-                "pace": row.get("avg_pace", "N/A"),
+                "pace": round(pace, 2),
             })
 
         return results
@@ -236,19 +239,23 @@ class RunnerTools:
             "total_distance",
             "total_timer_time",
             "avg_heart_rate",
-            "avg_pace",
         ])
 
         df = filtered_lf.sort("timestamp", descending=True).collect()
 
         results = []
         for row in df.iter_rows(named=True):
+            # 计算配速（分钟/公里）
+            distance_km = row.get("total_distance", 0) / 1000
+            duration_minutes = row.get("total_timer_time", 0) / 60
+            pace = duration_minutes / distance_km if distance_km > 0 else 0
+            
             results.append({
                 "timestamp": str(row.get("timestamp", "N/A")),
-                "distance": round(row.get("total_distance", 0) / 1000, 2),
+                "distance": round(distance_km, 2),
                 "duration": row.get("total_timer_time", 0),
                 "heart_rate": row.get("avg_heart_rate", "N/A"),
-                "pace": row.get("avg_pace", "N/A"),
+                "pace": round(pace, 2),
             })
 
         return results

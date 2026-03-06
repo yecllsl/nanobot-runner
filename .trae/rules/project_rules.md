@@ -1,26 +1,38 @@
 ---
 alwaysApply: false
-description: 开发Rust+ Python，PyO3统一实现绑定项目时使用此规则
+description: 业务规则、审查维度、输出格式规范。与 AGENTS.md（AI操作说明）配合使用。
 ---
-## 1. 项目架构
-分层设计：Rust（crates/，高性能核心）+ Python（python/，上层接口），PyO3（crates/pyo3/src/lib.rs）统一实现绑定。核心目录：src/（Rust模块）、python/（Python代码）、tests/（分rust/python测试）、docs/：（维护文档）；
-scripts/：（辅助脚本）、pyproject.toml（maturin配置）。
+# Project Rules - Nanobot Runner
 
-## 2. 开发环境
-Rust：rustup（≥1.70），启用rustfmt/clippy；Python：≥3.12，虚拟环境，安装maturin≥1.0、匹配版本的PyO3；依赖版本分别锁定在Cargo.toml、pyproject.toml。
+## 业务规则
 
-## 3. 代码规范
-Rust：遵循rustfmt/clippy，PyO3绑定函数用snake_case，错误封装为PyErr；Python：PEP8+类型注解，禁止直调Rust底层；通用：核心逻辑写文档字符串。
+**计算**: VDOT(Powers公式,距离>=1500m) | TSS(时长×IF²×100) | 心率漂移(相关性<-0.7) | ATL/CTL(指数加权)
 
-## 4. 构建流程
-开发：`maturin develop`；发布：`maturin build --release`；验证跨平台（Linux/macOS/Windows）构建。
+**存储**: Parquet按年分片 | SHA256去重 | 必填: activity_id, timestamp, source_file, filename, total_distance, total_timer_time
 
-## 5. 测试与调试
-测试：Rust用cargo test，Python用pytest，集成测试验证跨语言数据传递；调试：Rust用rust-gdb，Python用pdb，PyO3调试模式`maturin develop --debug`；性能：减少跨语言调用，Rust避免内存拷贝。
+## 审查维度
 
-## 6. 版本控制
-分支：main（稳定）、dev（开发），功能分支`feature/xxx`；提交：语义化（feat/fix/docs: 描述）；版本：语义化版本，同步Cargo/pyproject.toml版本。
+**必检**: 功能正确性 | 边界处理(None vs异常) | Polars LazyFrame | 类型注解 | 单元测试
 
-## 7. 发布流程
-测试通过，更新CHANGELOG；2. 打tag（vX.Y.Z），`maturin publish`；3. 验证wheel安装。
+**命名**: 类PascalCase, 函数snake_case, 常量UPPER_SNAKE_CASE
 
+**CI**: black→isort→mypy→bandit→pytest
+
+## 输出格式
+**CLI**: 时长HH:MM:SS | 配速M'SS"/km | 📊统计 ✅成功 ❌错误
+
+**Agent**: JSON含success/data/message或error/details
+
+## 技术约束
+**Windows**: 禁用&&/||, 用`cmd1; if($?) {cmd2}` | 禁用ls/cat/grep, 用dir/type/findstr
+
+**Polars**: 读取用scan_parquet(LazyFrame) | 写入用compression="snappy"
+
+## 禁止项
+❌硬编码敏感信息 | ❌print调试(用logger) | ❌修改已存储Parquet | ❌测试未通过合并
+
+## 覆盖率
+core≥80% | agents≥70% | cli≥60%
+
+## Commit格式
+`<type>(<scope>): <subject>` (feat/fix/docs/refactor/test/chore)

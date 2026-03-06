@@ -295,3 +295,86 @@ class AnalyticsEngine:
             return trend_data
         except Exception as e:
             raise RuntimeError(f"获取VDOT趋势失败: {e}") from e
+
+    def calculate_tss_for_run(
+        self,
+        distance_m: float,
+        duration_s: float,
+        avg_heart_rate: float,
+        age: int = 30
+    ) -> float:
+        """
+        计算单次跑步的 TSS 值
+
+        Args:
+            distance_m: 距离（米）
+            duration_s: 时长（秒）
+            avg_heart_rate: 平均心率
+            age: 年龄（用于估算最大心率）
+
+        Returns:
+            float: TSS 值
+        """
+        if distance_m <= 0 or duration_s <= 0:
+            return 0.0
+
+        max_hr = 220 - age
+        rest_hr = 60
+
+        if avg_heart_rate <= rest_hr:
+            return 0.0
+
+        intensity_factor = (avg_heart_rate - rest_hr) / (max_hr - rest_hr)
+        intensity_factor = min(intensity_factor, 1.5)
+
+        tss = (duration_s * intensity_factor) / 3600 * 100
+
+        return round(tss, 2)
+
+    def get_training_load(self, days: int = 42) -> Dict[str, Any]:
+        """
+        获取训练负荷（ATL/CTL）
+
+        Args:
+            days: 分析天数
+
+        Returns:
+            dict: 训练负荷数据
+        """
+        from datetime import datetime, timedelta
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        lf = self.storage.read_parquet()
+
+        df = lf.filter(
+            pl.col("timestamp").is_between(start_date, end_date)
+        ).collect()
+
+        if df.is_empty():
+            return {"message": "暂无跑步数据", "atl": 0.0, "ctl": 0.0, "tsb": 0.0}
+
+        tss_values = []
+        for row in df.iter_rows(named=True):
+            tss = self.calculate_tss_for_run(
+                distance_m=row.get("total_distance", 0),
+                duration_s=row.get("total_timer_time", 0),
+                avg_heart_rate=row.get("avg_heart_rate", 0)
+            )
+            tss_values.append(tss)
+
+        if not tss_values:
+            return {"message": "数据不足", "atl": 0.0, "ctl": 0.0, "tsb": 0.0}
+
+        atl = self.calculate_atl(tss_values)
+        ctl = self.calculate_ctl(tss_values)
+        tsb = ctl - atl
+
+        return {
+            "atl": atl,
+            "ctl": ctl,
+            "tsb": round(tsb, 2),
+            "days_analyzed": days,
+            "runs_count": len(tss_values),
+        }

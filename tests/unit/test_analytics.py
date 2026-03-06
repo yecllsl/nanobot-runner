@@ -547,3 +547,129 @@ class TestAnalyticsEngineAdvanced:
         result = engine.get_running_stats(year=2024)
 
         assert result["total_runs"] == 0
+
+
+class TestTrainingLoad:
+    """测试训练负荷功能"""
+
+    def test_calculate_tss_for_run_normal(self):
+        """测试正常TSS计算"""
+        engine = AnalyticsEngine(Mock())
+
+        tss = engine.calculate_tss_for_run(
+            distance_m=5000,
+            duration_s=1800,
+            avg_heart_rate=140,
+            age=30
+        )
+
+        assert tss > 0
+
+    def test_calculate_tss_for_run_zero_distance(self):
+        """测试零距离TSS计算"""
+        engine = AnalyticsEngine(Mock())
+
+        tss = engine.calculate_tss_for_run(
+            distance_m=0,
+            duration_s=1800,
+            avg_heart_rate=140,
+            age=30
+        )
+
+        assert tss == 0.0
+
+    def test_calculate_tss_for_run_zero_time(self):
+        """测试零时间TSS计算"""
+        engine = AnalyticsEngine(Mock())
+
+        tss = engine.calculate_tss_for_run(
+            distance_m=5000,
+            duration_s=0,
+            avg_heart_rate=140,
+            age=30
+        )
+
+        assert tss == 0.0
+
+    def test_calculate_tss_for_run_low_heart_rate(self):
+        """测试低心率TSS计算"""
+        engine = AnalyticsEngine(Mock())
+
+        tss = engine.calculate_tss_for_run(
+            distance_m=5000,
+            duration_s=1800,
+            avg_heart_rate=50,
+            age=30
+        )
+
+        assert tss == 0.0
+
+    def test_calculate_tss_for_run_different_age(self):
+        """测试不同年龄的TSS计算"""
+        engine = AnalyticsEngine(Mock())
+
+        tss_young = engine.calculate_tss_for_run(
+            distance_m=5000,
+            duration_s=1800,
+            avg_heart_rate=140,
+            age=25
+        )
+
+        tss_old = engine.calculate_tss_for_run(
+            distance_m=5000,
+            duration_s=1800,
+            avg_heart_rate=140,
+            age=50
+        )
+
+        assert tss_young > 0
+        assert tss_old > 0
+
+    def test_get_training_load_empty_data(self):
+        """测试空数据的训练负荷"""
+        mock_storage = Mock()
+        mock_lf = Mock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = Mock()
+        mock_df.is_empty.return_value = True
+        mock_lf.filter.return_value.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=30)
+
+        assert "message" in result
+        assert "atl" in result
+        assert result["atl"] == 0.0
+
+    def test_get_training_load_with_data(self):
+        """测试有数据的训练负荷"""
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame({
+            "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+            "total_distance": [5000.0, 6000.0],
+            "total_timer_time": [1800, 2100],
+            "avg_heart_rate": [140, 145],
+        })
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(return_value=[
+            {"timestamp": datetime(2024, 1, 1), "total_distance": 5000.0, "total_timer_time": 1800, "avg_heart_rate": 140},
+            {"timestamp": datetime(2024, 1, 2), "total_distance": 6000.0, "total_timer_time": 2100, "avg_heart_rate": 145},
+        ])
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=7)
+
+        assert "atl" in result
+        assert "ctl" in result
+        assert "tsb" in result
+        assert "runs_count" in result
