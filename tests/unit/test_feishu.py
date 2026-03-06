@@ -249,3 +249,62 @@ class TestFeishuBotAdvanced:
             result = bot.send_import_notification(stats)
 
             assert "error" not in result
+
+    def test_send_daily_report(self):
+        """测试发送每日晨报"""
+        webhook = "https://example.com/webhook"
+        bot = FeishuBot(webhook=webhook)
+
+        report_data = {
+            "weekly_distance": 25.5,
+            "weekly_duration": 3.5
+        }
+
+        with patch("requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"code": 0, "msg": "success"}
+            mock_post.return_value = mock_response
+
+            result = bot.send_daily_report(report_data)
+
+            assert "error" not in result
+
+    def test_send_daily_report_empty_data(self):
+        """测试发送空数据每日晨报"""
+        webhook = "https://example.com/webhook"
+        bot = FeishuBot(webhook=webhook)
+
+        report_data = {}
+
+        with patch("requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"code": 0, "msg": "success"}
+            mock_post.return_value = mock_response
+
+            result = bot.send_daily_report(report_data)
+
+            assert "error" not in result
+
+    def test_send_request_timeout(self):
+        """测试请求超时异常"""
+        import requests
+        webhook = "https://example.com/webhook"
+        bot = FeishuBot(webhook=webhook)
+
+        with patch("requests.post", side_effect=requests.exceptions.Timeout("Connection timed out")):
+            result = bot.send_text("测试消息")
+
+            assert "error" in result
+            assert "Connection timed out" in result["error"]
+
+    def test_send_request_connection_error(self):
+        """测试连接错误异常"""
+        import requests
+        webhook = "https://example.com/webhook"
+        bot = FeishuBot(webhook=webhook)
+
+        with patch("requests.post", side_effect=requests.exceptions.ConnectionError("Connection refused")):
+            result = bot.send_text("测试消息")
+
+            assert "error" in result
+            assert "Connection refused" in result["error"]

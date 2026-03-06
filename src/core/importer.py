@@ -16,12 +16,12 @@ from src.core.storage import StorageManager
 class ImportService:
     """数据导入服务"""
 
-    def __init__(self):
+    def __init__(self, parser=None, storage=None, indexer=None):
         """初始化导入服务"""
         self.console = Console()
-        self.parser = FitParser()
-        self.indexer = IndexManager()
-        self.storage = StorageManager()
+        self.parser = parser or FitParser()
+        self.indexer = indexer or IndexManager()
+        self.storage = storage or StorageManager()
 
     def scan_directory(self, directory: Path) -> List[Path]:
         """
@@ -97,12 +97,13 @@ class ImportService:
         progress.update(task_id, advance=1)
         return result
 
-    def import_file(self, filepath: Path) -> Dict[str, Any]:
+    def import_file(self, filepath: Path, force: bool = False) -> Dict[str, Any]:
         """
         导入单个文件
 
         Args:
             filepath: FIT文件路径
+            force: 强制导入，跳过去重检查
 
         Returns:
             dict: 导入结果
@@ -116,7 +117,7 @@ class ImportService:
 
         fingerprint = self.indexer.generate_fingerprint(metadata)
 
-        if self.indexer.exists(fingerprint):
+        if not force and self.indexer.exists(fingerprint):
             self.console.print(f"[yellow]跳过: 文件已存在 ({filepath.name})[/yellow]")
             return {"status": "skipped", "message": "文件已存在"}
 
@@ -138,12 +139,13 @@ class ImportService:
             self.console.print("[red]错误: 保存失败[/red]")
             return {"status": "error", "message": "保存失败"}
 
-    def import_directory(self, directory: Path) -> Dict[str, Any]:
+    def import_directory(self, directory: Path, force: bool = False) -> Dict[str, Any]:
         """
         批量导入目录
 
         Args:
             directory: 目录路径
+            force: 强制导入，跳过去重检查
 
         Returns:
             dict: 导入统计
@@ -164,7 +166,7 @@ class ImportService:
             task = progress.add_task("正在导入...", total=len(fit_files))
 
             for filepath in fit_files:
-                result = self.import_file(filepath)
+                result = self.import_file(filepath, force=force)
 
                 if result["status"] == "added":
                     added += 1
