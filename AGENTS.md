@@ -4,11 +4,11 @@ This file provides guidance to Agents when working with code in this repository.
 
 ## 项目概述
 
-Nanobot Runner 是一款基于 nanobot-ai 底座的本地化 AI 跑步助理。核心目标是解决数据隐私与深度分析的矛盾，通过 Parquet 列式存储与 Polars 高性能计算引擎，为技术型跑者提供企业级 BI 能力。
+Nanobot Runner 是一款基于 nanobot-ai 底座的桌面端私人 AI 跑步助理。核心目标是解决数据隐私与深度分析的矛盾，通过 Parquet 列式存储与 Polars 高性能计算引擎，为技术型跑者提供企业级 BI 能力。
 
 **核心技术栈**: Python 3.11+, nanobot-ai, Typer + Rich (CLI), Polars (计算引擎), Apache Parquet (存储), fitparse (FIT解析)
 
-**当前版本**: 0.1.0
+**当前版本**: 0.2.0
 
 ## 常用命令
 
@@ -87,6 +87,9 @@ uv run pytest tests/integration/
 
 # 运行端到端测试
 uv run pytest tests/e2e/
+
+# 运行性能测试
+uv run pytest tests/performance/
 ```
 
 ### 代码质量工具
@@ -130,7 +133,8 @@ src/
 │   ├── importer.py    # 数据导入服务编排 (ImportService)
 │   ├── analytics.py   # 数据分析引擎 (AnalyticsEngine)
 │   ├── config.py      # 配置管理 (ConfigManager)
-│   └── schema.py      # Parquet Schema定义 (ParquetSchema)
+│   ├── schema.py      # Parquet Schema定义 (ParquetSchema)
+│   └── decorators.py  # 通用装饰器（错误处理、存储初始化等）
 ├── agents/
 │   └── tools.py       # Agent工具集 (RunnerTools) - 封装为nanobot-ai可识别的工具
 ├── notify/
@@ -142,16 +146,34 @@ tests/
 ├── unit/              # 单元测试
 │   ├── test_analytics.py
 │   ├── test_cli.py
+│   ├── test_cli_formatter.py
 │   ├── test_config.py
+│   ├── test_decorators.py
 │   ├── test_feishu.py
 │   ├── test_importer.py
 │   ├── test_indexer.py
 │   ├── test_parser.py
 │   ├── test_schema.py
 │   ├── test_storage.py
-│   └── test_tools.py
+│   ├── test_tools.py
+│   └── test_tools_extended.py
 ├── integration/       # 集成测试
+│   ├── module/        # 模块级集成测试
+│   │   ├── test_analytics_flow.py
+│   │   └── test_import_flow.py
+│   └── scene/         # 场景级集成测试
+│       ├── test_comprehensive_workflow.py
+│       ├── test_fixed_workflow.py
+│       └── test_real_workflow.py
 ├── e2e/               # 端到端测试
+│   ├── v0_2_0/        # v0.2.0 版本 E2E 测试
+│   │   ├── test_agent_e2e_main.py
+│   │   ├── generate_test_data.py
+│   │   └── run_e2e_tests.py
+│   ├── test_performance.py
+│   └── test_user_journey.py
+├── performance/       # 性能测试
+│   └── test_query_performance.py
 ├── scripts/           # 测试脚本
 ├── cases/             # 测试用例文档
 ├── reports/           # 测试报告
@@ -185,6 +207,7 @@ docs/                  # 项目文档
 - `ConfigManager` 管理全局配置和数据目录
 - `FeishuBot` 负责消息推送到飞书
 - `ParquetSchema` 定义统一的数据结构规范
+- `decorators` 提供错误处理、存储初始化、空数据处理等通用装饰器
 - `cli_formatter` 为 CLI 和 Agent 交互提供统一的格式化输出
 
 ### 数据存储
@@ -263,6 +286,15 @@ docs/                  # 项目文档
 - `format_runs_table()`: 跑步记录表格
 - `format_vdot_trend()`: VDOT趋势表格
 - `format_agent_response()`: Agent响应格式化
+
+### 装饰器模块
+
+`decorators.py` 提供通用装饰器功能：
+
+- `handle_tool_errors`: 工具函数错误处理装饰器，统一捕获 FileNotFoundError、ValueError、KeyError 等异常
+- `require_storage`: 确保 StorageManager 已初始化的装饰器
+- `handle_empty_data`: 处理空数据的装饰器
+- `validate_date_format`: 日期格式验证函数
 
 ## 开发注意事项
 
