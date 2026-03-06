@@ -46,7 +46,7 @@ class TestStorageManager:
             assert result is True
 
     def test_save_activities_alias(self):
-        """测试 save_activities 方法（save_to_parquet 的别名）"""
+        """测试 save_activities 方法"""
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))
 
@@ -61,7 +61,50 @@ class TestStorageManager:
             )
 
             result = manager.save_activities(test_data, 2024)
-            assert result is True
+            assert result["success"] is True
+            assert result["records_saved"] == 1
+            assert result["year"] == 2024
+
+    def test_save_activities_auto_year(self):
+        """测试 save_activities 自动推断年份"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = StorageManager(data_dir=Path(tmpdir))
+
+            test_data = pl.DataFrame(
+                {
+                    "activity_id": ["test_001"],
+                    "timestamp": [datetime(2024, 6, 15)],
+                    "total_distance": [5000.0],
+                    "total_timer_time": [1800],
+                    "avg_heart_rate": [140],
+                }
+            )
+
+            result = manager.save_activities(test_data)  # 不指定年份
+            assert result["success"] is True
+            assert result["year"] == 2024  # 自动从timestamp推断
+
+    def test_load_activities_alias(self):
+        """测试 load_activities 方法（read_activities 的别名）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = StorageManager(data_dir=Path(tmpdir))
+
+            test_data = pl.DataFrame(
+                {
+                    "activity_id": ["test_001"],
+                    "timestamp": [datetime(2024, 1, 1)],
+                    "total_distance": [5000.0],
+                    "total_timer_time": [1800],
+                    "avg_heart_rate": [140],
+                }
+            )
+
+            manager.save_to_parquet(test_data, 2024)
+
+            # 测试 load_activities 别名
+            loaded_df = manager.load_activities(2024)
+            assert len(loaded_df) == 1
+            assert loaded_df["activity_id"][0] == "test_001"
 
     def test_save_to_parquet_empty_with_allow_empty_true(self):
         """测试允许保存空数据框（allow_empty=True）"""

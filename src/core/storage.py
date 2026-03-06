@@ -26,6 +26,34 @@ class StorageManager:
         except OSError as e:
             raise OSError(f"无法创建数据目录 {self.data_dir}: {e}") from e
 
+    def _convert_to_parquet_compatible(self, df: pl.DataFrame) -> pl.DataFrame:
+        """
+        将DataFrame转换为Parquet兼容的格式
+
+        Args:
+            df: 原始DataFrame
+
+        Returns:
+            pl.DataFrame: 转换后的DataFrame
+        """
+        if df.is_empty():
+            return df
+
+        # 定义类型转换映射
+        type_conversions = {
+            pl.Object: pl.String,
+        }
+
+        # 转换Object类型为String类型
+        for col_name in df.columns:
+            col_type = df.schema[col_name]
+            if isinstance(col_type, pl.Object):
+                df = df.with_columns(
+                    pl.col(col_name).cast(pl.String).alias(col_name)
+                )
+
+        return df
+
     def save_to_parquet(self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False) -> bool:
         """
         保存数据到Parquet文件（按年份分片）
@@ -50,11 +78,16 @@ class StorageManager:
             raise ValueError("年份必须在2000-2100范围内")
 
         try:
+            # 转换数据类型以兼容Parquet
+            dataframe = self._convert_to_parquet_compatible(dataframe)
+
             filename = f"activities_{year}.parquet"
             filepath = self.data_dir / filename
 
             if filepath.exists():
                 existing_df = pl.read_parquet(filepath)
+                # 同样转换现有数据
+                existing_df = self._convert_to_parquet_compatible(existing_df)
                 combined_df = pl.concat([existing_df, dataframe])
                 combined_df.write_parquet(filepath, compression="snappy")
             else:
@@ -64,18 +97,55 @@ class StorageManager:
         except Exception as e:
             raise RuntimeError(f"保存Parquet文件失败: {e}") from e
 
-    def save_activities(self, dataframe: pl.DataFrame, year: int) -> bool:
+    def save_activities(self, dataframe: pl.DataFrame, year: int = None) -> dict:
         """
-        保存活动数据到Parquet文件（save_to_parquet的别名）
+        保存活动数据到Parquet文件
 
         Args:
             dataframe: Polars DataFrame数据
-            year: 年份
+            year: 年份，默认为None（自动从数据中推断）
 
         Returns:
-            bool: 保存是否成功
+            dict: 保存结果，包含success和records_saved字段
         """
-        return self.save_to_parquet(dataframe, year)
+        try:
+            # 自动推断年份
+            if year is None:
+                if not dataframe.is_empty() and "timestamp" in dataframe.columns:
+                    # 从第一行数据的时间戳推断年份
+                    first_timestamp = dataframe["timestamp"][0]
+                    if hasattr(first_timestamp, 'year'):
+                        year = first_timestamp.year
+                    else:
+                        year = datetime.now().year
+                else:
+                    year = datetime.now().year
+
+            success = self.save_to_parquet(dataframe, year)
+            return {
+                "success": success,
+                "records_saved": len(dataframe) if not dataframe.is_empty() else 0,
+                "year": year
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "records_saved": 0,
+                "error": str(e),
+                "year": year if year else datetime.now().year
+            }
+
+    def load_activities(self, year: Optional[int] = None) -> pl.DataFrame:
+        """
+        加载活动数据（read_activities的别名）
+
+        Args:
+            year: 年份，不指定则加载所有年份数据
+
+        Returns:
+            pl.DataFrame: 活动数据
+        """
+        return self.read_activities(year)
 
     def read_parquet(self, years: Optional[List[int]] = None) -> pl.LazyFrame:
         """

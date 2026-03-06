@@ -50,6 +50,10 @@ def run_command(cmd: str, cwd: Optional[Path] = None, timeout: int = 30) -> Tupl
         (stdout, stderr, returncode)
     """
     try:
+        # 设置环境变量确保UTF-8编码
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+
         result = subprocess.run(
             cmd,
             shell=True,
@@ -57,7 +61,9 @@ def run_command(cmd: str, cwd: Optional[Path] = None, timeout: int = 30) -> Tupl
             capture_output=True,
             text=True,
             timeout=timeout,
-            encoding='utf-8'
+            encoding='utf-8',
+            errors='replace',  # 遇到编码错误时替换而不是抛出异常
+            env=env
         )
         return result.stdout, result.stderr, result.returncode
     except subprocess.TimeoutExpired:
