@@ -1,6 +1,8 @@
 # Agent工具集
 # 封装为nanobot-ai可识别的工具
 
+import json
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -10,32 +12,350 @@ from src.core.analytics import AnalyticsEngine
 from src.core.storage import StorageManager
 
 
+class BaseTool(ABC):
+    """工具基类（适配nanobot-ai 0.1.4+）"""
+
+    def __init__(self, runner_tools: "RunnerTools"):
+        self.runner_tools = runner_tools
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """工具名称"""
+        pass
+
+    @property
+    @abstractmethod
+    def description(self) -> str:
+        """工具描述"""
+        pass
+
+    @property
+    @abstractmethod
+    def parameters(self) -> dict[str, Any]:
+        """参数schema"""
+        pass
+
+    @abstractmethod
+    async def execute(self, **kwargs: Any) -> str:
+        """执行工具"""
+        pass
+
+    def to_schema(self) -> dict[str, Any]:
+        """转换为OpenAI function schema格式"""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.parameters,
+            }
+        }
+
+    def validate_params(self, params: dict[str, Any]) -> list[str]:
+        """验证工具参数"""
+        schema = self.parameters or {}
+        if schema.get("type", "object") != "object":
+            return [f"Schema must be object type, got {schema.get('type')!r}"]
+
+        errors = []
+        required = schema.get("required", [])
+        properties = schema.get("properties", {})
+
+        for field in required:
+            if field not in params:
+                errors.append(f"missing required field: {field}")
+
+        for field, value in params.items():
+            if field in properties:
+                prop_schema = properties[field]
+                prop_type = prop_schema.get("type")
+                if prop_type == "integer" and not isinstance(value, int):
+                    errors.append(f"{field} must be integer")
+                elif prop_type == "number" and not isinstance(value, (int, float)):
+                    errors.append(f"{field} must be number")
+                elif prop_type == "string" and not isinstance(value, str):
+                    errors.append(f"{field} must be string")
+
+        return errors
+
+    def _run_sync(self, func, *args, **kwargs) -> str:
+        """同步调用方法并返回JSON字符串"""
+        try:
+            result = func(*args, **kwargs)
+            return json.dumps(result, ensure_ascii=False, default=str)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+class GetRunningStatsTool(BaseTool):
+    """获取跑步统计数据"""
+
+    @property
+    def name(self) -> str:
+        return "get_running_stats"
+
+    @property
+    def description(self) -> str:
+        return "获取跑步统计数据，包括总次数、总距离、总时长、平均距离、平均时长、最大距离、平均心率等"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "开始日期（可选，格式：YYYY-MM-DD）"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "结束日期（可选，格式：YYYY-MM-DD）"
+                }
+            }
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        start_date = kwargs.get("start_date")
+        end_date = kwargs.get("end_date")
+        return self._run_sync(
+            self.runner_tools.get_running_stats, start_date, end_date
+        )
+
+
+class GetRecentRunsTool(BaseTool):
+    """获取最近跑步记录"""
+
+    @property
+    def name(self) -> str:
+        return "get_recent_runs"
+
+    @property
+    def description(self) -> str:
+        return "获取最近的跑步记录列表"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "返回数量限制（默认10条）",
+                    "default": 10
+                }
+            }
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        limit = kwargs.get("limit", 10)
+        return self._run_sync(self.runner_tools.get_recent_runs, limit)
+
+
+class CalculateVdotForRunTool(BaseTool):
+    """计算单次跑步的VDOT值"""
+
+    @property
+    def name(self) -> str:
+        return "calculate_vdot_for_run"
+
+    @property
+    def description(self) -> str:
+        return "计算单次跑步的VDOT值（跑力值），用于评估跑步能力"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "distance_m": {
+                    "type": "number",
+                    "description": "距离（米）"
+                },
+                "time_s": {
+                    "type": "number",
+                    "description": "用时（秒）"
+                }
+            },
+            "required": ["distance_m", "time_s"]
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        distance_m = kwargs.get("distance_m", 0)
+        time_s = kwargs.get("time_s", 0)
+        return self._run_sync(
+            self.runner_tools.calculate_vdot_for_run, distance_m, time_s
+        )
+
+
+class GetVdotTrendTool(BaseTool):
+    """获取VDOT趋势"""
+
+    @property
+    def name(self) -> str:
+        return "get_vdot_trend"
+
+    @property
+    def description(self) -> str:
+        return "获取VDOT趋势变化，了解跑步能力的变化趋势"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "返回数量限制（默认20条）",
+                    "default": 20
+                }
+            }
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        limit = kwargs.get("limit", 20)
+        return self._run_sync(self.runner_tools.get_vdot_trend, limit)
+
+
+class GetHrDriftAnalysisTool(BaseTool):
+    """分析心率漂移"""
+
+    @property
+    def name(self) -> str:
+        return "get_hr_drift_analysis"
+
+    @property
+    def description(self) -> str:
+        return "分析心率漂移情况，评估跑步效率和有氧基础"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "run_id": {
+                    "type": "string",
+                    "description": "活动ID（可选）"
+                }
+            }
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        run_id = kwargs.get("run_id")
+        return self._run_sync(self.runner_tools.get_hr_drift_analysis, run_id)
+
+
+class GetTrainingLoadTool(BaseTool):
+    """获取训练负荷"""
+
+    @property
+    def name(self) -> str:
+        return "get_training_load"
+
+    @property
+    def description(self) -> str:
+        return "获取训练负荷数据，包括ATL（急性负荷）、CTL（慢性负荷）、TSB（训练压力平衡）"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": "分析天数（默认42天）",
+                    "default": 42
+                }
+            }
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        days = kwargs.get("days", 42)
+        return self._run_sync(self.runner_tools.get_training_load, days)
+
+
+class QueryByDateRangeTool(BaseTool):
+    """按日期范围查询"""
+
+    @property
+    def name(self) -> str:
+        return "query_by_date_range"
+
+    @property
+    def description(self) -> str:
+        return "按日期范围查询跑步记录"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "开始日期（格式：YYYY-MM-DD）"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "结束日期（格式：YYYY-MM-DD）"
+                }
+            },
+            "required": ["start_date", "end_date"]
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        start_date = kwargs.get("start_date", "")
+        end_date = kwargs.get("end_date", "")
+        return self._run_sync(
+            self.runner_tools.query_by_date_range, start_date, end_date
+        )
+
+
+class QueryByDistanceTool(BaseTool):
+    """按距离范围查询"""
+
+    @property
+    def name(self) -> str:
+        return "query_by_distance"
+
+    @property
+    def description(self) -> str:
+        return "按距离范围查询跑步记录"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "min_distance": {
+                    "type": "number",
+                    "description": "最小距离（公里）"
+                },
+                "max_distance": {
+                    "type": "number",
+                    "description": "最大距离（公里，可选）"
+                }
+            },
+            "required": ["min_distance"]
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        min_distance = kwargs.get("min_distance", 0)
+        max_distance = kwargs.get("max_distance")
+        return self._run_sync(
+            self.runner_tools.query_by_distance, min_distance, max_distance
+        )
+
+
 class RunnerTools:
-    """跑步助理工具集"""
+    """跑步助理工具集（业务逻辑层）"""
 
     def __init__(self, storage: Optional[StorageManager] = None):
-        """
-        初始化工具集
-
-        Args:
-            storage: StorageManager实例
-        """
         self.storage = storage or StorageManager()
         self.analytics = AnalyticsEngine(self.storage)
 
     def get_running_stats(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        获取跑步统计数据
-
-        Args:
-            start_date: 开始日期（可选）
-            end_date: 结束日期（可选）
-
-        Returns:
-            dict: 统计数据
-        """
         summary = self.analytics.get_running_summary(start_date, end_date)
 
         if summary.height == 0:
@@ -54,54 +374,32 @@ class RunnerTools:
         }
 
     def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        获取最近跑步记录
-
-        Args:
-            limit: 返回数量限制
-
-        Returns:
-            list: 跑步记录列表
-        """
         lf = self.storage.read_parquet()
         df = lf.sort("timestamp", descending=True).limit(limit).collect()
 
         runs = []
         for row in df.iter_rows(named=True):
+            distance_km = row.get("total_distance", 0) / 1000
+            duration_min = row.get("total_timer_time", 0) / 60
+            pace = duration_min / distance_km if distance_km > 0 else 0
+
             runs.append(
                 {
                     "timestamp": str(row.get("timestamp", "N/A")),
-                    "distance": row.get("distance", 0),
-                    "duration": row.get("duration", 0),
-                    "heart_rate": row.get("heart_rate", "N/A"),
+                    "distance_km": round(distance_km, 2),
+                    "duration_min": round(duration_min, 1),
+                    "avg_pace_sec_km": round(pace, 1) if pace > 0 else None,
+                    "avg_heart_rate": row.get("avg_heart_rate"),
+                    "vdot": row.get("vdot_estimate"),
                 }
             )
 
         return runs
 
     def calculate_vdot_for_run(self, distance_m: float, time_s: float) -> float:
-        """
-        计算单次跑步的VDOT值
-
-        Args:
-            distance_m: 距离（米）
-            time_s: 用时（秒）
-
-        Returns:
-            float: VDOT值
-        """
         return self.analytics.calculate_vdot(distance_m, time_s)
 
     def get_vdot_trend(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """
-        获取VDOT趋势
-
-        Args:
-            limit: 返回数量限制
-
-        Returns:
-            list: VDOT趋势数据
-        """
         lf = self.storage.read_parquet()
         df = lf.sort("timestamp", descending=True).limit(limit).collect()
 
@@ -123,37 +421,18 @@ class RunnerTools:
         return vdot_trend
 
     def get_hr_drift_analysis(self, run_id: Optional[str] = None) -> Dict[str, Any]:
-        """
-        获取心率漂移分析
-
-        Args:
-            run_id: 活动ID（可选）
-
-        Returns:
-            dict: 心率漂移分析结果
-        """
         lf = self.storage.read_parquet()
         df = lf.collect()
 
         if df.height == 0:
             return {"error": "暂无数据"}
 
-        # 获取心率和配速数据
         heart_rate = df.select(pl.col("heart_rate")).to_series().to_list()
         pace = df.select(pl.col("pace")).to_series().to_list()
 
         return self.analytics.analyze_hr_drift(heart_rate, pace)
 
     def get_training_load(self, days: int = 42) -> Dict[str, Any]:
-        """
-        获取训练负荷（ATL/CTL）
-
-        Args:
-            days: 分析天数
-
-        Returns:
-            dict: 训练负荷数据
-        """
         return self.analytics.get_training_load(days)
 
     def query_by_date_range(
@@ -161,16 +440,6 @@ class RunnerTools:
         start_date: str,
         end_date: str
     ) -> List[Dict[str, Any]]:
-        """
-        按日期范围查询跑步记录
-
-        Args:
-            start_date: 开始日期（格式：YYYY-MM-DD）
-            end_date: 结束日期（格式：YYYY-MM-DD）
-
-        Returns:
-            list: 跑步记录列表
-        """
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
@@ -194,11 +463,10 @@ class RunnerTools:
 
         results = []
         for row in df.iter_rows(named=True):
-            # 计算配速（分钟/公里）
             distance_km = row.get("total_distance", 0) / 1000
             duration_minutes = row.get("total_timer_time", 0) / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
-            
+
             results.append({
                 "timestamp": str(row.get("timestamp", "N/A")),
                 "distance": round(distance_km, 2),
@@ -214,16 +482,6 @@ class RunnerTools:
         min_distance: float,
         max_distance: Optional[float] = None
     ) -> List[Dict[str, Any]]:
-        """
-        按距离范围查询跑步记录
-
-        Args:
-            min_distance: 最小距离（公里）
-            max_distance: 最大距离（公里），None 表示无上限
-
-        Returns:
-            list: 跑步记录列表
-        """
         min_meters = min_distance * 1000
         max_meters = max_distance * 1000 if max_distance else None
 
@@ -245,11 +503,10 @@ class RunnerTools:
 
         results = []
         for row in df.iter_rows(named=True):
-            # 计算配速（分钟/公里）
             distance_km = row.get("total_distance", 0) / 1000
             duration_minutes = row.get("total_timer_time", 0) / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
-            
+
             results.append({
                 "timestamp": str(row.get("timestamp", "N/A")),
                 "distance": round(distance_km, 2),
@@ -261,7 +518,20 @@ class RunnerTools:
         return results
 
 
-# 工具描述（供Agent使用）
+def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
+    """创建工具实例列表（供nanobot-ai使用）"""
+    return [
+        GetRunningStatsTool(runner_tools),
+        GetRecentRunsTool(runner_tools),
+        CalculateVdotForRunTool(runner_tools),
+        GetVdotTrendTool(runner_tools),
+        GetHrDriftAnalysisTool(runner_tools),
+        GetTrainingLoadTool(runner_tools),
+        QueryByDateRangeTool(runner_tools),
+        QueryByDistanceTool(runner_tools),
+    ]
+
+
 TOOL_DESCRIPTIONS = {
     "get_running_stats": {
         "description": "获取跑步统计数据，包括总次数、总距离、平均距离等",

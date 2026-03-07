@@ -130,12 +130,16 @@ def chat():
     """
     启动自然语言交互模式
     """
-    from nanobot.agent import AgentLoop
-    from nanobot.agent.tools import Tool, ToolRegistry
-    from nanobot.bus import MessageBus
-    from nanobot.providers import LiteLLMProvider
+    import asyncio
+    asyncio.run(_run_chat())
 
-    from src.agents.tools import RunnerTools, TOOL_DESCRIPTIONS
+
+async def _run_chat():
+    from nanobot.agent import AgentLoop
+    from nanobot.agent.tools import ToolRegistry
+    from nanobot.bus import MessageBus
+
+    from src.agents.tools import RunnerTools, create_tools
     from src.cli_formatter import format_agent_response
 
     console.print("[bold green]🤖 Nanobot Runner Agent[/bold green]")
@@ -151,23 +155,24 @@ def chat():
     console.print()
 
     try:
+        from nanobot.config.loader import load_config
+        from nanobot.cli.commands import _make_provider
+
+        config = load_config()
+        agent_defaults = config.agents.defaults
+
+        provider = _make_provider(config)
+
         storage = StorageManager()
         runner_tools = RunnerTools(storage)
 
         registry = ToolRegistry()
 
-        for tool_name, tool_desc in TOOL_DESCRIPTIONS.items():
-            tool = Tool(
-                name=tool_name,
-                description=tool_desc.get("description", ""),
-                function=getattr(runner_tools, tool_name)
-            )
+        for tool in create_tools(runner_tools):
             registry.register(tool)
 
         workspace = Path.home() / ".nanobot-runner"
         workspace.mkdir(parents=True, exist_ok=True)
-
-        provider = LiteLLMProvider(model="local")
 
         bus = MessageBus()
 
@@ -175,13 +180,15 @@ def chat():
             bus=bus,
             provider=provider,
             workspace=workspace,
-            max_iterations=20,
-            memory_window=10,
+            model=agent_defaults.model,
+            max_iterations=agent_defaults.max_tool_iterations,
+            memory_window=agent_defaults.memory_window,
         )
 
         agent.tools = registry
 
-        console.print("[bold green]✓ Agent 已初始化[/bold green]")
+        console.print(f"[bold green]✓ Agent 已初始化[/bold green]")
+        console.print(f"[dim]模型: {agent_defaults.model}[/dim]")
         console.print()
 
         while True:
@@ -196,7 +203,7 @@ def chat():
                     continue
 
                 with console.status("[bold green]思考中...", spinner="dots"):
-                    response = agent.chat(user_input)
+                    response = await agent.process_direct(user_input)
 
                 console.print()
                 format_agent_response(response)
