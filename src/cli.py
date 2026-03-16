@@ -10,10 +10,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Prompt
 
 from src.core.config import ConfigManager
+from src.core.importer import ImportService
+from src.core.indexer import IndexManager
 from src.core.parser import FitParser
 from src.core.storage import StorageManager
-from src.core.indexer import IndexManager
-from src.core.importer import ImportService
 
 app = typer.Typer(
     name="nanobotrun",
@@ -160,8 +160,8 @@ async def _run_chat():
     console.print()
 
     try:
-        from nanobot.config.loader import load_config
         from nanobot.cli.commands import _make_provider
+        from nanobot.config.loader import load_config
 
         config = load_config()
         agent_defaults = config.agents.defaults
@@ -232,6 +232,172 @@ def version():
     from . import __version__
 
     console.print(f"[bold]Nanobot Runner[/bold] v{__version__}")
+
+
+@app.command()
+def report(
+    push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
+    schedule: Optional[str] = typer.Option(
+        None, "--schedule", "-s", help="配置定时推送时间 (HH:MM)"
+    ),
+    enable: Optional[bool] = typer.Option(None, "--enable/--disable", help="启用/禁用定时推送"),
+    status: bool = typer.Option(False, "--status", help="查看定时推送状态"),
+    age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+):
+    """
+    生成并推送每日晨报
+
+    示例:
+        nanobotrun report              # 生成晨报
+        nanobotrun report --push       # 生成并推送到飞书
+        nanobotrun report --schedule 07:00  # 配置每天 07:00 推送
+        nanobotrun report --enable     # 启用定时推送
+        nanobotrun report --disable    # 禁用定时推送
+        nanobotrun report --status     # 查看定时推送状态
+    """
+    from src.core.report_service import ReportService
+
+    try:
+        service = ReportService()
+
+        # 查看状态
+        if status:
+            schedule_status = service.get_schedule_status()
+            if schedule_status.get("configured"):
+                state = (
+                    "[green]已启用[/green]"
+                    if schedule_status.get("enabled")
+                    else "[yellow]已禁用[/yellow]"
+                )
+                console.print(f"[bold]定时推送状态:[/bold] {state}")
+                console.print(f"  推送时间: {schedule_status.get('time', 'N/A')}")
+                console.print(f"  推送到飞书: {'是' if schedule_status.get('push') else '否'}")
+                console.print(f"  年龄设置: {schedule_status.get('age', 30)}")
+            else:
+                console.print("[yellow]未配置定时推送[/yellow]")
+                console.print(
+                    "使用 [cyan]nanobotrun report --schedule HH:MM[/cyan] 配置定时推送"
+                )
+            return
+
+        # 启用/禁用
+        if enable is not None:
+            result = service.enable_schedule(enabled=enable)
+            if result.get("success"):
+                console.print(f"[green]{result.get('message')}[/green]")
+            else:
+                console.print(f"[red]{result.get('error')}[/red]")
+                raise typer.Exit(1)
+            return
+
+        # 配置定时推送
+        if schedule:
+            result = service.schedule_report(time_str=schedule, push=push, age=age)
+            if result.get("success"):
+                console.print(f"[green]{result.get('message')}[/green]")
+            else:
+                console.print(f"[red]{result.get('error')}[/red]")
+                raise typer.Exit(1)
+            return
+
+        # 立即生成晨报
+        result = service.run_report_now(push=push, age=age)
+
+        if not result.get("success"):
+            console.print(f"[red]生成晨报失败: {result.get('error')}[/red]")
+            raise typer.Exit(1)
+
+        report_data = result.get("report", {})
+
+        # 显示晨报内容
+        _display_report(report_data)
+
+        # 推送结果
+        if push:
+            push_result = result.get("push_result", {})
+            if push_result.get("success"):
+                console.print("[green]晨报已推送到飞书[/green]")
+            else:
+                console.print(f"[red]推送失败: {push_result.get('error')}[/red]")
+
+    except Exception as e:
+        console.print(f"[red]操作失败: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
+def _display_report(report_data: dict):
+    """
+    在终端显示晨报内容
+
+    Args:
+        report_data: 晨报数据
+    """
+    from rich.panel import Panel
+    from rich.table import Table
+
+    # 日期和问候语
+    console.print()
+    console.print(
+        Panel(
+            f"[bold]{report_data.get('date', '')}[/bold]\n{report_data.get('greeting', '')}",
+            title="☀️ 每日跑步晨报",
+            border_style="blue",
+        )
+    )
+
+    # 昨日训练
+    yesterday_run = report_data.get("yesterday_run")
+    if yesterday_run:
+        table = Table(title="昨日训练", show_header=False)
+        table.add_column("指标", style="cyan")
+        table.add_column("数值", style="green")
+        table.add_row("距离", f"{yesterday_run.get('distance_km', 0)} km")
+        table.add_row("时长", f"{yesterday_run.get('duration_min', 0)} 分钟")
+        table.add_row("TSS", str(yesterday_run.get("tss", 0)))
+        console.print(table)
+    else:
+        console.print("[dim]昨日无训练记录[/dim]")
+
+    # 体能状态
+    fitness = report_data.get("fitness_status", {})
+    fitness_table = Table(title="体能状态", show_header=False)
+    fitness_table.add_column("指标", style="cyan")
+    fitness_table.add_column("数值", style="green")
+    fitness_table.add_row("ATL (疲劳)", str(fitness.get("atl", 0)))
+    fitness_table.add_row("CTL (体能)", str(fitness.get("ctl", 0)))
+    fitness_table.add_row("TSB (状态)", str(fitness.get("tsb", 0)))
+    fitness_table.add_row("评估", fitness.get("status", "数据不足"))
+    console.print(fitness_table)
+
+    # 训练建议
+    console.print(
+        Panel(
+            report_data.get("training_advice", "暂无建议"),
+            title="今日建议",
+            border_style="green",
+        )
+    )
+
+    # 本周计划
+    weekly_plan = report_data.get("weekly_plan", [])
+    if weekly_plan:
+        plan_table = Table(title="本周计划")
+        plan_table.add_column("日期", style="cyan")
+        plan_table.add_column("计划", style="green")
+        for day_plan in weekly_plan:
+            day_str = day_plan.get("day", "")
+            date_str = day_plan.get("date", "")
+            plan_str = day_plan.get("plan", "")
+            is_today = day_plan.get("is_today", False)
+
+            if is_today:
+                plan_table.add_row(
+                    f"[bold]{day_str} {date_str}[/bold] (今天)",
+                    f"[bold]{plan_str}[/bold]",
+                )
+            else:
+                plan_table.add_row(f"{day_str} {date_str}", plan_str)
+        console.print(plan_table)
 
 
 if __name__ == "__main__":
