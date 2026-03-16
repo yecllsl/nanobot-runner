@@ -635,6 +635,8 @@ class TestTrainingLoad:
         assert "message" in result
         assert "atl" in result
         assert result["atl"] == 0.0
+        assert result["fitness_status"] == "数据不足"
+        assert "training_advice" in result
 
     def test_get_training_load_with_data(self):
         """测试有数据的训练负荷"""
@@ -672,6 +674,7 @@ class TestTrainingLoad:
                 },
             ]
         )
+        mock_collected.sort.return_value = mock_collected
         mock_lf.filter.return_value.collect.return_value = mock_collected
 
         engine = AnalyticsEngine(mock_storage)
@@ -681,6 +684,451 @@ class TestTrainingLoad:
         assert "ctl" in result
         assert "tsb" in result
         assert "runs_count" in result
+        assert "fitness_status" in result
+        assert "training_advice" in result
+
+    def test_calculate_atl_ewma_formula(self):
+        """测试 ATL 的 EWMA 公式正确性"""
+        import math
+
+        engine = AnalyticsEngine(Mock())
+
+        # 创建测试数据：最近 7 天每天 TSS = 100
+        tss_values = [100.0] * 7
+
+        atl = engine.calculate_atl(tss_values)
+
+        # EWMA 公式验证
+        # ATL = sum(TSS[i] * exp(-i/7)) / sum(exp(-i/7))
+        weighted_sum = sum(100 * math.exp(-i / 7) for i in range(7))
+        weight_sum = sum(math.exp(-i / 7) for i in range(7))
+        expected_atl = weighted_sum / weight_sum
+
+        assert abs(atl - expected_atl) < 0.1
+
+    def test_calculate_ctl_ewma_formula(self):
+        """测试 CTL 的 EWMA 公式正确性"""
+        import math
+
+        engine = AnalyticsEngine(Mock())
+
+        # 创建测试数据：最近 42 天每天 TSS = 100
+        tss_values = [100.0] * 42
+
+        ctl = engine.calculate_ctl(tss_values)
+
+        # EWMA 公式验证
+        # CTL = sum(TSS[i] * exp(-i/42)) / sum(exp(-i/42))
+        weighted_sum = sum(100 * math.exp(-i / 42) for i in range(42))
+        weight_sum = sum(math.exp(-i / 42) for i in range(42))
+        expected_ctl = weighted_sum / weight_sum
+
+        assert abs(ctl - expected_ctl) < 0.1
+
+    def test_calculate_atl_empty_list(self):
+        """测试空列表的 ATL 计算"""
+        engine = AnalyticsEngine(Mock())
+        atl = engine.calculate_atl([])
+        assert atl == 0.0
+
+    def test_calculate_ctl_empty_list(self):
+        """测试空列表的 CTL 计算"""
+        engine = AnalyticsEngine(Mock())
+        ctl = engine.calculate_ctl([])
+        assert ctl == 0.0
+
+    def test_calculate_atl_single_value(self):
+        """测试单个值的 ATL 计算"""
+        engine = AnalyticsEngine(Mock())
+        atl = engine.calculate_atl([50.0])
+        assert atl == 50.0
+
+    def test_calculate_ctl_single_value(self):
+        """测试单个值的 CTL 计算"""
+        engine = AnalyticsEngine(Mock())
+        ctl = engine.calculate_ctl([50.0])
+        assert ctl == 50.0
+
+    def test_calculate_atl_recent_weight_higher(self):
+        """测试 ATL 对最近数据赋予更高权重"""
+        engine = AnalyticsEngine(Mock())
+
+        # 最近数据高，早期数据低
+        tss_increasing = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0]
+        atl_increasing = engine.calculate_atl(tss_increasing)
+
+        # 最近数据低，早期数据高
+        tss_decreasing = [70.0, 60.0, 50.0, 40.0, 30.0, 20.0, 10.0]
+        atl_decreasing = engine.calculate_atl(tss_decreasing)
+
+        # 由于 EWMA 对最近数据赋予更高权重
+        # 递增序列的 ATL 应该更高（因为最近的数据更大）
+        assert atl_increasing > atl_decreasing
+
+    def test_calculate_ctl_stable_training(self):
+        """测试稳定训练的 CTL 计算"""
+        engine = AnalyticsEngine(Mock())
+
+        # 稳定训练：每天 TSS = 100
+        tss_values = [100.0] * 100
+
+        atl = engine.calculate_atl(tss_values)
+        ctl = engine.calculate_ctl(tss_values)
+
+        # 稳定训练时，ATL 和 CTL 应该接近 100
+        assert abs(atl - 100.0) < 5.0
+        assert abs(ctl - 100.0) < 5.0
+
+    def test_evaluate_fitness_status_tsb_positive_high(self):
+        """测试 TSB > 10 时的体能状态评估"""
+        engine = AnalyticsEngine(Mock())
+
+        status, advice = engine._evaluate_fitness_status(tsb=15.0, atl=50.0, ctl=65.0)
+
+        assert status == "恢复良好"
+        assert "高强度训练" in advice or "比赛" in advice
+
+    def test_evaluate_fitness_status_tsb_positive_low(self):
+        """测试 TSB 0-10 时的体能状态评估"""
+        engine = AnalyticsEngine(Mock())
+
+        status, advice = engine._evaluate_fitness_status(tsb=5.0, atl=60.0, ctl=65.0)
+
+        assert status == "状态正常"
+        assert "保持" in advice or "正常" in advice
+
+    def test_evaluate_fitness_status_tsb_negative_low(self):
+        """测试 TSB -10-0 时的体能状态评估"""
+        engine = AnalyticsEngine(Mock())
+
+        status, advice = engine._evaluate_fitness_status(tsb=-5.0, atl=70.0, ctl=65.0)
+
+        assert status == "轻度疲劳"
+        assert "恢复" in advice or "降低" in advice
+
+    def test_evaluate_fitness_status_tsb_negative_high(self):
+        """测试 TSB < -10 时的体能状态评估"""
+        engine = AnalyticsEngine(Mock())
+
+        status, advice = engine._evaluate_fitness_status(tsb=-15.0, atl=80.0, ctl=65.0)
+
+        assert status == "过度训练"
+        assert "警告" in advice or "休息" in advice
+
+    def test_evaluate_fitness_status_low_ctl(self):
+        """测试低 CTL 时的补充建议"""
+        engine = AnalyticsEngine(Mock())
+
+        status, advice = engine._evaluate_fitness_status(tsb=5.0, atl=20.0, ctl=25.0)
+
+        assert "体能基础较弱" in advice
+
+    def test_evaluate_fitness_status_high_ctl(self):
+        """测试高 CTL 时的补充建议"""
+        engine = AnalyticsEngine(Mock())
+
+        status, advice = engine._evaluate_fitness_status(tsb=5.0, atl=80.0, ctl=85.0)
+
+        assert "体能基础扎实" in advice
+
+    def test_get_training_load_no_heart_rate_data(self):
+        """测试无心率数据时的训练负荷"""
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建没有心率数据的数据框
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "total_distance": [5000.0, 6000.0],
+                "total_timer_time": [1800, 2100],
+                "avg_heart_rate": [None, None],
+            }
+        )
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(
+            return_value=[
+                {
+                    "timestamp": datetime(2024, 1, 1),
+                    "total_distance": 5000.0,
+                    "total_timer_time": 1800,
+                    "avg_heart_rate": None,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 2),
+                    "total_distance": 6000.0,
+                    "total_timer_time": 2100,
+                    "avg_heart_rate": None,
+                },
+            ]
+        )
+        mock_collected.sort.return_value = mock_collected
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=7)
+
+        assert "message" in result
+        assert "心率" in result["message"]
+        assert result["atl"] == 0.0
+        assert result["fitness_status"] == "数据不足"
+
+    def test_get_training_load_insufficient_data_warning(self):
+        """测试数据量不足时的警告提示"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建只有 5 条记录的数据
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(5, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 5,
+                "total_timer_time": [1800] * 5,
+                "avg_heart_rate": [140] * 5,
+            }
+        )
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(
+            return_value=[
+                {
+                    "timestamp": ts,
+                    "total_distance": 5000.0,
+                    "total_timer_time": 1800,
+                    "avg_heart_rate": 140,
+                }
+                for ts in timestamps
+            ]
+        )
+        mock_collected.sort.return_value = mock_collected
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=42)
+
+        # 应该有数据量较少的提示
+        assert "message" in result
+        assert "数据量较少" in result["message"]
+
+    def test_get_training_load_short_period_warning(self):
+        """测试分析周期过短时的警告提示"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建足够多的数据，但分析周期只有 14 天
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(20, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 20,
+                "total_timer_time": [1800] * 20,
+                "avg_heart_rate": [140] * 20,
+            }
+        )
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(
+            return_value=[
+                {
+                    "timestamp": ts,
+                    "total_distance": 5000.0,
+                    "total_timer_time": 1800,
+                    "avg_heart_rate": 140,
+                }
+                for ts in timestamps
+            ]
+        )
+        mock_collected.sort.return_value = mock_collected
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=14)
+
+        # 应该有分析周期较短的提示
+        assert "message" in result
+        assert "分析周期较短" in result["message"]
+
+    def test_get_training_load_tsb_calculation(self):
+        """测试 TSB 计算正确性"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建足够多的稳定训练数据
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(50, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 50,
+                "total_timer_time": [1800] * 50,
+                "avg_heart_rate": [140] * 50,
+            }
+        )
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(
+            return_value=[
+                {
+                    "timestamp": ts,
+                    "total_distance": 5000.0,
+                    "total_timer_time": 1800,
+                    "avg_heart_rate": 140,
+                }
+                for ts in timestamps
+            ]
+        )
+        mock_collected.sort.return_value = mock_collected
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=50)
+
+        # TSB = CTL - ATL
+        expected_tsb = result["ctl"] - result["atl"]
+        assert abs(result["tsb"] - expected_tsb) < 0.1
+
+    def test_get_training_load_performance(self):
+        """测试训练负荷计算性能（1000 条记录 < 2 秒）"""
+        import time
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建 1000 条记录
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i / 24) for i in range(1000)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 1000,
+                "total_timer_time": [1800] * 1000,
+                "avg_heart_rate": [140] * 1000,
+            }
+        )
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(
+            return_value=[
+                {
+                    "timestamp": ts,
+                    "total_distance": 5000.0,
+                    "total_timer_time": 1800,
+                    "avg_heart_rate": 140,
+                }
+                for ts in timestamps
+            ]
+        )
+        mock_collected.sort.return_value = mock_collected
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+
+        start_time = time.time()
+        result = engine.get_training_load(days=100)
+        elapsed_time = time.time() - start_time
+
+        assert elapsed_time < 2.0, f"计算时间 {elapsed_time:.2f}秒 超过2秒限制"
+        assert "atl" in result
+        assert "ctl" in result
+
+    def test_ewma_industry_standard_comparison(self):
+        """测试 EWMA 计算与行业标准对比（误差 < 10%）"""
+        import math
+
+        engine = AnalyticsEngine(Mock())
+
+        # 模拟 42 天的训练数据，每天 TSS = 100
+        # 行业标准：稳定训练 42 天后，CTL 应该接近 100
+        tss_values = [100.0] * 42
+
+        ctl = engine.calculate_ctl(tss_values)
+
+        # 稳定训练后 CTL 应该接近日均值
+        # 误差应该在 10% 以内
+        assert abs(ctl - 100.0) < 10.0
+
+    def test_get_training_load_sorted_by_timestamp(self):
+        """测试数据按时间戳排序"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建乱序的时间戳
+        today = datetime.now()
+        timestamps = [
+            today - timedelta(days=5),
+            today - timedelta(days=1),
+            today - timedelta(days=3),
+            today - timedelta(days=2),
+            today - timedelta(days=4),
+        ]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 5,
+                "total_timer_time": [1800] * 5,
+                "avg_heart_rate": [140] * 5,
+            }
+        )
+
+        mock_collected = MagicMock()
+        mock_collected.is_empty = MagicMock(return_value=False)
+        mock_collected.iter_rows = MagicMock(
+            return_value=[
+                {
+                    "timestamp": ts,
+                    "total_distance": 5000.0,
+                    "total_timer_time": 1800,
+                    "avg_heart_rate": 140,
+                }
+                for ts in timestamps
+            ]
+        )
+        mock_collected.sort.return_value = mock_collected
+        mock_lf.filter.return_value.collect.return_value = mock_collected
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load(days=7)
+
+        # 验证 sort 方法被调用
+        mock_collected.sort.assert_called_once_with("timestamp")
+        assert "atl" in result
 
 
 class TestTrainingEffect:
@@ -1870,6 +2318,665 @@ class TestPaceDistribution:
         assert result["zones"]["Z2"]["distance"] == 18000.0
 
 
+class TestTrainingLoadTrend:
+    """测试训练负荷趋势分析功能"""
+
+    def test_get_training_load_trend_empty_data(self):
+        """测试空数据的训练负荷趋势"""
+        mock_storage = Mock()
+        mock_lf = Mock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = Mock()
+        mock_df.is_empty.return_value = True
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=30)
+
+        assert result["trend_data"] == []
+        assert result["summary"]["status"] == "数据不足"
+        assert result["summary"]["current_atl"] == 0.0
+        assert "message" in result
+
+    def test_get_training_load_trend_no_heart_rate(self):
+        """测试无心率数据的训练负荷趋势"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=i) for i in range(5)],
+                "total_distance": [5000.0] * 5,
+                "total_timer_time": [1800] * 5,
+                "avg_heart_rate": [None] * 5,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=7)
+
+        assert result["trend_data"] == []
+        assert result["summary"]["status"] == "数据不足"
+        assert "心率" in result["message"]
+
+    def test_get_training_load_trend_with_data(self):
+        """测试有数据的训练负荷趋势"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建 10 天的训练数据
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(10, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 10,
+                "total_timer_time": [1800] * 10,
+                "avg_heart_rate": [140] * 10,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=10)
+
+        assert "trend_data" in result
+        assert "summary" in result
+        assert len(result["trend_data"]) == 10
+
+        # 验证每日数据结构
+        first_day = result["trend_data"][0]
+        assert "date" in first_day
+        assert "tss" in first_day
+        assert "atl" in first_day
+        assert "ctl" in first_day
+        assert "tsb" in first_day
+        assert "status" in first_day
+
+        # 验证汇总数据
+        assert "current_atl" in result["summary"]
+        assert "current_ctl" in result["summary"]
+        assert "current_tsb" in result["summary"]
+        assert "status" in result["summary"]
+        assert "recommendation" in result["summary"]
+
+    def test_get_training_load_trend_with_date_range(self):
+        """测试使用日期范围的训练负荷趋势"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 1, 1),
+                    datetime(2024, 1, 5),
+                    datetime(2024, 1, 10),
+                ],
+                "total_distance": [5000.0, 6000.0, 7000.0],
+                "total_timer_time": [1800, 2100, 2400],
+                "avg_heart_rate": [140, 145, 150],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(
+            start_date="2024-01-01", end_date="2024-01-10"
+        )
+
+        assert len(result["trend_data"]) == 10  # 10 天
+
+    def test_get_training_load_trend_invalid_date_format(self):
+        """测试无效日期格式"""
+        engine = AnalyticsEngine(Mock())
+
+        with pytest.raises(ValueError, match="开始日期格式无效"):
+            engine.get_training_load_trend(start_date="2024/01/01")
+
+        with pytest.raises(ValueError, match="结束日期格式无效"):
+            engine.get_training_load_trend(end_date="2024-01-32")
+
+    def test_get_training_load_trend_start_after_end(self):
+        """测试开始日期晚于结束日期"""
+        engine = AnalyticsEngine(Mock())
+
+        with pytest.raises(ValueError, match="开始日期不能晚于结束日期"):
+            engine.get_training_load_trend(
+                start_date="2024-12-31", end_date="2024-01-01"
+            )
+
+    def test_get_training_load_trend_days_parameter(self):
+        """测试 days 参数优先级"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=5)],
+                "total_distance": [5000.0],
+                "total_timer_time": [1800],
+                "avg_heart_rate": [140],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(
+            days=7, start_date="2024-01-01"
+        )  # days 应该优先
+
+        assert len(result["trend_data"]) == 7
+
+    def test_get_training_load_trend_tss_aggregation(self):
+        """测试 TSS 按日期聚合"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 同一天多次训练
+        same_day = datetime(2024, 1, 5)
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [
+                    same_day.replace(hour=8),
+                    same_day.replace(hour=18),
+                ],
+                "total_distance": [5000.0, 3000.0],
+                "total_timer_time": [1800, 1200],
+                "avg_heart_rate": [140, 130],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(
+            start_date="2024-01-05", end_date="2024-01-05"
+        )
+
+        # 当日 TSS 应该是两次训练的总和
+        assert result["trend_data"][0]["tss"] > 0
+
+    def test_get_training_load_trend_fill_missing_dates(self):
+        """测试填充缺失日期"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 只有第 1 天和第 5 天有训练
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 1, 1),
+                    datetime(2024, 1, 5),
+                ],
+                "total_distance": [5000.0, 5000.0],
+                "total_timer_time": [1800, 1800],
+                "avg_heart_rate": [140, 140],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(
+            start_date="2024-01-01", end_date="2024-01-05"
+        )
+
+        # 应该有 5 天数据，缺失日期 TSS 为 0
+        assert len(result["trend_data"]) == 5
+        assert result["trend_data"][1]["tss"] == 0.0  # 第 2 天无训练
+        assert result["trend_data"][2]["tss"] == 0.0  # 第 3 天无训练
+        assert result["trend_data"][3]["tss"] == 0.0  # 第 4 天无训练
+
+    def test_get_training_load_trend_ewma_calculation(self):
+        """测试 EWMA 计算正确性"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建稳定训练数据（每天相同 TSS）
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(50, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 50,
+                "total_timer_time": [1800] * 50,
+                "avg_heart_rate": [140] * 50,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=30)
+
+        # 稳定训练后，ATL 和 CTL 应该接近
+        latest = result["trend_data"][-1]
+        assert latest["atl"] > 0
+        assert latest["ctl"] > 0
+        # TSB = CTL - ATL
+        assert abs(latest["tsb"] - (latest["ctl"] - latest["atl"])) < 0.1
+
+    def test_get_training_load_trend_status_evaluation(self):
+        """测试体能状态评估"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建高强度训练数据（导致过度训练状态）
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(14, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [15000.0] * 14,  # 高训练量
+                "total_timer_time": [5400] * 14,  # 1.5 小时
+                "avg_heart_rate": [170] * 14,  # 高心率
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=14)
+
+        # 应该有状态评估
+        for day_data in result["trend_data"]:
+            assert day_data["status"] in [
+                "恢复良好",
+                "状态正常",
+                "轻度疲劳",
+                "过度训练",
+            ]
+
+    def test_get_training_load_trend_performance(self):
+        """测试性能要求（90 天数据 < 3 秒）"""
+        import time
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建 90 天的训练数据
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(90, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 90,
+                "total_timer_time": [1800] * 90,
+                "avg_heart_rate": [140] * 90,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+
+        start_time = time.time()
+        result = engine.get_training_load_trend(days=90)
+        elapsed_time = time.time() - start_time
+
+        assert elapsed_time < 3.0, f"计算时间 {elapsed_time:.2f}秒 超过3秒限制"
+        assert len(result["trend_data"]) == 90
+
+    def test_get_training_load_trend_default_90_days(self):
+        """测试默认 90 天范围"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=10)],
+                "total_distance": [5000.0],
+                "total_timer_time": [1800],
+                "avg_heart_rate": [140],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend()  # 不传参数
+
+        # 默认 90 天
+        assert len(result["trend_data"]) == 90
+
+    def test_get_training_load_trend_summary_correctness(self):
+        """测试汇总数据正确性"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=i) for i in range(7, 0, -1)],
+                "total_distance": [5000.0] * 7,
+                "total_timer_time": [1800] * 7,
+                "avg_heart_rate": [140] * 7,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=7)
+
+        # 汇总数据应该等于最后一天的数据
+        last_day = result["trend_data"][-1]
+        assert result["summary"]["current_atl"] == last_day["atl"]
+        assert result["summary"]["current_ctl"] == last_day["ctl"]
+        assert result["summary"]["current_tsb"] == last_day["tsb"]
+        assert result["summary"]["status"] == last_day["status"]
+
+    def test_get_training_load_trend_with_history_data(self):
+        """测试包含历史数据的 EWMA 计算"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建 60 天数据，但只查询最近 10 天
+        today = datetime.now()
+        timestamps = [today - timedelta(days=i) for i in range(60, 0, -1)]
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 60,
+                "total_timer_time": [1800] * 60,
+                "avg_heart_rate": [140] * 60,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=10)
+
+        # 历史数据应该影响 CTL 计算
+        # 第一天的 CTL 不应该为 0
+        first_day = result["trend_data"][0]
+        assert first_day["ctl"] > 0
+
+    def test_get_training_load_trend_zero_tss_filtering(self):
+        """测试 TSS 为 0 的记录被过滤"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 包含无效心率数据的记录
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [
+                    today - timedelta(days=2),
+                    today - timedelta(days=1),
+                ],
+                "total_distance": [5000.0, 5000.0],
+                "total_timer_time": [1800, 1800],
+                "avg_heart_rate": [140, None],  # 第二条无心率
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=3)
+
+        # 只有第一条记录有效
+        assert result["total_runs"] == 1
+
+    def test_get_training_load_trend_chronological_order(self):
+        """测试数据按时间顺序排列"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=i) for i in range(5, 0, -1)],
+                "total_distance": [5000.0] * 5,
+                "total_timer_time": [1800] * 5,
+                "avg_heart_rate": [140] * 5,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=5)
+
+        # 验证日期顺序
+        dates = [day["date"] for day in result["trend_data"]]
+        assert dates == sorted(dates)
+
+    def test_get_training_load_trend_tsb_progression(self):
+        """测试 TSB 变化趋势"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 递增训练量
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=i) for i in range(14, 0, -1)],
+                "total_distance": [3000.0 + i * 500 for i in range(14)],
+                "total_timer_time": [1200 + i * 200 for i in range(14)],
+                "avg_heart_rate": [130 + i * 3 for i in range(14)],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=14)
+
+        # TSB 应该逐渐下降（疲劳累积）
+        tsb_values = [day["tsb"] for day in result["trend_data"]]
+        # 由于 EWMA 特性，TSB 变化应该是渐进的
+        assert len(set(tsb_values)) > 1  # TSB 有变化
+
+    def test_get_training_load_trend_days_analyzed(self):
+        """测试 days_analyzed 字段"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [datetime.now() - timedelta(days=5)],
+                "total_distance": [5000.0],
+                "total_timer_time": [1800],
+                "avg_heart_rate": [140],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=10)
+
+        assert result["days_analyzed"] == 10
+
+    def test_get_training_load_trend_recommendation_content(self):
+        """测试训练建议内容"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=i) for i in range(7, 0, -1)],
+                "total_distance": [5000.0] * 7,
+                "total_timer_time": [1800] * 7,
+                "avg_heart_rate": [140] * 7,
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(days=7)
+
+        # 建议应该包含中文内容
+        assert len(result["summary"]["recommendation"]) > 0
+        assert isinstance(result["summary"]["recommendation"], str)
+
+    def test_get_training_load_trend_single_day(self):
+        """测试单日查询"""
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "total_distance": [5000.0],
+                "total_timer_time": [1800],
+                "avg_heart_rate": [140],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.get_training_load_trend(
+            start_date="2024-01-01", end_date="2024-01-01"
+        )
+
+        assert len(result["trend_data"]) == 1
+        assert result["trend_data"][0]["date"] == "2024-01-01"
+
+    def test_get_training_load_trend_empty_trend_data_edge_case(self):
+        """测试 trend_data 为空但 tss_records 不为空的边界情况"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 创建数据，但日期范围不匹配（训练数据在查询范围之外）
+        today = datetime.now()
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [today - timedelta(days=100)],  # 很久以前的数据
+                "total_distance": [5000.0],
+                "total_timer_time": [1800],
+                "avg_heart_rate": [140],
+            }
+        )
+
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        # 查询最近 7 天，但数据在 100 天前
+        result = engine.get_training_load_trend(days=7)
+
+        # 应该有 7 天的趋势数据（TSS 为 0）
+        assert len(result["trend_data"]) == 7
+        # 所有天的 TSS 应该为 0
+        for day in result["trend_data"]:
+            assert day["tss"] == 0.0
+
+
 class TestCalculateTssForRun:
     """测试 calculate_tss_for_run 方法的完整覆盖"""
 
@@ -2100,3 +3207,657 @@ class TestCalculateTssForRun:
 
         assert isinstance(tss, float)
         assert tss >= 0
+
+
+class TestDailyReport:
+    """测试晨报生成功能"""
+
+    def test_generate_daily_report_success(self):
+        """测试成功生成晨报"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 模拟空数据
+        mock_df = pl.DataFrame()
+        mock_lf.filter.return_value.collect.return_value = mock_df
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.generate_daily_report(age=30)
+
+        # 验证返回结构
+        assert "date" in result
+        assert "greeting" in result
+        assert "yesterday_run" in result
+        assert "fitness_status" in result
+        assert "training_advice" in result
+        assert "weekly_plan" in result
+        assert "generated_at" in result
+
+        # 验证fitness_status结构
+        assert "atl" in result["fitness_status"]
+        assert "ctl" in result["fitness_status"]
+        assert "tsb" in result["fitness_status"]
+        assert "status" in result["fitness_status"]
+
+        # 验证weekly_plan是列表
+        assert isinstance(result["weekly_plan"], list)
+        assert len(result["weekly_plan"]) == 7
+
+    def test_generate_daily_report_with_yesterday_run(self):
+        """测试有昨日训练数据的晨报"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 昨日训练数据
+        yesterday = datetime.now().date() - timedelta(days=1)
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [datetime.combine(yesterday, datetime.min.time())],
+                "total_distance": [8500.0],
+                "total_timer_time": [2700],  # 45分钟
+                "avg_heart_rate": [145],
+            }
+        )
+
+        # 设置mock行为
+        mock_filtered = MagicMock()
+        mock_filtered.is_empty.return_value = False
+        mock_filtered.__iter__ = lambda self: iter([mock_df])
+        mock_lf.filter.return_value.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.generate_daily_report(age=30)
+
+        # 验证昨日训练数据
+        assert result["yesterday_run"] is not None
+        assert result["yesterday_run"]["distance_km"] == 8.5
+        assert result["yesterday_run"]["duration_min"] == 45.0
+
+    def test_generate_daily_report_no_yesterday_run(self):
+        """测试无昨日训练数据的晨报"""
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        # 模拟空数据
+        mock_df = pl.DataFrame()
+        mock_lf.filter.return_value.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.generate_daily_report(age=30)
+
+        assert result["yesterday_run"] is None
+
+    def test_generate_greeting_morning(self):
+        """测试早晨问候语"""
+        engine = AnalyticsEngine(Mock())
+
+        # 早上7点
+        greeting = engine._generate_greeting(hour=7, weekday=2)
+        assert "早上好" in greeting
+
+    def test_generate_greeting_afternoon(self):
+        """测试下午问候语"""
+        engine = AnalyticsEngine(Mock())
+
+        # 下午3点
+        greeting = engine._generate_greeting(hour=15, weekday=2)
+        assert "下午好" in greeting
+
+    def test_generate_greeting_evening(self):
+        """测试晚上问候语"""
+        engine = AnalyticsEngine(Mock())
+
+        # 晚上8点
+        greeting = engine._generate_greeting(hour=20, weekday=2)
+        assert "晚上好" in greeting
+
+    def test_generate_greeting_monday(self):
+        """测试周一问候语"""
+        engine = AnalyticsEngine(Mock())
+
+        greeting = engine._generate_greeting(hour=8, weekday=0)
+        assert "新的一周" in greeting
+
+    def test_generate_greeting_sunday(self):
+        """测试周日问候语"""
+        engine = AnalyticsEngine(Mock())
+
+        greeting = engine._generate_greeting(hour=8, weekday=6)
+        assert "休息日" in greeting
+
+    def test_generate_greeting_training_day(self):
+        """测试训练日问候语"""
+        engine = AnalyticsEngine(Mock())
+
+        greeting = engine._generate_greeting(hour=8, weekday=2)
+        assert "训练日" in greeting
+
+    def test_generate_training_advice_tsb_positive_high(self):
+        """测试TSB>10时的训练建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 15.0,
+            "fitness_status": "恢复良好",
+            "ctl": 60.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "状态良好" in advice
+
+    def test_generate_training_advice_tsb_positive_low(self):
+        """测试TSB 0-10时的训练建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 5.0,
+            "fitness_status": "状态正常",
+            "ctl": 60.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "状态正常" in advice
+
+    def test_generate_training_advice_tsb_negative_low(self):
+        """测试TSB -10-0时的训练建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": -5.0,
+            "fitness_status": "轻度疲劳",
+            "ctl": 60.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "疲劳" in advice
+
+    def test_generate_training_advice_tsb_negative_high(self):
+        """测试TSB<-10时的训练建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": -15.0,
+            "fitness_status": "过度训练",
+            "ctl": 60.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "警告" in advice or "休息" in advice
+
+    def test_generate_training_advice_insufficient_data(self):
+        """测试数据不足时的训练建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 0.0,
+            "fitness_status": "数据不足",
+            "ctl": 0.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "数据" in advice
+
+    def test_generate_training_advice_with_high_tss_yesterday(self):
+        """测试昨日高强度训练后的建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 5.0,
+            "fitness_status": "状态正常",
+            "ctl": 60.0,
+        }
+
+        yesterday_run = {
+            "distance_km": 15.0,
+            "duration_min": 90.0,
+            "tss": 120.0,
+            "run_count": 1,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=yesterday_run,
+            weekday=2,
+            age=30,
+        )
+
+        assert "TSS" in advice or "恢复" in advice
+
+    def test_generate_training_advice_low_ctl(self):
+        """测试低CTL时的建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 5.0,
+            "fitness_status": "状态正常",
+            "ctl": 20.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "体能基础较弱" in advice
+
+    def test_generate_training_advice_high_ctl(self):
+        """测试高CTL时的建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 5.0,
+            "fitness_status": "状态正常",
+            "ctl": 90.0,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+
+        assert "体能基础扎实" in advice
+
+    def test_generate_weekly_plan_structure(self):
+        """测试周计划结构"""
+        from datetime import date
+
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 5.0,
+            "ctl": 60.0,
+        }
+
+        weekly_plan = engine._generate_weekly_plan(
+            today=date(2024, 1, 10),  # 周三
+            fitness_status=fitness_status,
+            age=30,
+        )
+
+        assert len(weekly_plan) == 7
+        for day_plan in weekly_plan:
+            assert "day" in day_plan
+            assert "date" in day_plan
+            assert "plan" in day_plan
+            assert "is_today" in day_plan
+            assert "is_past" in day_plan
+
+    def test_generate_weekly_plan_today_marked(self):
+        """测试今日标记"""
+        from datetime import date
+
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {"tsb": 5.0, "ctl": 60.0}
+
+        weekly_plan = engine._generate_weekly_plan(
+            today=date(2024, 1, 10),  # 周三
+            fitness_status=fitness_status,
+            age=30,
+        )
+
+        # 验证今日标记
+        today_plan = next((p for p in weekly_plan if p["is_today"]), None)
+        assert today_plan is not None
+        assert today_plan["day"] == "周三"
+
+    def test_generate_weekly_plan_past_marked(self):
+        """测试过去日期标记"""
+        from datetime import date
+
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {"tsb": 5.0, "ctl": 60.0}
+
+        weekly_plan = engine._generate_weekly_plan(
+            today=date(2024, 1, 10),  # 周三
+            fitness_status=fitness_status,
+            age=30,
+        )
+
+        # 周一和周二应该是过去的
+        past_plans = [p for p in weekly_plan if p["is_past"]]
+        assert len(past_plans) == 2  # 周一和周二
+
+        for plan in past_plans:
+            assert plan["plan"] == "已完成"
+
+    def test_get_daily_plan_overtrained(self):
+        """测试过度训练状态的日计划"""
+        engine = AnalyticsEngine(Mock())
+
+        # TSB < -10
+        plan = engine._get_daily_plan(weekday=1, tsb=-15.0, ctl=60.0, is_past=False)
+        assert "轻松跑" in plan or "休息" in plan
+
+    def test_get_daily_plan_fatigued(self):
+        """测试轻度疲劳状态的日计划"""
+        engine = AnalyticsEngine(Mock())
+
+        # TSB -10 ~ 0
+        plan = engine._get_daily_plan(weekday=2, tsb=-5.0, ctl=60.0, is_past=False)
+        assert "跑" in plan
+
+    def test_get_daily_plan_good_status(self):
+        """测试良好状态的日计划"""
+        engine = AnalyticsEngine(Mock())
+
+        # TSB > 0
+        plan = engine._get_daily_plan(weekday=6, tsb=10.0, ctl=60.0, is_past=False)
+        assert "长距离" in plan
+
+    def test_get_daily_plan_past_day(self):
+        """测试过去日期的日计划"""
+        engine = AnalyticsEngine(Mock())
+
+        plan = engine._get_daily_plan(weekday=1, tsb=5.0, ctl=60.0, is_past=True)
+        assert plan == "已完成"
+
+    def test_get_daily_plan_rest_day(self):
+        """测试休息日计划"""
+        engine = AnalyticsEngine(Mock())
+
+        # 周一通常是休息日
+        plan = engine._get_daily_plan(weekday=0, tsb=5.0, ctl=60.0, is_past=False)
+        assert plan == "休息"
+
+    def test_get_yesterday_run_success(self):
+        """测试成功获取昨日训练"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        yesterday = datetime.now().date() - timedelta(days=1)
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [datetime.combine(yesterday, datetime.min.time())],
+                "total_distance": [5000.0],
+                "total_timer_time": [1800],
+                "avg_heart_rate": [140],
+            }
+        )
+
+        mock_lf.filter.return_value.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine._get_yesterday_run(yesterday)
+
+        assert result is not None
+        assert result["distance_km"] == 5.0
+        assert result["duration_min"] == 30.0
+        assert result["run_count"] == 1
+
+    def test_get_yesterday_run_no_data(self):
+        """测试无昨日训练数据"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        yesterday = datetime.now().date() - timedelta(days=1)
+        mock_df = pl.DataFrame()
+        mock_lf.filter.return_value.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine._get_yesterday_run(yesterday)
+
+        assert result is None
+
+    def test_get_yesterday_run_exception(self):
+        """测试获取昨日训练异常处理"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_storage.read_parquet.side_effect = Exception("数据库错误")
+
+        yesterday = datetime.now().date() - timedelta(days=1)
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine._get_yesterday_run(yesterday)
+
+        assert result is None
+
+    def test_generate_daily_report_performance(self):
+        """测试晨报生成性能（< 1秒）"""
+        import time
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame()
+        mock_lf.filter.return_value.collect.return_value = mock_df
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+
+        start_time = time.time()
+        result = engine.generate_daily_report(age=30)
+        elapsed_time = time.time() - start_time
+
+        assert elapsed_time < 1.0, f"生成时间 {elapsed_time:.2f}秒 超过1秒限制"
+        assert "date" in result
+
+    def test_generate_daily_report_different_ages(self):
+        """测试不同年龄的晨报生成"""
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame()
+        mock_lf.filter.return_value.collect.return_value = mock_df
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+
+        result_25 = engine.generate_daily_report(age=25)
+        result_50 = engine.generate_daily_report(age=50)
+
+        assert "date" in result_25
+        assert "date" in result_50
+
+    def test_generate_training_advice_weekday_specific(self):
+        """测试不同星期的训练建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 15.0,
+            "fitness_status": "恢复良好",
+            "ctl": 60.0,
+        }
+
+        # 周二（weekday=1）应该建议节奏跑
+        advice_tuesday = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=1,
+            age=30,
+        )
+        assert "节奏跑" in advice_tuesday
+
+        # 周三（weekday=2）应该建议轻松跑
+        advice_wednesday = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=None,
+            weekday=2,
+            age=30,
+        )
+        assert "轻松跑" in advice_wednesday
+
+    def test_generate_weekly_plan_different_tsb(self):
+        """测试不同TSB状态的周计划"""
+        from datetime import date
+
+        engine = AnalyticsEngine(Mock())
+
+        # 高TSB状态
+        fitness_status_high = {"tsb": 15.0, "ctl": 60.0}
+        plan_high = engine._generate_weekly_plan(
+            today=date(2024, 1, 10),
+            fitness_status=fitness_status_high,
+            age=30,
+        )
+
+        # 低TSB状态
+        fitness_status_low = {"tsb": -15.0, "ctl": 60.0}
+        plan_low = engine._generate_weekly_plan(
+            today=date(2024, 1, 10),
+            fitness_status=fitness_status_low,
+            age=30,
+        )
+
+        # 验证两种状态下的计划不同
+        assert plan_high[6]["plan"] != plan_low[6]["plan"]
+
+    def test_generate_daily_report_complete_structure(self):
+        """测试晨报完整结构"""
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        mock_df = pl.DataFrame()
+        mock_lf.filter.return_value.collect.return_value = mock_df
+        mock_lf.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine.generate_daily_report(age=30)
+
+        # 验证所有必需字段
+        required_fields = [
+            "date",
+            "greeting",
+            "yesterday_run",
+            "fitness_status",
+            "training_advice",
+            "weekly_plan",
+            "generated_at",
+        ]
+
+        for field in required_fields:
+            assert field in result, f"缺少字段: {field}"
+
+        # 验证fitness_status子字段
+        fitness_fields = ["atl", "ctl", "tsb", "status"]
+        for field in fitness_fields:
+            assert field in result["fitness_status"], f"fitness_status缺少字段: {field}"
+
+        # 验证weekly_plan子字段
+        for day_plan in result["weekly_plan"]:
+            plan_fields = ["day", "date", "plan", "is_today", "is_past"]
+            for field in plan_fields:
+                assert field in day_plan, f"weekly_plan项缺少字段: {field}"
+
+    def test_generate_training_advice_moderate_yesterday_tss(self):
+        """测试昨日中等强度训练后的建议"""
+        engine = AnalyticsEngine(Mock())
+
+        fitness_status = {
+            "tsb": 5.0,
+            "fitness_status": "状态正常",
+            "ctl": 60.0,
+        }
+
+        yesterday_run = {
+            "distance_km": 8.0,
+            "duration_min": 45.0,
+            "tss": 65.0,  # 中等强度
+            "run_count": 1,
+        }
+
+        advice = engine._generate_training_advice(
+            fitness_status=fitness_status,
+            yesterday_run=yesterday_run,
+            weekday=2,
+            age=30,
+        )
+
+        assert "中等强度" in advice or "适度" in advice
+
+    def test_get_yesterday_run_multiple_runs(self):
+        """测试昨日多次训练"""
+        from datetime import datetime, timedelta
+        from unittest.mock import MagicMock
+
+        mock_storage = MagicMock()
+        mock_lf = MagicMock()
+        mock_storage.read_parquet.return_value = mock_lf
+
+        yesterday = datetime.now().date() - timedelta(days=1)
+        mock_df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime.combine(yesterday, datetime.min.time()),
+                    datetime.combine(yesterday, datetime.min.time())
+                    + timedelta(hours=12),
+                ],
+                "total_distance": [5000.0, 3000.0],
+                "total_timer_time": [1800, 1200],
+                "avg_heart_rate": [140, 135],
+            }
+        )
+
+        mock_lf.filter.return_value.collect.return_value = mock_df
+
+        engine = AnalyticsEngine(mock_storage)
+        result = engine._get_yesterday_run(yesterday)
+
+        assert result is not None
+        assert result["distance_km"] == 8.0
+        assert result["run_count"] == 2

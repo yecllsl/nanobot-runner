@@ -59,7 +59,7 @@ class AnalyticsEngine:
             raise ValueError("心率数据不能为空且时长必须为正数")
 
         try:
-            avg_hr = heart_rate_data.mean()
+            avg_hr: float = float(heart_rate_data.mean())  # type: ignore[arg-type]
             intensity_factor = avg_hr / 180
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)
@@ -161,43 +161,83 @@ class AnalyticsEngine:
         """
         计算急性训练负荷（ATL，7天指数移动平均）
 
+        使用 EWMA 公式：ATL = sum(TSS[i] * exp(-i/7)) / sum(exp(-i/7))
+        其中 i 为天数索引（0 表示最近一天）
+
         Args:
-            tss_values: TSS值列表
+            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
 
         Returns:
             float: ATL值
         """
+        import math
+
         if not tss_values:
             return 0.0
 
-        atl_alpha = 1 / 7
-        atl_value = tss_values[0]
+        # 使用 EWMA 指数加权公式
+        # ATL 时间常数 = 7 天
+        time_constant = 7.0
 
-        for tss in tss_values:
-            atl_value = atl_alpha * tss + (1 - atl_alpha) * atl_value
+        # 计算加权和
+        weighted_sum = 0.0
+        weight_sum = 0.0
 
-        return round(atl_value, 2)
+        # tss_values 按时间顺序排列，最近的在最后
+        # i 表示距离当前的天数（0 = 最近）
+        n = len(tss_values)
+        for i, tss in enumerate(reversed(tss_values)):
+            # 计算指数权重
+            weight = math.exp(-i / time_constant)
+            weighted_sum += tss * weight
+            weight_sum += weight
+
+        if weight_sum == 0:
+            return 0.0
+
+        atl = weighted_sum / weight_sum
+        return round(atl, 2)
 
     def calculate_ctl(self, tss_values: List[float]) -> float:
         """
         计算慢性训练负荷（CTL，42天指数移动平均）
 
+        使用 EWMA 公式：CTL = sum(TSS[i] * exp(-i/42)) / sum(exp(-i/42))
+        其中 i 为天数索引（0 表示最近一天）
+
         Args:
-            tss_values: TSS值列表
+            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
 
         Returns:
             float: CTL值
         """
+        import math
+
         if not tss_values:
             return 0.0
 
-        ctl_alpha = 1 / 42
-        ctl_value = tss_values[0]
+        # 使用 EWMA 指数加权公式
+        # CTL 时间常数 = 42 天
+        time_constant = 42.0
 
-        for tss in tss_values:
-            ctl_value = ctl_alpha * tss + (1 - ctl_alpha) * ctl_value
+        # 计算加权和
+        weighted_sum = 0.0
+        weight_sum = 0.0
 
-        return round(ctl_value, 2)
+        # tss_values 按时间顺序排列，最近的在最后
+        # i 表示距离当前的天数（0 = 最近）
+        n = len(tss_values)
+        for i, tss in enumerate(reversed(tss_values)):
+            # 计算指数权重
+            weight = math.exp(-i / time_constant)
+            weighted_sum += tss * weight
+            weight_sum += weight
+
+        if weight_sum == 0:
+            return 0.0
+
+        ctl = weighted_sum / weight_sum
+        return round(ctl, 2)
 
     def calculate_atl_ctl(
         self, tss_values: List[float], atl_days: int = 7, ctl_days: int = 42
@@ -379,13 +419,26 @@ class AnalyticsEngine:
 
     def get_training_load(self, days: int = 42) -> Dict[str, Any]:
         """
-        获取训练负荷（ATL/CTL）
+        获取训练负荷（ATL/CTL/TSB）及体能状态评估
+
+        计算说明：
+        - ATL (急性训练负荷): 7天 EWMA，反映短期疲劳
+        - CTL (慢性训练负荷): 42天 EWMA，反映长期体能
+        - TSB (训练压力平衡): CTL - ATL，反映当前状态
 
         Args:
-            days: 分析天数
+            days: 分析天数（建议至少 42 天以获得准确的 CTL）
 
         Returns:
-            dict: 训练负荷数据
+            dict: 训练负荷数据，包含：
+                - atl: 急性训练负荷
+                - ctl: 慢性训练负荷
+                - tsb: 训练压力平衡
+                - fitness_status: 体能状态评估
+                - training_advice: 训练建议
+                - days_analyzed: 分析天数
+                - runs_count: 跑步次数
+                - message: 提示信息（数据不足时）
         """
         from datetime import datetime, timedelta
 
@@ -396,32 +449,127 @@ class AnalyticsEngine:
 
         df = lf.filter(pl.col("timestamp").is_between(start_date, end_date)).collect()
 
+        # 数据不足时的友好提示
         if df.is_empty():
-            return {"message": "暂无跑步数据", "atl": 0.0, "ctl": 0.0, "tsb": 0.0}
+            return {
+                "message": "暂无跑步数据，请先导入 FIT 文件",
+                "atl": 0.0,
+                "ctl": 0.0,
+                "tsb": 0.0,
+                "fitness_status": "数据不足",
+                "training_advice": "请先导入跑步数据以进行训练负荷分析",
+                "days_analyzed": days,
+                "runs_count": 0,
+            }
 
+        # 按时间排序（最早的在前，最近的在后）
+        df = df.sort("timestamp")
+
+        # 计算每次跑步的 TSS
         tss_values = []
         for row in df.iter_rows(named=True):
             tss = self.calculate_tss_for_run(
                 distance_m=row.get("total_distance", 0),
                 duration_s=row.get("total_timer_time", 0),
-                avg_heart_rate=row.get("avg_heart_rate", 0),
+                avg_heart_rate=row.get("avg_heart_rate"),
             )
             tss_values.append(tss)
 
-        if not tss_values:
-            return {"message": "数据不足", "atl": 0.0, "ctl": 0.0, "tsb": 0.0}
+        # 过滤掉 TSS 为 0 的记录（无效数据）
+        valid_tss = [tss for tss in tss_values if tss > 0]
 
-        atl = self.calculate_atl(tss_values)
-        ctl = self.calculate_ctl(tss_values)
+        if not valid_tss:
+            return {
+                "message": "暂无有效训练数据（心率数据缺失），无法计算训练负荷",
+                "atl": 0.0,
+                "ctl": 0.0,
+                "tsb": 0.0,
+                "fitness_status": "数据不足",
+                "training_advice": "训练数据缺少心率信息，建议使用带有心率监测的设备记录训练",
+                "days_analyzed": days,
+                "runs_count": len(tss_values),
+            }
+
+        # 数据量不足时的提示
+        if len(valid_tss) < 7:
+            message = f"数据量较少（{len(valid_tss)} 次训练），建议积累更多数据以获得更准确的分析"
+        elif days < 42:
+            message = f"分析周期较短（{days} 天），建议使用 42 天以上数据以获得准确的 CTL"
+        else:
+            message = None
+
+        # 计算 ATL、CTL、TSB
+        atl = self.calculate_atl(valid_tss)
+        ctl = self.calculate_ctl(valid_tss)
         tsb = ctl - atl
 
-        return {
+        # 体能状态评估和训练建议
+        fitness_status, training_advice = self._evaluate_fitness_status(tsb, atl, ctl)
+
+        result = {
             "atl": atl,
             "ctl": ctl,
             "tsb": round(tsb, 2),
+            "fitness_status": fitness_status,
+            "training_advice": training_advice,
             "days_analyzed": days,
-            "runs_count": len(tss_values),
+            "runs_count": len(valid_tss),
+            "total_runs": len(tss_values),
         }
+
+        if message:
+            result["message"] = message
+
+        return result
+
+    def _evaluate_fitness_status(
+        self, tsb: float, atl: float, ctl: float
+    ) -> tuple[str, str]:
+        """
+        根据训练压力平衡评估体能状态并生成训练建议
+
+        TSB 解读：
+        - TSB > 10: 恢复良好，体能充沛
+        - TSB 0-10: 状态正常，保持训练
+        - TSB -10-0: 轻度疲劳，注意恢复
+        - TSB < -10: 过度训练，需要休息
+
+        Args:
+            tsb: 训练压力平衡 (CTL - ATL)
+            atl: 急性训练负荷
+            ctl: 慢性训练负荷
+
+        Returns:
+            tuple: (体能状态, 训练建议)
+        """
+        if tsb > 10:
+            status = "恢复良好"
+            advice = "当前体能充沛，适合进行高强度训练或比赛。" "建议安排质量课（间歇跑、节奏跑）或长距离跑。" "注意把握巅峰期，可考虑参加比赛。"
+        elif tsb > 0:
+            status = "状态正常"
+            advice = (
+                "当前状态良好，可以保持正常训练节奏。" "建议继续按训练计划执行，注意训练与恢复的平衡。" "可适度增加训练强度，但需监控身体反应。"
+            )
+        elif tsb > -10:
+            status = "轻度疲劳"
+            advice = (
+                "当前有一定训练累积疲劳，属于正常训练状态。" "建议适当降低训练强度，增加恢复时间。" "保证充足睡眠和营养，可安排轻松跑或交叉训练。"
+            )
+        else:
+            status = "过度训练"
+            advice = (
+                "警告：当前疲劳累积过多，存在过度训练风险！"
+                "建议立即减少训练量，安排 2-3 天完全休息或轻松活动。"
+                "密切监控身体状态，如持续疲劳建议咨询专业教练或医生。"
+            )
+
+        # 根据 CTL 补充建议
+        if ctl < 30:
+            advice += " 体能基础较弱，建议循序渐进增加训练量。"
+        elif ctl > 80:
+            advice += " 体能基础扎实，可保持当前训练水平。"
+
+        return status, advice
 
     def _calculate_hr_zones(self, max_hr: int) -> Dict[str, tuple]:
         """
@@ -903,6 +1051,553 @@ class AnalyticsEngine:
             "total_time_in_hr": int(total_time),
             "activities_count": hr_df.height,
             "data_type": "avg_heart_rate",
+        }
+
+    def generate_daily_report(self, age: int = 30) -> Dict[str, Any]:
+        """
+        生成每日晨报内容
+
+        包含：
+        - 日期和问候语
+        - 昨日训练摘要（如有）
+        - 当前体能状态（ATL/CTL/TSB）
+        - 训练建议
+        - 本周训练计划预览
+
+        Args:
+            age: 年龄，用于计算最大心率和训练建议
+
+        Returns:
+            Dict[str, Any]: 晨报内容字典，包含：
+                - date: 日期字符串
+                - greeting: 问候语
+                - yesterday_run: 昨日训练摘要（None表示无训练）
+                - fitness_status: 体能状态数据
+                - training_advice: 今日训练建议
+                - weekly_plan: 本周训练计划预览
+                - generated_at: 生成时间戳
+        """
+        from datetime import datetime, timedelta
+
+        # 获取当前日期
+        now = datetime.now()
+        today = now.date()
+        yesterday = today - timedelta(days=1)
+
+        # 星期映射
+        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+        # 1. 生成日期和问候语
+        date_str = (
+            f"{today.year}年{today.month}月{today.day}日 {weekday_names[today.weekday()]}"
+        )
+        greeting = self._generate_greeting(now.hour, today.weekday())
+
+        # 2. 获取昨日训练摘要
+        yesterday_run = self._get_yesterday_run(yesterday)
+
+        # 3. 获取体能状态
+        fitness_status = self.get_training_load(days=42)
+
+        # 4. 生成训练建议
+        training_advice = self._generate_training_advice(
+            fitness_status, yesterday_run, today.weekday(), age
+        )
+
+        # 5. 生成本周训练计划预览
+        weekly_plan = self._generate_weekly_plan(today, fitness_status, age)
+
+        return {
+            "date": date_str,
+            "greeting": greeting,
+            "yesterday_run": yesterday_run,
+            "fitness_status": {
+                "atl": fitness_status.get("atl", 0.0),
+                "ctl": fitness_status.get("ctl", 0.0),
+                "tsb": fitness_status.get("tsb", 0.0),
+                "status": fitness_status.get("fitness_status", "数据不足"),
+            },
+            "training_advice": training_advice,
+            "weekly_plan": weekly_plan,
+            "generated_at": now.isoformat(),
+        }
+
+    def _generate_greeting(self, hour: int, weekday: int) -> str:
+        """
+        根据时间和星期生成问候语
+
+        Args:
+            hour: 当前小时（0-23）
+            weekday: 当前星期（0=周一，6=周日）
+
+        Returns:
+            str: 问候语
+        """
+        # 时间段问候
+        if 5 <= hour < 9:
+            time_greeting = "早上好"
+        elif 9 <= hour < 12:
+            time_greeting = "上午好"
+        elif 12 <= hour < 14:
+            time_greeting = "中午好"
+        elif 14 <= hour < 18:
+            time_greeting = "下午好"
+        else:
+            time_greeting = "晚上好"
+
+        # 根据星期添加训练提示
+        if weekday == 0:  # 周一
+            return f"{time_greeting}！新的一周开始了，让我们制定训练计划吧。"
+        elif weekday == 6:  # 周日
+            return f"{time_greeting}！今天是休息日，好好恢复吧。"
+        else:
+            return f"{time_greeting}！今天是您的训练日。"
+
+    def _get_yesterday_run(self, yesterday) -> Optional[Dict[str, Any]]:
+        """
+        获取昨日训练摘要
+
+        Args:
+            yesterday: 昨日日期对象
+
+        Returns:
+            Optional[Dict]: 昨日训练数据，无训练返回None
+        """
+        from datetime import datetime, timedelta
+
+        try:
+            lf = self.storage.read_parquet()
+
+            # 过滤昨日的数据
+            start_of_yesterday = datetime.combine(yesterday, datetime.min.time())
+            end_of_yesterday = datetime.combine(yesterday, datetime.max.time())
+
+            df = lf.filter(
+                pl.col("timestamp").is_between(start_of_yesterday, end_of_yesterday)
+            ).collect()
+
+            if df.is_empty():
+                return None
+
+            # 计算昨日训练汇总
+            total_distance = df["total_distance"].sum()
+            total_duration = df["total_timer_time"].sum()
+
+            # 计算TSS
+            tss_values = []
+            for row in df.iter_rows(named=True):
+                tss = self.calculate_tss_for_run(
+                    distance_m=row.get("total_distance", 0),
+                    duration_s=row.get("total_timer_time", 0),
+                    avg_heart_rate=row.get("avg_heart_rate"),
+                )
+                tss_values.append(tss)
+            total_tss = sum(tss_values)
+
+            return {
+                "distance_km": round(total_distance / 1000, 2),
+                "duration_min": round(total_duration / 60, 1),
+                "tss": round(total_tss, 1),
+                "run_count": df.height,
+            }
+        except Exception:
+            return None
+
+    def _generate_training_advice(
+        self,
+        fitness_status: Dict[str, Any],
+        yesterday_run: Optional[Dict[str, Any]],
+        weekday: int,
+        age: int,
+    ) -> str:
+        """
+        基于训练负荷数据生成训练建议
+
+        Args:
+            fitness_status: 体能状态数据
+            yesterday_run: 昨日训练数据
+            weekday: 当前星期
+            age: 年龄
+
+        Returns:
+            str: 训练建议文本
+        """
+        tsb = fitness_status.get("tsb", 0.0)
+        status = fitness_status.get("fitness_status", "数据不足")
+        ctl = fitness_status.get("ctl", 0.0)
+
+        advice_parts = []
+
+        # 基于TSB状态生成建议
+        if status == "数据不足":
+            advice_parts.append("暂无足够数据生成个性化建议，请先导入更多训练数据。")
+            advice_parts.append("建议开始规律训练，每次训练都记录心率数据。")
+        elif tsb > 10:
+            advice_parts.append("状态良好，可以进行中等强度训练。")
+            if weekday in [1, 3, 5]:  # 周二、周四、周六
+                advice_parts.append("建议进行 8-10 公里的节奏跑，保持心率在区间3。")
+            elif weekday in [2, 4]:  # 周三、周五
+                advice_parts.append("建议进行轻松跑 6-8 公里，保持心率在区间2。")
+            else:
+                advice_parts.append("可以进行长距离慢跑或交叉训练。")
+        elif tsb > 0:
+            advice_parts.append("状态正常，可以保持正常训练节奏。")
+            advice_parts.append("建议进行 6-8 公里的轻松跑，注意监控身体反应。")
+        elif tsb > -10:
+            advice_parts.append("有一定训练累积疲劳，建议适当降低强度。")
+            advice_parts.append("建议进行轻松跑或交叉训练，保证充足休息。")
+        else:
+            advice_parts.append("警告：疲劳累积过多，建议安排休息日。")
+            advice_parts.append("建议进行 2-3 天轻松活动或完全休息。")
+
+        # 考虑昨日训练情况
+        if yesterday_run:
+            if yesterday_run["tss"] > 100:
+                advice_parts.append(f"昨日训练强度较高（TSS: {yesterday_run['tss']}），注意恢复。")
+            elif yesterday_run["tss"] > 50:
+                advice_parts.append("昨日进行了中等强度训练，今日可适度活动。")
+
+        # 基于CTL补充建议
+        if ctl < 30:
+            advice_parts.append("体能基础较弱，建议循序渐进增加训练量。")
+        elif ctl > 80:
+            advice_parts.append("体能基础扎实，可保持当前训练水平。")
+
+        return " ".join(advice_parts)
+
+    def _generate_weekly_plan(
+        self, today, fitness_status: Dict[str, Any], age: int
+    ) -> List[Dict[str, str]]:
+        """
+        生成本周训练计划预览
+
+        Args:
+            today: 今日日期对象
+            fitness_status: 体能状态数据
+            age: 年龄
+
+        Returns:
+            List[Dict]: 每日训练计划列表
+        """
+        from datetime import timedelta
+
+        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        tsb = fitness_status.get("tsb", 0.0)
+        ctl = fitness_status.get("ctl", 0.0)
+
+        # 获取本周一的日期
+        monday = today - timedelta(days=today.weekday())
+
+        weekly_plan = []
+
+        for i in range(7):
+            current_date = monday + timedelta(days=i)
+            weekday_name = weekday_names[i]
+            is_today = current_date == today
+            is_past = current_date < today
+
+            # 根据TSB和星期生成计划
+            plan = self._get_daily_plan(i, tsb, ctl, is_past)
+            weekly_plan.append(
+                {
+                    "day": weekday_name,
+                    "date": current_date.strftime("%m/%d"),
+                    "plan": plan,
+                    "is_today": is_today,
+                    "is_past": is_past,
+                }
+            )
+
+        return weekly_plan
+
+    def _get_daily_plan(
+        self, weekday: int, tsb: float, ctl: float, is_past: bool
+    ) -> str:
+        """
+        获取单日训练计划
+
+        Args:
+            weekday: 星期几（0=周一，6=周日）
+            tsb: 训练压力平衡
+            ctl: 慢性训练负荷
+            is_past: 是否已过去
+
+        Returns:
+            str: 训练计划
+        """
+        if is_past:
+            return "已完成"
+
+        # 基于TSB调整训练计划
+        if tsb < -10:
+            # 过度训练状态，减少训练量
+            plans = {
+                0: "休息",
+                1: "轻松跑 4km",
+                2: "休息",
+                3: "轻松跑 5km",
+                4: "休息",
+                5: "轻松跑 4km",
+                6: "休息",
+            }
+        elif tsb < 0:
+            # 轻度疲劳状态
+            plans = {
+                0: "休息",
+                1: "轻松跑 6km",
+                2: "节奏跑 8km",
+                3: "轻松跑 5km",
+                4: "间歇跑 6km",
+                5: "轻松跑 6km",
+                6: "休息",
+            }
+        else:
+            # 状态良好
+            plans = {
+                0: "休息",
+                1: "轻松跑 6km",
+                2: "节奏跑 8km",
+                3: "轻松跑 5km",
+                4: "间歇跑 8km",
+                5: "轻松跑 6km",
+                6: "长距离跑 15km",
+            }
+
+        return plans.get(weekday, "休息")
+
+    def get_training_load_trend(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        获取训练负荷趋势数据（每日 TSS、ATL、CTL、TSB）
+
+        计算说明：
+        - 按日期聚合每日 TSS 总和
+        - 对每个日期，基于历史数据计算 ATL（7天 EWMA）、CTL（42天 EWMA）
+        - TSB = CTL - ATL，反映当前体能状态
+        - 提供体能状态评估和训练建议
+
+        Args:
+            start_date: 开始日期（格式：YYYY-MM-DD），可选
+            end_date: 结束日期（格式：YYYY-MM-DD），可选
+            days: 最近 N 天，优先级高于 start_date/end_date
+
+        Returns:
+            dict: 训练负荷趋势数据，包含：
+                - trend_data: 每日训练负荷数据列表
+                    - date: 日期
+                    - tss: 当日 TSS 总和
+                    - atl: 急性训练负荷
+                    - ctl: 慢性训练负荷
+                    - tsb: 训练压力平衡
+                    - status: 体能状态
+                - summary: 汇总信息
+                    - current_atl: 当前 ATL
+                    - current_ctl: 当前 CTL
+                    - current_tsb: 当前 TSB
+                    - status: 当前体能状态
+                    - recommendation: 训练建议
+
+        Raises:
+            ValueError: 当日期格式无效时
+        """
+        from datetime import datetime, timedelta
+
+        # 解析日期范围
+        if days is not None:
+            end_dt = datetime.now().replace(hour=23, minute=59, second=59)
+            start_dt = (end_dt - timedelta(days=days - 1)).replace(
+                hour=0, minute=0, second=0
+            )
+        else:
+            if end_date:
+                try:
+                    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
+                        hour=23, minute=59, second=59
+                    )
+                except ValueError as e:
+                    raise ValueError(f"结束日期格式无效: {end_date}，应为 YYYY-MM-DD") from e
+            else:
+                end_dt = datetime.now().replace(hour=23, minute=59, second=59)
+
+            if start_date:
+                try:
+                    start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
+                        hour=0, minute=0, second=0
+                    )
+                except ValueError as e:
+                    raise ValueError(f"开始日期格式无效: {start_date}，应为 YYYY-MM-DD") from e
+            else:
+                # 默认最近 90 天
+                start_dt = (end_dt - timedelta(days=89)).replace(
+                    hour=0, minute=0, second=0
+                )
+
+        # 验证日期范围
+        if start_dt > end_dt:
+            raise ValueError("开始日期不能晚于结束日期")
+
+        # 读取数据（需要额外读取 CTL 计算所需的 42 天历史数据）
+        history_start = start_dt - timedelta(days=42)
+        lf = self.storage.read_parquet()
+
+        # 过滤历史数据范围
+        df = (
+            lf.filter(pl.col("timestamp") >= history_start)
+            .filter(pl.col("timestamp") <= end_dt)
+            .collect()
+        )
+
+        # 数据为空时的友好提示
+        if df.is_empty():
+            return {
+                "trend_data": [],
+                "summary": {
+                    "current_atl": 0.0,
+                    "current_ctl": 0.0,
+                    "current_tsb": 0.0,
+                    "status": "数据不足",
+                    "recommendation": "暂无跑步数据，请先导入 FIT 文件",
+                },
+                "message": "暂无跑步数据",
+                "days_analyzed": (end_dt - start_dt).days + 1,
+            }
+
+        # 按时间排序
+        df = df.sort("timestamp")
+
+        # 计算每次跑步的 TSS
+        tss_records = []
+        for row in df.iter_rows(named=True):
+            tss = self.calculate_tss_for_run(
+                distance_m=row.get("total_distance", 0),
+                duration_s=row.get("total_timer_time", 0),
+                avg_heart_rate=row.get("avg_heart_rate"),
+            )
+            timestamp = row.get("timestamp")
+            if timestamp and tss > 0:
+                tss_records.append({"timestamp": timestamp, "tss": tss})
+
+        # 如果没有有效的 TSS 数据
+        if not tss_records:
+            return {
+                "trend_data": [],
+                "summary": {
+                    "current_atl": 0.0,
+                    "current_ctl": 0.0,
+                    "current_tsb": 0.0,
+                    "status": "数据不足",
+                    "recommendation": "训练数据缺少心率信息，建议使用带有心率监测的设备记录训练",
+                },
+                "message": "暂无有效训练数据（心率数据缺失）",
+                "days_analyzed": (end_dt - start_dt).days + 1,
+            }
+
+        # 创建 TSS 数据 DataFrame
+        tss_df = pl.DataFrame(tss_records)
+
+        # 按日期分组聚合 TSS
+        tss_df = tss_df.with_columns(
+            pl.col("timestamp").dt.strftime("%Y-%m-%d").alias("date_str")
+        )
+        daily_tss = (
+            tss_df.group_by("date_str")
+            .agg(pl.col("tss").sum().alias("daily_tss"))
+            .sort("date_str")
+        )
+
+        # 创建完整的日期序列（填充没有训练的日期）
+        date_range = []
+        current_date = start_dt.date()
+        end_date_only = end_dt.date()
+        while current_date <= end_date_only:
+            date_range.append(current_date.strftime("%Y-%m-%d"))
+            current_date += timedelta(days=1)
+
+        # 创建日期 DataFrame 并左连接
+        date_df = pl.DataFrame({"date_str": date_range})
+        complete_daily = date_df.join(daily_tss, on="date_str", how="left").fill_null(
+            0.0
+        )
+
+        # 计算累积的 ATL、CTL、TSB
+        # 需要包含历史数据进行 EWMA 计算
+        # 先获取历史 TSS 数据（在 start_date 之前的）
+        history_tss = {}
+        for record in tss_records:
+            ts = record["timestamp"]
+            date_key = ts.strftime("%Y-%m-%d")
+            if ts < start_dt:
+                if date_key not in history_tss:
+                    history_tss[date_key] = 0.0
+                history_tss[date_key] += record["tss"]
+
+        # 排序历史 TSS（最早的在前）
+        sorted_history = sorted(history_tss.items(), key=lambda x: x[0])
+        historical_tss_values = [tss for _, tss in sorted_history]
+
+        # 计算每日趋势
+        trend_data = []
+        cumulative_tss = historical_tss_values.copy()  # 累积的 TSS 列表
+
+        for row in complete_daily.iter_rows(named=True):
+            date_str = row["date_str"]
+            daily_tss_value = row["daily_tss"]
+
+            # 添加当日 TSS 到累积列表
+            cumulative_tss.append(daily_tss_value)
+
+            # 计算截至当日的 ATL、CTL
+            atl = self.calculate_atl(cumulative_tss)
+            ctl = self.calculate_ctl(cumulative_tss)
+            tsb = ctl - atl
+
+            # 评估体能状态
+            status, _ = self._evaluate_fitness_status(tsb, atl, ctl)
+
+            trend_data.append(
+                {
+                    "date": date_str,
+                    "tss": round(daily_tss_value, 2),
+                    "atl": atl,
+                    "ctl": ctl,
+                    "tsb": round(tsb, 2),
+                    "status": status,
+                }
+            )
+
+        # 获取最新数据作为汇总
+        latest = trend_data[-1] if trend_data else None
+
+        if latest:
+            _, recommendation = self._evaluate_fitness_status(
+                latest["tsb"], latest["atl"], latest["ctl"]
+            )
+
+            summary = {
+                "current_atl": latest["atl"],
+                "current_ctl": latest["ctl"],
+                "current_tsb": latest["tsb"],
+                "status": latest["status"],
+                "recommendation": recommendation,
+            }
+        else:
+            summary = {
+                "current_atl": 0.0,
+                "current_ctl": 0.0,
+                "current_tsb": 0.0,
+                "status": "数据不足",
+                "recommendation": "暂无训练数据",
+            }
+
+        return {
+            "trend_data": trend_data,
+            "summary": summary,
+            "days_analyzed": len(trend_data),
+            "total_runs": len(tss_records),
         }
 
     def get_pace_distribution(self, year: Optional[int] = None) -> Dict[str, Any]:

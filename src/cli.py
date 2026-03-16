@@ -67,8 +67,12 @@ def import_data(
 @app.command()
 def stats(
     year: Optional[int] = typer.Option(None, "--year", "-y", help="指定年份"),
-    start_date: Optional[str] = typer.Option(None, "--start", "-s", help="开始日期 (YYYY-MM-DD)"),
-    end_date: Optional[str] = typer.Option(None, "--end", "-e", help="结束日期 (YYYY-MM-DD)"),
+    start_date: Optional[str] = typer.Option(
+        None, "--start", "-s", help="开始日期 (YYYY-MM-DD)"
+    ),
+    end_date: Optional[str] = typer.Option(
+        None, "--end", "-e", help="结束日期 (YYYY-MM-DD)"
+    ),
 ):
     """
     查看跑步统计信息
@@ -131,6 +135,7 @@ def chat():
     启动自然语言交互模式
     """
     import asyncio
+
     asyncio.run(_run_chat())
 
 

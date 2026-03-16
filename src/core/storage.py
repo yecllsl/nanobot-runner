@@ -48,13 +48,13 @@ class StorageManager:
         for col_name in df.columns:
             col_type = df.schema[col_name]
             if isinstance(col_type, pl.Object):
-                df = df.with_columns(
-                    pl.col(col_name).cast(pl.String).alias(col_name)
-                )
+                df = df.with_columns(pl.col(col_name).cast(pl.String).alias(col_name))
 
         return df
 
-    def save_to_parquet(self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False) -> bool:
+    def save_to_parquet(
+        self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False
+    ) -> bool:
         """
         保存数据到Parquet文件（按年份分片）
 
@@ -114,7 +114,7 @@ class StorageManager:
                 if not dataframe.is_empty() and "timestamp" in dataframe.columns:
                     # 从第一行数据的时间戳推断年份
                     first_timestamp = dataframe["timestamp"][0]
-                    if hasattr(first_timestamp, 'year'):
+                    if hasattr(first_timestamp, "year"):
                         year = first_timestamp.year
                     else:
                         year = datetime.now().year
@@ -125,14 +125,14 @@ class StorageManager:
             return {
                 "success": success,
                 "records_saved": len(dataframe) if not dataframe.is_empty() else 0,
-                "year": year
+                "year": year,
             }
         except Exception as e:
             return {
                 "success": False,
                 "records_saved": 0,
                 "error": str(e),
-                "year": year if year else datetime.now().year
+                "year": year if year else datetime.now().year,
             }
 
     def load_activities(self, year: Optional[int] = None) -> pl.DataFrame:
@@ -308,7 +308,7 @@ class StorageManager:
         try:
             years = self.get_available_years()
             total_records = 0
-            
+
             for year in years:
                 df = self.read_activities(year)
                 total_records += df.height
@@ -320,21 +320,24 @@ class StorageManager:
                     timestamps = df["timestamp"]
                     time_range = {
                         "start": str(timestamps.min()),
-                        "end": str(timestamps.max())
+                        "end": str(timestamps.max()),
                     }
 
             return {
                 "total_records": total_records,
                 "years": years,
-                "time_range": time_range
+                "time_range": time_range,
             }
         except Exception as e:
             return {"total_records": 0, "years": [], "time_range": {}, "error": str(e)}
 
-    def query_activities(self, years: Optional[List[int]] = None, 
-                        days: Optional[int] = None,
-                        min_distance: Optional[float] = None,
-                        min_heart_rate: Optional[int] = None) -> pl.DataFrame:
+    def query_activities(
+        self,
+        years: Optional[List[int]] = None,
+        days: Optional[int] = None,
+        min_distance: Optional[float] = None,
+        min_heart_rate: Optional[int] = None,
+    ) -> pl.DataFrame:
         """
         查询跑步活动数据（支持过滤）
 
@@ -351,10 +354,13 @@ class StorageManager:
 
         if days is not None:
             from datetime import datetime, timedelta
+
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
-            lf = lf.filter(pl.col("timestamp") >= start_date).filter(pl.col("timestamp") <= end_date)
+            lf = lf.filter(pl.col("timestamp") >= start_date).filter(
+                pl.col("timestamp") <= end_date
+            )
 
         if min_distance is not None:
             lf = lf.filter(pl.col("total_distance") >= min_distance)
