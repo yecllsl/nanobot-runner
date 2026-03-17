@@ -370,17 +370,20 @@ class TestFeishuBotRetry:
         bot = FeishuBot(webhook=webhook)
 
         with patch("requests.post") as mock_post:
-            # 前两次超时，第三次成功
-            mock_post.side_effect = [
-                requests.exceptions.Timeout("Timeout"),
-                requests.exceptions.Timeout("Timeout"),
-                MagicMock(json=lambda: {"code": 0, "msg": "success"}),
-            ]
+            with patch("src.notify.feishu.time.sleep") as mock_sleep:
+                # 前两次超时，第三次成功
+                mock_post.side_effect = [
+                    requests.exceptions.Timeout("Timeout"),
+                    requests.exceptions.Timeout("Timeout"),
+                    MagicMock(json=lambda: {"code": 0, "msg": "success"}),
+                ]
 
-            result = bot.send_text("测试消息")
+                result = bot.send_text("测试消息")
 
-            assert "error" not in result
-            assert mock_post.call_count == 3
+                assert "error" not in result
+                assert mock_post.call_count == 3
+                # 验证sleep被调用了2次（两次重试）
+                assert mock_sleep.call_count == 2
 
     def test_retry_on_connection_error(self):
         """测试连接错误重试"""
@@ -388,17 +391,19 @@ class TestFeishuBotRetry:
         bot = FeishuBot(webhook=webhook)
 
         with patch("requests.post") as mock_post:
-            # 前两次连接错误，第三次成功
-            mock_post.side_effect = [
-                requests.exceptions.ConnectionError("Connection refused"),
-                requests.exceptions.ConnectionError("Connection refused"),
-                MagicMock(json=lambda: {"code": 0, "msg": "success"}),
-            ]
+            with patch("src.notify.feishu.time.sleep") as mock_sleep:
+                # 前两次连接错误，第三次成功
+                mock_post.side_effect = [
+                    requests.exceptions.ConnectionError("Connection refused"),
+                    requests.exceptions.ConnectionError("Connection refused"),
+                    MagicMock(json=lambda: {"code": 0, "msg": "success"}),
+                ]
 
-            result = bot.send_text("测试消息")
+                result = bot.send_text("测试消息")
 
-            assert "error" not in result
-            assert mock_post.call_count == 3
+                assert "error" not in result
+                assert mock_post.call_count == 3
+                assert mock_sleep.call_count == 2
 
     def test_max_retries_exceeded(self):
         """测试超过最大重试次数"""
@@ -406,14 +411,16 @@ class TestFeishuBotRetry:
         bot = FeishuBot(webhook=webhook)
 
         with patch("requests.post") as mock_post:
-            # 所有请求都超时
-            mock_post.side_effect = requests.exceptions.Timeout("Timeout")
+            with patch("src.notify.feishu.time.sleep") as mock_sleep:
+                # 所有请求都超时
+                mock_post.side_effect = requests.exceptions.Timeout("Timeout")
 
-            result = bot.send_text("测试消息")
+                result = bot.send_text("测试消息")
 
-            assert "error" in result
-            assert "已重试" in result["error"]
-            assert mock_post.call_count == FeishuBot.MAX_RETRIES + 1
+                assert "error" in result
+                assert "已重试" in result["error"]
+                assert mock_post.call_count == FeishuBot.MAX_RETRIES + 1
+                assert mock_sleep.call_count == FeishuBot.MAX_RETRIES
 
     def test_no_retry_on_success(self):
         """测试成功时不重试"""
@@ -421,14 +428,17 @@ class TestFeishuBotRetry:
         bot = FeishuBot(webhook=webhook)
 
         with patch("requests.post") as mock_post:
-            mock_response = MagicMock()
-            mock_response.json.return_value = {"code": 0, "msg": "success"}
-            mock_post.return_value = mock_response
+            with patch("src.notify.feishu.time.sleep") as mock_sleep:
+                mock_response = MagicMock()
+                mock_response.json.return_value = {"code": 0, "msg": "success"}
+                mock_post.return_value = mock_response
 
-            result = bot.send_text("测试消息")
+                result = bot.send_text("测试消息")
 
-            assert "error" not in result
-            assert mock_post.call_count == 1
+                assert "error" not in result
+                assert mock_post.call_count == 1
+                # 成功时不应调用sleep
+                assert mock_sleep.call_count == 0
 
 
 class TestFeishuBotErrorHandling:
@@ -463,28 +473,30 @@ class TestFeishuBotErrorHandling:
         webhook = "https://example.com/webhook"
         bot = FeishuBot(webhook=webhook)
 
-        with patch(
-            "requests.post",
-            side_effect=requests.exceptions.Timeout("Connection timed out"),
-        ):
-            result = bot.send_text("测试消息")
+        with patch("requests.post") as mock_post:
+            with patch("src.notify.feishu.time.sleep") as mock_sleep:
+                mock_post.side_effect = requests.exceptions.Timeout("Connection timed out")
+                result = bot.send_text("测试消息")
 
-            assert "error" in result
-            assert "超时" in result["error"]
+                assert "error" in result
+                assert "超时" in result["error"]
+                # 验证重试次数
+                assert mock_sleep.call_count == FeishuBot.MAX_RETRIES
 
     def test_request_connection_error_exception(self):
         """测试连接错误异常"""
         webhook = "https://example.com/webhook"
         bot = FeishuBot(webhook=webhook)
 
-        with patch(
-            "requests.post",
-            side_effect=requests.exceptions.ConnectionError("Connection refused"),
-        ):
-            result = bot.send_text("测试消息")
+        with patch("requests.post") as mock_post:
+            with patch("src.notify.feishu.time.sleep") as mock_sleep:
+                mock_post.side_effect = requests.exceptions.ConnectionError("Connection refused")
+                result = bot.send_text("测试消息")
 
-            assert "error" in result
-            assert "连接错误" in result["error"]
+                assert "error" in result
+                assert "连接错误" in result["error"]
+                # 验证重试次数
+                assert mock_sleep.call_count == FeishuBot.MAX_RETRIES
 
 
 class TestFeishuBotNanobotChannel:
@@ -546,8 +558,12 @@ class TestFeishuBotNanobotChannel:
 
             assert result is False
 
+    @pytest.mark.slow
     def test_get_feishu_channel_success(self):
-        """测试获取 nanobot 飞书通道成功"""
+        """测试获取 nanobot 飞书通道成功
+        
+        注意: 此测试涉及nanobot模块导入，执行较慢
+        """
         bot = FeishuBot(webhook=None)
 
         mock_feishu_config = Mock()

@@ -171,9 +171,10 @@ class TestComprehensiveWorkflow:
         """测试错误处理"""
         print("\n=== 测试错误处理 ===")
 
-        # 测试空数据保存 - 应该抛出 ValueError
+        # 测试空数据保存 - 应该抛出 ValidationError
+        from src.core.exceptions import ValidationError
         empty_df = pl.DataFrame()
-        with pytest.raises(ValueError, match="数据框不能为空"):
+        with pytest.raises(ValidationError, match="数据框不能为空"):
             self.storage_manager.save_to_parquet(empty_df, 2024)
         print("✓ 空数据处理测试通过")
 

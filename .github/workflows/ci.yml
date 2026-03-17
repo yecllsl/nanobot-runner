@@ -53,22 +53,22 @@ jobs:
     - name: Check code formatting with black
       run: |
         echo "开始代码格式化检查..."
-        python -m black --check src/ tests/ || echo "black检查完成，可能存在格式问题"
+        python -m black --check src/ tests/
         
     - name: Check import sorting with isort
       run: |
         echo "开始导入排序检查..."
-        python -m isort --check-only src/ tests/ || echo "isort检查完成，可能存在导入问题"
+        python -m isort --check-only src/ tests/
         
     - name: Type checking with mypy
       run: |
         echo "开始类型检查..."
-        python -m mypy src/ --ignore-missing-imports || echo "mypy检查完成，可能存在类型问题"
+        python -m mypy src/ --ignore-missing-imports
         
     - name: Security scan with bandit
       run: |
         echo "开始安全扫描..."
-        python -m bandit -r src/ -f json -o bandit-report.json || echo "bandit检查完成，可能存在安全问题"
+        python -m bandit -r src/ -f json -o bandit-report.json
         
   # 测试执行
   test:
@@ -114,22 +114,22 @@ jobs:
     - name: Run unit tests
       run: |
         echo "开始单元测试..."
-        python -m pytest tests/unit/ -v --cov=src --cov-report=term-missing --tb=short || echo "单元测试完成，可能存在测试失败"
+        python -m pytest tests/unit/ -v --cov=src --cov-report=term-missing --tb=short
         
     - name: Run integration tests
       run: |
         echo "开始集成测试..."
-        python -m pytest tests/integration/ -v --tb=short || echo "集成测试完成，可能存在测试失败"
+        python -m pytest tests/integration/ -v --tb=short
         
     - name: Run E2E tests
       run: |
         echo "开始端到端测试..."
-        python -m pytest tests/e2e/ -v --tb=short || echo "端到端测试完成，可能存在测试失败"
+        python -m pytest tests/e2e/ -v --tb=short
         
     - name: Generate coverage report
       run: |
         echo "开始生成覆盖率报告..."
-        python -m pytest --cov=src --cov-report=xml --cov-report=term-missing || echo "覆盖率报告生成完成，可能存在覆盖率问题"
+        python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
         
     - name: Verify coverage file
       run: |
@@ -189,7 +189,7 @@ jobs:
     - name: Build package
       run: |
         echo "开始构建包..."
-        python -m build || echo "构建完成，可能存在构建问题"
+        python -m build
         
     - name: Verify build artifacts
       run: |
