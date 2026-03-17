@@ -2,11 +2,12 @@
 # 为CLI和Agent交互提供统一的格式化输出
 
 from typing import Any, Dict, List, Optional, Union
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
+
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 console = Console()
 
@@ -124,7 +125,9 @@ def format_success(message: str) -> Panel:
     Returns:
         Panel: Rich面板对象
     """
-    return Panel(f"[green]{message}[/green]", title="[Success] 成功", border_style="green")
+    return Panel(
+        f"[green]{message}[/green]", title="[Success] 成功", border_style="green"
+    )
 
 
 def format_warning(message: str) -> Panel:
@@ -137,7 +140,9 @@ def format_warning(message: str) -> Panel:
     Returns:
         Panel: Rich面板对象
     """
-    return Panel(f"[yellow]{message}[/yellow]", title="[Warning] 警告", border_style="yellow")
+    return Panel(
+        f"[yellow]{message}[/yellow]", title="[Warning] 警告", border_style="yellow"
+    )
 
 
 def format_runs_table(runs: List[Dict[str, Any]]) -> Table:

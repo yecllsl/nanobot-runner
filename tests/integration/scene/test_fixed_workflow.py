@@ -181,6 +181,7 @@ class TestFixedWorkflow:
 
         # 测试空数据保存 - 应该抛出 ValidationError
         from src.core.exceptions import ValidationError
+
         empty_df = pl.DataFrame()
         with pytest.raises(ValidationError, match="数据框不能为空"):
             self.storage_manager.save_to_parquet(empty_df, 2024)

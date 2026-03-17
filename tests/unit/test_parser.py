@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, Mock, patch
 import polars as pl
 import pytest
 
-from src.core.parser import FitParser
 from src.core.exceptions import ParseError, ValidationError
+from src.core.parser import FitParser
 
 
 class MockFitMessage:
@@ -184,8 +184,13 @@ class TestFitParser:
                 result = parser.parse_file_metadata(temp_path)
 
                 assert result["serial_number"] == "12345"
-                assert result.get("time_created") is None or "time_created" not in result
-                assert result.get("total_distance") is None or "total_distance" not in result
+                assert (
+                    result.get("time_created") is None or "time_created" not in result
+                )
+                assert (
+                    result.get("total_distance") is None
+                    or "total_distance" not in result
+                )
             finally:
                 os.unlink(temp_path)
 
@@ -308,7 +313,10 @@ class TestFitParserAdvanced:
 
                 assert result is not None
                 assert "session_avg_heart_rate" in result.columns
-                assert result.select(pl.col("session_avg_heart_rate").first()).item() == 140
+                assert (
+                    result.select(pl.col("session_avg_heart_rate").first()).item()
+                    == 140
+                )
             finally:
                 os.unlink(temp_path)
 
@@ -573,9 +581,9 @@ class TestFitParserAdvanced:
 
     def test_parse_directory_success(self):
         """测试成功解析目录"""
-        import tempfile
         import os
-        
+        import tempfile
+
         parser = FitParser()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -618,7 +626,7 @@ class TestFitParserAdvanced:
     def test_parse_directory_empty(self):
         """测试空目录解析"""
         import tempfile
-        
+
         parser = FitParser()
 
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -75,7 +75,9 @@ class TestBaseTool:
             runner_tools = RunnerTools()
             tool = CalculateVdotForRunTool(runner_tools)
 
-            errors = tool.validate_params({"distance_m": "not_a_number", "time_s": "not_a_number"})
+            errors = tool.validate_params(
+                {"distance_m": "not_a_number", "time_s": "not_a_number"}
+            )
 
             assert len(errors) > 0
             assert any("must be number" in e for e in errors)
@@ -183,7 +185,9 @@ class TestGetRecentRunsTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             runner_tools = RunnerTools(storage=mock_storage)
             tool = GetRecentRunsTool(runner_tools)
@@ -242,7 +246,9 @@ class TestGetVdotTrendTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             runner_tools = RunnerTools(storage=mock_storage)
             tool = GetVdotTrendTool(runner_tools)
@@ -333,7 +339,9 @@ class TestQueryByDateRangeTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             runner_tools = RunnerTools(storage=mock_storage)
             tool = QueryByDateRangeTool(runner_tools)
@@ -369,7 +377,9 @@ class TestQueryByDistanceTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             runner_tools = RunnerTools(storage=mock_storage)
             tool = QueryByDistanceTool(runner_tools)
@@ -469,7 +479,9 @@ class TestRunnerTools:
             mock_summary.row.return_value = (5, 25000, 1800, 5.0, 360, 5.0, 145)
             tools.analytics.get_running_summary = MagicMock(return_value=mock_summary)
 
-            result = tools.get_running_stats(start_date="2024-01-01", end_date="2024-12-31")
+            result = tools.get_running_stats(
+                start_date="2024-01-01", end_date="2024-12-31"
+            )
 
             assert "total_runs" in result
 
@@ -546,7 +558,9 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -564,8 +578,16 @@ class TestRunnerTools:
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
             mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = [
-                {"timestamp": "2024-01-01", "total_distance": 5000, "total_timer_time": 1200},
-                {"timestamp": "2024-01-02", "total_distance": 10000, "total_timer_time": 2400},
+                {
+                    "timestamp": "2024-01-01",
+                    "total_distance": 5000,
+                    "total_timer_time": 1200,
+                },
+                {
+                    "timestamp": "2024-01-02",
+                    "total_distance": 10000,
+                    "total_timer_time": 2400,
+                },
             ]
 
             tools = RunnerTools(storage=mock_storage)
@@ -601,7 +623,11 @@ class TestRunnerTools:
             mock_storage.read_parquet.return_value = mock_lf
             mock_df = MagicMock()
             mock_df.height = 1
-            mock_df.select.return_value.to_series.return_value.to_list.return_value = [150, 155, 160]
+            mock_df.select.return_value.to_series.return_value.to_list.return_value = [
+                150,
+                155,
+                160,
+            ]
             mock_lf.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
@@ -620,7 +646,9 @@ class TestRunnerTools:
             MockStorage.return_value = mock_storage
 
             tools = RunnerTools(storage=mock_storage)
-            tools.analytics.get_training_load = MagicMock(return_value={"atl": 50, "ctl": 60, "tsb": 10})
+            tools.analytics.get_training_load = MagicMock(
+                return_value={"atl": 50, "ctl": 60, "tsb": 10}
+            )
 
             result = tools.get_training_load(days=42)
 
@@ -648,7 +676,9 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -688,7 +718,9 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -704,7 +736,9 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
+                []
+            )
 
             tools = RunnerTools(storage=mock_storage)
 

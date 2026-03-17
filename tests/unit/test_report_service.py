@@ -65,9 +65,7 @@ class TestGenerateReport:
         }
 
         with patch("src.core.report_service.CronService"):
-            service = ReportService(
-                config=mock_config, analytics=mock_analytics
-            )
+            service = ReportService(config=mock_config, analytics=mock_analytics)
             result = service.generate_report(age=30)
 
             assert "date" in result
@@ -83,9 +81,7 @@ class TestGenerateReport:
         mock_analytics.generate_daily_report.return_value = {"date": "test"}
 
         with patch("src.core.report_service.CronService"):
-            service = ReportService(
-                config=mock_config, analytics=mock_analytics
-            )
+            service = ReportService(config=mock_config, analytics=mock_analytics)
             service.generate_report(age=40)
 
             mock_analytics.generate_daily_report.assert_called_once_with(age=40)
@@ -515,6 +511,7 @@ class TestRunScheduledReport:
             )
             # 使用 asyncio.run 来测试异步方法
             import asyncio
+
             result = asyncio.run(service.run_scheduled_report())
 
             assert result is True
@@ -548,6 +545,7 @@ class TestRunScheduledReport:
             service = ReportService(config=mock_config, analytics=mock_analytics)
             # 使用 asyncio.run 来测试异步方法
             import asyncio
+
             result = asyncio.run(service.run_scheduled_report())
 
             assert result is True

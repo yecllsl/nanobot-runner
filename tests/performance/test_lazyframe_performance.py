@@ -3,17 +3,17 @@ LazyFrame 性能对比测试
 验证 LazyFrame 优化效果：性能提升 >= 20%
 """
 
-import pytest
-import time
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import polars as pl
+import pytest
 
-from src.core.storage import StorageManager
 from src.core.analytics import AnalyticsEngine
+from src.core.storage import StorageManager
 
 
 class TestLazyFramePerformance:

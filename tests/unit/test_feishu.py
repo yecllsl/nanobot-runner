@@ -316,9 +316,7 @@ class TestFeishuBotDailyReport:
         bot = FeishuBot(webhook=None)
 
         # Mock _check_nanobot_feishu_config 返回 False
-        with patch.object(
-            bot, "_check_nanobot_feishu_config", return_value=False
-        ):
+        with patch.object(bot, "_check_nanobot_feishu_config", return_value=False):
             report_data = {"date": "2024年3月15日"}
             result = bot.send_daily_report(report_data)
 
@@ -475,7 +473,9 @@ class TestFeishuBotErrorHandling:
 
         with patch("requests.post") as mock_post:
             with patch("src.notify.feishu.time.sleep") as mock_sleep:
-                mock_post.side_effect = requests.exceptions.Timeout("Connection timed out")
+                mock_post.side_effect = requests.exceptions.Timeout(
+                    "Connection timed out"
+                )
                 result = bot.send_text("测试消息")
 
                 assert "error" in result
@@ -490,7 +490,9 @@ class TestFeishuBotErrorHandling:
 
         with patch("requests.post") as mock_post:
             with patch("src.notify.feishu.time.sleep") as mock_sleep:
-                mock_post.side_effect = requests.exceptions.ConnectionError("Connection refused")
+                mock_post.side_effect = requests.exceptions.ConnectionError(
+                    "Connection refused"
+                )
                 result = bot.send_text("测试消息")
 
                 assert "error" in result
@@ -517,9 +519,7 @@ class TestFeishuBotNanobotChannel:
         mock_config = Mock()
         mock_config.channels = mock_channels
 
-        with patch(
-            "nanobot.config.loader.load_config", return_value=mock_config
-        ):
+        with patch("nanobot.config.loader.load_config", return_value=mock_config):
             result = bot._check_nanobot_feishu_config()
 
             assert result is True
@@ -539,9 +539,7 @@ class TestFeishuBotNanobotChannel:
         mock_config = Mock()
         mock_config.channels = mock_channels
 
-        with patch(
-            "nanobot.config.loader.load_config", return_value=mock_config
-        ):
+        with patch("nanobot.config.loader.load_config", return_value=mock_config):
             result = bot._check_nanobot_feishu_config()
 
             assert result is False
@@ -561,7 +559,7 @@ class TestFeishuBotNanobotChannel:
     @pytest.mark.slow
     def test_get_feishu_channel_success(self):
         """测试获取 nanobot 飞书通道成功
-        
+
         注意: 此测试涉及nanobot模块导入，执行较慢
         """
         bot = FeishuBot(webhook=None)

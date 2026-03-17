@@ -1,9 +1,9 @@
 # 装饰器模块
 # 提供通用装饰器功能
 
+import logging
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
-import logging
 
 from src.core.exceptions import NanobotRunnerError
 
@@ -47,9 +47,7 @@ def handle_tool_errors(
     return decorator
 
 
-def handle_errors(
-    default_response: Any = None, log_traceback: bool = True
-) -> Callable:
+def handle_errors(default_response: Any = None, log_traceback: bool = True) -> Callable:
     """
     统一错误处理装饰器
 

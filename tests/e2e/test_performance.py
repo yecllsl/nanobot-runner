@@ -266,9 +266,7 @@ class TestPerformanceE2E:
         def query_operation(thread_id):
             """查询操作线程"""
             try:
-                with patch.object(
-                    self.storage_manager, "read_activities"
-                ) as mock_read:
+                with patch.object(self.storage_manager, "read_activities") as mock_read:
                     mock_read.return_value = self.large_df.head(2000)
                     result = self.storage_manager.read_activities()
                     results.append((thread_id, "query", "success"))

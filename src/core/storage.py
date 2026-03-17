@@ -284,7 +284,9 @@ class StorageManager:
                 filepath = self.data_dir / filename
                 if filepath.exists():
                     # 使用 scan_parquet 获取记录数，避免加载全部数据
-                    total_records += pl.scan_parquet(filepath).select(pl.len()).collect().item()
+                    total_records += (
+                        pl.scan_parquet(filepath).select(pl.len()).collect().item()
+                    )
 
             time_range = {}
             if years:
@@ -293,11 +295,13 @@ class StorageManager:
                 # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
                 if len(lf.collect_schema()) > 0:
                     # 使用 LazyFrame 计算时间范围
-                    result = lf.select([
-                        pl.col("timestamp").min().alias("start"),
-                        pl.col("timestamp").max().alias("end")
-                    ]).collect()
-                    
+                    result = lf.select(
+                        [
+                            pl.col("timestamp").min().alias("start"),
+                            pl.col("timestamp").max().alias("end"),
+                        ]
+                    ).collect()
+
                     if not result.is_empty():
                         time_range = {
                             "start": str(result["start"][0]),

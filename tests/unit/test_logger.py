@@ -282,7 +282,9 @@ class TestLogWithData:
         logger.handlers.clear()
         logger.addHandler(handler)
 
-        log_with_data(logger, logging.INFO, "user action", {"user_id": 456, "action": "click"})
+        log_with_data(
+            logger, logging.INFO, "user action", {"user_id": 456, "action": "click"}
+        )
 
         output = stream.getvalue()
         data = json.loads(output.strip())

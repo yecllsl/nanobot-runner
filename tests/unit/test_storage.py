@@ -7,8 +7,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
+from src.core.exceptions import StorageError, ValidationError
 from src.core.storage import StorageManager
-from src.core.exceptions import ValidationError, StorageError
 
 
 class TestStorageManager:
@@ -358,7 +358,7 @@ class TestStorageManager:
     def test_query_activities_by_days(self):
         """测试按天数查询"""
         from datetime import datetime, timedelta
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))
 

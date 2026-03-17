@@ -2,16 +2,16 @@
 
 import pytest
 
-from src.core.exceptions import (
-    NanobotRunnerError,
-    StorageError,
-    ParseError,
-    ConfigError,
-    ValidationError,
-    IndexError,
-    ImportError,
-)
 from src.core.decorators import handle_errors, handle_tool_errors
+from src.core.exceptions import (
+    ConfigError,
+    ImportError,
+    IndexError,
+    NanobotRunnerError,
+    ParseError,
+    StorageError,
+    ValidationError,
+)
 
 
 class TestNanobotRunnerError:
@@ -169,6 +169,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_success(self):
         """测试正常执行"""
+
         @handle_errors()
         def successful_function():
             return {"result": "success"}
@@ -178,6 +179,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_nanobot_runner_error(self):
         """测试 NanobotRunnerError 处理"""
+
         @handle_errors()
         def error_function():
             raise StorageError(message="存储失败")
@@ -189,6 +191,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_file_not_found(self):
         """测试 FileNotFoundError 处理"""
+
         @handle_errors()
         def file_not_found_function():
             raise FileNotFoundError("文件不存在")
@@ -200,6 +203,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_value_error(self):
         """测试 ValueError 处理"""
+
         @handle_errors()
         def value_error_function():
             raise ValueError("参数错误")
@@ -211,6 +215,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_key_error(self):
         """测试 KeyError 处理"""
+
         @handle_errors()
         def key_error_function():
             raise KeyError("missing_key")
@@ -221,6 +226,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_generic_exception(self):
         """测试通用异常处理"""
+
         @handle_errors()
         def generic_error_function():
             raise RuntimeError("未知错误")
@@ -231,6 +237,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_custom_default(self):
         """测试自定义默认返回值"""
+
         @handle_errors(default_response={"status": "failed"})
         def custom_default_function():
             raise Exception("错误")
@@ -240,6 +247,7 @@ class TestHandleErrorsDecorator:
 
     def test_handle_errors_no_traceback(self):
         """测试不记录堆栈"""
+
         @handle_errors(log_traceback=False)
         def error_function():
             raise StorageError(message="存储失败")
@@ -253,6 +261,7 @@ class TestHandleToolErrorsDecorator:
 
     def test_handle_tool_errors_nanobot_runner_error(self):
         """测试 NanobotRunnerError 处理"""
+
         @handle_tool_errors()
         def error_function():
             raise ParseError(message="解析失败")
@@ -264,6 +273,7 @@ class TestHandleToolErrorsDecorator:
 
     def test_handle_tool_errors_success(self):
         """测试正常执行"""
+
         @handle_tool_errors()
         def successful_function():
             return {"result": "success"}
@@ -273,6 +283,7 @@ class TestHandleToolErrorsDecorator:
 
     def test_handle_tool_errors_custom_default(self):
         """测试自定义默认返回值"""
+
         @handle_tool_errors(default_response={"status": "failed"})
         def custom_default_function():
             raise Exception("错误")

@@ -53,6 +53,7 @@ class TestUserJourney:
         """测试后置清理"""
         import gc
         import time
+
         gc.collect()
         time.sleep(0.1)
         try:
@@ -202,7 +203,9 @@ class TestUserJourney:
         corrupt_file.write_text("invalid fit data")
 
         with patch.object(
-            self.import_service, "import_file", return_value={"status": "error", "message": "解析失败"}
+            self.import_service,
+            "import_file",
+            return_value={"status": "error", "message": "解析失败"},
         ):
             result = self.import_service.import_file(corrupt_file)
             assert result.get("status") == "error"

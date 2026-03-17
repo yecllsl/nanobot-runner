@@ -88,11 +88,13 @@ class AnalyticsEngine:
 
             if start_date or end_date:
                 from datetime import datetime
+
                 if start_date:
                     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                     lf = lf.filter(pl.col("timestamp") >= start_dt)
                 if end_date:
                     from datetime import timedelta
+
                     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
                     end_dt = end_dt + timedelta(days=1)
                     lf = lf.filter(pl.col("timestamp") < end_dt)
@@ -291,7 +293,12 @@ class AnalyticsEngine:
 
             # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
             if len(lf.collect_schema()) == 0:
-                return {"total_runs": 0, "total_distance": 0.0, "total_duration": 0.0, "avg_heart_rate": 0.0}
+                return {
+                    "total_runs": 0,
+                    "total_distance": 0.0,
+                    "total_duration": 0.0,
+                    "avg_heart_rate": 0.0,
+                }
 
             result = lf.select(
                 [
@@ -315,13 +322,17 @@ class AnalyticsEngine:
                 "total_distance": round(total_distance / 1000, 2),
                 "total_duration": round(total_duration / 3600, 2),
                 "avg_heart_rate": round(avg_heart_rate, 1) if avg_heart_rate else 0,
-                "avg_pace": self._calculate_avg_pace_from_values(total_distance, total_duration),
+                "avg_pace": self._calculate_avg_pace_from_values(
+                    total_distance, total_duration
+                ),
             }
             return stats
         except Exception as e:
             raise RuntimeError(f"获取统计数据失败: {e}") from e
 
-    def _calculate_avg_pace_from_values(self, total_distance: float, total_duration: float) -> str:
+    def _calculate_avg_pace_from_values(
+        self, total_distance: float, total_duration: float
+    ) -> str:
         """
         根据总距离和总时长计算平均配速
 
@@ -385,7 +396,8 @@ class AnalyticsEngine:
                 return []
 
             recent_lf = lf.filter(
-                pl.col("timestamp") >= (pl.col("timestamp").max() - pl.duration(days=days))
+                pl.col("timestamp")
+                >= (pl.col("timestamp").max() - pl.duration(days=days))
             ).sort("timestamp")
 
             df = recent_lf.collect()
@@ -523,7 +535,11 @@ class AnalyticsEngine:
                 "runs_count": 0,
             }
 
-        df = lf.filter(pl.col("timestamp").is_between(start_date, end_date)).sort("timestamp").collect()
+        df = (
+            lf.filter(pl.col("timestamp").is_between(start_date, end_date))
+            .sort("timestamp")
+            .collect()
+        )
 
         if df.is_empty():
             return {

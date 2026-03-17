@@ -131,6 +131,7 @@ class TestAnalyticsEngine:
     def test_get_running_summary_with_date_filter(self):
         """测试带日期过滤的跑步摘要"""
         from datetime import datetime
+
         mock_storage = Mock()
         engine = AnalyticsEngine(mock_storage)
 
@@ -838,7 +839,12 @@ class TestTrainingLoad:
         mock_storage.read_parquet.return_value = mock_lf
 
         # 模拟有列的 LazyFrame
-        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+        mock_lf.collect_schema.return_value = [
+            "timestamp",
+            "total_distance",
+            "total_timer_time",
+            "avg_heart_rate",
+        ]
 
         # 创建没有心率数据的数据框
         mock_df = pl.DataFrame(
@@ -891,7 +897,12 @@ class TestTrainingLoad:
         mock_storage.read_parquet.return_value = mock_lf
 
         # 模拟有列的 LazyFrame
-        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+        mock_lf.collect_schema.return_value = [
+            "timestamp",
+            "total_distance",
+            "total_timer_time",
+            "avg_heart_rate",
+        ]
 
         # 创建只有 5 条记录的数据
         today = datetime.now()
@@ -928,7 +939,12 @@ class TestTrainingLoad:
         mock_storage.read_parquet.return_value = mock_lf
 
         # 模拟有列的 LazyFrame
-        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+        mock_lf.collect_schema.return_value = [
+            "timestamp",
+            "total_distance",
+            "total_timer_time",
+            "avg_heart_rate",
+        ]
 
         # 创建足够多的数据，但分析周期只有 14 天
         today = datetime.now()
@@ -1077,7 +1093,12 @@ class TestTrainingLoad:
         mock_storage.read_parquet.return_value = mock_lf
 
         # 模拟有列的 LazyFrame
-        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+        mock_lf.collect_schema.return_value = [
+            "timestamp",
+            "total_distance",
+            "total_timer_time",
+            "avg_heart_rate",
+        ]
 
         # 创建乱序的时间戳
         today = datetime.now()

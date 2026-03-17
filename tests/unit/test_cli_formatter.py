@@ -1,17 +1,18 @@
 # CLI格式化输出单元测试
 
 import pytest
+
 from src.cli_formatter import (
-    format_duration,
-    format_pace,
-    format_distance,
-    format_stats_panel,
-    format_runs_table,
-    format_error,
-    format_success,
-    format_warning,
-    format_vdot_trend,
     format_agent_response,
+    format_distance,
+    format_duration,
+    format_error,
+    format_pace,
+    format_runs_table,
+    format_stats_panel,
+    format_success,
+    format_vdot_trend,
+    format_warning,
 )
 
 
@@ -261,8 +262,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_dict_error(self):
         """测试错误响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
@@ -275,8 +276,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_dict_message(self):
         """测试消息响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
@@ -289,8 +290,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_dict_data(self):
         """测试数据响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
@@ -303,8 +304,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_empty_list(self):
         """测试空列表响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
@@ -317,8 +318,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_list_with_runs(self):
         """测试跑步记录列表响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
@@ -331,8 +332,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_list_with_vdot(self):
         """测试VDOT列表响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
@@ -345,8 +346,8 @@ class TestFormatAgentResponse:
 
     def test_format_agent_response_string(self):
         """测试字符串响应"""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         old_stdout = sys.stdout
         sys.stdout = StringIO()
