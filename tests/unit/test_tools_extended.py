@@ -4,10 +4,10 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 import polars as pl
+import pytest
 
-from src.agents.tools import RunnerTools, TOOL_DESCRIPTIONS
+from src.agents.tools import TOOL_DESCRIPTIONS, RunnerTools
 
 
 class TestRunnerToolsExtended:
@@ -217,15 +217,29 @@ class TestRunnerToolsExtended:
             mock_df = MagicMock()
             mock_df.collect.return_value = mock_df
             mock_df.height = 1
-            mock_df.select.return_value.to_series.return_value.to_list.return_value = [130, 135, 140]
-            mock_df.select.return_value.to_series.return_value.to_list.return_value = [300, 310, 320]
+            mock_df.select.return_value.to_series.return_value.to_list.return_value = [
+                130,
+                135,
+                140,
+            ]
+            mock_df.select.return_value.to_series.return_value.to_list.return_value = [
+                300,
+                310,
+                320,
+            ]
 
-            with patch.object(pl, 'col', return_value=MagicMock()):
-                with patch.object(mock_df, 'select', return_value=MagicMock(
-                    to_series=MagicMock(
-                        to_list=MagicMock(side_effect=[[130, 135, 140], [300, 310, 320]])
-                    )
-                )):
+            with patch.object(pl, "col", return_value=MagicMock()):
+                with patch.object(
+                    mock_df,
+                    "select",
+                    return_value=MagicMock(
+                        to_series=MagicMock(
+                            to_list=MagicMock(
+                                side_effect=[[130, 135, 140], [300, 310, 320]]
+                            )
+                        )
+                    ),
+                ):
                     tools = RunnerTools(storage=mock_storage)
                     result = tools.get_hr_drift_analysis()
 
@@ -264,7 +278,11 @@ class TestRunnerToolsExtended:
 
             with patch("src.agents.tools.AnalyticsEngine") as MockAnalytics:
                 mock_engine = MagicMock()
-                mock_engine.get_training_load.return_value = {"atl": 50.0, "ctl": 60.0, "tsb": 10.0}
+                mock_engine.get_training_load.return_value = {
+                    "atl": 50.0,
+                    "ctl": 60.0,
+                    "tsb": 10.0,
+                }
                 MockAnalytics.return_value = mock_engine
 
                 tools = RunnerTools(storage=mock_storage)

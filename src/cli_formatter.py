@@ -2,11 +2,12 @@
 # 为CLI和Agent交互提供统一的格式化输出
 
 from typing import Any, Dict, List, Optional, Union
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
+
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 console = Console()
 
@@ -46,7 +47,7 @@ def format_pace(seconds_per_km: float) -> str:
     """
     if seconds_per_km <= 0:
         return "N/A"
-    
+
     minutes = int(seconds_per_km // 60)
     seconds = int(seconds_per_km % 60)
     return f"{minutes}'{seconds:02d}\""
@@ -79,7 +80,7 @@ def format_stats_panel(data: Dict[str, Any]) -> Panel:
         Panel: Rich面板对象
     """
     lines = []
-    
+
     for key, value in data.items():
         if isinstance(value, (int, float)):
             if "distance" in key.lower():
@@ -89,14 +90,16 @@ def format_stats_panel(data: Dict[str, Any]) -> Panel:
             elif "pace" in key.lower():
                 display_value = format_pace(value)
             else:
-                display_value = f"{value:.2f}" if isinstance(value, float) else str(value)
+                display_value = (
+                    f"{value:.2f}" if isinstance(value, float) else str(value)
+                )
         else:
             display_value = str(value)
-        
+
         lines.append(f"  {key}: [bold]{display_value}[/bold]")
-    
+
     content = "\n".join(lines)
-    return Panel(content, title="📊 统计信息", border_style="cyan")
+    return Panel(content, title="[Stats] 统计信息", border_style="cyan")
 
 
 def format_error(message: str) -> Panel:
@@ -109,11 +112,7 @@ def format_error(message: str) -> Panel:
     Returns:
         Panel: Rich面板对象
     """
-    return Panel(
-        f"[red]{message}[/red]",
-        title="❌ 错误",
-        border_style="red"
-    )
+    return Panel(f"[red]{message}[/red]", title="[Error] 错误", border_style="red")
 
 
 def format_success(message: str) -> Panel:
@@ -127,9 +126,7 @@ def format_success(message: str) -> Panel:
         Panel: Rich面板对象
     """
     return Panel(
-        f"[green]{message}[/green]",
-        title="✅ 成功",
-        border_style="green"
+        f"[green]{message}[/green]", title="[Success] 成功", border_style="green"
     )
 
 
@@ -144,9 +141,7 @@ def format_warning(message: str) -> Panel:
         Panel: Rich面板对象
     """
     return Panel(
-        f"[yellow]{message}[/yellow]",
-        title="⚠️ 警告",
-        border_style="yellow"
+        f"[yellow]{message}[/yellow]", title="[Warning] 警告", border_style="yellow"
     )
 
 
@@ -160,7 +155,7 @@ def format_runs_table(runs: List[Dict[str, Any]]) -> Table:
     Returns:
         Table: Rich表格对象
     """
-    table = Table(title="🏃 跑步记录", show_header=True, header_style="bold magenta")
+    table = Table(title="[Run] 跑步记录", show_header=True, header_style="bold magenta")
 
     table.add_column("日期", style="cyan", width=12)
     table.add_column("距离", style="green", width=10, justify="right")
@@ -173,7 +168,10 @@ def format_runs_table(runs: List[Dict[str, Any]]) -> Table:
             if "error" in run:
                 table.add_row(
                     run.get("timestamp", "N/A")[:10] if run.get("timestamp") else "N/A",
-                    "-", "-", "-", "-"
+                    "-",
+                    "-",
+                    "-",
+                    "-",
                 )
                 continue
 
@@ -224,7 +222,7 @@ def format_vdot_trend(vdot_data: List[Dict[str, Any]]) -> Table:
     Returns:
         Table: Rich表格对象
     """
-    table = Table(title="📈 VDOT趋势", show_header=True, header_style="bold magenta")
+    table = Table(title="[Trend] VDOT趋势", show_header=True, header_style="bold magenta")
 
     table.add_column("日期", style="cyan", width=12)
     table.add_column("VDOT", style="green", width=10, justify="right")
@@ -236,8 +234,12 @@ def format_vdot_trend(vdot_data: List[Dict[str, Any]]) -> Table:
             table.add_row(
                 item.get("date", "N/A")[:10] if item.get("date") else "N/A",
                 f"{item.get('vdot', 0):.1f}" if item.get("vdot") else "-",
-                f"{item.get('distance', 0) / 1000:.2f} km" if item.get("distance") else "-",
-                format_duration(item.get("duration", 0)) if item.get("duration") else "-",
+                f"{item.get('distance', 0) / 1000:.2f} km"
+                if item.get("distance")
+                else "-",
+                format_duration(item.get("duration", 0))
+                if item.get("duration")
+                else "-",
             )
 
     return table
@@ -256,10 +258,9 @@ def format_agent_response(response: Any) -> None:
             return
 
         if "message" in response:
-            console.print(Panel(
-                f"[yellow]{response['message']}[/yellow]",
-                border_style="yellow"
-            ))
+            console.print(
+                Panel(f"[yellow]{response['message']}[/yellow]", border_style="yellow")
+            )
             return
 
         console.print(format_stats_panel(response))

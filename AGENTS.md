@@ -6,8 +6,9 @@ Agent 工作指南。
 
 Nanobot Runner - 基于 nanobot-ai 的桌面端私人 AI 跑步助理。通过 Parquet + Polars 实现本地数据隐私与企业级 BI 能力的平衡。
 
-**技术栈**: Python 3.11+, nanobot-ai, Typer + Rich, Polars, Apache Parquet, fitparse
-**版本**: 0.2.1
+**核心技术栈**: Python 3.11+, nanobot-ai, Typer + Rich (CLI), Polars (计算引擎), Apache Parquet (存储), fitparse (FIT解析)
+
+**当前版本**: 0.3.0
 
 ## 常用命令
 

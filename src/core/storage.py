@@ -1,84 +1,65 @@
 # Parquet存储管理器
 # 管理跑步数据的Parquet文件读写
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
+
+from src.core.exceptions import StorageError, ValidationError
+from src.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class StorageManager:
     """Parquet存储管理器，管理跑步数据的存储"""
 
     def __init__(self, data_dir: Optional[Path] = None) -> None:
-        """
-        初始化存储管理器
-
-        Args:
-            data_dir: 数据目录路径，不指定则使用默认目录
-
-        Raises:
-            OSError: 当无法创建数据目录时
-        """
         self.data_dir = data_dir or Path.home() / ".nanobot-runner" / "data"
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"存储管理器初始化，数据目录: {self.data_dir}")
         except OSError as e:
-            raise OSError(f"无法创建数据目录 {self.data_dir}: {e}") from e
+            logger.error(f"无法创建数据目录 {self.data_dir}: {e}")
+            raise StorageError(
+                message=f"无法创建数据目录 {self.data_dir}: {e}",
+                recovery_suggestion="请检查用户目录权限或手动创建数据目录",
+            ) from e
 
     def _convert_to_parquet_compatible(self, df: pl.DataFrame) -> pl.DataFrame:
-        """
-        将DataFrame转换为Parquet兼容的格式
-
-        Args:
-            df: 原始DataFrame
-
-        Returns:
-            pl.DataFrame: 转换后的DataFrame
-        """
         if df.is_empty():
             return df
 
-        # 定义类型转换映射
-        type_conversions = {
-            pl.Object: pl.String,
-        }
-
-        # 转换Object类型为String类型
         for col_name in df.columns:
             col_type = df.schema[col_name]
             if isinstance(col_type, pl.Object):
-                df = df.with_columns(
-                    pl.col(col_name).cast(pl.String).alias(col_name)
-                )
+                df = df.with_columns(pl.col(col_name).cast(pl.String).alias(col_name))
+                logger.debug(f"转换列类型: {col_name} Object -> String")
 
         return df
 
-    def save_to_parquet(self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False) -> bool:
-        """
-        保存数据到Parquet文件（按年份分片）
-
-        Args:
-            dataframe: Polars DataFrame数据
-            year: 年份
-            allow_empty: 是否允许保存空数据框，默认False
-
-        Returns:
-            bool: 保存是否成功
-
-        Raises:
-            ValueError: 当数据框为空（且allow_empty=False）或年份无效时
-        """
+    def save_to_parquet(
+        self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False
+    ) -> bool:
         if dataframe.is_empty():
             if allow_empty:
                 return True
-            raise ValueError("数据框不能为空")
+            logger.warning("尝试保存空数据框")
+            raise ValidationError(
+                message="数据框不能为空",
+                recovery_suggestion="请确保导入了有效的活动数据",
+            )
 
         if year < 2000 or year > 2100:
-            raise ValueError("年份必须在2000-2100范围内")
+            logger.error(f"年份无效: {year}")
+            raise ValidationError(
+                message="年份必须在2000-2100范围内",
+                recovery_suggestion="请检查数据中的时间戳字段",
+            )
 
         try:
-            # 转换数据类型以兼容Parquet
             dataframe = self._convert_to_parquet_compatible(dataframe)
 
             filename = f"activities_{year}.parquet"
@@ -86,35 +67,30 @@ class StorageManager:
 
             if filepath.exists():
                 existing_df = pl.read_parquet(filepath)
-                # 同样转换现有数据
                 existing_df = self._convert_to_parquet_compatible(existing_df)
                 combined_df = pl.concat([existing_df, dataframe])
                 combined_df.write_parquet(filepath, compression="snappy")
+                logger.info(f"追加数据到 {filename}, 新增 {dataframe.height} 条记录")
             else:
                 dataframe.write_parquet(filepath, compression="snappy")
+                logger.info(f"创建新文件 {filename}, 写入 {dataframe.height} 条记录")
 
             return True
+        except (ValidationError, StorageError):
+            raise
         except Exception as e:
-            raise RuntimeError(f"保存Parquet文件失败: {e}") from e
+            logger.error(f"保存Parquet文件失败: {e}")
+            raise StorageError(
+                message=f"保存Parquet文件失败: {e}",
+                recovery_suggestion="请检查磁盘空间和数据目录权限",
+            ) from e
 
     def save_activities(self, dataframe: pl.DataFrame, year: int = None) -> dict:
-        """
-        保存活动数据到Parquet文件
-
-        Args:
-            dataframe: Polars DataFrame数据
-            year: 年份，默认为None（自动从数据中推断）
-
-        Returns:
-            dict: 保存结果，包含success和records_saved字段
-        """
         try:
-            # 自动推断年份
             if year is None:
                 if not dataframe.is_empty() and "timestamp" in dataframe.columns:
-                    # 从第一行数据的时间戳推断年份
                     first_timestamp = dataframe["timestamp"][0]
-                    if hasattr(first_timestamp, 'year'):
+                    if hasattr(first_timestamp, "year"):
                         year = first_timestamp.year
                     else:
                         year = datetime.now().year
@@ -122,44 +98,35 @@ class StorageManager:
                     year = datetime.now().year
 
             success = self.save_to_parquet(dataframe, year)
+            logger.debug(f"保存活动数据成功: {len(dataframe)} 条记录, 年份: {year}")
             return {
                 "success": success,
                 "records_saved": len(dataframe) if not dataframe.is_empty() else 0,
-                "year": year
+                "year": year,
+            }
+        except (ValidationError, StorageError) as e:
+            logger.error(f"保存活动数据失败: {e.message}")
+            return {
+                "success": False,
+                "records_saved": 0,
+                "error": e.message,
+                "error_code": e.error_code,
+                "recovery_suggestion": e.recovery_suggestion,
+                "year": year if year else datetime.now().year,
             }
         except Exception as e:
+            logger.error(f"保存活动数据失败: {e}")
             return {
                 "success": False,
                 "records_saved": 0,
                 "error": str(e),
-                "year": year if year else datetime.now().year
+                "year": year if year else datetime.now().year,
             }
 
     def load_activities(self, year: Optional[int] = None) -> pl.DataFrame:
-        """
-        加载活动数据（read_activities的别名）
-
-        Args:
-            year: 年份，不指定则加载所有年份数据
-
-        Returns:
-            pl.DataFrame: 活动数据
-        """
         return self.read_activities(year)
 
     def read_parquet(self, years: Optional[List[int]] = None) -> pl.LazyFrame:
-        """
-        使用LazyFrame读取Parquet数据（优化查询性能）
-
-        Args:
-            years: 要读取的年份列表，None表示读取所有年份
-
-        Returns:
-            pl.LazyFrame: 延迟加载的DataFrame
-
-        Raises:
-            FileNotFoundError: 当数据文件不存在时
-        """
         try:
             if years:
                 parquet_files = []
@@ -170,42 +137,41 @@ class StorageManager:
                         parquet_files.append(filepath)
 
                 if not parquet_files:
+                    logger.debug(f"未找到指定年份的数据文件: {years}")
                     return pl.LazyFrame()
 
+                logger.debug(f"读取 {len(parquet_files)} 个数据文件")
                 return pl.concat([pl.scan_parquet(f) for f in parquet_files])
             else:
                 parquet_files = list(self.data_dir.glob("activities_*.parquet"))
                 if not parquet_files:
+                    logger.debug("未找到任何数据文件")
                     return pl.LazyFrame()
 
+                logger.debug(f"读取全部 {len(parquet_files)} 个数据文件")
                 return pl.concat([pl.scan_parquet(f) for f in parquet_files])
         except Exception as e:
-            raise RuntimeError(f"读取Parquet数据失败: {e}") from e
+            logger.error(f"读取Parquet数据失败: {e}")
+            raise StorageError(
+                message=f"读取Parquet数据失败: {e}",
+                recovery_suggestion="请检查数据文件是否损坏，或尝试重新导入数据",
+            ) from e
 
     def read_activities(self, year: Optional[int] = None) -> pl.DataFrame:
-        """
-        读取跑步活动数据
-
-        Args:
-            year: 年份，不指定则读取所有年份数据
-
-        Returns:
-            pl.DataFrame: 跑步活动数据
-
-        Raises:
-            FileNotFoundError: 当数据文件不存在时
-        """
         try:
             if year:
                 filename = f"activities_{year}.parquet"
                 filepath = self.data_dir / filename
                 if not filepath.exists():
+                    logger.debug(f"数据文件不存在: {filename}")
                     return pl.DataFrame()
-                return pl.read_parquet(filepath)
+                df = pl.read_parquet(filepath)
+                logger.debug(f"读取 {filename}: {df.height} 条记录")
+                return df
             else:
-                # 读取所有年份数据
                 parquet_files = list(self.data_dir.glob("activities_*.parquet"))
                 if not parquet_files:
+                    logger.debug("未找到任何数据文件")
                     return pl.DataFrame()
 
                 dataframes = []
@@ -214,19 +180,19 @@ class StorageManager:
                     dataframes.append(df)
 
                 if dataframes:
-                    return pl.concat(dataframes)
+                    result = pl.concat(dataframes)
+                    logger.debug(f"读取全部数据: {result.height} 条记录")
+                    return result
                 else:
                     return pl.DataFrame()
         except Exception as e:
-            raise RuntimeError(f"读取活动数据失败: {e}") from e
+            logger.error(f"读取活动数据失败: {e}")
+            raise StorageError(
+                message=f"读取活动数据失败: {e}",
+                recovery_suggestion="请检查数据文件是否损坏，或尝试重新导入数据",
+            ) from e
 
     def get_available_years(self) -> List[int]:
-        """
-        获取可用的数据年份
-
-        Returns:
-            List[int]: 可用年份列表
-        """
         try:
             parquet_files = list(self.data_dir.glob("activities_*.parquet"))
             years = []
@@ -237,17 +203,16 @@ class StorageManager:
                 except (IndexError, ValueError):
                     continue
 
+            logger.debug(f"可用年份: {sorted(years)}")
             return sorted(years)
         except Exception as e:
-            raise RuntimeError(f"获取可用年份失败: {e}") from e
+            logger.error(f"获取可用年份失败: {e}")
+            raise StorageError(
+                message=f"获取可用年份失败: {e}",
+                recovery_suggestion="请检查数据目录是否存在",
+            ) from e
 
     def get_data_summary(self) -> Dict[str, Any]:
-        """
-        获取数据存储摘要信息
-
-        Returns:
-            Dict[str, Any]: 数据摘要信息
-        """
         try:
             years = self.get_available_years()
             total_records = 0
@@ -261,6 +226,9 @@ class StorageManager:
                     total_records += df.height
                     total_size_bytes += filepath.stat().st_size
 
+            logger.debug(
+                f"数据摘要: {total_records} 条记录, {total_size_bytes / (1024 * 1024):.2f} MB"
+            )
             return {
                 "available_years": years,
                 "total_records": total_records,
@@ -268,23 +236,19 @@ class StorageManager:
                 "data_directory": str(self.data_dir),
             }
         except Exception as e:
-            raise RuntimeError(f"获取数据摘要失败: {e}") from e
+            logger.error(f"获取数据摘要失败: {e}")
+            raise StorageError(
+                message=f"获取数据摘要失败: {e}",
+                recovery_suggestion="请检查数据目录和文件权限",
+            ) from e
 
     def delete_year_data(self, year: int) -> bool:
-        """
-        删除指定年份的数据
-
-        Args:
-            year: 要删除的年份
-
-        Returns:
-            bool: 删除是否成功
-
-        Raises:
-            ValueError: 当年份无效时
-        """
         if year < 2000 or year > 2100:
-            raise ValueError("年份必须在2000-2100范围内")
+            logger.error(f"年份无效: {year}")
+            raise ValidationError(
+                message="年份必须在2000-2100范围内",
+                recovery_suggestion="请输入有效的年份",
+            )
 
         try:
             filename = f"activities_{year}.parquet"
@@ -292,15 +256,21 @@ class StorageManager:
 
             if filepath.exists():
                 filepath.unlink()
+                logger.info(f"删除年份数据: {filename}")
                 return True
             else:
+                logger.debug(f"数据文件不存在，无需删除: {filename}")
                 return False
         except Exception as e:
-            raise RuntimeError(f"删除年份数据失败: {e}") from e
+            logger.error(f"删除年份数据失败: {e}")
+            raise StorageError(
+                message=f"删除年份数据失败: {e}",
+                recovery_suggestion="请检查文件权限",
+            ) from e
 
     def get_stats(self) -> Dict[str, Any]:
         """
-        获取存储统计信息
+        获取存储统计信息（使用 LazyFrame 优化性能）
 
         Returns:
             dict: 统计信息
@@ -308,33 +278,51 @@ class StorageManager:
         try:
             years = self.get_available_years()
             total_records = 0
-            
+
             for year in years:
-                df = self.read_activities(year)
-                total_records += df.height
+                filename = f"activities_{year}.parquet"
+                filepath = self.data_dir / filename
+                if filepath.exists():
+                    # 使用 scan_parquet 获取记录数，避免加载全部数据
+                    total_records += (
+                        pl.scan_parquet(filepath).select(pl.len()).collect().item()
+                    )
 
             time_range = {}
             if years:
-                df = self.read_activities()
-                if not df.is_empty():
-                    timestamps = df["timestamp"]
-                    time_range = {
-                        "start": str(timestamps.min()),
-                        "end": str(timestamps.max())
-                    }
+                # 使用 LazyFrame 读取时间范围
+                lf = self.read_parquet()
+                # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
+                if len(lf.collect_schema()) > 0:
+                    # 使用 LazyFrame 计算时间范围
+                    result = lf.select(
+                        [
+                            pl.col("timestamp").min().alias("start"),
+                            pl.col("timestamp").max().alias("end"),
+                        ]
+                    ).collect()
+
+                    if not result.is_empty():
+                        time_range = {
+                            "start": str(result["start"][0]),
+                            "end": str(result["end"][0]),
+                        }
 
             return {
                 "total_records": total_records,
                 "years": years,
-                "time_range": time_range
+                "time_range": time_range,
             }
         except Exception as e:
             return {"total_records": 0, "years": [], "time_range": {}, "error": str(e)}
 
-    def query_activities(self, years: Optional[List[int]] = None, 
-                        days: Optional[int] = None,
-                        min_distance: Optional[float] = None,
-                        min_heart_rate: Optional[int] = None) -> pl.DataFrame:
+    def query_activities(
+        self,
+        years: Optional[List[int]] = None,
+        days: Optional[int] = None,
+        min_distance: Optional[float] = None,
+        min_heart_rate: Optional[int] = None,
+    ) -> pl.DataFrame:
         """
         查询跑步活动数据（支持过滤）
 
@@ -351,10 +339,13 @@ class StorageManager:
 
         if days is not None:
             from datetime import datetime, timedelta
+
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
-            lf = lf.filter(pl.col("timestamp") >= start_date).filter(pl.col("timestamp") <= end_date)
+            lf = lf.filter(pl.col("timestamp") >= start_date).filter(
+                pl.col("timestamp") <= end_date
+            )
 
         if min_distance is not None:
             lf = lf.filter(pl.col("total_distance") >= min_distance)

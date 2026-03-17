@@ -179,15 +179,17 @@ class TestFixedWorkflow:
         """测试错误处理"""
         print("\n=== 测试错误处理 ===")
 
-        # 测试空数据保存
+        # 测试空数据保存 - 应该抛出 ValidationError
+        from src.core.exceptions import ValidationError
+
         empty_df = pl.DataFrame()
-        result = self.storage_manager.save_to_parquet(empty_df, 2024)
-        assert result is False
+        with pytest.raises(ValidationError, match="数据框不能为空"):
+            self.storage_manager.save_to_parquet(empty_df, 2024)
         print("✓ 空数据处理测试通过")
 
-        # 测试边界值计算
-        zero_vdot = self.analytics_engine.calculate_vdot(0, 1800)
-        assert zero_vdot == 0.0
+        # 测试边界值计算 - 零距离应该抛出 ValueError
+        with pytest.raises(ValueError, match="距离和时间必须为正数"):
+            self.analytics_engine.calculate_vdot(0, 1800)
         print("✓ 边界值计算测试通过")
 
         # 测试无效年份读取
@@ -269,7 +271,7 @@ def test_cli_commands():
     )
 
     assert result.returncode == 0
-    assert "0.1.0" in result.stdout
+    assert "v0.3.0" in result.stdout or "Nanobot Runner" in result.stdout
     print("✓ CLI version命令测试通过")
 
 

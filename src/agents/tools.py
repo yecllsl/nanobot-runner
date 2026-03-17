@@ -49,7 +49,7 @@ class BaseTool(ABC):
                 "name": self.name,
                 "description": self.description,
                 "parameters": self.parameters,
-            }
+            },
         }
 
     def validate_params(self, params: dict[str, Any]) -> list[str]:
@@ -106,21 +106,16 @@ class GetRunningStatsTool(BaseTool):
             "properties": {
                 "start_date": {
                     "type": "string",
-                    "description": "开始日期（可选，格式：YYYY-MM-DD）"
+                    "description": "开始日期（可选，格式：YYYY-MM-DD）",
                 },
-                "end_date": {
-                    "type": "string",
-                    "description": "结束日期（可选，格式：YYYY-MM-DD）"
-                }
-            }
+                "end_date": {"type": "string", "description": "结束日期（可选，格式：YYYY-MM-DD）"},
+            },
         }
 
     async def execute(self, **kwargs: Any) -> str:
         start_date = kwargs.get("start_date")
         end_date = kwargs.get("end_date")
-        return self._run_sync(
-            self.runner_tools.get_running_stats, start_date, end_date
-        )
+        return self._run_sync(self.runner_tools.get_running_stats, start_date, end_date)
 
 
 class GetRecentRunsTool(BaseTool):
@@ -142,9 +137,9 @@ class GetRecentRunsTool(BaseTool):
                 "limit": {
                     "type": "integer",
                     "description": "返回数量限制（默认10条）",
-                    "default": 10
+                    "default": 10,
                 }
-            }
+            },
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -168,16 +163,10 @@ class CalculateVdotForRunTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "distance_m": {
-                    "type": "number",
-                    "description": "距离（米）"
-                },
-                "time_s": {
-                    "type": "number",
-                    "description": "用时（秒）"
-                }
+                "distance_m": {"type": "number", "description": "距离（米）"},
+                "time_s": {"type": "number", "description": "用时（秒）"},
             },
-            "required": ["distance_m", "time_s"]
+            "required": ["distance_m", "time_s"],
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -207,9 +196,9 @@ class GetVdotTrendTool(BaseTool):
                 "limit": {
                     "type": "integer",
                     "description": "返回数量限制（默认20条）",
-                    "default": 20
+                    "default": 20,
                 }
-            }
+            },
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -232,12 +221,7 @@ class GetHrDriftAnalysisTool(BaseTool):
     def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
-            "properties": {
-                "run_id": {
-                    "type": "string",
-                    "description": "活动ID（可选）"
-                }
-            }
+            "properties": {"run_id": {"type": "string", "description": "活动ID（可选）"}},
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -261,12 +245,8 @@ class GetTrainingLoadTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "分析天数（默认42天）",
-                    "default": 42
-                }
-            }
+                "days": {"type": "integer", "description": "分析天数（默认42天）", "default": 42}
+            },
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -290,16 +270,10 @@ class QueryByDateRangeTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "start_date": {
-                    "type": "string",
-                    "description": "开始日期（格式：YYYY-MM-DD）"
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "结束日期（格式：YYYY-MM-DD）"
-                }
+                "start_date": {"type": "string", "description": "开始日期（格式：YYYY-MM-DD）"},
+                "end_date": {"type": "string", "description": "结束日期（格式：YYYY-MM-DD）"},
             },
-            "required": ["start_date", "end_date"]
+            "required": ["start_date", "end_date"],
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -326,16 +300,10 @@ class QueryByDistanceTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "min_distance": {
-                    "type": "number",
-                    "description": "最小距离（公里）"
-                },
-                "max_distance": {
-                    "type": "number",
-                    "description": "最大距离（公里，可选）"
-                }
+                "min_distance": {"type": "number", "description": "最小距离（公里）"},
+                "max_distance": {"type": "number", "description": "最大距离（公里，可选）"},
             },
-            "required": ["min_distance"]
+            "required": ["min_distance"],
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -436,9 +404,7 @@ class RunnerTools:
         return self.analytics.get_training_load(days)
 
     def query_by_date_range(
-        self,
-        start_date: str,
-        end_date: str
+        self, start_date: str, end_date: str
     ) -> List[Dict[str, Any]]:
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
@@ -448,16 +414,16 @@ class RunnerTools:
 
         lf = self.storage.read_parquet()
 
-        filtered_lf = lf.filter(
-            pl.col("timestamp").is_between(start_dt, end_dt)
-        )
+        filtered_lf = lf.filter(pl.col("timestamp").is_between(start_dt, end_dt))
 
-        selected_lf = filtered_lf.select([
-            "timestamp",
-            "total_distance",
-            "total_timer_time",
-            "avg_heart_rate",
-        ])
+        selected_lf = filtered_lf.select(
+            [
+                "timestamp",
+                "total_distance",
+                "total_timer_time",
+                "avg_heart_rate",
+            ]
+        )
 
         df = selected_lf.sort("timestamp", descending=True).collect()
 
@@ -467,20 +433,20 @@ class RunnerTools:
             duration_minutes = row.get("total_timer_time", 0) / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
 
-            results.append({
-                "timestamp": str(row.get("timestamp", "N/A")),
-                "distance": round(distance_km, 2),
-                "duration": row.get("total_timer_time", 0),
-                "heart_rate": row.get("avg_heart_rate", "N/A"),
-                "pace": round(pace, 2),
-            })
+            results.append(
+                {
+                    "timestamp": str(row.get("timestamp", "N/A")),
+                    "distance": round(distance_km, 2),
+                    "duration": row.get("total_timer_time", 0),
+                    "heart_rate": row.get("avg_heart_rate", "N/A"),
+                    "pace": round(pace, 2),
+                }
+            )
 
         return results
 
     def query_by_distance(
-        self,
-        min_distance: float,
-        max_distance: Optional[float] = None
+        self, min_distance: float, max_distance: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         min_meters = min_distance * 1000
         max_meters = max_distance * 1000 if max_distance else None
@@ -488,16 +454,20 @@ class RunnerTools:
         lf = self.storage.read_parquet()
 
         if max_meters:
-            distance_filter = pl.col("total_distance").is_between(min_meters, max_meters)
+            distance_filter = pl.col("total_distance").is_between(
+                min_meters, max_meters
+            )
         else:
             distance_filter = pl.col("total_distance") >= min_meters
 
-        filtered_lf = lf.filter(distance_filter).select([
-            "timestamp",
-            "total_distance",
-            "total_timer_time",
-            "avg_heart_rate",
-        ])
+        filtered_lf = lf.filter(distance_filter).select(
+            [
+                "timestamp",
+                "total_distance",
+                "total_timer_time",
+                "avg_heart_rate",
+            ]
+        )
 
         df = filtered_lf.sort("timestamp", descending=True).collect()
 
@@ -507,13 +477,15 @@ class RunnerTools:
             duration_minutes = row.get("total_timer_time", 0) / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
 
-            results.append({
-                "timestamp": str(row.get("timestamp", "N/A")),
-                "distance": round(distance_km, 2),
-                "duration": row.get("total_timer_time", 0),
-                "heart_rate": row.get("avg_heart_rate", "N/A"),
-                "pace": round(pace, 2),
-            })
+            results.append(
+                {
+                    "timestamp": str(row.get("timestamp", "N/A")),
+                    "distance": round(distance_km, 2),
+                    "duration": row.get("total_timer_time", 0),
+                    "heart_rate": row.get("avg_heart_rate", "N/A"),
+                    "pace": round(pace, 2),
+                }
+            )
 
         return results
 
