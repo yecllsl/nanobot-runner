@@ -185,17 +185,140 @@ git commit -m "fix(api): 修复响应格式错误
 
 2. **修复问题并测试**
 
-3. **合并到main和develop**
+3. **合并到 main 和 develop**
    ```bash
    git checkout main
    git merge hotfix/security-patch
    git tag -a v1.0.1 -m "紧急安全修复"
-   git push origin main --tags
+   git push origin main
+   git push origin v1.0.1
    
    git checkout develop
    git merge main
    git push origin develop
    ```
+
+### 3.3 CI/CD 失败后的版本管理策略
+
+#### 问题场景
+
+在发布过程中，如果打了标签并推送后，发现 GitHub Actions workflow 失败，需要修复代码。此时面临版本管理问题：
+
+```
+场景：
+1. 创建 v0.3.0 标签并推送 → GitHub Actions 失败
+2. 修复代码后，如何处理版本标签？
+```
+
+#### 解决方案对比
+
+| 方案 | 操作 | 优点 | 缺点 | 推荐度 |
+|------|------|------|------|--------|
+| **方案一**：删除重打标签 | 删除 v0.3.0 标签，修复后重新打 v0.3.0 标签并强制推送 | 版本号整洁，符合语义 | 需要 force push，可能影响他人 | ⭐⭐ |
+| **方案二**：发布补丁版本 | 修复后发布 v0.3.1 补丁版本 | 符合语义化版本规范，无需 force push | 多一个版本号 | ⭐⭐⭐⭐⭐ |
+
+#### 推荐方案：发布补丁版本（方案二）
+
+**执行步骤**：
+
+1. **在 main 分支修复代码**
+   ```bash
+   git checkout main
+   # 进行代码修复
+   git add .
+   git commit -m "fix: 修复 GitHub Actions 失败的问题"
+   ```
+
+2. **更新版本号**
+   ```bash
+   # 更新 pyproject.toml: 0.3.0 → 0.3.1
+   # 更新 AGENTS.md: 0.3.0 → 0.3.1
+   # 更新 README.md: v0.3.0 → v0.3.1
+   git add pyproject.toml AGENTS.md README.md
+   git commit -m "chore(version): bump version to 0.3.1 for patch release"
+   ```
+
+3. **创建并推送 v0.3.1 标签**
+   ```bash
+   git tag -a v0.3.1 -m "版本 0.3.1 补丁发布"
+   git push origin main
+   git push origin v0.3.1
+   ```
+
+4. **触发新的 Release workflow**
+   - GitHub Actions 会自动触发 v0.3.1 的发布流程
+   - 验证所有检查通过后，发布成功
+
+**为什么推荐方案二？**
+
+1. ✅ **符合语义化版本控制规范**（Semantic Versioning）
+   - PATCH 版本（第三位）用于向后兼容的问题修复
+   - CI/CD 配置错误属于需要修复的问题
+
+2. ✅ **避免强制推送**
+   - 不需要删除远程标签
+   - 不会造成 Git 历史混乱
+   - 对其他协作者友好
+
+3. ✅ **可追溯性更好**
+   - v0.3.0 标签指向有问题的版本（可作为参考）
+   - v0.3.1 标签指向修复后的版本（正式使用）
+   - 清晰的版本演进历史
+
+4. ✅ **行业最佳实践**
+   - 大多数开源项目采用此方式
+   - npm、PyPI 等包管理器都支持补丁版本
+
+#### 备选方案：删除重打标签（仅在特殊情况下使用）
+
+**适用场景**：
+- 项目处于早期开发阶段（如 v0.x.x）
+- 还没有人拉取该标签
+- 版本号有严格要求，不能接受补丁版本
+
+**执行步骤**：
+
+```bash
+# 1. 删除本地标签
+git tag -d v0.3.0
+
+# 2. 删除远程标签
+git push origin :refs/tags/v0.3.0
+
+# 3. 修复代码并提交
+# ... 进行代码修复 ...
+git commit -m "fix: 修复发布问题"
+
+# 4. 重新创建标签
+git tag -a v0.3.0 -m "版本 0.3.0 发布（修复版）"
+
+# 5. 强制推送标签（⚠️ 谨慎使用）
+git push origin v0.3.0 --force
+
+# 6. 推送代码
+git push origin main
+```
+
+**⚠️ 警告**：
+- 强制推送会改变 Git 历史
+- 如果其他人已经拉取了 v0.3.0 标签，会造成混乱
+- 可能导致协作者的本地仓库与远程不一致
+- **不推荐在团队项目中使用**
+
+#### 决策流程图
+
+```mermaid
+graph TD
+    A[CI/CD 失败] --> B{是否已有人使用此标签？}
+    B -->|是 | C[方案二：发布补丁版本]
+    B -->|否 | D{项目是否早期阶段？}
+    D -->|是 | E[可选：删除重打]
+    D -->|否 | C
+    C --> F[发布 v0.3.1]
+    E --> G[删除 v0.3.0，重新打标签]
+    F --> H[推荐 ✅]
+    G --> I[谨慎使用 ⚠️]
+```
 
 ## 4. 代码审查规范
 
