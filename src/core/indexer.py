@@ -23,7 +23,7 @@ class IndexManager:
         self.index_file.parent.mkdir(parents=True, exist_ok=True)
         self.index = self._load_index()
 
-    def _load_index(self) -> Dict[str, any]:
+    def _load_index(self) -> Dict[str, Any]:
         """加载索引文件"""
         if self.index_file.exists():
             try:
@@ -39,7 +39,7 @@ class IndexManager:
         with open(self.index_file, "w", encoding="utf-8") as f:
             json.dump(self.index, f, indent=2, ensure_ascii=False)
 
-    def generate_fingerprint(self, metadata: Dict[str, any]) -> str:
+    def generate_fingerprint(self, metadata: Dict[str, Any]) -> str:
         """
         生成文件指纹
 
@@ -49,16 +49,12 @@ class IndexManager:
         Returns:
             str: 指纹字符串
         """
-        # 提取关键字段
-        serial = metadata.get("serial_number", "")
-        time_created = metadata.get("time_created", "")
-        total_distance = metadata.get("total_distance", 0)
-        filename = metadata.get("filename", "")
-
-        # 构建指纹字符串
-        fingerprint_str = f"{serial}:{time_created}:{total_distance}:{filename}"
-
-        # 使用SHA256生成哈希
+        key_fields = [
+            metadata.get("total_distance", 0),
+            metadata.get("total_timer_time", 0),
+            metadata.get("start_time", ""),
+        ]
+        fingerprint_str = "|".join(str(field) for field in key_fields)
         return hashlib.sha256(fingerprint_str.encode()).hexdigest()
 
     def exists(self, fingerprint: str) -> bool:
@@ -73,7 +69,7 @@ class IndexManager:
         """
         return fingerprint in self.index.get("fingerprints", [])
 
-    def add(self, fingerprint: str, metadata: Dict[str, any] = None) -> bool:
+    def add(self, fingerprint: str, metadata: Dict[str, Any] = None) -> bool:
         """
         添加指纹到索引
 
@@ -132,7 +128,7 @@ class IndexManager:
         """
         return self.index.get("fingerprints", [])
 
-    def get_file_info(self, fingerprint: str) -> Optional[Dict[str, any]]:
+    def get_file_info(self, fingerprint: str) -> Optional[Dict[str, Any]]:
         """
         获取指纹对应的文件信息
 
@@ -140,7 +136,7 @@ class IndexManager:
             fingerprint: 指纹字符串
 
         Returns:
-            dict: 文件信息，不存在返回None
+            dict: 文件信息，不存在返回 None
         """
         return self.index.get("metadata", {}).get("files", {}).get(fingerprint)
 
