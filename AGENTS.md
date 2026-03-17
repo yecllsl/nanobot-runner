@@ -8,7 +8,7 @@ Nanobot Runner - 基于 nanobot-ai 的桌面端私人 AI 跑步助理。通过 P
 
 **核心技术栈**: Python 3.11+, nanobot-ai, Typer + Rich (CLI), Polars (计算引擎), Apache Parquet (存储), fitparse (FIT解析)
 
-**当前版本**: 0.3.0
+**当前版本**: 0.3.1
 
 ## 常用命令
 
