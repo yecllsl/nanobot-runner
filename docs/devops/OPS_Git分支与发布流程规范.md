@@ -4,10 +4,10 @@
 
 | 项目 | 详细信息 |
 |------|----------|
-| **文档版本** | v2.0 |
-| **更新日期** | 2026-03-06 |
-| **适用版本** | v0.2.0+ |
-| **更新内容** | 适配v0.2.0版本发布流程，优化自动化发布规范 |
+| **文档版本** | v3.0 |
+| **更新日期** | 2026-03-17 |
+| **适用版本** | v0.3.1+ |
+| **更新内容** | 优化发布流程（预检→CI 验证→正式发布），新增标签推送最佳实践，解决 CI/CD 失败后的版本管理问题 |
 
 ## 1. 分支管理规范
 
@@ -75,46 +75,105 @@ git commit -m "fix(api): 修复响应格式错误
 
 ## 3. 发布流程规范
 
-### 3.1 版本发布流程
+### 3.1 版本发布流程（优化版）
+
+#### 阶段一：发布准备与预检
 
 1. **准备发布**
    ```bash
    git checkout develop
    git pull
-   git checkout -b release/v1.0.0
+   git checkout -b release/v0.3.1
    ```
 
 2. **更新版本信息**
-   - 更新 `pyproject.toml` 中的版本号
+   - 更新 `pyproject.toml` 中的版本号（如：0.3.0 → 0.3.1）
+   - 更新 `AGENTS.md` 中的版本号
+   - 更新 `README.md` 中的版本号
    - 更新 `CHANGELOG.md`（如有）
-   - 更新依赖版本
 
-3. **测试验证**
+3. **本地预检**
    ```bash
-   pytest tests/
-   python -m nanobotrun --help
+   # 运行代码质量检查
+   uv run black --check src tests
+   uv run isort --check-only src tests
+   uv run mypy src
+   uv run bandit -r src
+   
+   # 运行测试套件
+   uv run pytest tests/ -v
+   
+   # 验证构建
+   uv build
    ```
 
-4. **合并到main分支**
+4. **推送预检分支触发 CI 预检**
+   ```bash
+   # 推送 release 分支，触发预检 workflow（不创建标签）
+   git push origin release/v0.3.1
+   ```
+   
+   **说明**：此时会触发 `.github/workflows/release-pre-check.yml`，执行完整 CI 流程但不发布。
+
+#### 阶段二：CI 验证通过后的正式发布
+
+5. **确认预检 CI 通过**
+   - 访问 GitHub Actions 查看预检 workflow 状态
+   - 确认所有检查项通过（code-quality, test, build）
+   - 如有失败，在 release 分支修复后重新推送
+
+6. **合并到 main 分支**
    ```bash
    git checkout main
-   git merge release/v1.0.0
-   git tag -a v1.0.0 -m "版本1.0.0发布"
-   git push origin main --tags
+   git merge release/v0.3.1
    ```
 
-5. **合并回develop分支**
+7. **创建并发布标签（关键步骤）**
+   ```bash
+   # 创建标签（本地）
+   git tag -a v0.3.1 -m "版本 0.3.1 发布"
+   
+   # 推送代码到 main 分支
+   git push origin main
+   
+   # 推送标签（明确指定标签名，避免推送旧标签）
+   git push origin v0.3.1
+   ```
+   
+   **⚠️ 重要注意事项**：
+   - ✅ **推荐**：`git push origin v0.3.1`（只推送新标签）
+   - ✅ **推荐**：`git push origin main && git push origin v0.3.1`（分步推送）
+   - ❌ **避免**：`git push origin main --tags`（会尝试推送所有标签，包括已存在的旧标签）
+   
+   **原因**：使用 `--tags` 会推送所有本地标签到远程，如果远程已存在同名标签（如 v0.3.0），会导致推送失败并产生错误提示。虽然不影响新标签的发布，但会造成混淆。
+
+8. **合并回 develop 分支**
    ```bash
    git checkout develop
    git merge main
    git push origin develop
    ```
 
-6. **删除发布分支**
+9. **删除发布分支**
    ```bash
-   git branch -d release/v1.0.0
-   git push origin --delete release/v1.0.0
+   git branch -d release/v0.3.1
+   git push origin --delete release/v0.3.1
    ```
+
+#### 阶段三：发布验证
+
+10. **验证 GitHub Release**
+    - 访问 https://github.com/yecllsl/nanobot-runner/releases
+    - 确认 v0.3.1 标签已创建
+    - 确认 Release 资产（.whl, .tar.gz）已上传
+
+11. **验证 PyPI 发布**
+    - 访问 https://pypi.org/project/nanobot-runner/#history
+    - 确认版本号已更新到 v0.3.1
+
+12. **验证 GitHub Actions**
+    - 访问 https://github.com/yecllsl/nanobot-runner/actions
+    - 确认 Release workflow 执行成功
 
 ### 3.2 热修复流程
 

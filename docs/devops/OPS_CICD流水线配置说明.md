@@ -1,52 +1,89 @@
-# CICD流水线配置说明
+# CICD 流水线配置说明
 
 ## 📋 文档版本信息
 
 | 项目 | 详细信息 |
 |------|----------|
-| **文档版本** | v2.0 |
-| **更新日期** | 2026-03-06 |
-| **适用版本** | v0.2.0+ |
-| **更新内容** | 适配v0.2.0版本Agent自然语言交互功能 |
+| **文档版本** | v3.0 |
+| **更新日期** | 2026-03-17 |
+| **适用版本** | v0.3.1+ |
+| **更新内容** | 新增发布预检 workflow，优化发布流程（预检→CI 验证→正式发布），解决 CI/CD 失败后的版本管理问题 |
 
 ## 1. 流水线概述
 
-Nanobot Runner项目采用GitHub Actions构建完整的CICD流水线，实现代码推送后的自动化测试、构建和部署。v0.2.0版本对流水线进行了全面优化，支持Agent自然语言交互功能的自动化验证。
+Nanobot Runner 项目采用 GitHub Actions 构建完整的 CICD 流水线，实现代码推送后的自动化测试、构建和部署。v0.3.1 版本对发布流程进行了优化，引入预检机制，降低版本管理风险。
 
 ### 1.1 流水线架构
 
 ```mermaid
 graph TB
-    A[代码推送] --> B[代码质量检查]
-    A --> C[测试执行]
-    C --> D[构建打包]
-    D --> E[安全扫描]
-    E --> F[发布部署]
-    
-    B --> C
-    C --> D
-    D --> E
-    E --> F
+    A[代码推送] --> B{推送类型？}
+    B -->|main/develop| C[完整 CI 流程]
+    B -->|release/*| D[预检 CI 流程]
+    B -->|Tag| E[Release 发布流程]
+    C --> F[代码质量检查]
+    D --> F
+    F --> G[测试执行]
+    G --> H[构建打包]
+    H --> I[安全扫描]
+    I --> J[部署/发布]
 ```
 
 ### 1.2 触发条件
 
 | 事件类型 | 触发条件 | 执行动作 |
 |---------|---------|----------|
-| **Push到main分支** | 代码合并到主干 | 完整CI流程 |
-| **Push到develop分支** | 开发分支更新 | 完整CI流程 |
-| **Pull Request** | 创建/更新PR | 测试和代码质量检查 |
-| **Release发布** | 创建新版本标签 | 构建和发布包 |
+| **Push 到 main 分支** | 代码合并到主干 | 完整 CI 流程 |
+| **Push 到 develop 分支** | 开发分支更新 | 完整 CI 流程 |
+| **Push 到 release/* 分支** | 发布预检分支 | 预检 CI 流程（不发布） |
+| **Pull Request** | 创建/更新 PR | 测试和代码质量检查 |
+| **Release 发布** | 创建新版本标签 | 构建和发布包 |
+
+### 1.3 发布流程优化（v0.3.1+）
+
+#### 传统发布流程的问题
+
+在 v0.3.0 及之前版本，发布流程为：
+```
+本地打标签 → 推送标签到 GitHub → 触发 Release workflow → CI/CD 执行
+```
+
+**问题**：
+- 如果 CI/CD 执行失败，标签已经创建并推送
+- 需要删除标签修复后重新打标签，或发布补丁版本
+- 造成版本管理混乱
+
+#### 优化后的发布流程
+
+```mermaid
+graph LR
+    A[创建 release 分支] --> B[本地预检]
+    B --> C[推送 release 分支]
+    C --> D[预检 workflow 执行]
+    D --> E{CI 通过？}
+    E -->|否 | F[修复代码]
+    F --> C
+    E -->|是 | G[合并到 main]
+    G --> H[打标签并推送]
+    H --> I[Release workflow 执行]
+    I --> J[发布成功]
+```
+
+**优势**：
+- ✅ CI 验证在打标签之前，降低版本管理风险
+- ✅ 预检失败只需修复 release 分支，无需处理标签
+- ✅ 正式发布时 CI 已通过，成功率更高
+- ✅ 符合"先验证，后发布"的最佳实践
 
 ## 2. 流水线配置详解
 
 ### 2.1 主要工作流文件
 
-#### 2.1.1 CI流水线 (.github/workflows/ci.yml)
+#### 2.1.1 CI 流水线 (.github/workflows/ci.yml)
 
 **核心功能**:
-- 多版本Python测试 (3.11, 3.12)
-- 单元测试、集成测试、E2E测试
+- 多版本 Python 测试 (3.11, 3.12)
+- 单元测试、集成测试、E2E 测试
 - 代码覆盖率报告
 - 代码质量检查
 - 包构建
@@ -58,7 +95,29 @@ strategy:
     python-version: ['3.11', '3.12']
 ```
 
-#### 2.1.2 完整CICD流水线 (.github/workflows/ci-cd.yml)
+#### 2.1.2 发布预检流水线 (.github/workflows/release-pre-check.yml)
+
+**核心功能**:
+- 在 release 分支推送时触发
+- 执行完整 CI 流程（code-quality, test, build）
+- **不执行发布操作**
+- 验证通过后方可合并到 main 分支
+
+**触发条件**:
+```yaml
+on:
+  push:
+    branches:
+      - 'release/*'
+```
+
+**使用说明**:
+1. 创建 release 分支：`git checkout -b release/v0.3.1`
+2. 推送分支：`git push origin release/v0.3.1`
+3. 等待 GitHub Actions 执行完成
+4. 确认所有检查通过后，合并到 main 分支
+
+#### 2.1.3 完整 CICD 流水线 (.github/workflows/ci-cd.yml)
 
 **核心功能**:
 - 代码质量检查 (black, isort, mypy, bandit)
@@ -66,7 +125,7 @@ strategy:
 - 性能测试
 - 安全扫描
 - 文档生成
-- 发布到GitHub Releases
+- 发布到 GitHub Releases
 
 ### 2.2 测试阶段配置
 
@@ -93,7 +152,7 @@ addopts = "-v --cov=src --cov-report=term-missing --cov-report=html --cov-report
     pytest tests/integration/ -v
 ```
 
-#### 2.2.3 E2E测试
+#### 2.2.3 E2E 测试
 ```yaml
 - name: Run E2E tests
   run: |
@@ -133,9 +192,10 @@ line_length = 88
 ```toml
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = true
+disallow_untyped_defs = false
+check_untyped_defs = false
 ```
 
 #### 2.3.3 安全扫描
@@ -182,7 +242,7 @@ packages = ["src"]
 
 ### 2.5 部署阶段
 
-#### 2.5.1 发布到GitHub Releases
+#### 2.5.1 发布到 GitHub Releases
 ```yaml
 - name: Upload release assets
   uses: actions/upload-release-asset@v1
@@ -204,7 +264,7 @@ packages = ["src"]
 
 ## 3. 环境配置
 
-### 3.1 Python版本管理
+### 3.1 Python 版本管理
 
 **支持版本**: Python 3.11, 3.12
 
@@ -242,7 +302,7 @@ env:
 
 ### 4.1 覆盖率配置
 
-**pytest配置**:
+**pytest 配置**:
 ```toml
 addopts = "-v --cov=src --cov-report=term-missing --cov-report=html --cov-report=xml"
 ```
@@ -258,14 +318,14 @@ addopts = "-v --cov=src --cov-report=term-missing --cov-report=html --cov-report
 ### 4.2 覆盖率报告
 
 - **终端报告**: 显示缺失覆盖的行
-- **HTML报告**: 生成详细的HTML报告
-- **XML报告**: 用于CI/CD集成
+- **HTML 报告**: 生成详细的 HTML 报告
+- **XML 报告**: 用于 CI/CD 集成
 
 ## 5. 安全配置
 
 ### 5.1 安全扫描工具
 
-**Bandit配置**:
+**Bandit 配置**:
 ```toml
 [tool.bandit]
 skips = ["B101"]  # 跳过断言检查
@@ -273,7 +333,7 @@ targets = ["src"]
 recursive = true
 ```
 
-**Safety检查**:
+**Safety 检查**:
 ```yaml
 - name: Run safety check
   run: |
@@ -282,8 +342,8 @@ recursive = true
 
 ### 5.2 安全报告
 
-- **Bandit报告**: JSON格式安全漏洞报告
-- **Safety报告**: 依赖安全漏洞报告
+- **Bandit 报告**: JSON 格式安全漏洞报告
+- **Safety 报告**: 依赖安全漏洞报告
 
 ## 6. 性能优化
 
@@ -313,7 +373,7 @@ strategy:
 
 ### 7.1 常见问题
 
-#### 问题1: 依赖安装失败
+#### 问题 1: 依赖安装失败
 **解决方案**:
 ```bash
 # 清理缓存
@@ -323,7 +383,7 @@ uv cache clean
 uv sync --force-reinstall
 ```
 
-#### 问题2: 测试超时
+#### 问题 2: 测试超时
 **解决方案**:
 ```yaml
 - name: Run tests with timeout
@@ -331,7 +391,7 @@ uv sync --force-reinstall
     timeout 300 pytest tests/ -v
 ```
 
-#### 问题3: 构建失败
+#### 问题 3: 构建失败
 **解决方案**:
 ```bash
 # 检查构建配置
@@ -414,5 +474,5 @@ python -m build --no-isolation
 
 ---
 
-**最后更新**: 2026-03-02  
-**维护者**: DevOps智能体
+**最后更新**: 2026-03-17  
+**维护者**: DevOps 智能体
