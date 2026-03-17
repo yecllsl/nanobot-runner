@@ -246,7 +246,7 @@ class AgentTestHelper:
     def query_running_stats(self, start_date: str, end_date: str) -> str:
         """查询跑步统计数据"""
         # 通过Agent工具调用统计数据
-        cmd = f"uv run python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_running_stats('{start_date}', '{end_date}'); print(result)\""
+        cmd = f"python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_running_stats('{start_date}', '{end_date}'); print(result)\""
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -256,7 +256,7 @@ class AgentTestHelper:
 
     def query_recent_runs(self, limit: int) -> str:
         """查询最近跑步记录"""
-        cmd = f'uv run python -c "from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_recent_runs({limit}); print(result)"'
+        cmd = f'python -c "from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_recent_runs({limit}); print(result)"'
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -266,7 +266,7 @@ class AgentTestHelper:
 
     def query_by_date_range(self, start_date: str, end_date: str) -> str:
         """按日期范围查询"""
-        cmd = f"uv run python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.query_by_date_range('{start_date}', '{end_date}'); print(f'查询到{{len(result)}}条记录')\""
+        cmd = f"python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.query_by_date_range('{start_date}', '{end_date}'); print(f'查询到{{len(result)}}条记录')\""
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -276,7 +276,7 @@ class AgentTestHelper:
 
     def query_vdot_trend(self, limit: int) -> str:
         """查询VDOT趋势"""
-        cmd = f"uv run python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_vdot_trend({limit}); print(f'VDOT趋势分析完成')\""
+        cmd = f"python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_vdot_trend({limit}); print(f'VDOT趋势分析完成')\""
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -286,7 +286,7 @@ class AgentTestHelper:
 
     def query_hr_drift_analysis(self) -> str:
         """查询心率漂移分析"""
-        cmd = "uv run python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_hr_drift_analysis('latest'); print('心率漂移分析完成')\""
+        cmd = "python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_hr_drift_analysis('latest'); print('心率漂移分析完成')\""
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -296,7 +296,7 @@ class AgentTestHelper:
 
     def query_training_load(self) -> str:
         """查询训练负荷"""
-        cmd = "uv run python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_training_load(); print('训练负荷分析完成')\""
+        cmd = "python -c \"from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); result = tools.get_training_load(); print('训练负荷分析完成')\""
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -308,7 +308,7 @@ class AgentTestHelper:
         """通过自然语言提问"""
         # 模拟Agent自然语言处理
         question_escaped = question.replace('"', '\\"')
-        cmd = f'uv run python -c "from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); print("模拟Agent回复")"'
+        cmd = f'python -c "from src.agents.tools import RunnerTools; from src.core.storage import StorageManager; storage = StorageManager(); tools = RunnerTools(storage); print("模拟Agent回复")"'
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:
@@ -319,7 +319,7 @@ class AgentTestHelper:
     def get_formatted_response(self, data: str) -> str:
         """获取格式化响应"""
         # 模拟Rich格式化输出
-        cmd = "uv run python -c \"from src.cli_formatter import format_stats_panel; print('格式化输出完成')\""
+        cmd = "python -c \"from src.cli_formatter import format_stats_panel; print('格式化输出完成')\""
         stdout, stderr, returncode = run_command(cmd, self.project_root, 10)
 
         if returncode != 0:

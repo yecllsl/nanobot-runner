@@ -80,7 +80,7 @@ class ParquetSchema:
     @classmethod
     def get_schema(cls) -> Dict[str, pl.DataType]:
         """获取完整Schema定义"""
-        return cls.UNIFIED_SCHEMA.copy()
+        return {k: v for k, v in cls.UNIFIED_SCHEMA.items()}
 
     @classmethod
     def get_required_fields(cls) -> set:
@@ -110,12 +110,12 @@ class ParquetSchema:
         # 只检查必填字段
         for col_name in cls.REQUIRED_FIELDS:
             if col_name not in df.columns:
-                msg = f"缺少必填字段: {col_name}"
+                msg = f"缺少必填字段：{col_name}"
                 messages.append(msg)
                 logger.warning(msg)
                 is_valid = False
-            elif not isinstance(df.schema[col_name], schema[col_name]):
-                msg = f"字段 {col_name} 类型不匹配: 期望 {schema[col_name]}, 实际 {df.schema[col_name]}"
+            elif df.schema[col_name] != schema[col_name]:
+                msg = f"字段 {col_name} 类型不匹配：期望 {schema[col_name]}, 实际 {df.schema[col_name]}"
                 messages.append(msg)
                 logger.warning(msg)
                 is_valid = False

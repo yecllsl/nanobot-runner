@@ -233,7 +233,9 @@ class FitParser:
                     if time_diffs.len() > 0:
                         avg_gap = time_diffs.mean()
                         # time_diffs 是 Series，直接对 Series 进行过滤
-                        time_gaps = time_diffs.filter(time_diffs > avg_gap * 2).len()
+                        # 使用 float 乘法避免类型问题
+                        threshold = float(avg_gap) * 2.0 if avg_gap is not None else 0
+                        time_gaps = time_diffs.filter(time_diffs > threshold).len()
 
             return {
                 "missing_required_columns": missing_columns,

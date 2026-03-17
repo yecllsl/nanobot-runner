@@ -365,8 +365,8 @@ class AnalyticsEngine:
             str: 平均配速（分钟/公里）
         """
         try:
-            total_distance = df["distance"].sum() / 1000
-            total_duration = df["duration"].sum() / 60
+            total_distance = float(df["distance"].sum()) / 1000.0
+            total_duration = float(df["duration"].sum()) / 60.0
 
             if total_distance <= 0:
                 return "0:00"

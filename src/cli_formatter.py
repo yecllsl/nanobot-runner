@@ -12,7 +12,7 @@ from rich.text import Text
 console = Console()
 
 
-def format_duration(seconds: int) -> str:
+def format_duration(seconds: Union[int, float]) -> str:
     """
     格式化时长为人类可读格式
 
@@ -22,6 +22,7 @@ def format_duration(seconds: int) -> str:
     Returns:
         str: 格式化后的时长字符串
     """
+    seconds = int(seconds)
     if seconds < 60:
         return f"{seconds}秒"
     elif seconds < 3600:
