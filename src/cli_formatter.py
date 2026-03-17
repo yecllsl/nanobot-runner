@@ -98,7 +98,7 @@ def format_stats_panel(data: Dict[str, Any]) -> Panel:
         lines.append(f"  {key}: [bold]{display_value}[/bold]")
 
     content = "\n".join(lines)
-    return Panel(content, title="📊 统计信息", border_style="cyan")
+    return Panel(content, title="[Stats] 统计信息", border_style="cyan")
 
 
 def format_error(message: str) -> Panel:
@@ -111,7 +111,7 @@ def format_error(message: str) -> Panel:
     Returns:
         Panel: Rich面板对象
     """
-    return Panel(f"[red]{message}[/red]", title="❌ 错误", border_style="red")
+    return Panel(f"[red]{message}[/red]", title="[Error] 错误", border_style="red")
 
 
 def format_success(message: str) -> Panel:
@@ -124,7 +124,7 @@ def format_success(message: str) -> Panel:
     Returns:
         Panel: Rich面板对象
     """
-    return Panel(f"[green]{message}[/green]", title="✅ 成功", border_style="green")
+    return Panel(f"[green]{message}[/green]", title="[Success] 成功", border_style="green")
 
 
 def format_warning(message: str) -> Panel:
@@ -137,7 +137,7 @@ def format_warning(message: str) -> Panel:
     Returns:
         Panel: Rich面板对象
     """
-    return Panel(f"[yellow]{message}[/yellow]", title="⚠️ 警告", border_style="yellow")
+    return Panel(f"[yellow]{message}[/yellow]", title="[Warning] 警告", border_style="yellow")
 
 
 def format_runs_table(runs: List[Dict[str, Any]]) -> Table:
@@ -150,7 +150,7 @@ def format_runs_table(runs: List[Dict[str, Any]]) -> Table:
     Returns:
         Table: Rich表格对象
     """
-    table = Table(title="🏃 跑步记录", show_header=True, header_style="bold magenta")
+    table = Table(title="[Run] 跑步记录", show_header=True, header_style="bold magenta")
 
     table.add_column("日期", style="cyan", width=12)
     table.add_column("距离", style="green", width=10, justify="right")
@@ -217,7 +217,7 @@ def format_vdot_trend(vdot_data: List[Dict[str, Any]]) -> Table:
     Returns:
         Table: Rich表格对象
     """
-    table = Table(title="📈 VDOT趋势", show_header=True, header_style="bold magenta")
+    table = Table(title="[Trend] VDOT趋势", show_header=True, header_style="bold magenta")
 
     table.add_column("日期", style="cyan", width=12)
     table.add_column("VDOT", style="green", width=10, justify="right")

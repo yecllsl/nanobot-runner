@@ -127,7 +127,7 @@ def import_data(
                 result = importer.import_file(path_obj, force=force)
 
             if result.get("status") == "added":
-                print_status("✓ 导入成功", "success")
+                print_status("[OK] 导入成功", "success")
             elif result.get("status") == "skipped":
                 print_status("文件已存在，跳过导入（使用 --force 强制导入）", "warning")
             else:
@@ -165,7 +165,7 @@ def import_data(
 
             console.print()
             print_status(
-                f"✓ 导入完成: 新增 {stats['added']} 个，跳过 {stats['skipped']} 个", "success"
+                f"[OK] 导入完成: 新增 {stats['added']} 个，跳过 {stats['skipped']} 个", "success"
             )
             if stats["failed"] > 0:
                 print_status(f"  失败 {stats['failed']} 个文件", "warning")
@@ -287,7 +287,7 @@ async def _run_chat():
     from src.agents.tools import RunnerTools, create_tools
     from src.cli_formatter import format_agent_response
 
-    console.print("[bold green]🤖 Nanobot Runner Agent[/bold green]")
+    console.print("[bold green][Bot] Nanobot Runner Agent[/bold green]")
     console.print("[dim]基于 nanobot 的本地跑步数据助理[/dim]")
     console.print("=" * 60)
     console.print()
@@ -332,7 +332,7 @@ async def _run_chat():
 
         agent.tools = registry
 
-        console.print(f"[bold green]✓ Agent 已初始化[/bold green]")
+        console.print(f"[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {agent_defaults.model}[/dim]")
         console.print()
 
@@ -509,7 +509,7 @@ def _display_report(report_data: dict):
     console.print(
         Panel(
             f"[bold]{report_data.get('date', '')}[/bold]\n{report_data.get('greeting', '')}",
-            title="☀️ 每日跑步晨报",
+            title="[Morning] 每日跑步晨报",
             border_style="blue",
         )
     )
