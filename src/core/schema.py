@@ -159,8 +159,9 @@ class ParquetSchema:
             if col_name in df.columns:
                 try:
                     df = df.with_columns(pl.col(col_name).cast(col_type))
-                except Exception:
-                    pass
+                except Exception:  # nosec B110
+                    # 类型转换失败时保持原类型
+                    logger.warning(f"列 {col_name} 类型转换失败，保持原类型")
 
         return df
 
