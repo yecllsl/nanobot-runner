@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 
 from src.core.storage import StorageManager
+from src.core.exceptions import ValidationError, StorageError
 
 
 class TestStorageManager:
@@ -139,7 +140,7 @@ class TestStorageManager:
                 }
             )
 
-            with pytest.raises(ValueError, match="数据框不能为空"):
+            with pytest.raises(ValidationError, match="数据框不能为空"):
                 manager.save_to_parquet(empty_data, 2024)
 
     def test_get_data_summary(self):

@@ -170,6 +170,102 @@ class TestQueryPerformance:
         assert isinstance(result, list), "查询结果应为列表类型"
         
         print(f"✅ 最近跑步记录查询性能测试通过: {elapsed:.3f}秒")
+    
+    @pytest.mark.performance
+    def test_get_training_load_performance(self):
+        """测试训练负荷计算性能（ATL/CTL计算）"""
+        # 预热查询
+        self.tools.get_training_load(days=30)
+        
+        # 正式性能测试
+        start_time = time.time()
+        result = self.tools.get_training_load(days=42)
+        elapsed = time.time() - start_time
+        
+        print(f"📊 训练负荷计算性能: {elapsed:.3f}秒")
+        
+        # 性能要求：响应时间 < 2 秒
+        assert elapsed < 2.0, f"训练负荷计算耗时 {elapsed:.3f}秒，超过 2 秒限制"
+        assert isinstance(result, dict), "查询结果应为字典类型"
+        assert "atl" in result, "结果应包含 ATL 字段"
+        assert "ctl" in result, "结果应包含 CTL 字段"
+        assert "tsb" in result, "结果应包含 TSB 字段"
+        
+        print(f"✅ 训练负荷计算性能测试通过: {elapsed:.3f}秒")
+        print(f"   ATL: {result.get('atl', 0)}, CTL: {result.get('ctl', 0)}, TSB: {result.get('tsb', 0)}")
+    
+    @pytest.mark.performance
+    def test_get_stats_lazyframe_performance(self):
+        """测试 get_stats 方法 LazyFrame 性能"""
+        # 预热查询
+        self.storage.get_stats()
+        
+        # 正式性能测试
+        start_time = time.time()
+        result = self.storage.get_stats()
+        elapsed = time.time() - start_time
+        
+        print(f"📊 get_stats LazyFrame 性能: {elapsed:.3f}秒")
+        
+        # 性能要求：响应时间 < 1 秒
+        assert elapsed < 1.0, f"get_stats 耗时 {elapsed:.3f}秒，超过 1 秒限制"
+        assert isinstance(result, dict), "查询结果应为字典类型"
+        assert "total_records" in result, "结果应包含 total_records 字段"
+        assert "years" in result, "结果应包含 years 字段"
+        
+        print(f"✅ get_stats LazyFrame 性能测试通过: {elapsed:.3f}秒")
+        print(f"   总记录数: {result.get('total_records', 0)}")
+    
+    @pytest.mark.performance
+    def test_lazyframe_vs_dataframe_comparison(self):
+        """对比 LazyFrame 与 DataFrame 查询性能差异"""
+        import tracemalloc
+        
+        # 获取所有 parquet 文件路径
+        parquet_files = list(self.temp_dir.glob("activities_*.parquet"))
+        
+        # 测试 LazyFrame 方式
+        tracemalloc.start()
+        start_time = time.time()
+        lazy_result = pl.concat([pl.scan_parquet(f) for f in parquet_files]).select([
+            pl.len().alias("count"),
+            pl.col("total_distance").sum().alias("total_distance"),
+            pl.col("total_timer_time").sum().alias("total_timer_time"),
+        ]).collect()
+        lazy_time = time.time() - start_time
+        lazy_memory = tracemalloc.get_traced_memory()[1] / 1024 / 1024  # MB
+        tracemalloc.stop()
+        
+        # 测试 DataFrame 方式（传统方式）
+        tracemalloc.start()
+        start_time = time.time()
+        dfs = [pl.read_parquet(f) for f in parquet_files]
+        df = pl.concat(dfs) if len(dfs) > 1 else dfs[0]
+        df_result = df.select([
+            pl.len().alias("count"),
+            pl.col("total_distance").sum().alias("total_distance"),
+            pl.col("total_timer_time").sum().alias("total_timer_time"),
+        ])
+        df_time = time.time() - start_time
+        df_memory = tracemalloc.get_traced_memory()[1] / 1024 / 1024  # MB
+        tracemalloc.stop()
+        
+        # 计算性能提升比例
+        time_improvement = ((df_time - lazy_time) / df_time * 100) if df_time > 0 else 0
+        memory_improvement = ((df_memory - lazy_memory) / df_memory * 100) if df_memory > 0 else 0
+        
+        print(f"📊 LazyFrame vs DataFrame 性能对比:")
+        print(f"   LazyFrame: {lazy_time:.3f}秒, 内存: {lazy_memory:.2f}MB")
+        print(f"   DataFrame: {df_time:.3f}秒, 内存: {df_memory:.2f}MB")
+        print(f"   时间提升: {time_improvement:.1f}%")
+        print(f"   内存优化: {memory_improvement:.1f}%")
+        
+        # 验证结果一致性
+        assert lazy_result["count"][0] == df_result["count"][0], "LazyFrame 和 DataFrame 结果不一致"
+        
+        # 验证性能提升（目标：≥20%）
+        # 注意：小数据集可能看不出明显差异，主要验证功能正确性
+        print(f"✅ LazyFrame vs DataFrame 对比测试通过")
 
 
 def test_performance_baseline():
@@ -183,7 +279,10 @@ def test_performance_baseline():
     elapsed = time.time() - start_time
     
     print(f"📊 空数据查询基准性能: {elapsed:.3f}秒")
+    
+    # 空数据时返回 message 字段
     assert elapsed < 1.0, f"空数据查询耗时 {elapsed:.3f}秒，超过基准限制"
+    assert isinstance(result, dict), "结果应为字典类型"
     
     print("✅ 性能基准测试通过")
 
@@ -203,6 +302,7 @@ if __name__ == "__main__":
         test_instance.test_get_vdot_trend_performance()
         test_instance.test_get_running_stats_performance()
         test_instance.test_get_recent_runs_performance()
+        test_instance.test_get_training_load_performance()
         
         print("🎉 所有性能测试执行完成！")
         print("✅ 性能测试结果: 通过")

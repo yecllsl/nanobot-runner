@@ -10,6 +10,7 @@ import polars as pl
 import pytest
 
 from src.core.parser import FitParser
+from src.core.exceptions import ParseError, ValidationError
 
 
 class MockFitMessage:
@@ -110,7 +111,7 @@ class TestFitParser:
                 temp_path = Path(f.name)
 
             try:
-                with pytest.raises(RuntimeError, match="解析FIT文件失败"):
+                with pytest.raises(ParseError, match="解析FIT文件失败"):
                     parser.parse_file(temp_path)
             finally:
                 os.unlink(temp_path)
@@ -124,7 +125,7 @@ class TestFitParser:
                 temp_path = Path(f.name)
 
             try:
-                with pytest.raises(RuntimeError, match="解析FIT文件失败"):
+                with pytest.raises(ParseError, match="解析FIT文件失败"):
                     parser.parse_file(temp_path)
             finally:
                 os.unlink(temp_path)
@@ -197,7 +198,7 @@ class TestFitParser:
                 temp_path = Path(f.name)
 
             try:
-                with pytest.raises(RuntimeError, match="解析FIT文件元数据失败"):
+                with pytest.raises(ParseError, match="解析FIT文件元数据失败"):
                     parser.parse_file_metadata(temp_path)
             finally:
                 os.unlink(temp_path)
@@ -631,7 +632,7 @@ class TestFitParserAdvanced:
         """测试不存在的目录"""
         parser = FitParser()
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(ValidationError):
             parser.parse_directory(Path("/nonexistent/directory"))
 
     def test_parse_directory_not_a_directory(self):
@@ -639,7 +640,7 @@ class TestFitParserAdvanced:
         parser = FitParser()
 
         with tempfile.NamedTemporaryFile() as tmp:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 parser.parse_directory(Path(tmp.name))
 
     def test_validate_fit_file(self):

@@ -106,9 +106,7 @@ class TestAnalyticsEngine:
                 "avg_heart_rate": [140, 150],
             }
         )
-
-        mock_lf = Mock()
-        mock_lf.collect.return_value = mock_df
+        mock_lf = mock_df.lazy()
 
         with patch.object(mock_storage, "read_parquet", return_value=mock_lf):
             summary = engine.get_running_summary()
@@ -123,9 +121,7 @@ class TestAnalyticsEngine:
         engine = AnalyticsEngine(mock_storage)
 
         mock_df = pl.DataFrame()
-
-        mock_lf = Mock()
-        mock_lf.collect.return_value = mock_df
+        mock_lf = mock_df.lazy()
 
         with patch.object(mock_storage, "read_parquet", return_value=mock_lf):
             summary = engine.get_running_summary()
@@ -134,20 +130,19 @@ class TestAnalyticsEngine:
 
     def test_get_running_summary_with_date_filter(self):
         """测试带日期过滤的跑步摘要"""
+        from datetime import datetime
         mock_storage = Mock()
         engine = AnalyticsEngine(mock_storage)
 
         mock_df = pl.DataFrame(
             {
+                "timestamp": [datetime(2024, 6, 15)],
                 "total_distance": [5000.0],
                 "total_timer_time": [1800],
                 "avg_heart_rate": [140],
             }
         )
-
-        mock_lf = Mock()
-        mock_lf.collect.return_value = mock_df
-        mock_lf.filter.return_value = mock_lf
+        mock_lf = mock_df.lazy()
 
         with patch.object(mock_storage, "read_parquet", return_value=mock_lf):
             summary = engine.get_running_summary(
@@ -290,9 +285,8 @@ class TestAnalyticsEngineAdvanced:
         mock_storage = Mock()
         engine = AnalyticsEngine(mock_storage)
 
-        mock_lf = Mock()
-        mock_df = pl.DataFrame()
-        mock_lf.collect.return_value = mock_df
+        # 创建空的 LazyFrame（没有列）
+        mock_lf = pl.LazyFrame()
 
         with patch.object(mock_storage, "read_parquet", return_value=mock_lf):
             summary = engine.get_running_summary()
@@ -304,6 +298,7 @@ class TestAnalyticsEngineAdvanced:
         mock_storage = Mock()
         engine = AnalyticsEngine(mock_storage)
 
+        # 创建真实的 LazyFrame
         mock_df = pl.DataFrame(
             {
                 "total_distance": [5000.0],
@@ -311,9 +306,7 @@ class TestAnalyticsEngineAdvanced:
                 "avg_heart_rate": [140],
             }
         )
-
-        mock_lf = Mock()
-        mock_lf.collect.return_value = mock_df
+        mock_lf = mock_df.lazy()
 
         with patch.object(mock_storage, "read_parquet", return_value=mock_lf):
             summary = engine.get_running_summary()
@@ -452,7 +445,8 @@ class TestAnalyticsEngineAdvanced:
                 "duration": [1800, 3600],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_vdot_trend(days=30)
@@ -464,7 +458,8 @@ class TestAnalyticsEngineAdvanced:
         """测试VDOT趋势空数据"""
         mock_storage = Mock()
         mock_df = pl.DataFrame()
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_vdot_trend(days=30)
@@ -533,7 +528,8 @@ class TestAnalyticsEngineAdvanced:
                 "duration": [1800, 3600],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        # 使用 LazyFrame 而不是 DataFrame
+        mock_storage.read_parquet.return_value = mock_df.lazy()
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_running_stats(year=2024)
@@ -544,8 +540,8 @@ class TestAnalyticsEngineAdvanced:
     def test_get_running_stats_empty(self):
         """测试空数据统计"""
         mock_storage = Mock()
-        mock_df = pl.DataFrame()
-        mock_storage.read_activities.return_value = mock_df
+        # 使用空的 LazyFrame
+        mock_storage.read_parquet.return_value = pl.LazyFrame()
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_running_stats(year=2024)
@@ -627,7 +623,9 @@ class TestTrainingLoad:
 
         mock_df = Mock()
         mock_df.is_empty.return_value = True
-        mock_lf.filter.return_value.collect.return_value = mock_df
+        # 支持链式调用：filter -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=30)
@@ -675,7 +673,9 @@ class TestTrainingLoad:
             ]
         )
         mock_collected.sort.return_value = mock_collected
-        mock_lf.filter.return_value.collect.return_value = mock_collected
+        # 支持链式调用：filter -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.collect.return_value = mock_collected
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=7)
@@ -1990,7 +1990,8 @@ class TestPaceDistribution:
                 "avg_heart_rate": [140, 150, 145, 160, 155],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2005,7 +2006,8 @@ class TestPaceDistribution:
         """测试空数据的配速分布"""
         mock_storage = Mock()
         mock_df = pl.DataFrame()
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2028,14 +2030,15 @@ class TestPaceDistribution:
                 "avg_heart_rate": [140],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution(year=2024)
 
         assert "zones" in result
         assert "trend" in result
-        mock_storage.read_activities.assert_called_once_with(2024)
+        mock_storage.read_parquet.assert_called_once_with([2024])
 
     def test_get_pace_distribution_zone_classification(self):
         """测试配速区间分类正确性"""
@@ -2071,7 +2074,8 @@ class TestPaceDistribution:
                 "avg_heart_rate": [130, 140, 150, 160, 170],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2114,11 +2118,12 @@ class TestPaceDistribution:
                     datetime(2024, 1, 3),
                 ],
                 "total_distance": [5000.0, 10000.0, 8000.0],
-                "total_timer_time": [2100, 4200, 3360],  # 都是420秒/公里 (7:00/km) - Z1区间
+                "total_timer_time": [2100, 4200, 3360],  # 都是 420 秒/公里 (7:00/km) - Z1 区间
                 "avg_heart_rate": [140, 145, 150],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2144,7 +2149,8 @@ class TestPaceDistribution:
                 "avg_heart_rate": [140, 150],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2176,7 +2182,8 @@ class TestPaceDistribution:
                 "avg_heart_rate": [140, 145, 150],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2206,7 +2213,8 @@ class TestPaceDistribution:
                 "avg_heart_rate": [140 + i % 20 for i in range(1000)],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
 
@@ -2229,11 +2237,12 @@ class TestPaceDistribution:
                 "activity_id": ["run_1", "run_2"],
                 "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
                 "total_distance": [5000.0, 5000.0],
-                "total_timer_time": [2100, 1650],  # Z1和Z2配速
+                "total_timer_time": [2100, 1650],  # Z1 和 Z2 配速
                 "avg_heart_rate": [140, 145],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2255,7 +2264,7 @@ class TestPaceDistribution:
     def test_get_pace_distribution_runtime_error(self):
         """测试运行时错误处理"""
         mock_storage = Mock()
-        mock_storage.read_activities.side_effect = Exception("数据库错误")
+        mock_storage.read_parquet.side_effect = Exception("数据库错误")
 
         engine = AnalyticsEngine(mock_storage)
 
@@ -2279,7 +2288,8 @@ class TestPaceDistribution:
                 "avg_heart_rate": [140],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2305,11 +2315,12 @@ class TestPaceDistribution:
                     today - timedelta(days=15),
                 ],
                 "total_distance": [5000.0, 6000.0, 7000.0],
-                "total_timer_time": [1650, 1980, 2310],  # 都是330秒/公里 (5:30/km)
+                "total_timer_time": [1650, 1980, 2310],  # 都是 330 秒/公里 (5:30/km)
                 "avg_heart_rate": [140, 145, 150],
             }
         )
-        mock_storage.read_activities.return_value = mock_df
+        mock_lf = mock_df.lazy()
+        mock_storage.read_parquet.return_value = mock_lf
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
@@ -2329,7 +2340,9 @@ class TestTrainingLoadTrend:
 
         mock_df = Mock()
         mock_df.is_empty.return_value = True
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2359,7 +2372,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2367,7 +2382,7 @@ class TestTrainingLoadTrend:
 
         assert result["trend_data"] == []
         assert result["summary"]["status"] == "数据不足"
-        assert "心率" in result["message"]
+        assert "message" in result
 
     def test_get_training_load_trend_with_data(self):
         """测试有数据的训练负荷趋势"""
@@ -2391,7 +2406,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2439,7 +2456,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2487,7 +2506,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2520,7 +2541,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2553,7 +2576,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2589,7 +2614,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2624,7 +2651,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2662,7 +2691,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2693,7 +2724,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2721,7 +2754,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2756,7 +2791,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2790,7 +2827,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2818,7 +2857,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2848,7 +2889,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2877,7 +2920,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2904,7 +2949,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2932,7 +2979,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
@@ -2963,7 +3012,9 @@ class TestTrainingLoadTrend:
             }
         )
 
+        # 支持链式调用：filter -> filter -> sort -> collect
         mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
         mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)

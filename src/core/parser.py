@@ -8,154 +8,154 @@ from typing import Any, Dict, Optional
 import fitparse
 import polars as pl
 
+from src.core.exceptions import ParseError, ValidationError
+from src.core.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class FitParser:
     """FIT文件解析器"""
 
     def __init__(self) -> None:
-        """初始化解析器"""
-        pass
+        logger.debug("FitParser 初始化")
 
     def parse_file(self, filepath: Path) -> Optional[pl.DataFrame]:
-        """
-        解析单个FIT文件
-
-        Args:
-            filepath: FIT文件路径
-
-        Returns:
-            pl.DataFrame: 解析后的数据框，失败返回None
-
-        Raises:
-            FileNotFoundError: 当文件不存在时
-            ValueError: 当文件格式无效时
-        """
         if not filepath.exists():
-            raise FileNotFoundError(f"文件不存在: {filepath}")
+            logger.error(f"文件不存在: {filepath}")
+            raise ValidationError(
+                message=f"文件不存在: {filepath}",
+                recovery_suggestion="请确认文件路径是否正确",
+            )
 
         if filepath.suffix.lower() != ".fit":
-            raise ValueError(f"文件格式无效，必须是.fit文件: {filepath}")
+            logger.error(f"文件格式无效: {filepath}")
+            raise ValidationError(
+                message=f"文件格式无效，必须是.fit文件: {filepath}",
+                recovery_suggestion="请选择正确的FIT格式文件",
+            )
 
         try:
+            logger.debug(f"开始解析文件: {filepath}")
             fit_file = fitparse.FitFile(str(filepath))
 
             records = []
             session_data: Dict[str, Any] = {}
 
-            # 解析记录数据
             for record in fit_file.get_messages("record"):
                 record_data: Dict[str, Any] = {}
                 for data in record:
                     record_data[data.name] = data.value
                 records.append(record_data)
 
-            # 解析会话数据
             for session in fit_file.get_messages("session"):
                 for data in session:
                     session_data[data.name] = data.value
 
             if not records:
-                print(f"警告: 文件 {filepath} 没有记录数据")
+                logger.warning(f"文件无记录数据: {filepath}")
                 return None
 
-            # 转换为Polars DataFrame
             df = pl.DataFrame(records)
 
-            # 添加会话数据作为元数据
             if session_data:
                 df = self._add_session_metadata(df, session_data)
 
-            # 添加文件信息
             df = df.with_columns(
                 pl.lit(str(filepath)).alias("source_file"),
                 pl.lit(datetime.now()).alias("import_timestamp"),
             )
 
+            logger.info(f"解析文件成功: {filepath}, 记录数: {df.height}")
             return df
+        except (ValidationError, ParseError):
+            raise
         except Exception as e:
-            raise RuntimeError(f"解析FIT文件失败: {e}") from e
+            logger.error(f"解析FIT文件失败: {filepath}, 错误: {e}")
+            raise ParseError(
+                message=f"解析FIT文件失败: {e}",
+                recovery_suggestion="请确认文件格式正确，或尝试重新导出FIT文件",
+            ) from e
 
     def _add_session_metadata(
         self, df: pl.DataFrame, session_data: Dict[str, Any]
     ) -> pl.DataFrame:
-        """
-        添加会话元数据到数据框
-
-        Args:
-            df: 原始数据框
-            session_data: 会话数据字典
-
-        Returns:
-            pl.DataFrame: 添加了元数据的数据框
-        """
         try:
-            # 添加会话元数据作为常量列
             for key, value in session_data.items():
                 if value is not None:
                     df = df.with_columns(pl.lit(value).alias(f"session_{key}"))
 
+            logger.debug(f"添加会话元数据: {len(session_data)} 个字段")
             return df
         except Exception as e:
-            raise RuntimeError(f"添加会话元数据失败: {e}") from e
+            logger.error(f"添加会话元数据失败: {e}")
+            raise ParseError(
+                message=f"添加会话元数据失败: {e}",
+                recovery_suggestion="请检查FIT文件数据结构",
+            ) from e
 
     def parse_directory(self, directory: Path) -> pl.DataFrame:
-        """
-        解析目录中的所有FIT文件
-
-        Args:
-            directory: 目录路径
-
-        Returns:
-            pl.DataFrame: 合并后的数据框
-
-        Raises:
-            FileNotFoundError: 当目录不存在时
-        """
         if not directory.exists():
-            raise FileNotFoundError(f"目录不存在: {directory}")
+            logger.error(f"目录不存在: {directory}")
+            raise ValidationError(
+                message=f"目录不存在: {directory}",
+                recovery_suggestion="请确认目录路径是否正确",
+            )
 
         if not directory.is_dir():
-            raise ValueError(f"路径不是目录: {directory}")
+            logger.error(f"路径不是目录: {directory}")
+            raise ValidationError(
+                message=f"路径不是目录: {directory}",
+                recovery_suggestion="请选择有效的目录路径",
+            )
 
         try:
             fit_files = list(directory.glob("*.fit"))
             if not fit_files:
-                print(f"警告: 目录 {directory} 中没有找到.fit文件")
+                logger.debug(f"目录中无FIT文件: {directory}")
                 return pl.DataFrame()
 
+            logger.info(f"开始解析目录: {directory}, 文件数: {len(fit_files)}")
             dataframes = []
             for filepath in fit_files:
                 try:
                     df = self.parse_file(filepath)
                     if df is not None and not df.is_empty():
                         dataframes.append(df)
-                except Exception as e:
-                    print(f"警告: 解析文件 {filepath} 失败: {e}")
+                except (ValidationError, ParseError):
                     continue
 
             if dataframes:
-                return pl.concat(dataframes)
+                result = pl.concat(dataframes)
+                logger.info(f"目录解析完成: {result.height} 条记录")
+                return result
             else:
+                logger.warning(f"目录解析无有效数据: {directory}")
                 return pl.DataFrame()
+        except (ValidationError, ParseError):
+            raise
         except Exception as e:
-            raise RuntimeError(f"解析目录失败: {e}") from e
+            logger.error(f"解析目录失败: {e}")
+            raise ParseError(
+                message=f"解析目录失败: {e}",
+                recovery_suggestion="请检查目录权限和文件格式",
+            ) from e
 
     def parse_file_metadata(self, filepath: Path) -> Dict[str, Any]:
-        """
-        解析FIT文件的元数据（仅解析file_id消息，不解析完整记录）
-
-        Args:
-            filepath: FIT文件路径
-
-        Returns:
-            Dict[str, Any]: 元数据字典
-        """
         try:
             if not filepath.exists():
-                raise FileNotFoundError(f"文件不存在: {filepath}")
+                logger.error(f"文件不存在: {filepath}")
+                raise ValidationError(
+                    message=f"文件不存在: {filepath}",
+                    recovery_suggestion="请确认文件路径是否正确",
+                )
 
             if filepath.suffix.lower() != ".fit":
-                raise ValueError(f"文件格式无效，必须是.fit文件: {filepath}")
+                logger.error(f"文件格式无效: {filepath}")
+                raise ValidationError(
+                    message=f"文件格式无效，必须是.fit文件: {filepath}",
+                    recovery_suggestion="请选择正确的FIT格式文件",
+                )
 
             fit_file = fitparse.FitFile(str(filepath))
 
@@ -168,21 +168,19 @@ class FitParser:
                 for data in msg:
                     metadata[data.name] = data.value
 
+            logger.debug(f"解析文件元数据: {filepath}")
             return metadata
 
+        except (ValidationError, ParseError):
+            raise
         except Exception as e:
-            raise RuntimeError(f"解析FIT文件元数据失败: {e}") from e
+            logger.error(f"解析FIT文件元数据失败: {e}")
+            raise ParseError(
+                message=f"解析FIT文件元数据失败: {e}",
+                recovery_suggestion="请确认文件格式正确",
+            ) from e
 
     def validate_fit_file(self, filepath: Path) -> Dict[str, Any]:
-        """
-        验证FIT文件的有效性
-
-        Args:
-            filepath: FIT文件路径
-
-        Returns:
-            Dict[str, Any]: 验证结果
-        """
         try:
             if not filepath.exists():
                 return {"valid": False, "error": "文件不存在"}
@@ -196,10 +194,13 @@ class FitParser:
                 for msg in fit_file.get_messages("file_id"):
                     for data in msg:
                         file_id_data[data.name] = data.value
+                logger.debug(f"验证文件有效: {filepath}")
                 return {"valid": True, "file_id": file_id_data}
             except Exception as e:
+                logger.warning(f"文件验证失败: {filepath}, 错误: {e}")
                 return {"valid": False, "error": str(e)}
         except Exception as e:
+            logger.error(f"验证文件异常: {filepath}, 错误: {e}")
             return {"valid": False, "error": str(e)}
 
     def _validate_data_quality(self, df: pl.DataFrame) -> Dict[str, Any]:
@@ -211,18 +212,19 @@ class FitParser:
 
         Returns:
             Dict[str, Any]: 数据质量评估结果
+
+        Raises:
+            ParseError: 当验证失败时
         """
         try:
             required_columns = ["timestamp", "distance", "heart_rate"]
             missing_columns = [col for col in required_columns if col not in df.columns]
 
-            # 检查数据完整性
             null_counts = {}
             for col in df.columns:
                 null_count = df[col].null_count()
                 null_counts[col] = null_count
 
-            # 检查时间序列连续性
             time_gaps = 0
             if "timestamp" in df.columns:
                 timestamps = df["timestamp"].sort()
@@ -244,7 +246,10 @@ class FitParser:
                 ),
             }
         except Exception as e:
-            raise RuntimeError(f"数据质量验证失败: {e}") from e
+            raise ParseError(
+                message=f"数据质量验证失败: {e}",
+                recovery_suggestion="请检查数据结构",
+            ) from e
 
     def _calculate_quality_score(
         self, df: pl.DataFrame, missing_columns: list, null_counts: dict
@@ -261,20 +266,16 @@ class FitParser:
             float: 质量分数（0-100）
         """
         try:
-            # 基础分数
             score = 100.0
 
-            # 缺失必要列扣分
             score -= len(missing_columns) * 20
 
-            # 空值过多扣分
             total_cells = df.height * len(df.columns)
             if total_cells > 0:
                 total_nulls = sum(null_counts.values())
                 null_ratio = total_nulls / total_cells
                 score -= null_ratio * 50
 
-            # 确保分数在合理范围内
             return max(0.0, min(100.0, score))
         except Exception:
             return 0.0

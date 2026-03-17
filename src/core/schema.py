@@ -6,6 +6,10 @@ from typing import Any, Dict, List
 
 import polars as pl
 
+from src.core.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class ParquetSchema:
     """Parquet数据Schema定义"""
@@ -108,21 +112,19 @@ class ParquetSchema:
             if col_name not in df.columns:
                 msg = f"缺少必填字段: {col_name}"
                 messages.append(msg)
-                print(msg)
+                logger.warning(msg)
                 is_valid = False
             elif not isinstance(df.schema[col_name], schema[col_name]):
                 msg = f"字段 {col_name} 类型不匹配: 期望 {schema[col_name]}, 实际 {df.schema[col_name]}"
                 messages.append(msg)
-                print(msg)
+                logger.warning(msg)
                 is_valid = False
 
-        # 检查是否有额外字段（可选）
         extra_fields = [col for col in df.columns if col not in schema]
         if extra_fields:
             msg = f"存在未定义的字段: {', '.join(extra_fields)}"
             messages.append(msg)
-            print(msg)
-            # 不将额外字段视为错误，只记录警告
+            logger.info(msg)
 
         return {"valid": is_valid, "messages": messages}
 

@@ -6,8 +6,16 @@ from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.prompt import Prompt
+from rich.text import Text
 
 from src.core.config import ConfigManager
 from src.core.importer import ImportService
@@ -24,6 +32,70 @@ app = typer.Typer(
 console = Console()
 
 
+class CLIError:
+    """CLI错误消息和恢复建议"""
+
+    @staticmethod
+    def path_not_found(path: str) -> dict:
+        return {
+            "message": f"路径不存在: {path}",
+            "suggestion": "请检查路径是否正确，或使用绝对路径",
+        }
+
+    @staticmethod
+    def import_failed(error: str) -> dict:
+        return {
+            "message": f"导入失败: {error}",
+            "suggestion": "请确保文件是有效的FIT格式，或使用 --force 参数强制导入",
+        }
+
+    @staticmethod
+    def config_missing(key: str) -> dict:
+        return {
+            "message": f"缺少配置: {key}",
+            "suggestion": f"请运行 'nanobotrun config --set {key}' 进行配置",
+        }
+
+    @staticmethod
+    def storage_error(error: str) -> dict:
+        return {
+            "message": f"存储错误: {error}",
+            "suggestion": "请检查数据目录权限，或运行 'nanobotrun import' 导入数据",
+        }
+
+    @staticmethod
+    def schedule_not_found() -> dict:
+        return {
+            "message": "未找到定时任务",
+            "suggestion": "请先使用 'nanobotrun report --schedule HH:MM' 配置定时推送",
+        }
+
+    @staticmethod
+    def push_failed(error: str) -> dict:
+        return {
+            "message": f"推送失败: {error}",
+            "suggestion": "请检查飞书 Webhook 配置，或运行 'nanobotrun config --show' 查看当前配置",
+        }
+
+
+def print_error(error_info: dict) -> None:
+    """打印带恢复建议的错误消息"""
+    console.print(f"[red bold]错误:[/red bold] {error_info['message']}")
+    console.print(f"[yellow]建议:[/yellow] {error_info['suggestion']}")
+
+
+def print_status(message: str, status: str = "info") -> None:
+    """打印带状态颜色的消息"""
+    colors = {
+        "success": "green",
+        "error": "red",
+        "warning": "yellow",
+        "info": "cyan",
+    }
+    color = colors.get(status, "white")
+    console.print(f"[{color}]{message}[/{color}]")
+
+
 @app.command()
 def import_data(
     path: str = typer.Argument(..., help="FIT文件或目录路径"),
@@ -35,7 +107,7 @@ def import_data(
     path_obj = Path(path)
 
     if not path_obj.exists():
-        console.print(f"[red]错误：路径不存在: {path}[/red]")
+        print_error(CLIError.path_not_found(path))
         raise typer.Exit(1)
 
     try:
@@ -46,21 +118,63 @@ def import_data(
         importer = ImportService(parser, storage, indexer)
 
         if path_obj.is_file():
-            console.print(f"[cyan]正在导入文件: {path}[/cyan]")
-            result = importer.import_file(path_obj, force=force)
-            if result.get("status") == "added":
-                console.print(f"[green]✓ 导入成功[/green]")
-            elif result.get("status") == "skipped":
-                console.print(f"[yellow]文件已存在，跳过导入[/yellow]")
-            else:
-                console.print(f"[red]导入失败: {result.get('message', '未知错误')}[/red]")
-        elif path_obj.is_dir():
-            console.print(f"[cyan]正在导入目录: {path}[/cyan]")
-            stats = importer.import_directory(path_obj, force=force)
-            console.print(f"[green]✓ 导入完成，共 {stats['added']} 个文件新增[/green]")
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task(f"正在导入文件: {path_obj.name}", total=None)
+                result = importer.import_file(path_obj, force=force)
 
+            if result.get("status") == "added":
+                print_status("✓ 导入成功", "success")
+            elif result.get("status") == "skipped":
+                print_status("文件已存在，跳过导入（使用 --force 强制导入）", "warning")
+            else:
+                print_error(CLIError.import_failed(result.get("message", "未知错误")))
+                raise typer.Exit(1)
+
+        elif path_obj.is_dir():
+            fit_files = list(path_obj.glob("*.fit"))
+            if not fit_files:
+                print_status(f"目录中没有找到FIT文件: {path}", "warning")
+                return
+
+            with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+            ) as progress:
+                task = progress.add_task("导入进度", total=len(fit_files))
+
+                stats = {"added": 0, "skipped": 0, "failed": 0}
+
+                for fit_file in fit_files:
+                    progress.update(task, description=f"处理: {fit_file.name}")
+                    result = importer.import_file(fit_file, force=force)
+
+                    if result.get("status") == "added":
+                        stats["added"] += 1
+                    elif result.get("status") == "skipped":
+                        stats["skipped"] += 1
+                    else:
+                        stats["failed"] += 1
+
+                    progress.advance(task)
+
+            console.print()
+            print_status(
+                f"✓ 导入完成: 新增 {stats['added']} 个，跳过 {stats['skipped']} 个", "success"
+            )
+            if stats["failed"] > 0:
+                print_status(f"  失败 {stats['failed']} 个文件", "warning")
+
+    except PermissionError:
+        print_error(CLIError.storage_error("权限不足，无法写入数据目录"))
+        raise typer.Exit(1)
     except Exception as e:
-        console.print(f"[red]导入失败: {str(e)}[/red]")
+        print_error(CLIError.import_failed(str(e)))
         raise typer.Exit(1)
 
 
@@ -86,18 +200,36 @@ def stats(
         else:
             years = None
 
-        lf = storage.read_parquet(years=years)
-        df = lf.collect()
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task("正在加载统计数据", total=None)
+            lf = storage.read_parquet(years=years)
+            df = lf.collect()
 
         if df.is_empty():
-            console.print("[yellow]暂无跑步数据[/yellow]")
+            print_status("暂无跑步数据", "warning")
+            console.print("[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]")
             return
 
         from datetime import datetime
 
         if start_date or end_date:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
+            try:
+                start_dt = (
+                    datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+                )
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
+            except ValueError:
+                print_error(
+                    {
+                        "message": "日期格式无效",
+                        "suggestion": "请使用 YYYY-MM-DD 格式，例如: 2024-01-01",
+                    }
+                )
+                raise typer.Exit(1)
 
             if start_dt:
                 df = df.filter(df["timestamp"] >= str(start_dt))
@@ -124,8 +256,16 @@ def stats(
 
         console.print(format_stats_panel(stats_data))
 
+    except FileNotFoundError:
+        print_error(CLIError.storage_error("数据文件不存在"))
+        raise typer.Exit(1)
     except Exception as e:
-        console.print(f"[red]获取统计失败: {str(e)}[/red]")
+        print_error(
+            {
+                "message": f"获取统计失败: {str(e)}",
+                "suggestion": "请检查数据文件是否损坏，或重新导入数据",
+            }
+        )
         raise typer.Exit(1)
 
 
@@ -260,68 +400,98 @@ def report(
     try:
         service = ReportService()
 
-        # 查看状态
         if status:
             schedule_status = service.get_schedule_status()
             if schedule_status.get("configured"):
-                state = (
-                    "[green]已启用[/green]"
-                    if schedule_status.get("enabled")
-                    else "[yellow]已禁用[/yellow]"
-                )
-                console.print(f"[bold]定时推送状态:[/bold] {state}")
-                console.print(f"  推送时间: {schedule_status.get('time', 'N/A')}")
-                console.print(f"  推送到飞书: {'是' if schedule_status.get('push') else '否'}")
-                console.print(f"  年龄设置: {schedule_status.get('age', 30)}")
-            else:
-                console.print("[yellow]未配置定时推送[/yellow]")
+                state_color = "green" if schedule_status.get("enabled") else "yellow"
+                state_text = "已启用" if schedule_status.get("enabled") else "已禁用"
                 console.print(
-                    "使用 [cyan]nanobotrun report --schedule HH:MM[/cyan] 配置定时推送"
+                    f"[bold]定时推送状态:[/bold] [{state_color}]{state_text}[/{state_color}]"
+                )
+                console.print(
+                    f"  推送时间: [cyan]{schedule_status.get('time', 'N/A')}[/cyan]"
+                )
+                console.print(
+                    f"  推送到飞书: {'[green]是[/green]' if schedule_status.get('push') else '[dim]否[/dim]'}"
+                )
+                console.print(
+                    f"  年龄设置: [cyan]{schedule_status.get('age', 30)}[/cyan] 岁"
+                )
+            else:
+                print_status("未配置定时推送", "warning")
+                console.print(
+                    "[dim]使用 'nanobotrun report --schedule HH:MM' 配置定时推送[/dim]"
                 )
             return
 
-        # 启用/禁用
         if enable is not None:
             result = service.enable_schedule(enabled=enable)
             if result.get("success"):
-                console.print(f"[green]{result.get('message')}[/green]")
+                print_status(result.get("message", ""), "success")
             else:
-                console.print(f"[red]{result.get('error')}[/red]")
+                print_error(CLIError.schedule_not_found())
                 raise typer.Exit(1)
             return
 
-        # 配置定时推送
         if schedule:
-            result = service.schedule_report(time_str=schedule, push=push, age=age)
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task("正在配置定时推送", total=None)
+                result = service.schedule_report(time_str=schedule, push=push, age=age)
+
             if result.get("success"):
-                console.print(f"[green]{result.get('message')}[/green]")
+                print_status(result.get("message", ""), "success")
             else:
-                console.print(f"[red]{result.get('error')}[/red]")
+                print_error(
+                    {
+                        "message": result.get("error", "配置失败"),
+                        "suggestion": "请确保时间格式为 HH:MM，例如: 07:00",
+                    }
+                )
                 raise typer.Exit(1)
             return
 
-        # 立即生成晨报
-        result = service.run_report_now(push=push, age=age)
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task("正在生成晨报", total=None)
+            result = service.run_report_now(push=push, age=age)
 
         if not result.get("success"):
-            console.print(f"[red]生成晨报失败: {result.get('error')}[/red]")
+            print_error(
+                {
+                    "message": f"生成晨报失败: {result.get('error', '未知错误')}",
+                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun import' 导入数据",
+                }
+            )
             raise typer.Exit(1)
 
         report_data = result.get("report", {})
 
-        # 显示晨报内容
         _display_report(report_data)
 
-        # 推送结果
         if push:
             push_result = result.get("push_result", {})
             if push_result.get("success"):
-                console.print("[green]晨报已推送到飞书[/green]")
+                print_status("晨报已推送到飞书", "success")
             else:
-                console.print(f"[red]推送失败: {push_result.get('error')}[/red]")
+                print_error(CLIError.push_failed(push_result.get("error", "未知错误")))
 
+    except PermissionError:
+        print_error(CLIError.storage_error("权限不足，无法访问配置文件"))
+        raise typer.Exit(1)
     except Exception as e:
-        console.print(f"[red]操作失败: {str(e)}[/red]")
+        print_error(
+            {
+                "message": f"操作失败: {str(e)}",
+                "suggestion": "请检查配置和数据文件是否正常",
+            }
+        )
         raise typer.Exit(1)
 
 
@@ -335,7 +505,6 @@ def _display_report(report_data: dict):
     from rich.panel import Panel
     from rich.table import Table
 
-    # 日期和问候语
     console.print()
     console.print(
         Panel(
@@ -345,7 +514,6 @@ def _display_report(report_data: dict):
         )
     )
 
-    # 昨日训练
     yesterday_run = report_data.get("yesterday_run")
     if yesterday_run:
         table = Table(title="昨日训练", show_header=False)
@@ -353,32 +521,49 @@ def _display_report(report_data: dict):
         table.add_column("数值", style="green")
         table.add_row("距离", f"{yesterday_run.get('distance_km', 0)} km")
         table.add_row("时长", f"{yesterday_run.get('duration_min', 0)} 分钟")
-        table.add_row("TSS", str(yesterday_run.get("tss", 0)))
+        tss = yesterday_run.get("tss", 0)
+        tss_color = "green" if tss < 100 else "yellow" if tss < 150 else "red"
+        table.add_row("TSS", f"[{tss_color}]{tss}[/{tss_color}]")
         console.print(table)
     else:
         console.print("[dim]昨日无训练记录[/dim]")
 
-    # 体能状态
     fitness = report_data.get("fitness_status", {})
     fitness_table = Table(title="体能状态", show_header=False)
     fitness_table.add_column("指标", style="cyan")
     fitness_table.add_column("数值", style="green")
-    fitness_table.add_row("ATL (疲劳)", str(fitness.get("atl", 0)))
-    fitness_table.add_row("CTL (体能)", str(fitness.get("ctl", 0)))
-    fitness_table.add_row("TSB (状态)", str(fitness.get("tsb", 0)))
-    fitness_table.add_row("评估", fitness.get("status", "数据不足"))
+
+    atl = fitness.get("atl", 0)
+    ctl = fitness.get("ctl", 0)
+    tsb = fitness.get("tsb", 0)
+
+    atl_color = "green" if atl < 50 else "yellow" if atl < 100 else "red"
+    ctl_color = "green" if ctl < 50 else "yellow" if ctl < 100 else "red"
+    tsb_color = "green" if tsb > 0 else "yellow" if tsb > -20 else "red"
+
+    fitness_table.add_row("ATL (疲劳)", f"[{atl_color}]{atl}[/{atl_color}]")
+    fitness_table.add_row("CTL (体能)", f"[{ctl_color}]{ctl}[/{ctl_color}]")
+    fitness_table.add_row("TSB (状态)", f"[{tsb_color}]{tsb}[/{tsb_color}]")
+
+    status_text = fitness.get("status", "数据不足")
+    status_color = (
+        "green" if "良好" in status_text else "yellow" if "注意" in status_text else "red"
+    )
+    fitness_table.add_row("评估", f"[{status_color}]{status_text}[/{status_color}]")
     console.print(fitness_table)
 
-    # 训练建议
+    training_advice = report_data.get("training_advice", "暂无建议")
+    advice_border = (
+        "green" if "轻松" in training_advice or "休息" in training_advice else "yellow"
+    )
     console.print(
         Panel(
-            report_data.get("training_advice", "暂无建议"),
+            training_advice,
             title="今日建议",
-            border_style="green",
+            border_style=advice_border,
         )
     )
 
-    # 本周计划
     weekly_plan = report_data.get("weekly_plan", [])
     if weekly_plan:
         plan_table = Table(title="本周计划")
