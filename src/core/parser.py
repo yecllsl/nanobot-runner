@@ -234,7 +234,7 @@ class FitParser:
                         avg_gap = time_diffs.mean()
                         # time_diffs 是 Series，直接对 Series 进行过滤
                         # 使用 float 乘法避免类型问题
-                        threshold = float(avg_gap) * 2.0 if avg_gap is not None else 0
+                        threshold = avg_gap * 2.0 if avg_gap is not None else 0.0  # type: ignore[operator]
                         time_gaps = time_diffs.filter(time_diffs > threshold).len()
 
             return {

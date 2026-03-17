@@ -78,8 +78,8 @@ class ParquetSchema:
     }
 
     @classmethod
-    def get_schema(cls) -> Dict[str, pl.DataType]:
-        """获取完整Schema定义"""
+    def get_schema(cls) -> Dict[str, Any]:
+        """获取完整 Schema 定义"""
         return {k: v for k, v in cls.UNIFIED_SCHEMA.items()}
 
     @classmethod
