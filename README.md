@@ -3,8 +3,8 @@
 桌面端私人AI跑步助理
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Code Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen.svg)](./coverage.xml)
-[![Tests](https://img.shields.io/badge/tests-631%20passed-brightgreen.svg)]()
+[![Code Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)](./coverage.xml)
+[![Tests](https://img.shields.io/badge/tests-702%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 项目简介
@@ -222,8 +222,10 @@ uv run bandit -r src
 | `src/core/decorators.py` | 100% | ✅ |
 | `src/core/exceptions.py` | 100% | ✅ |
 | `src/core/logger.py` | 100% | ✅ |
+| `src/core/parser.py` | 99% | ✅ |
+| `src/core/storage.py` | 95% | ✅ |
 | `src/agents/tools.py` | 94% | ✅ |
-| **总体** | **88%** | ✅ |
+| **总体** | **90%** | ✅ |
 
 ## 数据隐私
 

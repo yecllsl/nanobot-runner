@@ -1,211 +1,161 @@
-# 项目文档索引
+# 项目文档导航
 
-> 最后更新: 2026-03-07  
-> 文档总数: 45个
+本文档提供 Nanobot Runner 项目的完整文档索引，帮助您快速定位所需信息。
 
----
+## 📚 文档分类
 
-## 文档命名规范
+### 核心文档
+
+| 文档 | 说明 | 位置 |
+|------|------|------|
+| **项目说明** | 项目简介、快速开始、功能介绍 | [README.md](../README.md) |
+| **Agent 工作指南** | 开发命令、架构细节、开发注意事项 | [AGENTS.md](../AGENTS.md) |
+| **CLI 使用指南** | 完整命令行使用说明 | [CLI Usage](./guides/cli_usage.md) |
+
+### API 参考文档
+
+| 模块 | 说明 |
+|------|------|
+| [AnalyticsEngine](./api/analytics_engine.md) | 数据分析引擎（VDOT/TSS/心率漂移/训练负荷） |
+| [StorageManager](./api/storage_manager.md) | Parquet 存储管理器 |
+| [RunnerTools](./api/runner_tools.md) | Agent 工具集 |
+
+### 架构设计
+
+| 文档 | 说明 |
+|------|------|
+| [架构设计总览](./architecture/ARC_架构设计.md) | 项目整体架构设计 |
+| [v0.3.0 架构评审](./architecture/review/ARC_v0.3.0_架构符合性评审报告.md) | 最新版架构符合性评审 |
+
+### 需求规格
+
+| 文档 | 说明 |
+|------|------|
+| [需求规格说明书](./requirement/REQ_需求规格说明书.md) | 主需求文档 |
+| [v0.3.0 迭代需求](./requirement/0.3.0/迭代需求规格说明书.md) | 当前迭代需求 |
+
+### 开发文档
+
+| 文档 | 说明 |
+|------|------|
+| [v0.3.0 交付报告](./development/DEV_v0.3.0_交付报告.md) | 最新版开发交付报告 |
+
+### 测试文档
+
+| 文档 | 说明 |
+|------|------|
+| [v0.3.0 回归测试与质量评估](./test/TST_v0.3.0_回归测试与质量评估报告.md) | 最新版测试报告 |
+| [性能基准测试](./test/performance/TST_v0.3.0_性能基准测试报告.md) | 性能测试结果 |
+
+### 运维文档
+
+| 文档 | 说明 |
+|------|------|
+| [项目部署手册](./devops/OPS_项目部署手册.md) | 部署指南 |
+| [CICD 流水线配置](./devops/OPS_CICD 流水线配置说明.md) | CI/CD 配置说明 |
+| [版本发布说明](./devops/release_notes/release.md) | 所有版本发布记录 |
+
+### 规划文档
+
+| 文档 | 说明 |
+|------|------|
+| [v0.3.0 任务清单](./planning/PLN_v0.3.0_任务清单.md) | 当前迭代任务规划 |
+
+## 📁 文档目录结构
 
 ```
-{角色}_{指令}_v{版本号}.md    # 版本迭代文档
-{角色}_{指令}.md              # 通用文档
+docs/
+├── README.md                 # 📍 本文档
+├── api/                      # API 参考文档
+│   ├── analytics_engine.md
+│   ├── storage_manager.md
+│   └── runner_tools.md
+├── guides/                   # 用户指南
+│   └── cli_usage.md
+├── architecture/             # 架构设计
+│   ├── ARC_架构设计.md
+│   └── review/
+│       └── ARC_v0.3.0_架构符合性评审报告.md
+├── requirement/              # 需求规格
+│   ├── REQ_需求规格说明书.md
+│   └── 0.3.0/
+│       └── 迭代需求规格说明书.md
+├── planning/                 # 任务规划
+│   └── PLN_v0.3.0_任务清单.md
+├── development/              # 开发报告
+│   └── DEV_v0.3.0_交付报告.md
+├── test/                     # 测试报告
+│   ├── TST_v0.3.0_回归测试与质量评估报告.md
+│   └── performance/
+│       └── TST_v0.3.0_性能基准测试报告.md
+├── devops/                   # 运维文档
+│   ├── OPS_项目部署手册.md
+│   ├── OPS_CICD 流水线配置说明.md
+│   └── release_notes/
+│       └── release.md
+└── archive/                  # 历史归档
+    ├── v0.1.0/
+    └── v0.2.0/
 ```
 
-**角色缩写对照表**:
-| 缩写 | 角色 | 目录 |
-|------|------|------|
-| ARC | 架构师 | architecture/ |
-| DEV | 开发 | development/ |
-| TST | 测试 | test/ |
-| OPS | 运维 | devops/ |
-| REQ | 需求 | requirement/ |
-| PLN | 规划 | planning/ |
-| EXT | 外部 | external/ |
+## 🏷️ 版本历史
 
----
+| 版本 | 发布日期 | 说明 | 文档位置 |
+|------|---------|------|---------|
+| **v0.3.0** | 2026-03-17 | 训练负荷完整实现与智能晨报 | [当前版本](#) |
+| v0.2.0 | 2024-03-04 | Agent 自然语言交互完善 | [归档](./archive/v0.2.0/) |
+| v0.1.0 | 2024-02-01 | 基础功能实现 | [归档](./archive/v0.1.0/) |
 
-## 一、架构文档 (architecture/)
+## 🔍 快速检索
 
-### 1.1 架构设计
-| 文档 | 说明 |
-|------|------|
-| [ARC_架构设计.md](architecture/ARC_架构设计.md) | 系统架构设计文档 |
+### 按主题查找
 
-### 1.2 版本迭代架构
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [0.2.0/迭代架构设计说明书.md](architecture/0.2.0/迭代架构设计说明书.md) | v0.2.0 | 0.2.0版本架构设计 |
-| [0.3.0/迭代架构设计说明书.md](architecture/0.3.0/迭代架构设计说明书.md) | v0.3.0 | 0.3.0版本架构设计 |
-
-### 1.3 架构评审
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [ARC_架构符合性评审报告.md](architecture/review/ARC_架构符合性评审报告.md) | - | 通用架构评审 |
-| [ARC_v0.2.0_架构符合性评审报告.md](architecture/review/ARC_v0.2.0_架构符合性评审报告.md) | v0.2.0 | 架构评审报告 |
-| [ARC_v0.2.0_架构符合性评审报告_复审.md](architecture/review/ARC_v0.2.0_架构符合性评审报告_复审.md) | v0.2.0 | 架构评审复审 |
-| [ARC-05_风险复盘_v0.2.0.md](architecture/review/ARC-05_风险复盘_v0.2.0.md) | v0.2.0 | 风险复盘报告 |
-
----
-
-## 二、开发文档 (development/)
-
-### 2.1 交付报告
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [DEV_交付报告.md](development/DEV_交付报告.md) | - | 通用交付报告 |
-| [DEV_v0.2.0_交付报告_en.md](development/DEV_v0.2.0_交付报告_en.md) | v0.2.0 | 英文交付报告 |
-| [DEV_单元测试报告.md](development/DEV_单元测试报告.md) | - | 单元测试报告 |
-| [DEV_测试报告_en.md](development/DEV_测试报告_en.md) | - | 英文测试报告 |
-
-### 2.2 Bug修复报告
-| 文档 | 说明 |
-|------|------|
-| [DEV_20240304_Bug修复报告.md](development/bug_fix/DEV_20240304_Bug修复报告.md) | Bug修复报告 |
-| [DEV_v0.2.0_Bug修复报告.md](development/bug_fix/DEV_v0.2.0_Bug修复报告.md) | v0.2.0 Bug修复 |
-| [DEV_v0.2.0_Bug修复报告_回归.md](development/bug_fix/DEV_v0.2.0_Bug修复报告_回归.md) | Bug修复回归 |
-
-### 2.3 调试报告
-| 文档 | 说明 |
-|------|------|
-| [DEV_本地调试报告.md](development/debug/DEV_本地调试报告.md) | 本地调试报告 |
-
----
-
-## 三、运维文档 (devops/)
-
-### 3.1 配置与规范
-| 文档 | 说明 |
-|------|------|
-| [OPS_CICD流水线配置说明.md](devops/OPS_CICD流水线配置说明.md) | CICD配置说明 |
-| [OPS_Git分支与发布流程规范.md](devops/OPS_Git分支与发布流程规范.md) | Git流程规范 |
-| [OPS_项目部署手册.md](devops/OPS_项目部署手册.md) | 部署手册 |
-
-### 3.2 运维报告
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [OPS-02_CICD流水线验证_v0.2.0.md](devops/OPS-02_CICD流水线验证_v0.2.0.md) | v0.2.0 | CICD验证 |
-| [OPS-04_自动化发布报告_v0.2.0.md](devops/OPS-04_自动化发布报告_v0.2.0.md) | v0.2.0 | 自动化发布 |
-| [OPS-05_运维文档更新报告_v0.2.0.md](devops/OPS-05_运维文档更新报告_v0.2.0.md) | v0.2.0 | 文档更新 |
-
-### 3.3 版本发布
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [OPS_v0.1.0_版本发布报告.md](devops/release_notes/OPS_v0.1.0_版本发布报告.md) | v0.1.0 | 版本发布报告 |
-
-### 3.4 故障排查
-| 文档 | 说明 |
-|------|------|
-| [GitHub_Actions代码质量故障排查报告.md](devops/troubleshoot/GitHub_Actions代码质量故障排查报告.md) | 代码质量故障 |
-| [GitHub_Actions代码质量检查工具执行故障排查报告.md](devops/troubleshoot/GitHub_Actions代码质量检查工具执行故障排查报告.md) | 工具执行故障 |
-| [GitHub_Actions代码质量检查工具配置故障排查报告.md](devops/troubleshoot/GitHub_Actions代码质量检查工具配置故障排查报告.md) | 工具配置故障 |
-| [GitHub_Actions流水线故障排查报告.md](devops/troubleshoot/GitHub_Actions流水线故障排查报告.md) | 流水线故障 |
-| [GitHub_Actions流水线故障排查报告_v2.md](devops/troubleshoot/GitHub_Actions流水线故障排查报告_v2.md) | 流水线故障v2 |
-
----
-
-## 四、规划文档 (planning/)
-
-### 4.1 任务清单
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [PLN_开发任务清单.md](planning/PLN_开发任务清单.md) | - | 通用任务清单 |
-| [PLN_v0.2.0_任务清单.md](planning/PLN_v0.2.0_任务清单.md) | v0.2.0 | 版本任务清单 |
-| [PLN_v0.3.0_任务清单.md](planning/PLN_v0.3.0_任务清单.md) | v0.3.0 | 版本任务清单 |
-
-### 4.2 准备报告
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [PLN_v0.3.0_开发准备报告.md](planning/PLN_v0.3.0_开发准备报告.md) | v0.3.0 | 开发准备报告 |
-
----
-
-## 五、需求文档 (requirement/)
-
-### 5.1 需求规格说明书
-| 文档 | 说明 |
-|------|------|
-| [REQ_需求规格说明书.md](requirement/REQ_需求规格说明书.md) | 中文需求规格 |
-| [REQ_需求规格说明书_en.md](requirement/REQ_需求规格说明书_en.md) | 英文需求规格 |
-
-### 5.2 版本迭代需求
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [0.2.0/迭代需求规格说明书.md](requirement/0.2.0/迭代需求规格说明书.md) | v0.2.0 | 迭代需求 |
-| [0.3.0/迭代需求规格说明书.md](requirement/0.3.0/迭代需求规格说明书.md) | v0.3.0 | 迭代需求 |
-
----
-
-## 六、测试文档 (test/)
-
-### 6.1 测试策略与规范
-| 文档 | 说明 |
-|------|------|
-| [TST_测试策略与规范.md](test/TST_测试策略与规范.md) | 测试策略规范 |
-| [TST_目录结构规范.md](test/TST_目录结构规范.md) | 目录结构规范 |
-| [TST_文档模板库.md](test/TST_文档模板库.md) | 文档模板库 |
-| [TST_v0.2.0_测试策略.md](test/TST_v0.2.0_测试策略.md) | v0.2.0测试策略 |
-
-### 6.2 测试用例
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [TST_v0.2.0_Agent自然语言交互测试用例.md](test/cases/TST_v0.2.0_Agent自然语言交互测试用例.md) | v0.2.0 | Agent交互测试 |
-
-### 6.3 测试报告
-| 文档 | 版本 | 说明 |
-|------|------|------|
-| [TST_v0.2.0_Bug清单.md](test/reports/TST_v0.2.0_Bug清单.md) | v0.2.0 | Bug清单 |
-| [TST_v0.2.0_全量测试报告.md](test/reports/TST_v0.2.0_全量测试报告.md) | v0.2.0 | 全量测试 |
-| [TST_v0.2.0_回归测试报告.md](test/reports/TST_v0.2.0_回归测试报告.md) | v0.2.0 | 回归测试 |
-| [TST_v0.2.0_迭代质量评估报告.md](test/reports/TST_v0.2.0_迭代质量评估报告.md) | v0.2.0 | 质量评估 |
-
-### 6.4 性能测试
-| 文档 | 说明 |
-|------|------|
-| [TST_20240304_查询性能测试报告.md](test/performance/TST_20240304_查询性能测试报告.md) | 查询性能测试 |
-
-### 6.5 回归测试
-| 文档 | 说明 |
-|------|------|
-| [TST_20240304_Bug回归测试报告.md](test/regression/TST_20240304_Bug回归测试报告.md) | Bug回归测试 |
-
----
-
-## 七、外部文档 (external/)
-
-### 7.1 教程文档
-| 文档 | 说明 |
-|------|------|
-| [示范项目主要目录作用说明.md](external/tutorials/示范项目主要目录作用说明.md) | 目录说明 |
-| [EXT_Python_Rust_PyO3项目规范.md](external/tutorials/EXT_Python_Rust_PyO3项目规范.md) | PyO3项目规范 |
-| [EXT_Python_Rust_PyO3架构规范_代码分层.md](external/tutorials/EXT_Python_Rust_PyO3架构规范_代码分层.md) | 代码分层规范 |
-| [EXT_调用外部工具教程.md](external/tutorials/EXT_调用外部工具教程.md) | 外部工具教程 |
-
----
-
-## 快速导航
-
-### 按版本查找
-
-**v0.2.0 文档**:
-- [架构设计](architecture/0.2.0/迭代架构设计说明书.md)
-- [需求规格](requirement/0.2.0/迭代需求规格说明书.md)
-- [任务清单](planning/PLN_v0.2.0_任务清单.md)
-- [测试报告](test/reports/TST_v0.2.0_全量测试报告.md)
-
-**v0.3.0 文档**:
-- [架构设计](architecture/0.3.0/迭代架构设计说明书.md)
-- [需求规格](requirement/0.3.0/迭代需求规格说明书.md)
-- [任务清单](planning/PLN_v0.3.0_任务清单.md)
-- [开发准备报告](planning/PLN_v0.3.0_开发准备报告.md)
+- **数据导入**: [CLI 使用指南 - import 命令](./guides/cli_usage.md#import-命令)
+- **数据分析**: [AnalyticsEngine API](./api/analytics_engine.md)
+- **Agent 工具**: [RunnerTools API](./api/runner_tools.md)
+- **飞书推送**: [项目部署手册 - 飞书配置](./devops/OPS_项目部署手册.md#飞书推送配置)
+- **CI/CD**: [CICD 流水线配置](./devops/OPS_CICD 流水线配置说明.md)
 
 ### 按角色查找
 
-| 角色 | 文档目录 |
-|------|----------|
-| 架构师 | [architecture/](architecture/) |
-| 开发 | [development/](development/) |
-| 测试 | [test/](test/) |
-| 运维 | [devops/](devops/) |
-| 需求 | [requirement/](requirement/) |
-| 规划 | [planning/](planning/) |
+**开发者**:
+1. [AGENTS.md](../AGENTS.md) - 开发环境配置
+2. [CLI 使用指南](./guides/cli_usage.md) - 本地调试
+3. [API 参考](#api-参考文档) - 接口文档
+
+**测试工程师**:
+1. [测试报告](#测试文档) - 测试策略与结果
+2. [AGENTS.md - 测试命令](../AGENTS.md#常用命令) - 测试执行
+
+**运维工程师**:
+1. [项目部署手册](./devops/OPS_项目部署手册.md) - 部署指南
+2. [CICD 流水线配置](./devops/OPS_CICD 流水线配置说明.md) - 发布流程
+3. [版本发布说明](./devops/release_notes/release.md) - 发布记录
+
+## 📊 文档统计
+
+- **总文档数**: ~75 个（已归档历史版本）
+- **核心文档**: 15 个
+- **API 文档**: 3 个
+- **测试文档**: 5 个
+- **运维文档**: 8 个
+
+## 📝 文档维护
+
+### 文档更新规范
+
+1. **新增功能**: 同步更新 API 文档和用户指南
+2. **版本迭代**: 创建新版本目录，旧版本归档到 `archive/`
+3. **文档修订**: 更新文档顶部版本号
+
+### 文档生命周期
+
+```
+新建 → 审核 → 发布 → 维护 → 归档
+```
+
+---
+
+**最后更新**: 2026-03-17  
+**当前版本**: v0.3.0  
+**维护者**: 项目团队
