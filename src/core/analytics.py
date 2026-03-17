@@ -380,6 +380,10 @@ class AnalyticsEngine:
         try:
             lf = self.storage.read_parquet()
 
+            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
+            if len(lf.collect_schema()) == 0:
+                return []
+
             recent_lf = lf.filter(
                 pl.col("timestamp") >= (pl.col("timestamp").max() - pl.duration(days=days))
             ).sort("timestamp")

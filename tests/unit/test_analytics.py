@@ -621,11 +621,8 @@ class TestTrainingLoad:
         mock_lf = Mock()
         mock_storage.read_parquet.return_value = mock_lf
 
-        mock_df = Mock()
-        mock_df.is_empty.return_value = True
-        # 支持链式调用：filter -> collect
-        mock_lf.filter.return_value = mock_lf
-        mock_lf.collect.return_value = mock_df
+        # 模拟空 LazyFrame（collect_schema 返回空）
+        mock_lf.collect_schema.return_value = []
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=30)
@@ -840,6 +837,9 @@ class TestTrainingLoad:
         mock_lf = MagicMock()
         mock_storage.read_parquet.return_value = mock_lf
 
+        # 模拟有列的 LazyFrame
+        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+
         # 创建没有心率数据的数据框
         mock_df = pl.DataFrame(
             {
@@ -868,8 +868,10 @@ class TestTrainingLoad:
                 },
             ]
         )
-        mock_collected.sort.return_value = mock_collected
-        mock_lf.filter.return_value.collect.return_value = mock_collected
+        # 支持链式调用：filter -> sort -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
+        mock_lf.collect.return_value = mock_collected
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=7)
@@ -888,6 +890,9 @@ class TestTrainingLoad:
         mock_lf = MagicMock()
         mock_storage.read_parquet.return_value = mock_lf
 
+        # 模拟有列的 LazyFrame
+        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+
         # 创建只有 5 条记录的数据
         today = datetime.now()
         timestamps = [today - timedelta(days=i) for i in range(5, 0, -1)]
@@ -901,21 +906,10 @@ class TestTrainingLoad:
             }
         )
 
-        mock_collected = MagicMock()
-        mock_collected.is_empty = MagicMock(return_value=False)
-        mock_collected.iter_rows = MagicMock(
-            return_value=[
-                {
-                    "timestamp": ts,
-                    "total_distance": 5000.0,
-                    "total_timer_time": 1800,
-                    "avg_heart_rate": 140,
-                }
-                for ts in timestamps
-            ]
-        )
-        mock_collected.sort.return_value = mock_collected
-        mock_lf.filter.return_value.collect.return_value = mock_collected
+        # 支持链式调用：filter -> sort -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=42)
@@ -933,6 +927,9 @@ class TestTrainingLoad:
         mock_lf = MagicMock()
         mock_storage.read_parquet.return_value = mock_lf
 
+        # 模拟有列的 LazyFrame
+        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+
         # 创建足够多的数据，但分析周期只有 14 天
         today = datetime.now()
         timestamps = [today - timedelta(days=i) for i in range(20, 0, -1)]
@@ -946,21 +943,10 @@ class TestTrainingLoad:
             }
         )
 
-        mock_collected = MagicMock()
-        mock_collected.is_empty = MagicMock(return_value=False)
-        mock_collected.iter_rows = MagicMock(
-            return_value=[
-                {
-                    "timestamp": ts,
-                    "total_distance": 5000.0,
-                    "total_timer_time": 1800,
-                    "avg_heart_rate": 140,
-                }
-                for ts in timestamps
-            ]
-        )
-        mock_collected.sort.return_value = mock_collected
-        mock_lf.filter.return_value.collect.return_value = mock_collected
+        # 支持链式调用：filter -> sort -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=14)
@@ -1004,8 +990,10 @@ class TestTrainingLoad:
                 for ts in timestamps
             ]
         )
-        mock_collected.sort.return_value = mock_collected
-        mock_lf.filter.return_value.collect.return_value = mock_collected
+        # 支持链式调用：filter -> sort -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
+        mock_lf.collect.return_value = mock_collected
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=50)
@@ -1088,6 +1076,9 @@ class TestTrainingLoad:
         mock_lf = MagicMock()
         mock_storage.read_parquet.return_value = mock_lf
 
+        # 模拟有列的 LazyFrame
+        mock_lf.collect_schema.return_value = ["timestamp", "total_distance", "total_timer_time", "avg_heart_rate"]
+
         # 创建乱序的时间戳
         today = datetime.now()
         timestamps = [
@@ -1107,27 +1098,16 @@ class TestTrainingLoad:
             }
         )
 
-        mock_collected = MagicMock()
-        mock_collected.is_empty = MagicMock(return_value=False)
-        mock_collected.iter_rows = MagicMock(
-            return_value=[
-                {
-                    "timestamp": ts,
-                    "total_distance": 5000.0,
-                    "total_timer_time": 1800,
-                    "avg_heart_rate": 140,
-                }
-                for ts in timestamps
-            ]
-        )
-        mock_collected.sort.return_value = mock_collected
-        mock_lf.filter.return_value.collect.return_value = mock_collected
+        # 支持链式调用：filter -> sort -> collect
+        mock_lf.filter.return_value = mock_lf
+        mock_lf.sort.return_value = mock_lf
+        mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_training_load(days=7)
 
-        # 验证 sort 方法被调用
-        mock_collected.sort.assert_called_once_with("timestamp")
+        # 验证 sort 方法在 LazyFrame 上被调用
+        mock_lf.sort.assert_called_once_with("timestamp")
         assert "atl" in result
 
 
