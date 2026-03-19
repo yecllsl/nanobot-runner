@@ -7,39 +7,39 @@
   - [x] 验证依赖已安装（`uv sync --all-extras`）
   - [x] 确认开发工具可用（black, isort, mypy, bandit, pytest）
 
-- [ ] **Task 1.2**: T001 - 用户画像引擎实现（8h）
-  - [ ] 定义画像数据结构（RunnerProfile, FitnessLevel, TrainingPattern 等）
-  - [ ] 实现 `build_profile()` 方法
-  - [ ] 实现 `get_fitness_level()` 方法
-  - [ ] 实现 `get_training_pattern()` 方法
-  - [ ] 实现 `calculate_injury_risk()` 方法
-  - [ ] 编写单元测试（覆盖率 ≥ 80%）
-  - [ ] 代码质量检查（black, isort, mypy, bandit）
+- [x] **Task 1.2**: T001 - 用户画像引擎实现（8h）
+  - [x] 定义画像数据结构（RunnerProfile, FitnessLevel, TrainingPattern 等）
+  - [x] 实现 `build_profile()` 方法
+  - [x] 实现 `get_fitness_level()` 方法
+  - [x] 实现 `get_training_pattern()` 方法
+  - [x] 实现 `calculate_injury_risk()` 方法
+  - [x] 编写单元测试（覆盖率 ≥ 80%）
+  - [x] 代码质量检查（black, isort, mypy, bandit）
 
-- [ ] **Task 1.3**: T002 - 画像双存储持久化（6h）
-  - [ ] 实现 `save_profile_json()` 方法（profile.json）
-  - [ ] 实现 `load_profile_json()` 方法
-  - [ ] 实现 `save_memory_md()` 方法（MEMORY.md）
-  - [ ] 实现 `load_memory_md()` 方法
-  - [ ] 实现 `sync_dual_storage()` 双存储同步方法
-  - [ ] 实现 `merge_profile_to_md()` 智能合并方法
-  - [ ] 编写单元测试（覆盖率 ≥ 80%）
-  - [ ] 代码质量检查
+- [x] **Task 1.3**: T002 - 画像双存储持久化（6h）
+  - [x] 实现 `save_profile_json()` 方法（profile.json）
+  - [x] 实现 `load_profile_json()` 方法
+  - [x] 实现 `save_memory_md()` 方法（MEMORY.md）
+  - [x] 实现 `load_memory_md()` 方法
+  - [x] 实现 `sync_dual_storage()` 双存储同步方法
+  - [x] 实现 `merge_profile_to_md()` 智能合并方法
+  - [x] 编写单元测试（覆盖率 ≥ 80%）
+  - [x] 代码质量检查
 
-- [ ] **Task 1.4**: T003 - 画像保鲜期与异常过滤（4h）
-  - [ ] 实现 `check_freshness()` 方法
-  - [ ] 定义 `ProfileStaleStatus` 数据结构
-  - [ ] 定义 `ANOMALY_FILTER_RULES` 异常过滤规则
-  - [ ] 实现 `filter_anomaly_data()` 方法
-  - [ ] 编写单元测试（覆盖率 ≥ 80%）
-  - [ ] 代码质量检查
+- [x] **Task 1.4**: T003 - 画像保鲜期与异常过滤（4h）
+  - [x] 实现 `check_freshness()` 方法
+  - [x] 定义 `ProfileStaleStatus` 数据结构
+  - [x] 定义 `ANOMALY_FILTER_RULES` 异常过滤规则
+  - [x] 实现 `filter_anomaly_data()` 方法
+  - [x] 编写单元测试（覆盖率 ≥ 80%）
+  - [x] 代码质量检查
 
-- [ ] **Task 1.5**: M1 里程碑验收
-  - [ ] 确认 T001-T003 全部完成
-  - [ ] 运行全量测试（`uv run pytest tests/unit/core/test_profile.py`）
-  - [ ] 生成覆盖率报告（`uv run pytest --cov=src/core/profile --cov-report=html`）
-  - [ ] 代码质量检查（`uv run black src; uv run isort src; uv run mypy src; uv run bandit -r src`）
-  - [ ] 提交开发交付报告
+- [x] **Task 1.5**: M1 里程碑验收
+  - [x] 确认 T001-T003 全部完成
+  - [x] 运行全量测试（`uv run pytest tests/unit/core/test_profile.py`）
+  - [x] 生成覆盖率报告（`uv run pytest --cov=src/core/profile --cov-report=html`）
+  - [x] 代码质量检查（`uv run black src; uv run isort src; uv run mypy src; uv run bandit -r src`）
+  - [x] 提交开发交付报告
 
 ## 阶段 2：训练计划实现（M2 - Day 4-7）
 

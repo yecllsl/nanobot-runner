@@ -411,11 +411,13 @@ class TestProfileEngine:
         timestamps.reverse()
 
         # 添加距离和时长数据
-        df = pl.DataFrame({
-            "timestamp": timestamps,
-            "total_distance": [5000.0] * 20,
-            "total_timer_time": [1800.0] * 20,
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "total_distance": [5000.0] * 20,
+                "total_timer_time": [1800.0] * 20,
+            }
+        )
         score = engine._calculate_consistency_score(df, days=90)
 
         # 规律训练应该有较高分数（至少>30）
@@ -565,9 +567,7 @@ class TestProfileEngine:
         # 创建 30 天数据，总跑量 200km
         data = {
             "timestamp": [now - timedelta(days=i) for i in range(30)],
-            "total_distance": [
-                7000.0 for _ in range(30)
-            ],  # 每次 7km，总共 210km
+            "total_distance": [7000.0 for _ in range(30)],  # 每次 7km，总共 210km
             "total_timer_time": [2100.0 for _ in range(30)],
         }
         df = pl.DataFrame(data)
@@ -644,7 +644,9 @@ class TestProfileEngine:
         """测试其他指标计算"""
         now = datetime.now()
         data = {
-            "timestamp": [now.replace(hour=7 + i % 3) - timedelta(days=i) for i in range(20)],
+            "timestamp": [
+                now.replace(hour=7 + i % 3) - timedelta(days=i) for i in range(20)
+            ],
             "total_distance": [5000.0 for _ in range(20)],
             "total_timer_time": [1800.0 for _ in range(20)],
         }
