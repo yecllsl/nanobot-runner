@@ -43,39 +43,39 @@
 
 ## 阶段 2：训练计划实现（M2 - Day 4-7）
 
-- [ ] **Task 2.1**: T004 - 训练计划引擎实现（12h）
-  - [ ] 定义训练计划数据结构（TrainingPlan, WeeklySchedule, DailyPlan）
-  - [ ] 实现 `generate_plan()` 方法
-  - [ ] 实现 `adjust_plan()` 方法（含心率漂移/主观疲劳度参数）
-  - [ ] 实现 `get_daily_workout()` 方法
-  - [ ] 实现 `get_phase_config_by_fitness_level()` 动态阶段配置
-  - [ ] 定义 `PHASE_CONFIG` 阶段划分配置
-  - [ ] 编写单元测试（覆盖率 ≥ 80%）
-  - [ ] 代码质量检查
+- [x] **Task 2.1**: T004 - 训练计划引擎实现（12h）
+  - [x] 定义训练计划数据结构（TrainingPlan, WeeklySchedule, DailyPlan）
+  - [x] 实现 `generate_plan()` 方法
+  - [x] 实现 `adjust_plan()` 方法（含心率漂移/主观疲劳度参数）
+  - [x] 实现 `get_daily_workout()` 方法
+  - [x] 实现 `get_phase_config_by_fitness_level()` 动态阶段配置
+  - [x] 定义 `PHASE_CONFIG` 阶段划分配置
+  - [x] 编写单元测试（覆盖率 ≥ 80%）
+  - [x] 代码质量检查
 
-- [ ] **Task 2.2**: T005 - 飞书日历同步服务（8h）
-  - [ ] 实现 `FeishuCalendarSync` 类
-  - [ ] 实现 `sync_plan()` 方法
-  - [ ] 实现 `sync_daily_workout()` 方法
-  - [ ] 实现 `build_calendar_event()` 日历事件构建
-  - [ ] 封装飞书日历 API 调用
-  - [ ] 编写单元测试（覆盖率 ≥ 80%）
-  - [ ] 代码质量检查
+- [x] **Task 2.2**: T005 - 飞书日历同步服务（8h）
+  - [x] 实现 `FeishuCalendarSync` 类
+  - [x] 实现 `sync_plan()` 方法
+  - [x] 实现 `sync_daily_workout()` 方法
+  - [x] 实现 `build_calendar_event()` 日历事件构建
+  - [x] 封装飞书日历 API 调用
+  - [x] 编写单元测试（覆盖率 ≥ 80%）
+  - [x] 代码质量检查
 
-- [ ] **Task 2.3**: T006 - 飞书反向同步与 Webhook 集成（6h）
-  - [ ] 实现 `FeishuCalendarWebhookHandler` 类
-  - [ ] 实现 Webhook 路由配置（`POST /webhook/calendar`）
-  - [ ] 实现冲突检测与解决策略
-  - [ ] 配置飞书事件订阅
-  - [ ] 编写单元测试（覆盖率 ≥ 80%）
-  - [ ] 代码质量检查
+- [x] **Task 2.3**: T006 - 飞书反向同步与 Webhook 集成（6h）
+  - [x] 实现 `FeishuCalendarWebhookHandler` 类
+  - [x] 实现 Webhook 路由配置（`POST /webhook/calendar`）
+  - [x] 实现冲突检测与解决策略
+  - [x] 配置飞书事件订阅
+  - [x] 编写单元测试（覆盖率 ≥ 80%）
+  - [x] 代码质量检查
 
-- [ ] **Task 2.4**: M2 里程碑验收
-  - [ ] 确认 T004-T006 全部完成
-  - [ ] 运行全量测试
-  - [ ] 生成覆盖率报告
-  - [ ] 代码质量检查
-  - [ ] 提交开发交付报告
+- [x] **Task 2.4**: M2 里程碑验收
+  - [x] 确认 T004-T006 全部完成
+  - [x] 运行全量测试（127 个测试全部通过）
+  - [x] 生成覆盖率报告
+  - [x] 代码质量检查
+  - [x] 提交开发交付报告
 
 ## 阶段 3：飞书集成（M3 - Day 8-9）
 
