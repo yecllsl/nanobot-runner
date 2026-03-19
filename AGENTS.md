@@ -79,9 +79,58 @@ docs/               # 项目文档
 
 ### 数据存储
 
-- 目录: `~/.nanobot-runner/data/`
-- Parquet: `activities_{year}.parquet`
-- 去重索引: `index.json` (SHA256)
+**nanobot Workspace 目录结构**：
+
+系统将 `~/.nanobot-runner` 作为 nanobot workspace，遵循 nanobot-ai 标准结构：
+
+```
+~/.nanobot-runner/
+├── data/                    # 业务数据存储（本项目扩展）
+│   ├── activities_*.parquet # 运动数据（按年分片）
+│   ├── profile.json         # 结构化画像数据（计算用）
+│   ├── plans/               # 训练计划存储
+│   │   └── {plan_id}.json
+│   └── index.json           # 去重索引（SHA256）
+├── memory/                  # 记忆系统（nanobot标准）
+│   ├── MEMORY.md            # 长期记忆/用户画像（Agent上下文）
+│   └── HISTORY.md           # 事件日志（可搜索历史）
+├── sessions/                # 会话历史（nanobot标准）
+│   └── feishu_{chat_id}.jsonl
+├── skills/                  # 技能扩展（nanobot标准）
+│   ├── training_plan/
+│   │   └── SKILL.md         # 训练计划生成技能
+│   ├── injury_prediction/
+│   │   └── SKILL.md         # 伤病风险预警技能
+│   └── vdot_prediction/
+│       └── SKILL.md         # VDOT预测技能
+├── AGENTS.md                # Agent行为准则
+├── SOUL.md                  # 人格、价值观、语气风格
+├── USER.md                  # 用户画像（辅助）
+├── HEARTBEAT.md             # 定时任务
+└── config.json              # 应用配置
+```
+
+**初始化机制**：
+
+> ⚠️ **重要**：workspace 目录结构由 nanobot-ai 框架自动初始化，无需自定义实现。
+
+当启动 nanobot-runner 应用时，nanobot-ai 框架会检测 `workspace=~/.nanobot-runner` 是否存在或为空，自动创建缺失的标准结构：
+
+| 自动创建的文件/目录 | 说明 |
+|-------------------|------|
+| `AGENTS.md` | Agent 行为准则模板 |
+| `SOUL.md` | 人格、价值观、语气风格 |
+| `USER.md` | 用户画像模板 |
+| `memory/MEMORY.md` | 长期记忆初始文件 |
+| `memory/HISTORY.md` | 事件日志初始文件 |
+| `skills/` | 技能目录（如版本默认带） |
+
+**应用需自行创建的目录**：
+- `data/`：业务数据存储目录
+- `data/plans/`：训练计划存储目录
+- `logs/`：日志文件目录
+
+**设计原则**：完全复用 nanobot 的初始化逻辑，避免重复实现。
 
 ### Schema 必填字段
 

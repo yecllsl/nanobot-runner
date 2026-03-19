@@ -326,17 +326,65 @@ echo "备份完成: $BACKUP_DIR.tar.gz"
 
 ## 配置说明
 
+### 首次运行与初始化
+
+**自动初始化机制**：
+
+> ⚠️ **重要**：workspace 目录结构由 nanobot-ai 框架自动初始化，无需手动创建。
+
+当首次运行 `nanobotrun` 命令时，nanobot-ai 框架会自动检测并创建必要的目录结构：
+
+```bash
+# 首次运行任意命令即可触发初始化
+uv run nanobotrun --help
+```
+
+**自动创建的文件/目录**：
+
+| 文件/目录 | 说明 |
+|----------|------|
+| `AGENTS.md` | Agent 行为准则模板 |
+| `SOUL.md` | 人格、价值观、语气风格 |
+| `USER.md` | 用户画像模板 |
+| `memory/MEMORY.md` | 长期记忆初始文件 |
+| `memory/HISTORY.md` | 事件日志初始文件 |
+| `skills/` | 技能目录（如版本默认带） |
+
+**应用自动创建的目录**：
+
+首次执行 `import` 命令时，应用会自动创建业务数据目录：
+
+| 目录 | 说明 |
+|-----|------|
+| `data/` | 业务数据存储目录 |
+| `data/plans/` | 训练计划存储目录 |
+| `logs/` | 日志文件目录 |
+
 ### 配置文件位置
 
 ```
-~/.nanobot-runner/
-├── config.json          # 主配置文件
-├── data/                # 数据目录
-│   ├── activities_2023.parquet
+~/.nanobot-runner/              # nanobot workspace（主目录）
+├── config.json                 # 应用配置文件
+├── data/                       # 业务数据目录
+│   ├── activities_2023.parquet # 运动数据（按年分片）
 │   ├── activities_2024.parquet
-│   └── index.json       # 去重索引
-└── logs/                # 日志目录
-    └── nanobot-runner.log
+│   ├── profile.json            # 用户画像数据
+│   ├── plans/                  # 训练计划
+│   └── index.json              # 去重索引
+├── memory/                     # 记忆系统
+│   ├── MEMORY.md               # 长期记忆/用户画像
+│   └── HISTORY.md              # 事件日志
+├── sessions/                   # 会话历史
+├── skills/                     # 技能扩展
+├── logs/                       # 日志目录
+│   └── nanobot-runner.log
+├── AGENTS.md                   # Agent行为准则
+├── SOUL.md                     # 人格设定
+├── USER.md                     # 用户画像
+└── HEARTBEAT.md                # 定时任务
+
+~/.nanobot/                     # nanobot 框架配置目录
+└── config.json                 # 框架配置（LLM Provider等）
 ```
 
 ### 配置项说明

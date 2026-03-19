@@ -4,6 +4,7 @@
 
 ## 目录
 
+- [运行环境与初始化](#运行环境与初始化)
 - [Core 模块](#core-模块)
   - [AnalyticsEngine](#analyticsengine)
   - [StorageManager](#storagemanager)
@@ -13,6 +14,52 @@
   - [RunnerTools](#runnertools)
 - [Notify 模块](#notify-模块)
   - [FeishuBot](#feishubot)
+
+---
+
+## 运行环境与初始化
+
+### nanobot Workspace 结构
+
+Nanobot Runner 使用 `~/.nanobot-runner` 作为 nanobot workspace，遵循 nanobot-ai 标准结构：
+
+```
+~/.nanobot-runner/
+├── data/                    # 业务数据存储（本项目扩展）
+│   ├── activities_*.parquet # 运动数据（按年分片）
+│   ├── profile.json         # 结构化画像数据
+│   ├── plans/               # 训练计划存储
+│   └── index.json           # 去重索引
+├── memory/                  # 记忆系统（nanobot标准）
+│   ├── MEMORY.md            # 长期记忆/用户画像
+│   └── HISTORY.md           # 事件日志
+├── sessions/                # 会话历史（nanobot标准）
+├── skills/                  # 技能扩展（nanobot标准）
+├── AGENTS.md                # Agent行为准则
+├── SOUL.md                  # 人格设定
+├── USER.md                  # 用户画像
+├── HEARTBEAT.md             # 定时任务
+└── config.json              # 应用配置
+```
+
+### 自动初始化机制
+
+> ⚠️ **重要**：workspace 目录结构由 nanobot-ai 框架自动初始化，无需自定义实现。
+
+当启动应用时，nanobot-ai 框架会自动检测并创建缺失的标准结构：
+
+| 自动创建的文件/目录 | 说明 |
+|-------------------|------|
+| `AGENTS.md` | Agent 行为准则模板 |
+| `SOUL.md` | 人格、价值观、语气风格 |
+| `USER.md` | 用户画像模板 |
+| `memory/MEMORY.md` | 长期记忆初始文件 |
+| `memory/HISTORY.md` | 事件日志初始文件 |
+| `skills/` | 技能目录 |
+
+**应用需自行创建的目录**：`data/`、`data/plans/`、`logs/`
+
+**设计原则**：完全复用 nanobot 的初始化逻辑，避免重复实现。
 
 ---
 
