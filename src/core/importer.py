@@ -2,7 +2,7 @@
 # 编排解析、索引、存储等模块，实现数据导入功能
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import polars as pl
 from rich.console import Console
@@ -13,13 +13,21 @@ from src.core.logger import get_logger
 from src.core.parser import FitParser
 from src.core.storage import StorageManager
 
+if TYPE_CHECKING:
+    pass
+
 logger = get_logger(__name__)
 
 
 class ImportService:
     """数据导入服务"""
 
-    def __init__(self, parser=None, storage=None, indexer=None):
+    def __init__(
+        self,
+        parser: Optional[FitParser] = None,
+        storage: Optional[StorageManager] = None,
+        indexer: Optional[IndexManager] = None,
+    ) -> None:
         """初始化导入服务"""
         self.console = Console()
         self.parser = parser or FitParser()

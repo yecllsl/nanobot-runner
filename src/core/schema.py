@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 import polars as pl
+import polars.exceptions as ple
 
 from src.core.logger import get_logger
 
@@ -159,8 +160,7 @@ class ParquetSchema:
             if col_name in df.columns:
                 try:
                     df = df.with_columns(pl.col(col_name).cast(col_type))
-                except Exception:  # nosec B110
-                    # 类型转换失败时保持原类型
+                except (ple.ComputeError, ple.SchemaError):
                     logger.warning(f"列 {col_name} 类型转换失败，保持原类型")
 
         return df

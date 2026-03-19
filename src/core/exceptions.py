@@ -58,7 +58,7 @@ class ValidationError(NanobotRunnerError):
 
 
 @dataclass
-class IndexError(NanobotRunnerError):
+class IndexStoreError(NanobotRunnerError):
     """索引相关错误"""
 
     error_code: str = "INDEX_ERROR"
