@@ -327,8 +327,8 @@ class StorageManager:
         查询跑步活动数据（支持过滤）
 
         Args:
-            years: 要查询的年份列表，None表示查询所有年份
-            days: 查询最近N天的数据，优先级高于years
+            years: 要查询的年份列表，None 表示查询所有年份
+            days: 查询最近 N 天的数据，优先级高于 years
             min_distance: 最小距离过滤（米）
             min_heart_rate: 最小心率过滤
 
@@ -354,3 +354,29 @@ class StorageManager:
             lf = lf.filter(pl.col("avg_heart_rate") >= min_heart_rate)
 
         return lf.collect()
+
+    def query_by_date_range(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        按日期范围查询活动数据
+
+        Args:
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            List[Dict]: 活动数据列表
+        """
+        lf = self.read_parquet()
+
+        if start_date is not None:
+            lf = lf.filter(pl.col("timestamp") >= start_date)
+
+        if end_date is not None:
+            lf = lf.filter(pl.col("timestamp") <= end_date)
+
+        df = lf.collect()
+        return df.to_dicts()
