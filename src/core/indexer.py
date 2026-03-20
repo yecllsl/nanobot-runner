@@ -52,7 +52,7 @@ class IndexManager:
         key_fields = [
             metadata.get("total_distance", 0),
             metadata.get("total_timer_time", 0),
-            metadata.get("start_time", ""),
+            metadata.get("time_created", metadata.get("start_time", "")),
         ]
         fingerprint_str = "|".join(str(field) for field in key_fields)
         return hashlib.sha256(fingerprint_str.encode()).hexdigest()

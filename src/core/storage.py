@@ -40,6 +40,44 @@ class StorageManager:
 
         return df
 
+    def _align_dataframes(
+        self, df1: pl.DataFrame, df2: pl.DataFrame
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        all_columns = sorted(set(df1.columns) | set(df2.columns))
+
+        for col in all_columns:
+            if col not in df1.columns:
+                df1 = df1.with_columns(pl.lit(None).alias(col))
+            if col not in df2.columns:
+                df2 = df2.with_columns(pl.lit(None).alias(col))
+
+        schema1 = df1.schema
+        schema2 = df2.schema
+
+        for col in all_columns:
+            type1 = schema1[col]
+            type2 = schema2[col]
+
+            if type1 == pl.Null and type2 != pl.Null:
+                df1 = df1.with_columns(pl.col(col).cast(type2))
+            elif type2 == pl.Null and type1 != pl.Null:
+                df2 = df2.with_columns(pl.col(col).cast(type1))
+            elif type1 != type2:
+                if type1 in (pl.Float64, pl.Float32) or type2 in (pl.Float64, pl.Float32):
+                    df1 = df1.with_columns(pl.col(col).cast(pl.Float64))
+                    df2 = df2.with_columns(pl.col(col).cast(pl.Float64))
+                elif type1.is_integer() and type2.is_integer():
+                    df1 = df1.with_columns(pl.col(col).cast(pl.Int64))
+                    df2 = df2.with_columns(pl.col(col).cast(pl.Int64))
+                else:
+                    df1 = df1.with_columns(pl.col(col).cast(pl.String))
+                    df2 = df2.with_columns(pl.col(col).cast(pl.String))
+
+        df1 = df1.select(all_columns)
+        df2 = df2.select(all_columns)
+
+        return df1, df2
+
     def save_to_parquet(
         self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False
     ) -> bool:
@@ -68,6 +106,7 @@ class StorageManager:
             if filepath.exists():
                 existing_df = pl.read_parquet(filepath)
                 existing_df = self._convert_to_parquet_compatible(existing_df)
+                existing_df, dataframe = self._align_dataframes(existing_df, dataframe)
                 combined_df = pl.concat([existing_df, dataframe])
                 combined_df.write_parquet(filepath, compression="snappy")
                 logger.info(f"追加数据到 {filename}, 新增 {dataframe.height} 条记录")

@@ -13,6 +13,78 @@ from src.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+_original_parse_definition_message = fitparse.base.FitFile._parse_definition_message
+
+
+def _patched_parse_definition_message(self, header):
+    from fitparse.records import BASE_TYPE_BYTE, BASE_TYPES, FieldDefinition
+
+    endian = ">" if self._read_struct("xB") else "<"
+    global_mesg_num, num_fields = self._read_struct("HB", endian=endian)
+    mesg_type = fitparse.profile.MESSAGE_TYPES.get(global_mesg_num)
+    field_defs = []
+
+    for n in range(num_fields):
+        field_def_num, field_size, base_type_num = self._read_struct(
+            "3B", endian=endian
+        )
+        field = mesg_type.fields.get(field_def_num) if mesg_type else None
+        base_type = BASE_TYPES.get(base_type_num, BASE_TYPE_BYTE)
+
+        if (field_size % base_type.size) != 0:
+            logger.debug(
+                f"非标准字段大小: {field_def_num}, size={field_size}, "
+                f"base_type={base_type.name}, expected_multiple={base_type.size}"
+            )
+            base_type = BASE_TYPE_BYTE
+            field_size = field_size
+
+        if field and field.components:
+            for component in field.components:
+                if component.accumulate:
+                    accumulators = self._accumulators.setdefault(global_mesg_num, {})
+                    accumulators[component.def_num] = 0
+
+        field_defs.append(
+            FieldDefinition(
+                field=field,
+                def_num=field_def_num,
+                base_type=base_type,
+                size=field_size,
+            )
+        )
+
+    dev_field_defs = []
+    if header.is_developer_data:
+        num_dev_fields = self._read_struct("B", endian=endian)
+        for n in range(num_dev_fields):
+            field_def_num, field_size, dev_data_index = self._read_struct(
+                "3B", endian=endian
+            )
+            field = fitparse.records.get_dev_type(dev_data_index, field_def_num)
+            dev_field_defs.append(
+                fitparse.records.DevFieldDefinition(
+                    field=field,
+                    dev_data_index=dev_data_index,
+                    def_num=field_def_num,
+                    size=field_size,
+                )
+            )
+
+    def_mesg = fitparse.records.DefinitionMessage(
+        header=header,
+        endian=endian,
+        mesg_type=mesg_type,
+        mesg_num=global_mesg_num,
+        field_defs=field_defs,
+        dev_field_defs=dev_field_defs,
+    )
+    self._local_mesgs[header.local_mesg_num] = def_mesg
+    return def_mesg
+
+
+fitparse.base.FitFile._parse_definition_message = _patched_parse_definition_message
+
 
 class FitParser:
     """FIT文件解析器"""
