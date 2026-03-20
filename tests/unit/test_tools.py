@@ -399,7 +399,7 @@ class TestCreateTools:
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 8
+            assert len(tools) == 9
 
     def test_create_tools_contains_all_tools(self):
         """测试包含所有工具"""
@@ -416,6 +416,7 @@ class TestCreateTools:
             assert "get_training_load" in tool_names
             assert "query_by_date_range" in tool_names
             assert "query_by_distance" in tool_names
+            assert "update_memory" in tool_names
 
 
 class TestRunnerTools:

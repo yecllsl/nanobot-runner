@@ -21,43 +21,65 @@ graph TB
         CLI[CLI 终端]
         Feishu[飞书 Bot]
     end
+    
+    subgraph "nanobot-ai 框架层"
+        Core[nanobot-ai Core<br/>框架核心]
+        AgentLoop[Agent Loop]
+        Channels[Channel Manager]
+    end
+    
+    subgraph "协议转换层"
+        FeishuChannel[FeishuBotChannel<br/>协议转换]
+    end
+    
     subgraph "Agent智能层"
-        Core[nanobot-ai 底座]
         Agent[Runner Agent]
         Tools[工具集 RunnerTools]
     end
+    
     subgraph "业务逻辑层"
         ImportSvc[导入服务 ImportService]
         QuerySvc[查询服务]
         AnalysisSvc[分析服务 AnalyticsEngine]
+        ProfileSvc[画像服务 RunnerProfileEngine]
+        PlanSvc[计划服务 TrainingPlanEngine]
     end
+    
     subgraph "数据与存储层"
         subgraph "高性能数据区"
             ParquetStore[(Parquet 数据湖)]
             PolarsEngine[Polars 计算引擎]
         end
+        subgraph "记忆系统"
+            MemoryMD[(MEMORY.md<br/>长期记忆)]
+            HistoryMD[(HISTORY.md<br/>事件日志)]
+        end
         subgraph "基座配置区"
             Config[配置文件 JSON]
             Index[指纹索引 index.json]
         end
-        RawFiles[原始 .fit 文件]
     end
-    %% 关系连线
+    
     CLI -->|指令| Core
     Feishu -->|Webhook| Core
-    
-    Core -->|调度| Agent
+    Core -->|调度| Channels
+    Channels -->|加载| FeishuChannel
+    FeishuChannel -->|转发| AgentLoop
+    AgentLoop -->|执行| Agent
     Agent -->|调用| Tools
     
     Tools --> ImportSvc
     Tools --> QuerySvc
+    Tools --> ProfileSvc
+    Tools --> PlanSvc
     
     ImportSvc -->|写入| ParquetStore
     ImportSvc -->|更新| Index
-    
     QuerySvc --> AnalysisSvc
     AnalysisSvc -->|Lazy查询| PolarsEngine
     PolarsEngine -->|读取| ParquetStore
+    ProfileSvc -->|读写| MemoryMD
+    ProfileSvc -->|写入| Config
     
     Core -->|读写| Config
 ```
@@ -89,6 +111,112 @@ graph TB
 *   **去重索引**: `index.json`，存储 `fingerprint` 集合
     *   *设计理由*：导入时只需Load全量指纹到内存比对，避免扫描庞大的 Parquet 文件，实现毫秒级去重校验。
     *   *指纹生成*: 基于文件元数据（serial_number + time_created + 文件大小）计算SHA256
+
+#### 4.1.3 nanobot Workspace 目录结构
+
+系统将 `~/.nanobot-runner` 作为 nanobot workspace，遵循 nanobot-ai 标准结构：
+
+```
+~/.nanobot-runner/
+├── data/                    # 业务数据存储（本项目扩展）
+│   ├── activities_*.parquet # 运动数据（按年分片）
+│   ├── profile.json         # 结构化画像数据（计算用）
+│   └── plans/               # 训练计划存储
+│       └── {plan_id}.json
+├── memory/                  # 记忆系统（nanobot标准）
+│   ├── MEMORY.md            # 长期记忆/用户画像（Agent上下文）
+│   └── HISTORY.md           # 事件日志（可搜索历史）
+├── sessions/                # 会话历史（nanobot标准）
+│   └── feishu_{chat_id}.jsonl
+├── skills/                  # 技能扩展（nanobot标准）
+│   ├── training_plan/
+│   │   └── SKILL.md         # 训练计划生成技能
+│   ├── injury_prediction/
+│   │   └── SKILL.md         # 伤病风险预警技能
+│   └── vdot_prediction/
+│       └── SKILL.md         # VDOT预测技能
+├── AGENTS.md                # Agent行为准则
+├── USER.md                  # 用户画像（辅助）
+├── HEARTBEAT.md             # 定时任务
+└── config.json              # 应用配置
+```
+
+**初始化机制**：
+
+> ⚠️ **重要**：workspace 目录结构由 nanobot-ai 框架自动初始化，无需自定义实现。
+
+当启动 nanobot-runner 应用时，nanobot-ai 框架会检测 `workspace=~/.nanobot-runner` 是否存在或为空，自动创建缺失的标准结构：
+
+| 自动创建的文件/目录 | 说明 |
+|-------------------|------|
+| `AGENTS.md` | Agent 行为准则模板 |
+| `SOUL.md` | 人格、价值观、语气风格 |
+| `USER.md` | 用户画像模板 |
+| `memory/MEMORY.md` | 长期记忆初始文件 |
+| `memory/HISTORY.md` | 事件日志初始文件 |
+| `skills/` | 技能目录（如版本默认带） |
+
+**设计依据**：
+- `data/`：本项目特有，存储 Parquet 业务数据，需应用自行创建
+- `memory/`、`sessions/`、`skills/`、`AGENTS.md`、`USER.md` 等：由 nanobot-ai 框架自动初始化
+- **完全复用 nanobot 的初始化逻辑**，避免重复实现
+
+#### 4.1.4 配置管理架构
+
+**三级配置体系**：
+
+| 配置层级 | 路径 | 职责 | 内容示例 |
+|---------|------|------|---------|
+| 框架配置 | `~/.nanobot/config.json` | nanobot-ai 框架配置 | LLM Provider、全局设置、通用工具链 |
+| 应用配置 | `~/.nanobot-runner/config.json` | 业务应用配置 | 飞书应用、数据路径、业务参数 |
+| 运行时配置 | 环境变量 | 敏感信息覆盖 | API密钥、临时配置 |
+
+**配置加载顺序**：
+```
+框架配置 → 应用配置 → 环境变量覆盖
+```
+
+**配置文件示例**：
+
+`~/.nanobot/config.json`（框架配置）：
+```json
+{
+  "providers": {
+    "default": "local-llm",
+    "local-llm": {
+      "type": "ollama",
+      "base_url": "http://localhost:11434"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "llama3",
+      "max_tool_iterations": 10,
+      "memory_window": 10
+    }
+  },
+  "channels": {
+    "feishu": {
+      "enabled": true,
+      "app_id": "${FEISHU_APP_ID}",
+      "app_secret": "${FEISHU_APP_SECRET}"
+    }
+  }
+}
+```
+
+`~/.nanobot-runner/config.json`（应用配置）：
+```json
+{
+  "version": "0.4.0",
+  "data_dir": "~/.nanobot-runner/data",
+  "feishu_webhook": "https://open.feishu.cn/...",
+  "auto_push_feishu": false,
+  "vdot_params": {
+    "min_distance": 1500
+  }
+}
+```
 
 ### 4.2 数据导入流程设计
 导入模块采用"解析-校验-落盘"三步流水线。
@@ -230,6 +358,17 @@ nanobot-runner/
 *   **内存控制**：常规分析操作内存占用 < 500MB (利用 Lazy Loading)。
 *   **存储效率**：Parquet列式存储，压缩比通常可达 5:1 至 10:1。
 
+### 7.1.2 Agent监控指标
+
+| 指标类别 | 指标名称 | 阈值 | 说明 |
+|---------|---------|------|------|
+| 记忆管理 | MEMORY.md大小 | < 50KB | 避免上下文过长 |
+| 会话管理 | sessions文件数量 | < 100 | 定期清理旧会话 |
+| Agent性能 | 平均响应时间 | < 3s | 复杂查询 |
+| 工具调用 | 工具成功率 | > 95% | 核心工具 |
+| 记忆更新 | MEMORY.md更新频率 | 每周至少1次 | 保持画像新鲜度 |
+| 日历同步 | 同步延迟 | < 5s | 飞书日历 |
+
 ### 7.2 安全合规
 *   **数据沙箱**：所有 Parquet、Index、Config 文件默认存储在 `~/.nanobot-runner/`，不越权访问其他目录。
 *   **网络隔离**：仅在配置飞书推送时发起出站请求，且仅发送摘要文本，不发送原始数据。
@@ -344,6 +483,7 @@ class QueryCache:
 | 0.2.0 | 2024-02 | 新增AnalyticsEngine，支持VDOT/TSS计算 | 架构师 | - |
 | 0.3.0 | 2024-03 | 新增Agent工具集、飞书推送、每日晨报 | 架构师 | - |
 | 0.3.1 | 2026-03-17 | **风险复盘架构调整** | 架构师 | R-007, R-010 |
+| 0.4.0 | 2026-03-19 | **架构评审修订**：新增workspace结构、配置管理、Channel集成机制、Agent监控指标 | 架构师 | R-010 |
 
 ### 0.3.1 版本变更详情
 

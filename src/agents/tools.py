@@ -1,15 +1,20 @@
-# Agent工具集
-# 封装为nanobot-ai可识别的工具
+# Agent 工具集
+# 封装为 nanobot-ai 可识别的工具
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
 
 from src.core.analytics import AnalyticsEngine
+from src.core.profile import ProfileStorageManager, RunnerProfile
 from src.core.storage import StorageManager
+
+logger = logging.getLogger(__name__)
 
 
 class BaseTool(ABC):
@@ -314,12 +319,49 @@ class QueryByDistanceTool(BaseTool):
         )
 
 
+class UpdateMemoryTool(BaseTool):
+    """更新 Agent 记忆工具（Agent 专用）"""
+
+    @property
+    def name(self) -> str:
+        return "update_memory"
+
+    @property
+    def description(self) -> str:
+        return "更新 Agent 观察笔记到 MEMORY.md，用于记录用户偏好、训练反馈等长期记忆"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "note": {
+                    "type": "string",
+                    "description": "要添加的观察笔记内容",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "笔记分类（可选）：training(训练), preference(偏好), injury(伤病), other(其他)",
+                    "enum": ["training", "preference", "injury", "other"],
+                    "default": "other",
+                },
+            },
+            "required": ["note"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        note = kwargs.get("note", "")
+        category = kwargs.get("category", "other")
+        return self._run_sync(self.runner_tools.update_memory, note, category)
+
+
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
     def __init__(self, storage: Optional[StorageManager] = None):
         self.storage = storage or StorageManager()
         self.analytics = AnalyticsEngine(self.storage)
+        self.profile_storage = ProfileStorageManager()
 
     def get_running_stats(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None
@@ -489,9 +531,56 @@ class RunnerTools:
 
         return results
 
+    def update_memory(self, note: str, category: str = "other") -> Dict[str, Any]:
+        """
+        更新 Agent 观察笔记到 MEMORY.md
+
+        Args:
+            note: 观察笔记内容
+            category: 笔记分类（training/preference/injury/other）
+
+        Returns:
+            Dict: 包含成功/失败状态和消息
+        """
+        try:
+            if not note or not note.strip():
+                return {"error": "笔记内容不能为空"}
+
+            # 验证分类
+            valid_categories = ["training", "preference", "injury", "other"]
+            if category not in valid_categories:
+                return {"error": f"无效的分类，必须是 {', '.join(valid_categories)} 之一"}
+
+            # 格式化笔记内容（添加分类标签）
+            category_map = {
+                "training": "训练",
+                "preference": "偏好",
+                "injury": "伤病",
+                "other": "其他",
+            }
+            formatted_note = f"[{category_map.get(category, '其他')}] {note}"
+
+            # 追加到 MEMORY.md
+            success = self.profile_storage.save_memory_md(
+                f"- @agent {formatted_note}", append=True
+            )
+
+            if success:
+                return {
+                    "success": True,
+                    "message": "记忆更新成功",
+                    "note": formatted_note,
+                }
+            else:
+                return {"error": "保存 MEMORY.md 失败"}
+
+        except Exception as e:
+            logger.error(f"更新记忆失败：{e}")
+            return {"error": f"更新记忆失败：{str(e)}"}
+
 
 def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
-    """创建工具实例列表（供nanobot-ai使用）"""
+    """创建工具实例列表（供 nanobot-ai 使用）"""
     return [
         GetRunningStatsTool(runner_tools),
         GetRecentRunsTool(runner_tools),
@@ -501,6 +590,7 @@ def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
         GetTrainingLoadTool(runner_tools),
         QueryByDateRangeTool(runner_tools),
         QueryByDistanceTool(runner_tools),
+        UpdateMemoryTool(runner_tools),
     ]
 
 
@@ -514,23 +604,23 @@ TOOL_DESCRIPTIONS = {
     },
     "get_recent_runs": {
         "description": "获取最近的跑步记录",
-        "parameters": {"limit": "返回数量限制（默认10条）"},
+        "parameters": {"limit": "返回数量限制（默认 10 条）"},
     },
     "calculate_vdot_for_run": {
-        "description": "计算单次跑步的VDOT值（跑力值）",
+        "description": "计算单次跑步的 VDOT 值（跑力值）",
         "parameters": {"distance_m": "距离（米）", "time_s": "用时（秒）"},
     },
     "get_vdot_trend": {
-        "description": "获取VDOT趋势变化",
-        "parameters": {"limit": "返回数量限制（默认20条）"},
+        "description": "获取 VDOT 趋势变化",
+        "parameters": {"limit": "返回数量限制（默认 20 条）"},
     },
     "get_hr_drift_analysis": {
         "description": "分析心率漂移情况",
-        "parameters": {"run_id": "活动ID（可选）"},
+        "parameters": {"run_id": "活动 ID（可选）"},
     },
     "get_training_load": {
         "description": "获取训练负荷（ATL/CTL）",
-        "parameters": {"days": "分析天数（默认42天）"},
+        "parameters": {"days": "分析天数（默认 42 天）"},
     },
     "query_by_date_range": {
         "description": "按日期范围查询跑步记录",
@@ -544,6 +634,13 @@ TOOL_DESCRIPTIONS = {
         "parameters": {
             "min_distance": "最小距离（公里）",
             "max_distance": "最大距离（公里，可选）",
+        },
+    },
+    "update_memory": {
+        "description": "更新 Agent 观察笔记到 MEMORY.md",
+        "parameters": {
+            "note": "观察笔记内容",
+            "category": "笔记分类（training/preference/injury/other，默认 other）",
         },
     },
 }

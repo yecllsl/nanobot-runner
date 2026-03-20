@@ -6,7 +6,7 @@ from src.core.decorators import handle_errors, handle_tool_errors
 from src.core.exceptions import (
     ConfigError,
     ImportError,
-    IndexError,
+    IndexStoreError,
     NanobotRunnerError,
     ParseError,
     StorageError,
@@ -132,19 +132,19 @@ class TestValidationError:
         assert isinstance(error, NanobotRunnerError)
 
 
-class TestIndexError:
+class TestIndexStoreError:
     """测试索引错误"""
 
     def test_default_values(self):
         """测试默认值"""
-        error = IndexError(message="索引错误")
+        error = IndexStoreError(message="索引错误")
         assert error.message == "索引错误"
         assert error.error_code == "INDEX_ERROR"
         assert error.recovery_suggestion == "请尝试重新导入数据以重建索引"
 
     def test_inheritance(self):
         """测试继承关系"""
-        error = IndexError(message="索引错误")
+        error = IndexStoreError(message="索引错误")
         assert isinstance(error, NanobotRunnerError)
 
 

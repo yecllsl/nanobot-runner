@@ -1,15 +1,33 @@
 # 分析引擎
 # 基于Polars实现核心数据分析算法
 
-from typing import Any, Dict, List, Optional
+import math
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import polars as pl
+
+if TYPE_CHECKING:
+    from src.core.storage import StorageManager
+
+# VDOT 计算常量 (Jack Daniels 公式)
+VDOT_COEFFICIENT = 0.0001
+VDOT_DISTANCE_EXPONENT = 1.06
+VDOT_TIME_EXPONENT = 0.43
+VDOT_MULTIPLIER = 24.6
+
+# TSS 计算常量
+DEFAULT_LTHR = 180  # 默认乳酸阈值心率
+
+# 训练负荷计算常量
+ATL_TIME_CONSTANT = 7.0  # 急性训练负荷时间常数（天）
+CTL_TIME_CONSTANT = 42.0  # 慢性训练负荷时间常数（天）
 
 
 class AnalyticsEngine:
     """数据分析引擎"""
 
-    def __init__(self, storage_manager) -> None:
+    def __init__(self, storage_manager: "StorageManager") -> None:
         """
         初始化分析引擎
 
@@ -35,7 +53,9 @@ class AnalyticsEngine:
         if distance_m <= 0 or time_s <= 0:
             raise ValueError("距离和时间必须为正数")
 
-        vdot = (0.0001 * (distance_m**1.06) * 24.6) / (time_s**0.43)
+        vdot = (
+            VDOT_COEFFICIENT * (distance_m**VDOT_DISTANCE_EXPONENT) * VDOT_MULTIPLIER
+        ) / (time_s**VDOT_TIME_EXPONENT)
         return round(vdot, 2)
 
     def calculate_tss(
@@ -60,7 +80,7 @@ class AnalyticsEngine:
 
         try:
             avg_hr: float = float(heart_rate_data.mean())  # type: ignore[arg-type]
-            intensity_factor = avg_hr / 180
+            intensity_factor = avg_hr / DEFAULT_LTHR
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)
         except Exception as e:
@@ -87,14 +107,10 @@ class AnalyticsEngine:
                 return pl.DataFrame()
 
             if start_date or end_date:
-                from datetime import datetime
-
                 if start_date:
                     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                     lf = lf.filter(pl.col("timestamp") >= start_dt)
                 if end_date:
-                    from datetime import timedelta
-
                     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
                     end_dt = end_dt + timedelta(days=1)
                     lf = lf.filter(pl.col("timestamp") < end_dt)
@@ -173,6 +189,33 @@ class AnalyticsEngine:
         except Exception as e:
             return {"error": f"分析失败: {str(e)}"}
 
+    def _calculate_ewma(self, tss_values: List[float], time_constant: float) -> float:
+        """
+        计算指数加权移动平均（EWMA）
+
+        Args:
+            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
+            time_constant: 时间常数（天）
+
+        Returns:
+            float: EWMA值
+        """
+        if not tss_values:
+            return 0.0
+
+        weighted_sum = 0.0
+        weight_sum = 0.0
+
+        for i, tss in enumerate(reversed(tss_values)):
+            weight = math.exp(-i / time_constant)
+            weighted_sum += tss * weight
+            weight_sum += weight
+
+        if weight_sum == 0:
+            return 0.0
+
+        return round(weighted_sum / weight_sum, 2)
+
     def calculate_atl(self, tss_values: List[float]) -> float:
         """
         计算急性训练负荷（ATL，7天指数移动平均）
@@ -186,33 +229,7 @@ class AnalyticsEngine:
         Returns:
             float: ATL值
         """
-        import math
-
-        if not tss_values:
-            return 0.0
-
-        # 使用 EWMA 指数加权公式
-        # ATL 时间常数 = 7 天
-        time_constant = 7.0
-
-        # 计算加权和
-        weighted_sum = 0.0
-        weight_sum = 0.0
-
-        # tss_values 按时间顺序排列，最近的在最后
-        # i 表示距离当前的天数（0 = 最近）
-        n = len(tss_values)
-        for i, tss in enumerate(reversed(tss_values)):
-            # 计算指数权重
-            weight = math.exp(-i / time_constant)
-            weighted_sum += tss * weight
-            weight_sum += weight
-
-        if weight_sum == 0:
-            return 0.0
-
-        atl = weighted_sum / weight_sum
-        return round(atl, 2)
+        return self._calculate_ewma(tss_values, ATL_TIME_CONSTANT)
 
     def calculate_ctl(self, tss_values: List[float]) -> float:
         """
@@ -227,33 +244,7 @@ class AnalyticsEngine:
         Returns:
             float: CTL值
         """
-        import math
-
-        if not tss_values:
-            return 0.0
-
-        # 使用 EWMA 指数加权公式
-        # CTL 时间常数 = 42 天
-        time_constant = 42.0
-
-        # 计算加权和
-        weighted_sum = 0.0
-        weight_sum = 0.0
-
-        # tss_values 按时间顺序排列，最近的在最后
-        # i 表示距离当前的天数（0 = 最近）
-        n = len(tss_values)
-        for i, tss in enumerate(reversed(tss_values)):
-            # 计算指数权重
-            weight = math.exp(-i / time_constant)
-            weighted_sum += tss * weight
-            weight_sum += weight
-
-        if weight_sum == 0:
-            return 0.0
-
-        ctl = weighted_sum / weight_sum
-        return round(ctl, 2)
+        return self._calculate_ewma(tss_values, CTL_TIME_CONSTANT)
 
     def calculate_atl_ctl(
         self, tss_values: List[float], atl_days: int = 7, ctl_days: int = 42
@@ -515,8 +506,6 @@ class AnalyticsEngine:
                 - runs_count: 跑步次数
                 - message: 提示信息（数据不足时）
         """
-        from datetime import datetime, timedelta
-
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
