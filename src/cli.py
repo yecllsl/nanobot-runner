@@ -21,6 +21,7 @@ from src.core.config import ConfigManager
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.parser import FitParser
+from src.core.profile import ProfileEngine, ProfileStorageManager
 from src.core.storage import StorageManager
 
 app = typer.Typer(
@@ -28,6 +29,9 @@ app = typer.Typer(
     help="Nanobot Runner - 本地跑步数据助理",
     add_completion=False,
 )
+
+profile_app = typer.Typer(help="用户画像管理")
+app.add_typer(profile_app, name="profile")
 
 console = Console()
 
@@ -583,6 +587,188 @@ def _display_report(report_data: dict):
             else:
                 plan_table.add_row(f"{day_str} {date_str}", plan_str)
         console.print(plan_table)
+
+
+@profile_app.command("show")
+def profile_show(
+    days: int = typer.Option(90, "--days", "-d", help="分析天数"),
+    age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+    resting_hr: int = typer.Option(60, "--resting-hr", "-r", help="静息心率"),
+    rebuild: bool = typer.Option(False, "--rebuild", help="重新构建画像"),
+):
+    """
+    显示用户画像信息
+
+    包含：平均 VDOT、健身水平、训练模式、受伤风险评估等
+    """
+    from rich.panel import Panel
+    from rich.table import Table
+
+    try:
+        config = ConfigManager()
+        storage = StorageManager(config.data_dir)
+        profile_storage = ProfileStorageManager()
+        profile = None
+
+        if rebuild:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task("正在构建用户画像...", total=None)
+                engine = ProfileEngine(storage)
+                profile = engine.build_profile(
+                    user_id="default_user",
+                    days=days,
+                    age=age,
+                    resting_hr=resting_hr,
+                )
+                profile_storage.save_profile_json(profile)
+        else:
+            profile = profile_storage.load_profile_json()
+
+            if profile is None:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    transient=True,
+                ) as progress:
+                    progress.add_task("首次运行，正在构建用户画像...", total=None)
+                    engine = ProfileEngine(storage)
+                    profile = engine.build_profile(
+                        user_id="default_user",
+                        days=days,
+                        age=age,
+                        resting_hr=resting_hr,
+                    )
+                    profile_storage.save_profile_json(profile)
+
+        if profile is None or profile.total_activities == 0:
+            console.print(
+                Panel(
+                    "[yellow]暂无跑步数据[/yellow]\n\n" "使用 'nanobotrun import <路径>' 导入FIT文件",
+                    title="用户画像",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        console.print()
+        console.print(
+            Panel(
+                f"[bold]用户 ID:[/bold] {profile.user_id}\n"
+                f"[bold]画像日期:[/bold] {profile.profile_date.strftime('%Y-%m-%d %H:%M')}\n"
+                f"[bold]分析周期:[/bold] {profile.analysis_period_days} 天",
+                title="[Profile] 用户画像",
+                border_style="blue",
+            )
+        )
+
+        basic_table = Table(title="基础统计", show_header=False)
+        basic_table.add_column("指标", style="cyan")
+        basic_table.add_column("数值", style="green")
+        basic_table.add_row("总活动次数", str(profile.total_activities))
+        basic_table.add_row("总跑量", f"{profile.total_distance_km:.2f} km")
+        basic_table.add_row("总时长", f"{profile.total_duration_hours:.2f} 小时")
+        basic_table.add_row("平均配速", f"{profile.avg_pace_min_per_km:.2f} min/km")
+        console.print(basic_table)
+
+        fitness_table = Table(title="体能指标", show_header=False)
+        fitness_table.add_column("指标", style="cyan")
+        fitness_table.add_column("数值", style="green")
+
+        vdot_color = (
+            "green"
+            if profile.avg_vdot >= 45
+            else "yellow"
+            if profile.avg_vdot >= 30
+            else "red"
+        )
+        fitness_table.add_row(
+            "平均 VDOT", f"[{vdot_color}]{profile.avg_vdot:.2f}[/{vdot_color}]"
+        )
+        fitness_table.add_row("最大 VDOT", f"{profile.max_vdot:.2f}")
+        fitness_table.add_row("体能水平", f"[bold]{profile.fitness_level.value}[/bold]")
+        console.print(fitness_table)
+
+        training_table = Table(title="训练模式", show_header=False)
+        training_table.add_column("指标", style="cyan")
+        training_table.add_column("数值", style="green")
+        training_table.add_row("周平均跑量", f"{profile.weekly_avg_distance_km:.2f} km")
+        training_table.add_row("周平均时长", f"{profile.weekly_avg_duration_hours:.2f} 小时")
+        training_table.add_row("训练模式", f"[bold]{profile.training_pattern.value}[/bold]")
+        training_table.add_row("训练一致性", f"{profile.consistency_score:.1f}/100")
+        console.print(training_table)
+
+        load_table = Table(title="训练负荷", show_header=False)
+        load_table.add_column("指标", style="cyan")
+        load_table.add_column("数值", style="green")
+
+        atl_color = (
+            "green" if profile.atl < 50 else "yellow" if profile.atl < 100 else "red"
+        )
+        ctl_color = (
+            "green" if profile.ctl < 50 else "yellow" if profile.ctl < 100 else "red"
+        )
+        tsb_color = (
+            "green" if profile.tsb > 0 else "yellow" if profile.tsb > -20 else "red"
+        )
+
+        load_table.add_row("ATL (疲劳)", f"[{atl_color}]{profile.atl:.2f}[/{atl_color}]")
+        load_table.add_row("CTL (体能)", f"[{ctl_color}]{profile.ctl:.2f}[/{ctl_color}]")
+        load_table.add_row("TSB (状态)", f"[{tsb_color}]{profile.tsb:.2f}[/{tsb_color}]")
+        console.print(load_table)
+
+        risk_color = (
+            "green"
+            if profile.injury_risk_level.value == "低"
+            else "yellow"
+            if profile.injury_risk_level.value == "中"
+            else "red"
+        )
+        console.print(
+            Panel(
+                f"[bold]伤病风险等级:[/bold] [{risk_color}]{profile.injury_risk_level.value}[/{risk_color}]\n"
+                f"[bold]风险评分:[/bold] {profile.injury_risk_score:.1f}",
+                title="伤病风险评估",
+                border_style=risk_color,
+            )
+        )
+
+        if (
+            profile.avg_heart_rate
+            or profile.max_heart_rate
+            or profile.resting_heart_rate
+        ):
+            hr_table = Table(title="心率指标", show_header=False)
+            hr_table.add_column("指标", style="cyan")
+            hr_table.add_column("数值", style="green")
+            if profile.avg_heart_rate:
+                hr_table.add_row("平均心率", f"{profile.avg_heart_rate:.1f} bpm")
+            if profile.max_heart_rate:
+                hr_table.add_row("最大心率", f"{profile.max_heart_rate:.1f} bpm")
+            if profile.resting_heart_rate:
+                hr_table.add_row("静息心率", f"{profile.resting_heart_rate:.1f} bpm")
+            console.print(hr_table)
+
+        console.print(
+            Panel(
+                f"[bold]数据质量评分:[/bold] {profile.data_quality_score:.1f}/100\n"
+                f"[bold]偏好训练时间:[/bold] {profile.favorite_running_time}",
+                title="其他信息",
+                border_style="dim",
+            )
+        )
+
+    except Exception as e:
+        print_error(
+            {
+                "message": f"获取用户画像失败: {str(e)}",
+                "suggestion": "请确保已导入跑步数据，或使用 --rebuild 重新构建画像",
+            }
+        )
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
