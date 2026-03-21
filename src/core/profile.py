@@ -49,7 +49,7 @@ class ProfileStorageManager:
 
     def save_profile_json(self, profile: RunnerProfile) -> bool:
         """
-        保存画像到 profile.json
+        保存画像到 profile.json 并同步到 MEMORY.md
 
         Args:
             profile: RunnerProfile 对象
@@ -68,6 +68,9 @@ class ProfileStorageManager:
                 json.dump(profile_data, f, indent=2, ensure_ascii=False)
 
             logger.info(f"画像已保存到 profile.json: {profile.user_id}")
+
+            self.sync_dual_storage(profile, sync_direction="json_to_md")
+
             return True
         except Exception as e:
             logger.error(f"保存 profile.json 失败：{e}")
