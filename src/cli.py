@@ -420,6 +420,204 @@ def init():
 
 
 @app.command()
+def gateway(
+    port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
+):
+    """
+    启动飞书机器人Gateway服务
+
+    启动后可通过飞书App与"Nanobot-ai助手"机器人交互：
+
+    命令示例:
+        /stats              # 查看训练统计
+        /recent 5           # 查看最近5次训练
+        /vd                 # 查看VDOT趋势
+        /help               # 显示帮助
+
+    自然语言示例:
+        我最近跑得怎么样？
+        给我一个训练建议
+        我的VDOT是多少？
+    """
+    import asyncio
+
+    from nanobot.agent import AgentLoop
+    from nanobot.agent.tools import ToolRegistry
+    from nanobot.bus import MessageBus
+    from nanobot.channels.manager import ChannelManager
+    from nanobot.cli.commands import _make_provider
+    from nanobot.config.loader import get_data_dir, load_config
+    from nanobot.cron.service import CronService
+    from nanobot.cron.types import CronJob
+    from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.session.manager import SessionManager
+    from nanobot.utils.helpers import sync_workspace_templates
+
+    from src.agents.tools import RunnerTools, create_tools
+
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    console.print("[bold green]🐈 Nanobot Runner Gateway[/bold green]")
+    console.print(f"[dim]启动 Gateway 服务，端口: {port}[/dim]")
+    console.print("=" * 60)
+
+    config = load_config()
+    workspace = Path.home() / ".nanobot-runner"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    sync_workspace_templates(workspace)
+
+    config.agents.defaults.workspace = str(workspace)
+
+    bus = MessageBus()
+    provider = _make_provider(config)
+    session_manager = SessionManager(workspace)
+
+    cron_store_path = get_data_dir() / "cron" / "jobs.json"
+    cron = CronService(cron_store_path)
+
+    storage = StorageManager()
+    runner_tools = RunnerTools(storage)
+
+    registry = ToolRegistry()
+    for tool in create_tools(runner_tools):
+        registry.register(tool)
+
+    agent = AgentLoop(
+        bus=bus,
+        provider=provider,
+        workspace=workspace,
+        model=config.agents.defaults.model,
+        temperature=config.agents.defaults.temperature,
+        max_tokens=config.agents.defaults.max_tokens,
+        max_iterations=config.agents.defaults.max_tool_iterations,
+        memory_window=config.agents.defaults.memory_window,
+        reasoning_effort=config.agents.defaults.reasoning_effort,
+        cron_service=cron,
+        restrict_to_workspace=config.tools.restrict_to_workspace,
+        session_manager=session_manager,
+        mcp_servers=config.tools.mcp_servers,
+        channels_config=config.channels,
+    )
+
+    agent.tools = registry
+
+    async def on_cron_job(job: CronJob) -> str | None:
+        response = await agent.process_direct(
+            job.payload.message,
+            session_key=f"cron:{job.id}",
+            channel=job.payload.channel or "cli",
+            chat_id=job.payload.to or "direct",
+        )
+        if job.payload.deliver and job.payload.to:
+            from nanobot.bus.events import OutboundMessage
+
+            await bus.publish_outbound(
+                OutboundMessage(
+                    channel=job.payload.channel or "cli",
+                    chat_id=job.payload.to,
+                    content=response or "",
+                )
+            )
+        return response
+
+    cron.on_job = on_cron_job
+
+    channels = ChannelManager(config, bus)
+
+    def _pick_heartbeat_target() -> tuple[str, str]:
+        enabled = set(channels.enabled_channels)
+        for item in session_manager.list_sessions():
+            key = item.get("key") or ""
+            if ":" not in key:
+                continue
+            channel, chat_id = key.split(":", 1)
+            if channel in {"cli", "system"}:
+                continue
+            if channel in enabled and chat_id:
+                return channel, chat_id
+        return "cli", "direct"
+
+    async def on_heartbeat_execute(tasks: str) -> str:
+        channel, chat_id = _pick_heartbeat_target()
+
+        async def _silent(*_args, **_kwargs):
+            pass
+
+        return await agent.process_direct(
+            tasks,
+            session_key="heartbeat",
+            channel=channel,
+            chat_id=chat_id,
+            on_progress=_silent,
+        )
+
+    async def on_heartbeat_notify(response: str) -> None:
+        from nanobot.bus.events import OutboundMessage
+
+        channel, chat_id = _pick_heartbeat_target()
+        if channel == "cli":
+            return
+        await bus.publish_outbound(
+            OutboundMessage(channel=channel, chat_id=chat_id, content=response)
+        )
+
+    hb_cfg = config.gateway.heartbeat
+    heartbeat = HeartbeatService(
+        workspace=workspace,
+        provider=provider,
+        model=agent.model,
+        on_execute=on_heartbeat_execute,
+        on_notify=on_heartbeat_notify,
+        interval_s=hb_cfg.interval_s,
+        enabled=hb_cfg.enabled,
+    )
+
+    if channels.enabled_channels:
+        console.print(f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}")
+    else:
+        console.print("[yellow]警告: 未启用任何通道[/yellow]")
+
+    cron_status = cron.status()
+    if cron_status["jobs"] > 0:
+        console.print(f"[green]✓[/green] 定时任务: {cron_status['jobs']} 个")
+
+    console.print(f"[green]✓[/green] 心跳检测: 每 {hb_cfg.interval_s} 秒")
+    console.print()
+    console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
+    console.print("  • /stats - 查看训练统计")
+    console.print("  • /recent [数量] - 查看最近训练")
+    console.print("  • /vd - 查看VDOT趋势")
+    console.print("  • /hr_drift - 查看心率漂移")
+    console.print("  • /help - 显示帮助")
+    console.print()
+    console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
+
+    async def run():
+        try:
+            await cron.start()
+            await heartbeat.start()
+            await asyncio.gather(
+                agent.run(),
+                channels.start_all(),
+            )
+        except KeyboardInterrupt:
+            console.print("\n[yellow]正在关闭...[/yellow]")
+        finally:
+            await agent.close_mcp()
+            heartbeat.stop()
+            cron.stop()
+            agent.stop()
+            await channels.stop_all()
+
+    asyncio.run(run())
+
+
+@app.command()
 def report(
     push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
     schedule: Optional[str] = typer.Option(

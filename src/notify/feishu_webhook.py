@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.config import ConfigManager
 from src.core.training_plan import DailyPlan, WorkoutType
+from src.notify.feishu import FeishuBot
+from src.notify.feishu_calendar import FeishuCalendarSync
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ class FeishuCalendarWebhookHandler:
     2. 解析事件类型并路由到对应处理器
     3. 检测并解决日历事件与本地训练计划的冲突
     4. 将变更同步到本地存储
+    5. 通过飞书机器人通知用户日历变更
     """
 
     def __init__(self, config: Optional[WebhookConfig] = None):
@@ -98,6 +101,8 @@ class FeishuCalendarWebhookHandler:
             config: Webhook 配置，不指定则从配置文件读取
         """
         self.config = config or self._load_config()
+        self._feishu_bot: Optional[FeishuBot] = None
+        self._calendar_sync: Optional[FeishuCalendarSync] = None
         logger.info("飞书日历 Webhook 处理器初始化完成")
 
     def _load_config(self) -> WebhookConfig:
@@ -123,6 +128,103 @@ class FeishuCalendarWebhookHandler:
             ),
             sync_to_local=config_dict.get("webhook_sync_to_local", True),
         )
+
+    def _get_feishu_bot(self) -> Optional[FeishuBot]:
+        """
+        获取飞书机器人实例
+
+        Returns:
+            FeishuBot: 飞书机器人实例
+        """
+        if self._feishu_bot is None:
+            try:
+                self._feishu_bot = FeishuBot()
+                logger.debug("飞书机器人实例创建成功")
+            except Exception as e:
+                logger.error(f"创建飞书机器人实例失败：{e}")
+        return self._feishu_bot
+
+    def _get_calendar_sync(self) -> Optional[FeishuCalendarSync]:
+        """
+        获取日历同步服务实例
+
+        Returns:
+            FeishuCalendarSync: 日历同步服务实例
+        """
+        if self._calendar_sync is None:
+            try:
+                self._calendar_sync = FeishuCalendarSync()
+                logger.debug("日历同步服务实例创建成功")
+            except Exception as e:
+                logger.error(f"创建日历同步服务实例失败：{e}")
+        return self._calendar_sync
+
+    def _notify_user(
+        self,
+        event_type: str,
+        event_data: Dict[str, Any],
+        conflict_info: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        通过飞书机器人通知用户日历变更
+
+        Args:
+            event_type: 事件类型
+            event_data: 事件数据
+            conflict_info: 冲突信息（可选）
+
+        Returns:
+            bool: 通知是否成功
+        """
+        bot = self._get_feishu_bot()
+        if not bot:
+            logger.warning("飞书机器人未初始化，无法通知用户")
+            return False
+
+        try:
+            summary = event_data.get("summary", "未命名事件")
+            event_time = event_data.get("start_time", {})
+            timestamp = event_time.get("timestamp")
+
+            event_date = ""
+            if timestamp:
+                dt = datetime.fromtimestamp(int(timestamp))
+                event_date = dt.strftime("%Y-%m-%d %H:%M")
+
+            event_type_names = {
+                WebhookEventType.EVENT_CREATED.value: "创建",
+                WebhookEventType.EVENT_UPDATED.value: "修改",
+                WebhookEventType.EVENT_DELETED.value: "删除",
+            }
+            action_name = event_type_names.get(event_type, "变更")
+
+            message_parts = [f"📅 **日历事件{action_name}通知**\n"]
+            message_parts.append(f"事件：{summary}")
+            if event_date:
+                message_parts.append(f"时间：{event_date}")
+
+            if conflict_info and conflict_info.get("has_conflict"):
+                message_parts.append("\n⚠️ **检测到冲突**")
+                local_plan = conflict_info.get("local_plan")
+                if local_plan:
+                    message_parts.append(f"本地计划：{local_plan}")
+                resolution = conflict_info.get("resolution_suggestion")
+                if resolution:
+                    message_parts.append(f"建议：{resolution}")
+
+            message = "\n".join(message_parts)
+
+            result = bot.send_text(message)
+            if result.get("success"):
+                logger.info(f"已通知用户日历变更：{summary}")
+                return True
+            else:
+                logger.warning(f"通知用户失败：{result.get('error')}")
+                return False
+
+        except Exception as e:
+            logger.error(f"通知用户异常：{e}", exc_info=True)
+            return False
 
     def verify_signature(self, payload: Dict[str, Any], signature: str) -> bool:
         """
@@ -309,22 +411,30 @@ class FeishuCalendarWebhookHandler:
         """
         logger.info(f"处理事件创建：{event.event_id}")
 
-        # 检测是否与本地训练计划冲突
         conflict_info = self._detect_conflict(event)
 
         if conflict_info and conflict_info["has_conflict"]:
-            # 根据策略解决冲突
             resolution = self._resolve_conflict(event, conflict_info)
             if not resolution["resolved"]:
+                self._notify_user(
+                    WebhookEventType.EVENT_CREATED.value,
+                    event.event_data,
+                    conflict_info,
+                )
                 return WebhookResponse(
                     success=False,
                     message="检测到冲突且无法自动解决",
                     details=conflict_info,
                 )
 
-        # 同步到本地（如果配置启用）
         if self.config.sync_to_local:
             self._sync_to_local(event, action="create")
+
+        self._notify_user(
+            WebhookEventType.EVENT_CREATED.value,
+            event.event_data,
+            conflict_info,
+        )
 
         return WebhookResponse(
             success=True,
@@ -349,21 +459,30 @@ class FeishuCalendarWebhookHandler:
         """
         logger.info(f"处理事件更新：{event.event_id}")
 
-        # 检测冲突
         conflict_info = self._detect_conflict(event)
 
         if conflict_info and conflict_info["has_conflict"]:
             resolution = self._resolve_conflict(event, conflict_info)
             if not resolution["resolved"]:
+                self._notify_user(
+                    WebhookEventType.EVENT_UPDATED.value,
+                    event.event_data,
+                    conflict_info,
+                )
                 return WebhookResponse(
                     success=False,
                     message="检测到冲突且无法自动解决",
                     details=conflict_info,
                 )
 
-        # 同步到本地
         if self.config.sync_to_local:
             self._sync_to_local(event, action="update")
+
+        self._notify_user(
+            WebhookEventType.EVENT_UPDATED.value,
+            event.event_data,
+            conflict_info,
+        )
 
         return WebhookResponse(
             success=True,
@@ -388,9 +507,13 @@ class FeishuCalendarWebhookHandler:
         """
         logger.info(f"处理事件删除：{event.event_id}")
 
-        # 同步删除到本地
         if self.config.sync_to_local:
             self._sync_to_local(event, action="delete")
+
+        self._notify_user(
+            WebhookEventType.EVENT_DELETED.value,
+            event.event_data,
+        )
 
         return WebhookResponse(
             success=True,

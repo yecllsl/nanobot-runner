@@ -134,9 +134,40 @@ tests/
 
 ## 数据存储
 
+### 目录结构
+
+**nanobot-ai 框架配置** (`~/.nanobot/`):
+- `config.json` - LLM Provider、飞书通道、Gateway 等框架配置
+- `cron/` - 定时任务存储（框架功能）
+- `bridge/` - 通道桥接数据
+- `history/` - 框架历史记录
+
+**nanobotrun 业务配置** (`~/.nanobot-runner/` 作为 workspace):
+- `config.json` - 业务配置（数据目录、飞书Webhook等）
+- `data/` - 跑步数据（Parquet文件、画像等）
+- `memory/` - Agent 记忆文件（MEMORY.md）
+- `sessions/` - 会话记录
+- `AGENTS.md`, `SOUL.md`, `USER.md` - Agent 配置文件
+
+### 配置分离原则
+
+| 类型 | 位置 | 说明 |
+|------|------|------|
+| LLM Provider | `~/.nanobot/config.json` | 框架级配置 |
+| 飞书通道 | `~/.nanobot/config.json` | 框架级配置 |
+| Gateway | `~/.nanobot/config.json` | 框架级配置 |
+| 定时任务 | `~/.nanobot/cron/` | 框架功能 |
+| 跑步数据 | `~/.nanobot-runner/data/` | 业务数据 |
+| 用户画像 | `~/.nanobot-runner/data/` | 业务数据 |
+| Agent记忆 | `~/.nanobot-runner/memory/` | 业务数据 |
+
+**重要**: `~/.nanobot-runner` 作为 nanobot-ai 的 workspace，存储业务相关数据和配置；框架级配置必须在 `~/.nanobot/` 中。
+
+### 数据文件
+
 `~/.nanobot-runner/data/activities_{year}.parquet` (snappy, 按年分片)
 `~/.nanobot-runner/data/index.json` (SHA256去重)
-`~/.nanobot-runner/config.json` (配置)
+`~/.nanobot-runner/config.json` (业务配置)
 
 Schema 必填: `activity_id`, `timestamp`, `source_file`, `filename`, `total_distance`, `total_timer_time`
 
