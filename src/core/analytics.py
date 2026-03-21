@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     from src.core.storage import StorageManager
 
 # VDOT 计算常量 (Jack Daniels 公式)
-VDOT_COEFFICIENT = 0.0001
+VDOT_COEFFICIENT = 0.000104
 VDOT_DISTANCE_EXPONENT = 1.06
-VDOT_TIME_EXPONENT = 0.43
-VDOT_MULTIPLIER = 24.6
+VDOT_TIME_EXPONENT = 0.5
+VDOT_MULTIPLIER = 100
 
 # TSS 计算常量
 DEFAULT_LTHR = 180  # 默认乳酸阈值心率
@@ -40,6 +40,8 @@ class AnalyticsEngine:
         """
         计算VDOT值（跑力值）
 
+        使用 Jack Daniels 的 VDOT 表近似公式
+
         Args:
             distance_m: 距离（米）
             time_s: 用时（秒）
@@ -53,10 +55,15 @@ class AnalyticsEngine:
         if distance_m <= 0 or time_s <= 0:
             raise ValueError("距离和时间必须为正数")
 
-        vdot = (
-            VDOT_COEFFICIENT * (distance_m**VDOT_DISTANCE_EXPONENT) * VDOT_MULTIPLIER
-        ) / (time_s**VDOT_TIME_EXPONENT)
-        return round(vdot, 2)
+        if distance_m < 1500:
+            return 0.0
+
+        time_min = time_s / 60.0
+        pace_min_per_km = time_min / (distance_m / 1000.0)
+
+        vdot = 85.46 - 7.08 * pace_min_per_km + 0.15 * pace_min_per_km**2
+
+        return round(max(0.0, vdot), 2)
 
     def calculate_tss(
         self, heart_rate_data: pl.Series, duration_s: float, ftp: int = 200
