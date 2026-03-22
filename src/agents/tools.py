@@ -385,12 +385,26 @@ class RunnerTools:
 
     def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
         lf = self.storage.read_parquet()
-        df = lf.sort("timestamp", descending=True).limit(limit).collect()
+
+        session_df = (
+            lf.group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("timestamp"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                    pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                ]
+            )
+            .sort("timestamp", descending=True)
+            .limit(limit)
+            .collect()
+        )
 
         runs = []
-        for row in df.iter_rows(named=True):
-            distance_km = row.get("total_distance", 0) / 1000
-            duration_min = row.get("total_timer_time", 0) / 60
+        for row in session_df.iter_rows(named=True):
+            distance_km = row.get("distance", 0) / 1000
+            duration_min = row.get("duration", 0) / 60
             pace = duration_min / distance_km if distance_km > 0 else 0
 
             runs.append(
@@ -399,8 +413,8 @@ class RunnerTools:
                     "distance_km": round(distance_km, 2),
                     "duration_min": round(duration_min, 1),
                     "avg_pace_sec_km": round(pace, 1) if pace > 0 else None,
-                    "avg_heart_rate": row.get("avg_heart_rate"),
-                    "vdot": row.get("vdot_estimate"),
+                    "avg_heart_rate": row.get("avg_hr"),
+                    "vdot": None,
                 }
             )
 
@@ -411,12 +425,25 @@ class RunnerTools:
 
     def get_vdot_trend(self, limit: int = 20) -> List[Dict[str, Any]]:
         lf = self.storage.read_parquet()
-        df = lf.sort("timestamp", descending=True).limit(limit).collect()
+
+        session_df = (
+            lf.group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("timestamp"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                ]
+            )
+            .sort("timestamp", descending=True)
+            .limit(limit)
+            .collect()
+        )
 
         vdot_trend = []
-        for row in df.iter_rows(named=True):
-            distance = row.get("total_distance", 0)
-            duration = row.get("total_timer_time", 0)
+        for row in session_df.iter_rows(named=True):
+            distance = row.get("distance", 0)
+            duration = row.get("duration", 0)
 
             if distance > 0 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
@@ -461,9 +488,9 @@ class RunnerTools:
         selected_lf = filtered_lf.select(
             [
                 "timestamp",
-                "total_distance",
-                "total_timer_time",
-                "avg_heart_rate",
+                "session_total_distance",
+                "session_total_timer_time",
+                "session_avg_heart_rate",
             ]
         )
 
@@ -471,16 +498,16 @@ class RunnerTools:
 
         results = []
         for row in df.iter_rows(named=True):
-            distance_km = row.get("total_distance", 0) / 1000
-            duration_minutes = row.get("total_timer_time", 0) / 60
+            distance_km = row.get("session_total_distance", 0) / 1000
+            duration_minutes = row.get("session_total_timer_time", 0) / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
 
             results.append(
                 {
                     "timestamp": str(row.get("timestamp", "N/A")),
                     "distance": round(distance_km, 2),
-                    "duration": row.get("total_timer_time", 0),
-                    "heart_rate": row.get("avg_heart_rate", "N/A"),
+                    "duration": row.get("session_total_timer_time", 0),
+                    "heart_rate": row.get("session_avg_heart_rate", "N/A"),
                     "pace": round(pace, 2),
                 }
             )
@@ -496,18 +523,18 @@ class RunnerTools:
         lf = self.storage.read_parquet()
 
         if max_meters:
-            distance_filter = pl.col("total_distance").is_between(
+            distance_filter = pl.col("session_total_distance").is_between(
                 min_meters, max_meters
             )
         else:
-            distance_filter = pl.col("total_distance") >= min_meters
+            distance_filter = pl.col("session_total_distance") >= min_meters
 
         filtered_lf = lf.filter(distance_filter).select(
             [
                 "timestamp",
-                "total_distance",
-                "total_timer_time",
-                "avg_heart_rate",
+                "session_total_distance",
+                "session_total_timer_time",
+                "session_avg_heart_rate",
             ]
         )
 
@@ -515,16 +542,16 @@ class RunnerTools:
 
         results = []
         for row in df.iter_rows(named=True):
-            distance_km = row.get("total_distance", 0) / 1000
-            duration_minutes = row.get("total_timer_time", 0) / 60
+            distance_km = row.get("session_total_distance", 0) / 1000
+            duration_minutes = row.get("session_total_timer_time", 0) / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
 
             results.append(
                 {
                     "timestamp": str(row.get("timestamp", "N/A")),
                     "distance": round(distance_km, 2),
-                    "duration": row.get("total_timer_time", 0),
-                    "heart_rate": row.get("avg_heart_rate", "N/A"),
+                    "duration": row.get("session_total_timer_time", 0),
+                    "heart_rate": row.get("session_avg_heart_rate", "N/A"),
                     "pace": round(pace, 2),
                 }
             )
