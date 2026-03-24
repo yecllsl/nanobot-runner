@@ -355,6 +355,39 @@ class UpdateMemoryTool(BaseTool):
         return self._run_sync(self.runner_tools.update_memory, note, category)
 
 
+class GenerateTrainingPlanTool(BaseTool):
+    """生成训练计划工具"""
+
+    @property
+    def name(self) -> str:
+        return "generate_training_plan"
+
+    @property
+    def description(self) -> str:
+        return "根据用户目标生成个性化训练计划"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "goal_distance_km": {
+                    "type": "number",
+                    "description": "目标比赛距离（公里），例如：5, 10, 21.0975, 42.195",
+                },
+                "goal_date": {"type": "string", "description": "目标比赛日期（YYYY-MM-DD）"},
+            },
+            "required": ["goal_distance_km", "goal_date"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        goal_distance_km = float(kwargs.get("goal_distance_km", 0))
+        goal_date = kwargs.get("goal_date", "")
+        return self._run_sync(
+            self.runner_tools.generate_training_plan, goal_distance_km, goal_date
+        )
+
+
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
@@ -464,8 +497,18 @@ class RunnerTools:
         if df.height == 0:
             return {"error": "暂无数据"}
 
+        if "heart_rate" not in df.columns:
+            return {"error": "暂无心率数据"}
+
         heart_rate = df.select(pl.col("heart_rate")).to_series().to_list()
-        pace = df.select(pl.col("pace")).to_series().to_list()
+
+        pace = None
+        if "speed" in df.columns:
+            speed_values = df.select(pl.col("speed")).to_series().to_list()
+            pace = [1000 / s if s and s > 0 else None for s in speed_values]
+        elif "enhanced_speed" in df.columns:
+            speed_values = df.select(pl.col("enhanced_speed")).to_series().to_list()
+            pace = [1000 / s if s and s > 0 else None for s in speed_values]
 
         return self.analytics.analyze_hr_drift(heart_rate, pace)
 
@@ -605,6 +648,57 @@ class RunnerTools:
             logger.error(f"更新记忆失败：{e}")
             return {"error": f"更新记忆失败：{str(e)}"}
 
+    def generate_training_plan(
+        self, goal_distance_km: float, goal_date: str
+    ) -> Dict[str, Any]:
+        """
+        生成训练计划
+
+        Args:
+            goal_distance_km: 目标比赛距离（公里）
+            goal_date: 目标比赛日期（YYYY-MM-DD）
+
+        Returns:
+            Dict: 包含训练计划信息
+        """
+        try:
+            from src.core.training_plan import TrainingPlanEngine
+
+            # 获取用户画像
+            profile = self.profile_storage.load_profile_json()
+            if not profile:
+                return {"error": "未找到用户画像，请先导入跑步数据"}
+
+            profile_dict = profile.to_dict()
+            vdot = profile_dict.get("estimated_vdot", 35.0)
+            volume = profile_dict.get("weekly_avg_distance", 30.0)
+            age = profile_dict.get("age", 30)
+            resting_hr = profile_dict.get("resting_hr", 60)
+
+            # 生成训练计划
+            engine = TrainingPlanEngine()
+            plan = engine.generate_plan(
+                user_id="default",
+                goal_distance_km=goal_distance_km,
+                goal_date=goal_date,
+                current_vdot=vdot,
+                current_weekly_distance_km=volume,
+                age=age,
+                resting_hr=resting_hr,
+            )
+
+            return {
+                "success": True,
+                "message": f"已生成{goal_distance_km}km 训练计划，共{len(plan.weeks)}周",
+                "fitness_level": plan.fitness_level.value,
+                "total_weeks": len(plan.weeks),
+                "total_distance": sum(ws.weekly_distance_km for ws in plan.weeks),
+            }
+
+        except Exception as e:
+            logger.error(f"生成训练计划失败：{e}")
+            return {"error": str(e)}
+
 
 def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
@@ -618,6 +712,7 @@ def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
         QueryByDateRangeTool(runner_tools),
         QueryByDistanceTool(runner_tools),
         UpdateMemoryTool(runner_tools),
+        GenerateTrainingPlanTool(runner_tools),
     ]
 
 

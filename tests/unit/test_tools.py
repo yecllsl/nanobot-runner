@@ -399,7 +399,7 @@ class TestCreateTools:
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 9
+            assert len(tools) == 10
 
     def test_create_tools_contains_all_tools(self):
         """测试包含所有工具"""
@@ -519,20 +519,23 @@ class TestRunnerTools:
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
 
-            # 正确设置 mock 链
+            # Mock group_by chain
+            mock_grouped = MagicMock()
+            mock_agg = MagicMock()
             mock_sorted = MagicMock()
             mock_limited = MagicMock()
             mock_df = MagicMock()
-            mock_lf.sort.return_value = mock_sorted
+            mock_lf.group_by.return_value = mock_grouped
+            mock_grouped.agg.return_value = mock_agg
+            mock_agg.sort.return_value = mock_sorted
             mock_sorted.limit.return_value = mock_limited
             mock_limited.collect.return_value = mock_df
             mock_df.iter_rows.return_value = [
                 {
                     "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                    "avg_heart_rate": 150,
-                    "vdot_estimate": 45,
+                    "distance": 5000,
+                    "duration": 1200,
+                    "avg_hr": 150,
                 }
             ]
 

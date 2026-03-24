@@ -6,6 +6,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     Progress,
@@ -380,6 +381,297 @@ def version():
 
 
 @app.command()
+def vdot(
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近N条记录"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="输出文件路径（JSON）"),
+):
+    """
+    查看VDOT趋势
+
+    示例:
+        nanobotrun vdot
+        nanobotrun vdot -n 20
+        nanobotrun vdot -o vdot_trend.json
+    """
+    import json
+
+    from src.agents.tools import RunnerTools
+
+    try:
+        storage = StorageManager()
+        tools = RunnerTools(storage)
+
+        console.print(f"[bold]VDOT趋势分析[/bold] (最近 {limit} 次训练)")
+
+        trend_data = tools.get_vdot_trend(limit=limit)
+
+        if not trend_data:
+            console.print("[yellow]暂无VDOT数据[/yellow]")
+            console.print("[dim]提示: 需要导入跑步数据后才能计算VDOT[/dim]")
+            return
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("日期", width=12)
+        table.add_column("距离(km)", justify="right")
+        table.add_column("VDOT", justify="right", style="yellow")
+
+        for item in trend_data:
+            distance_km = item.get("distance", 0) / 1000
+            table.add_row(
+                item.get("timestamp", "N/A")[:10],
+                f"{distance_km:.2f}",
+                f"{item.get('vdot', 0):.1f}",
+            )
+
+        console.print(table)
+
+        if trend_data:
+            vdot_values = [
+                item.get("vdot", 0) for item in trend_data if item.get("vdot")
+            ]
+            if vdot_values:
+                avg_vdot = sum(vdot_values) / len(vdot_values)
+                max_vdot = max(vdot_values)
+                min_vdot = min(vdot_values)
+                console.print(
+                    f"\n[dim]统计: 平均VDOT {avg_vdot:.1f} | 最高 {max_vdot:.1f} | 最低 {min_vdot:.1f}[/dim]"
+                )
+
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(trend_data, f, ensure_ascii=False, indent=2)
+            console.print(f"\n[green]✓[/green] 数据已保存到: [cyan]{output}[/cyan]")
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="load")
+def training_load(
+    days: int = typer.Option(42, "--days", "-d", help="分析天数"),
+):
+    """
+    查看训练负荷（ATL/CTL/TSB）
+
+    示例:
+        nanobotrun load
+        nanobotrun load -d 30
+    """
+    from src.core.analytics import AnalyticsEngine
+
+    try:
+        storage = StorageManager()
+        engine = AnalyticsEngine(storage)
+
+        console.print(f"[bold]训练负荷分析[/bold] (最近 {days} 天)")
+
+        load_data = engine.get_training_load(days=days)
+
+        if load_data.get("message"):
+            console.print(f"[yellow]{load_data['message']}[/yellow]")
+            return
+
+        atl = load_data.get("atl", 0)
+        ctl = load_data.get("ctl", 0)
+        tsb = load_data.get("tsb", 0)
+        status = load_data.get("fitness_status", "未知")
+        advice = load_data.get("training_advice", "")
+
+        status_color = "green" if tsb > 0 else "yellow" if tsb > -10 else "red"
+
+        panel = Panel(
+            f"[bold]ATL (急性训练负荷):[/bold] {atl:.1f}\n"
+            f"[bold]CTL (慢性训练负荷):[/bold] {ctl:.1f}\n"
+            f"[bold]TSB (训练压力平衡):[/bold] [{status_color}]{tsb:.1f}[/{status_color}]\n\n"
+            f"[bold]体能状态:[/bold] {status}\n"
+            f"[bold]训练建议:[/bold] {advice}",
+            title="[Training Load] 训练负荷",
+            border_style="blue",
+        )
+        console.print(panel)
+
+        console.print(
+            f"\n[dim]分析天数: {load_data.get('days_analyzed', days)} | 跑步次数: {load_data.get('runs_count', 0)}[/dim]"
+        )
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
+def recent(
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近N次训练"),
+):
+    """
+    查看最近训练记录
+
+    示例:
+        nanobotrun recent
+        nanobotrun recent -n 5
+    """
+    from src.agents.tools import RunnerTools
+
+    try:
+        storage = StorageManager()
+        tools = RunnerTools(storage)
+
+        console.print(f"[bold]最近 {limit} 次训练记录[/bold]")
+
+        runs = tools.get_recent_runs(limit=limit)
+
+        if not runs:
+            console.print("[yellow]暂无训练记录[/yellow]")
+            console.print("[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]")
+            return
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("日期", width=12)
+        table.add_column("距离(km)", justify="right")
+        table.add_column("时长", justify="right")
+        table.add_column("配速", justify="right")
+        table.add_column("平均心率", justify="right")
+
+        for run in runs:
+            timestamp = run.get("timestamp", "N/A")
+            if len(timestamp) > 10:
+                timestamp = timestamp[:10]
+
+            duration_min = run.get("duration_min", 0)
+            hours = int(duration_min // 60)
+            minutes = int(duration_min % 60)
+            duration_str = f"{hours}:{minutes:02d}" if hours > 0 else f"{minutes}分"
+
+            pace_sec = run.get("avg_pace_sec_km")
+            if pace_sec:
+                pace_min = int(pace_sec // 60)
+                pace_sec_remainder = int(pace_sec % 60)
+                pace_str = f"{pace_min}'{pace_sec_remainder:02d}\""
+            else:
+                pace_str = "-"
+
+            table.add_row(
+                timestamp,
+                f"{run.get('distance_km', 0):.2f}",
+                duration_str,
+                pace_str,
+                str(run.get("avg_heart_rate", "-") or "-"),
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="hr-drift")
+def hr_drift(
+    limit: int = typer.Option(10, "--limit", "-n", help="分析最近N次训练"),
+):
+    """
+    查看心率漂移分析
+
+    示例:
+        nanobotrun hr-drift
+        nanobotrun hr-drift -n 5
+    """
+    from src.agents.tools import RunnerTools
+
+    try:
+        storage = StorageManager()
+        tools = RunnerTools(storage)
+
+        console.print(f"[bold]心率漂移分析[/bold] (最近 {limit} 次训练)")
+
+        result = tools.get_hr_drift_analysis()
+
+        if result.get("error"):
+            console.print(f"[yellow]{result['error']}[/yellow]")
+            return
+
+        drift_value = result.get("hr_drift_percent")
+        correlation = result.get("correlation")
+
+        if drift_value is None:
+            console.print("[yellow]暂无心率漂移数据[/yellow]")
+            console.print("[dim]提示: 需要包含心率数据的跑步记录[/dim]")
+            return
+
+        drift_color = (
+            "green" if drift_value < 5 else "yellow" if drift_value < 10 else "red"
+        )
+        corr_color = "green" if correlation and correlation < -0.7 else "yellow"
+
+        panel = Panel(
+            f"[bold]心率漂移:[/bold] [{drift_color}]{drift_value:.1f}%[/{drift_color}]\n"
+            f"[bold]相关性:[/bold] [{corr_color}]{correlation:.3f if correlation else 'N/A'}[/{corr_color}]\n\n"
+            f"[dim]心率漂移 < 5%: 有氧基础良好[/dim]\n"
+            f"[dim]心率漂移 5-10%: 需要加强有氧训练[/dim]\n"
+            f"[dim]心率漂移 > 10%: 有氧能力不足[/dim]",
+            title="[HR Drift] 心率漂移分析",
+            border_style="blue",
+        )
+        console.print(panel)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
+def memory(
+    action: str = typer.Argument(..., help="操作：show/edit/clear"),
+):
+    """
+    管理 Agent 记忆
+
+    示例:
+        nanobotrun memory show
+        nanobotrun memory edit
+        nanobotrun memory clear
+    """
+    from src.core.profile import ProfileStorageManager
+
+    try:
+        profile_storage = ProfileStorageManager()
+        memory_file = profile_storage.memory_md_path
+
+        if action == "show":
+            if not memory_file.exists():
+                console.print("[yellow]记忆文件不存在[/yellow]")
+                return
+
+            with open(memory_file, encoding="utf-8") as f:
+                content = f.read()
+
+            console.print(f"[bold]Agent 记忆:[/bold] {memory_file}")
+            console.print(content)
+
+        elif action == "clear":
+            if not memory_file.exists():
+                console.print("[yellow]记忆文件不存在[/yellow]")
+                return
+
+            from rich.prompt import Confirm
+
+            if Confirm.ask("[red]确定要清空记忆文件吗？此操作不可恢复[/red]"):
+                with open(memory_file, "w", encoding="utf-8") as f:
+                    f.write("# Agent 记忆\n\n")
+                console.print("[green]✓[/green] 记忆文件已清空")
+
+        else:
+            console.print("[red]未知操作[/red]")
+            console.print("[dim]可用操作：show, edit, clear[/dim]")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
 def init():
     """
     初始化工作区
@@ -552,9 +844,13 @@ def show_plan(
         with open(plan_file, encoding="utf-8") as f:
             plan_data = json.load(f)
 
-        console.print(f"[bold]训练计划: {plan_data.get('goal_distance_km', '未知')}km比赛[/bold]")
+        console.print(
+            f"[bold]训练计划: {plan_data.get('goal_distance_km', '未知')}km比赛[/bold]"
+        )
         console.print(f"  目标日期: [cyan]{plan_data.get('goal_date', '未知')}[/cyan]")
-        console.print(f"  体能水平: [yellow]{plan_data.get('fitness_level', 'N/A')}[/yellow]")
+        console.print(
+            f"  体能水平: [yellow]{plan_data.get('fitness_level', 'N/A')}[/yellow]"
+        )
 
         weeks = plan_data.get("weeks", [])
 

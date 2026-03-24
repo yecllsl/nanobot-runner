@@ -141,13 +141,13 @@ class TestCreateTools:
     """create_tools 函数测试 - 扩展"""
 
     def test_create_tools_count(self):
-        """测试工具数量（新增后应为 9 个）"""
+        """测试工具数量（新增后应为 10 个）"""
         with patch("src.core.storage.StorageManager"):
             runner_tools = RunnerTools()
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 9
+            assert len(tools) == 10
 
     def test_create_tools_contains_update_memory(self):
         """测试包含 UpdateMemoryTool"""
