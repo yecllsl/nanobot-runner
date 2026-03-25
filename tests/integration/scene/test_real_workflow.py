@@ -64,14 +64,15 @@ class TestRealWorkflow:
             activity = {
                 "activity_id": f"run_202401{i+1:02d}",
                 "timestamp": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用datetime类型
+                "session_start_time": datetime(2024, 1, i + 1, 6, 0, 0),  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用datetime类型
-                "total_distance": float(5000 + i * 1000),  # 5km到11km，转换为float
-                "total_timer_time": float(1800 + i * 300),  # 30min到48min，转换为float
+                "session_total_distance": float(5000 + i * 1000),  # 5km到11km，转换为float
+                "session_total_timer_time": float(1800 + i * 300),  # 30min到48min，转换为float
                 "total_calories": int(300 + i * 50),  # 300cal到600cal，转换为int
-                "avg_heart_rate": int(140 + i * 5),  # 140bpm到170bpm，转换为int
+                "session_avg_heart_rate": int(140 + i * 5),  # 140bpm到170bpm，转换为int
                 "max_heart_rate": int(160 + i * 5),  # 160bpm到190bpm，转换为int
                 "record_count": int(100 + i * 20),  # 记录数
                 "sport": "running",
@@ -284,9 +285,10 @@ def test_performance_benchmarks():
             activity = {
                 "activity_id": f"run_{i:06d}",
                 "timestamp": f"2024-01-{(i % 30) + 1:02d}T08:00:00",
-                "total_distance": 5000 + (i % 5000),
-                "total_timer_time": 1800 + (i % 1200),
-                "avg_heart_rate": 140 + (i % 40),
+                "session_start_time": f"2024-01-{(i % 30) + 1:02d}T06:00:00",  # 添加session_start_time
+                "session_total_distance": 5000 + (i % 5000),
+                "session_total_timer_time": 1800 + (i % 1200),
+                "session_avg_heart_rate": 140 + (i % 40),
             }
             large_activities_data.append(activity)
 

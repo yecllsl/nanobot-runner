@@ -55,14 +55,15 @@ class TestFixedWorkflow:
             activity = {
                 "activity_id": f"run_202401{i+1:02d}",
                 "timestamp": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用标准datetime
+                "session_start_time": datetime(2024, 1, i + 1, 6, 0, 0),  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用标准datetime
-                "total_distance": 5000.0 + i * 1000,
-                "total_timer_time": 1800.0 + i * 300,
+                "session_total_distance": 5000.0 + i * 1000,
+                "session_total_timer_time": 1800.0 + i * 300,
                 "total_calories": 300 + i * 50,
-                "avg_heart_rate": 140 + i * 5,
+                "session_avg_heart_rate": 140 + i * 5,
                 "max_heart_rate": 160 + i * 5,
                 "record_count": 100 + i * 20,
             }
@@ -133,7 +134,7 @@ class TestFixedWorkflow:
         metadata = {
             "serial_number": "TEST12345",
             "time_created": "2024-01-01T08:00:00",
-            "total_distance": 5000,
+            "session_total_distance": 5000,
             "filename": "test.fit",
         }
 
@@ -208,16 +209,17 @@ class TestFixedWorkflow:
             activity = {
                 "activity_id": f"run_{i:06d}",
                 "timestamp": datetime(2024, 1, (i % 30) + 1, 8, 0, 0),  # 使用标准datetime
+                "session_start_time": datetime(2024, 1, (i % 30) + 1, 6, 0, 0),  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": datetime(
                     2024, 1, (i % 30) + 1, 8, 0, 0
                 ),  # 使用标准datetime
-                "total_distance": 5000.0 + (i % 5000),
-                "total_timer_time": 1800.0 + (i % 1200),
+                "session_total_distance": 5000.0 + (i % 5000),
+                "session_total_timer_time": 1800.0 + (i % 1200),
                 "total_calories": 300 + (i % 200),
-                "avg_heart_rate": 140 + (i % 40),
+                "session_avg_heart_rate": 140 + (i % 40),
                 "max_heart_rate": 160 + (i % 30),
                 "record_count": 100 + (i % 100),
             }

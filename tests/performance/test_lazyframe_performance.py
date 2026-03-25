@@ -45,14 +45,15 @@ class TestLazyFramePerformance:
             activity = {
                 "activity_id": f"run_{activity_date.strftime('%Y%m%d')}_{i:04d}",
                 "timestamp": activity_date,
+                "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": activity_date,
-                "total_distance": distance_m,
-                "total_timer_time": duration,
+                "session_total_distance": distance_m,
+                "session_total_timer_time": duration,
                 "total_calories": 300 + (i % 10) * 50,
-                "avg_heart_rate": 140 + (i % 20),
+                "session_avg_heart_rate": 140 + (i % 20),
                 "max_heart_rate": 160 + (i % 20),
                 "record_count": 100 + (i % 50),
             }
@@ -75,8 +76,8 @@ class TestLazyFramePerformance:
         result_eager = df_eager.select(
             [
                 pl.len().alias("count"),
-                pl.col("total_distance").sum(),
-                pl.col("total_timer_time").sum(),
+                pl.col("session_total_distance").sum(),
+                pl.col("session_total_timer_time").sum(),
             ]
         )
         eager_time = time.time() - start_eager
@@ -86,13 +87,13 @@ class TestLazyFramePerformance:
         result_lazy = lf.select(
             [
                 pl.len().alias("count"),
-                pl.col("total_distance").sum(),
-                pl.col("total_timer_time").sum(),
+                pl.col("session_total_distance").sum(),
+                pl.col("session_total_timer_time").sum(),
             ]
         ).collect()
         lazy_time = time.time() - start_lazy
 
-        improvement = (eager_time - lazy_time) / eager_time * 100
+        improvement = (eager_time - lazy_time) / eager_time * 100 if eager_time > 0 else 0
 
         print(f"📊 Eager 执行时间: {eager_time:.4f}秒")
         print(f"📊 LazyFrame 执行时间: {lazy_time:.4f}秒")
@@ -109,15 +110,15 @@ class TestLazyFramePerformance:
         # 无 pushdown（先 collect 再 filter）
         start_no_pushdown = time.time()
         df_all = lf.collect()
-        df_filtered = df_all.filter(pl.col("total_distance") > 10000)
+        df_filtered = df_all.filter(pl.col("session_total_distance") > 10000)
         no_pushdown_time = time.time() - start_no_pushdown
 
         # 有 pushdown（filter 在 LazyFrame 中）
         start_pushdown = time.time()
-        result_pushdown = lf.filter(pl.col("total_distance") > 10000).collect()
+        result_pushdown = lf.filter(pl.col("session_total_distance") > 10000).collect()
         pushdown_time = time.time() - start_pushdown
 
-        improvement = (no_pushdown_time - pushdown_time) / no_pushdown_time * 100
+        improvement = (no_pushdown_time - pushdown_time) / no_pushdown_time * 100 if no_pushdown_time > 0 else 0
 
         print(f"📊 无 pushdown 时间: {no_pushdown_time:.4f}秒")
         print(f"📊 有 pushdown 时间: {pushdown_time:.4f}秒")

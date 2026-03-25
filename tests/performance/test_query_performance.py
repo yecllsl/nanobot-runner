@@ -52,14 +52,15 @@ class TestQueryPerformance:
             activity = {
                 "activity_id": f'run_{activity_date.strftime("%Y%m%d")}_{i:04d}',
                 "timestamp": activity_date,
+                "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": activity_date,
-                "total_distance": distance_m,
-                "total_timer_time": duration,
+                "session_total_distance": distance_m,
+                "session_total_timer_time": duration,
                 "total_calories": 300 + (i % 10) * 50,
-                "avg_heart_rate": 140 + (i % 20),
+                "session_avg_heart_rate": 140 + (i % 20),
                 "max_heart_rate": 160 + (i % 20),
                 "record_count": 100 + (i % 50),
             }
@@ -234,8 +235,8 @@ class TestQueryPerformance:
             .select(
                 [
                     pl.len().alias("count"),
-                    pl.col("total_distance").sum().alias("total_distance"),
-                    pl.col("total_timer_time").sum().alias("total_timer_time"),
+                    pl.col("session_total_distance").sum().alias("session_total_distance"),
+                    pl.col("session_total_timer_time").sum().alias("session_total_timer_time"),
                 ]
             )
             .collect()
@@ -252,8 +253,8 @@ class TestQueryPerformance:
         df_result = df.select(
             [
                 pl.len().alias("count"),
-                pl.col("total_distance").sum().alias("total_distance"),
-                pl.col("total_timer_time").sum().alias("total_timer_time"),
+                pl.col("session_total_distance").sum().alias("session_total_distance"),
+                pl.col("session_total_timer_time").sum().alias("session_total_timer_time"),
             ]
         )
         df_time = time.time() - start_time

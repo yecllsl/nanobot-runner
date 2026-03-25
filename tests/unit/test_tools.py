@@ -1,7 +1,9 @@
 # Agent工具集单元测试
 
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import polars as pl
 import pytest
 
 from src.agents.tools import (
@@ -575,24 +577,29 @@ class TestRunnerTools:
 
     def test_get_vdot_trend_with_data(self):
         """测试获取VDOT趋势有数据"""
+        from datetime import datetime
         with patch("src.core.storage.StorageManager") as MockStorage:
             mock_storage = MagicMock()
             MockStorage.return_value = mock_storage
 
+            mock_df = pl.DataFrame(
+                [
+                    {
+                        "timestamp": datetime(2024, 1, 1),
+                        "distance": 5000.0,
+                        "duration": 1200.0,
+                    },
+                    {
+                        "timestamp": datetime(2024, 1, 2),
+                        "distance": 10000.0,
+                        "duration": 2400.0,
+                    },
+                ]
+            )
+
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = [
-                {
-                    "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                },
-                {
-                    "timestamp": "2024-01-02",
-                    "total_distance": 10000,
-                    "total_timer_time": 2400,
-                },
-            ]
+            mock_lf.group_by.return_value.agg.return_value.sort.return_value.limit.return_value.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -627,11 +634,12 @@ class TestRunnerTools:
             mock_storage.read_parquet.return_value = mock_lf
             mock_df = MagicMock()
             mock_df.height = 1
-            mock_df.select.return_value.to_series.return_value.to_list.return_value = [
-                150,
-                155,
-                160,
-            ]
+            mock_df.columns = ["heart_rate"]
+            mock_df.select.side_effect = lambda col: MagicMock(
+                to_series=lambda: MagicMock(
+                    to_list=lambda: [150, 155, 160, 165, 170, 175, 180, 185, 190, 195]
+                )
+            )
             mock_lf.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)

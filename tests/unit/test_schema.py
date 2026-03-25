@@ -25,9 +25,9 @@ class TestParquetSchema:
         assert "distance" in schema
         assert "duration" in schema
         assert "heart_rate" in schema
-        assert "total_distance" in schema
-        assert "total_timer_time" in schema
-        assert "avg_heart_rate" in schema
+        assert "session_total_distance" in schema
+        assert "session_total_timer_time" in schema
+        assert "session_avg_heart_rate" in schema
 
     def test_get_required_fields(self):
         """测试获取必填字段"""
@@ -37,15 +37,15 @@ class TestParquetSchema:
         assert "timestamp" in required
         assert "source_file" in required
         assert "filename" in required
-        assert "total_distance" in required
-        assert "total_timer_time" in required
+        assert "session_total_distance" in required
+        assert "session_total_timer_time" in required
 
     def test_get_default_values(self):
         """测试获取默认值"""
         defaults = ParquetSchema.get_default_values()
 
         assert defaults["serial_number"] == "UNKNOWN"
-        assert defaults["total_distance"] == 0.0
+        assert defaults["session_total_distance"] == 0.0
         assert defaults["record_count"] == 0
 
     def test_validate_dataframe_success(self):
@@ -57,9 +57,9 @@ class TestParquetSchema:
                 "source_file": ["test.fit"],
                 "filename": ["test"],
                 "serial_number": ["TEST1000"],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
                 "cadence": [180],
                 "record_count": [1],
             }
@@ -78,8 +78,8 @@ class TestParquetSchema:
                 "timestamp": ["2024-01-01"],
                 "source_file": ["test.fit"],
                 "filename": ["test"],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
             }
         )
 
@@ -101,9 +101,9 @@ class TestParquetSchema:
         df = pl.DataFrame(
             {
                 "activity_id": ["test_123"],
-                "timestamp": ["2024-01-01"],
-                "total_distance": ["1000"],
-                "total_timer_time": ["3600"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "total_distance": [1000.0],
+                "total_timer_time": [3600.0],
             }
         )
 
@@ -277,4 +277,48 @@ class TestCreateSchemaDataFrame:
 
         row = df.row(0, named=True)
         assert row["serial_number"] == "TEST1000"
-        assert row["total_distance"] == 0.0
+        assert row["session_total_distance"] == 0.0
+
+    def test_validate_dataframe_with_extra_fields(self):
+        """测试验证包含额外字段的DataFrame（应该记录警告但仍然有效）"""
+        df = pl.DataFrame(
+            {
+                "activity_id": ["test_123"],
+                "timestamp": [datetime(2024, 1, 1, 12, 0, 0)],
+                "source_file": ["test.fit"],
+                "filename": ["test"],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800.0],
+                "extra_field_1": ["value1"],  # 额外字段
+                "extra_field_2": [100],  # 额外字段
+            }
+        )
+
+        # 标准化后验证
+        normalized_df = ParquetSchema.normalize_dataframe(df)
+        result = ParquetSchema.validate_dataframe(normalized_df)
+        # 应该有效，但messages中会包含额外字段的警告
+        assert result["valid"] is True
+        assert any("未定义的字段" in msg for msg in result["messages"])
+
+    def test_normalize_dataframe_type_conversion_failure(self):
+        """测试标准化DataFrame时类型转换失败的情况"""
+        # 创建一个包含无法转换类型的DataFrame
+        df = pl.DataFrame(
+            {
+                "activity_id": ["test_123"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "source_file": ["test.fit"],
+                "filename": ["test"],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800.0],
+                # 创建一个无法直接转换的列（例如嵌套结构）
+                "complex_data": [[1, 2, 3]],  # 列表类型
+            }
+        )
+
+        # 标准化应该成功，但会记录警告
+        normalized = ParquetSchema.normalize_dataframe(df)
+        assert "activity_id" in normalized.columns
+        # 复杂类型应该保持原样或被转换
+        assert normalized.height == 1

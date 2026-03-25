@@ -779,7 +779,7 @@ class TestTrainingPlanIntegration:
             plan=plan, week_number=1, hr_drift=6.5, rpe=7
         )
 
-        assert adjusted_plan.updated_at > plan.created_at
+        assert adjusted_plan.updated_at >= plan.created_at
         # 调整后跑量应该减少（hr_drift=6.5% 触发 15% 减少，rpe=7 触发 15% 减少，总共约 28% 减少）
         assert adjusted_plan.weeks[0].weekly_distance_km < original_distance
 

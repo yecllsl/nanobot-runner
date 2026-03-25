@@ -427,8 +427,8 @@ class AnalyticsEngine:
 
             trend_data = []
             for row in df.iter_rows(named=True):
-                distance = row.get("total_distance", row.get("distance", 0))
-                duration = row.get("total_timer_time", row.get("duration", 0))
+                distance = row.get("session_total_distance", row.get("total_distance", row.get("distance", 0)))
+                duration = row.get("session_total_timer_time", row.get("total_timer_time", row.get("duration", 0)))
                 vdot = self.calculate_vdot(distance, duration)
                 trend_data.append(
                     {
@@ -554,8 +554,8 @@ class AnalyticsEngine:
             }
 
         df = (
-            lf.filter(pl.col("timestamp").is_between(start_date, end_date))
-            .sort("timestamp")
+            lf.filter(pl.col("session_start_time").is_between(start_date, end_date))
+            .sort("session_start_time")
             .collect()
         )
 
@@ -574,9 +574,9 @@ class AnalyticsEngine:
         tss_values = []
         for row in df.iter_rows(named=True):
             tss = self.calculate_tss_for_run(
-                distance_m=row.get("total_distance", 0),
-                duration_s=row.get("total_timer_time", 0),
-                avg_heart_rate=row.get("avg_heart_rate"),
+                distance_m=row.get("session_total_distance", 0),
+                duration_s=row.get("session_total_timer_time", 0),
+                avg_heart_rate=row.get("session_avg_heart_rate"),
             )
             tss_values.append(tss)
 
@@ -1083,9 +1083,12 @@ class AnalyticsEngine:
         Returns:
             Dict[str, Any]: 心率区间分析结果
         """
+        hr_col = "session_avg_heart_rate" if "session_avg_heart_rate" in df.columns else "avg_heart_rate"
+        duration_col = "session_total_timer_time" if "session_total_timer_time" in df.columns else "total_timer_time"
+        
         hr_df = df.filter(
-            pl.col("session_avg_heart_rate").is_not_null()
-            & (pl.col("session_avg_heart_rate") > 0)
+            pl.col(hr_col).is_not_null()
+            & (pl.col(hr_col) > 0)
         )
 
         if hr_df.is_empty():
@@ -1101,8 +1104,8 @@ class AnalyticsEngine:
         total_time = 0
 
         for row in hr_df.iter_rows(named=True):
-            avg_hr = row.get("session_avg_heart_rate", 0)
-            duration = row.get("session_total_timer_time", 0)
+            avg_hr = row.get(hr_col, 0)
+            duration = row.get(duration_col, 0)
 
             if avg_hr <= 0 or duration <= 0:
                 continue
@@ -1276,16 +1279,16 @@ class AnalyticsEngine:
                 return None
 
             # 计算昨日训练汇总
-            total_distance = df["total_distance"].sum()
-            total_duration = df["total_timer_time"].sum()
+            total_distance = df["session_total_distance"].sum()
+            total_duration = df["session_total_timer_time"].sum()
 
             # 计算TSS
             tss_values = []
             for row in df.iter_rows(named=True):
                 tss = self.calculate_tss_for_run(
-                    distance_m=row.get("total_distance", 0),
-                    duration_s=row.get("total_timer_time", 0),
-                    avg_heart_rate=row.get("avg_heart_rate"),
+                    distance_m=row.get("session_total_distance", 0),
+                    duration_s=row.get("session_total_timer_time", 0),
+                    avg_heart_rate=row.get("session_avg_heart_rate"),
                 )
                 tss_values.append(tss)
             total_tss = sum(tss_values)
@@ -1564,9 +1567,9 @@ class AnalyticsEngine:
         tss_records = []
         for row in df.iter_rows(named=True):
             tss = self.calculate_tss_for_run(
-                distance_m=row.get("total_distance", 0),
-                duration_s=row.get("total_timer_time", 0),
-                avg_heart_rate=row.get("avg_heart_rate"),
+                distance_m=row.get("session_total_distance", 0),
+                duration_s=row.get("session_total_timer_time", 0),
+                avg_heart_rate=row.get("session_avg_heart_rate"),
             )
             timestamp = row.get("timestamp")
             if timestamp and tss > 0:
@@ -1795,7 +1798,7 @@ class AnalyticsEngine:
                     }
 
             trend_df = result.sort("timestamp").select(
-                ["timestamp", "avg_pace_sec_per_km", "total_distance", "pace_zone"]
+                ["timestamp", "avg_pace_sec_per_km", "session_total_distance", "pace_zone"]
             )
 
             trend_data = []
@@ -1806,7 +1809,7 @@ class AnalyticsEngine:
                         if hasattr(row["timestamp"], "strftime")
                         else str(row["timestamp"]),
                         "pace": round(row["avg_pace_sec_per_km"], 2),
-                        "distance": round(row["total_distance"], 2),
+                        "distance": round(row["session_total_distance"], 2),
                         "zone": row["pace_zone"],
                     }
                 )
@@ -1815,7 +1818,7 @@ class AnalyticsEngine:
                 "zones": zones_result,
                 "trend": trend_data,
                 "total_runs": result.height,
-                "total_distance": round(result["total_distance"].sum(), 2),
+                "total_distance": round(result["session_total_distance"].sum(), 2),
             }
 
         except Exception as e:

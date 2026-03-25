@@ -28,7 +28,7 @@ class TestImportIntegration:
             metadata = {
                 "serial_number": "12345",
                 "time_created": "2024-01-01",
-                "total_distance": 5000,
+                "session_total_distance": 5000,
                 "filename": "test.fit",
             }
 
@@ -67,9 +67,10 @@ class TestImportIntegration:
                 {
                     "activity_id": ["test_001"],
                     "timestamp": [datetime(2024, 1, 1)],
-                    "distance": [5000.0],
-                    "duration": [1800],
-                    "heart_rate": [140],
+                    "session_start_time": [datetime(2024, 1, 1, 6, 0)],  # 添加session_start_time
+                    "session_total_distance": [5000.0],
+                    "session_total_timer_time": [1800],
+                    "session_avg_heart_rate": [140],
                 }
             )
 
@@ -80,7 +81,7 @@ class TestImportIntegration:
             metadata = {
                 "serial_number": "12345",
                 "time_created": "2024-01-01",
-                "total_distance": 5000,
+                "session_total_distance": 5000,
                 "filename": "test.fit",
             }
             fingerprint = indexer.generate_fingerprint(metadata)

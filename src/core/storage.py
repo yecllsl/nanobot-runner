@@ -508,10 +508,10 @@ class StorageManager:
             )
 
         if min_distance is not None:
-            lf = lf.filter(pl.col("total_distance") >= min_distance)
+            lf = lf.filter(pl.col("session_total_distance") >= min_distance)
 
         if min_heart_rate is not None:
-            lf = lf.filter(pl.col("avg_heart_rate") >= min_heart_rate)
+            lf = lf.filter(pl.col("session_avg_heart_rate") >= min_heart_rate)
 
         return lf.collect()
 

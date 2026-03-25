@@ -243,11 +243,11 @@ def stats(
                 df = df.filter(df["timestamp"] <= str(end_dt))
 
         total_runs = df.height
-        total_distance = df["total_distance"].sum()
-        total_time = df["total_timer_time"].sum()
-        avg_distance = df["total_distance"].mean()
-        avg_time = df["total_timer_time"].mean()
-        avg_hr = df["avg_heart_rate"].mean()
+        total_distance = df["session_total_distance"].sum()
+        total_time = df["session_total_timer_time"].sum()
+        avg_distance = df["session_total_distance"].mean()
+        avg_time = df["session_total_timer_time"].mean()
+        avg_hr = df["session_avg_heart_rate"].mean()
 
         from src.cli_formatter import format_stats_panel
 
