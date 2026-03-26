@@ -427,8 +427,14 @@ class AnalyticsEngine:
 
             trend_data = []
             for row in df.iter_rows(named=True):
-                distance = row.get("session_total_distance", row.get("total_distance", row.get("distance", 0)))
-                duration = row.get("session_total_timer_time", row.get("total_timer_time", row.get("duration", 0)))
+                distance = row.get(
+                    "session_total_distance",
+                    row.get("total_distance", row.get("distance", 0)),
+                )
+                duration = row.get(
+                    "session_total_timer_time",
+                    row.get("total_timer_time", row.get("duration", 0)),
+                )
                 vdot = self.calculate_vdot(distance, duration)
                 trend_data.append(
                     {
@@ -1083,13 +1089,18 @@ class AnalyticsEngine:
         Returns:
             Dict[str, Any]: 心率区间分析结果
         """
-        hr_col = "session_avg_heart_rate" if "session_avg_heart_rate" in df.columns else "avg_heart_rate"
-        duration_col = "session_total_timer_time" if "session_total_timer_time" in df.columns else "total_timer_time"
-        
-        hr_df = df.filter(
-            pl.col(hr_col).is_not_null()
-            & (pl.col(hr_col) > 0)
+        hr_col = (
+            "session_avg_heart_rate"
+            if "session_avg_heart_rate" in df.columns
+            else "avg_heart_rate"
         )
+        duration_col = (
+            "session_total_timer_time"
+            if "session_total_timer_time" in df.columns
+            else "total_timer_time"
+        )
+
+        hr_df = df.filter(pl.col(hr_col).is_not_null() & (pl.col(hr_col) > 0))
 
         if hr_df.is_empty():
             return {
@@ -1798,7 +1809,12 @@ class AnalyticsEngine:
                     }
 
             trend_df = result.sort("timestamp").select(
-                ["timestamp", "avg_pace_sec_per_km", "session_total_distance", "pace_zone"]
+                [
+                    "timestamp",
+                    "avg_pace_sec_per_km",
+                    "session_total_distance",
+                    "pace_zone",
+                ]
             )
 
             trend_data = []

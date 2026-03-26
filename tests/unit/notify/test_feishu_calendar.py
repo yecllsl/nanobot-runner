@@ -484,9 +484,7 @@ class TestFeishuCalendarSync:
         # 设置 AsyncMock 的返回值
         mock_api.create_event.return_value = {"event_id": "event_123"}
 
-        result = asyncio.run(
-            sync_service.sync_plan(sample_training_plan)
-        )
+        result = asyncio.run(sync_service.sync_plan(sample_training_plan))
 
         assert result.success is True
         assert "成功同步" in result.message
@@ -554,9 +552,7 @@ class TestFeishuCalendarSync:
         )
         date = datetime(2024, 1, 1)
 
-        result = asyncio.run(
-            sync_service.sync_daily_workout(daily_plan, date)
-        )
+        result = asyncio.run(sync_service.sync_daily_workout(daily_plan, date))
 
         assert result.success is True
         assert result.event_id is not None
@@ -575,9 +571,7 @@ class TestFeishuCalendarSync:
         )
         date = datetime(2024, 1, 1)
 
-        result = asyncio.run(
-            sync_service.sync_daily_workout(daily_plan, date)
-        )
+        result = asyncio.run(sync_service.sync_daily_workout(daily_plan, date))
 
         assert result.success is False
         assert "未启用" in result.message
@@ -594,9 +588,7 @@ class TestFeishuCalendarSync:
         )
         date = datetime(2024, 1, 1)
 
-        result = asyncio.run(
-            sync_service.update_event("event_123", daily_plan, date)
-        )
+        result = asyncio.run(sync_service.update_event("event_123", daily_plan, date))
 
         assert result.success is True
         assert result.event_id == "event_123"
@@ -607,9 +599,7 @@ class TestFeishuCalendarSync:
         """测试成功删除事件"""
         mock_api.delete_event.return_value = {}
 
-        result = asyncio.run(
-            sync_service.delete_event("event_123")
-        )
+        result = asyncio.run(sync_service.delete_event("event_123"))
 
         assert result.success is True
         assert result.event_id == "event_123"
@@ -623,9 +613,7 @@ class TestFeishuCalendarSync:
         date = datetime(2024, 1, 1)
         time_range = (6, 8)
 
-        result = asyncio.run(
-            sync_service.check_conflicts(date, time_range)
-        )
+        result = asyncio.run(sync_service.check_conflicts(date, time_range))
 
         assert result == []
 
@@ -691,9 +679,7 @@ class TestIntegration:
             plan.weeks.append(week)
 
             # 执行同步
-            result = asyncio.run(
-                service.sync_plan(plan)
-            )
+            result = asyncio.run(service.sync_plan(plan))
 
             # 验证结果
             assert result.success is True

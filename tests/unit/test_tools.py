@@ -578,6 +578,7 @@ class TestRunnerTools:
     def test_get_vdot_trend_with_data(self):
         """测试获取VDOT趋势有数据"""
         from datetime import datetime
+
         with patch("src.core.storage.StorageManager") as MockStorage:
             mock_storage = MagicMock()
             MockStorage.return_value = mock_storage
@@ -599,7 +600,9 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.group_by.return_value.agg.return_value.sort.return_value.limit.return_value.collect.return_value = mock_df
+            mock_lf.group_by.return_value.agg.return_value.sort.return_value.limit.return_value.collect.return_value = (
+                mock_df
+            )
 
             tools = RunnerTools(storage=mock_storage)
 

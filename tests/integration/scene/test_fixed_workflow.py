@@ -55,7 +55,9 @@ class TestFixedWorkflow:
             activity = {
                 "activity_id": f"run_202401{i+1:02d}",
                 "timestamp": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用标准datetime
-                "session_start_time": datetime(2024, 1, i + 1, 6, 0, 0),  # 添加session_start_time
+                "session_start_time": datetime(
+                    2024, 1, i + 1, 6, 0, 0
+                ),  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
@@ -209,7 +211,9 @@ class TestFixedWorkflow:
             activity = {
                 "activity_id": f"run_{i:06d}",
                 "timestamp": datetime(2024, 1, (i % 30) + 1, 8, 0, 0),  # 使用标准datetime
-                "session_start_time": datetime(2024, 1, (i % 30) + 1, 6, 0, 0),  # 添加session_start_time
+                "session_start_time": datetime(
+                    2024, 1, (i % 30) + 1, 6, 0, 0
+                ),  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",

@@ -218,22 +218,25 @@ def create_schema_dataframe(
                     "time_created", default_values["time_created"]
                 ),
                 "session_total_distance": metadata.get(
-                    "session_total_distance", metadata.get(
+                    "session_total_distance",
+                    metadata.get(
                         "total_distance", default_values["session_total_distance"]
-                    )
+                    ),
                 ),
                 "session_total_timer_time": metadata.get(
-                    "session_total_timer_time", metadata.get(
+                    "session_total_timer_time",
+                    metadata.get(
                         "total_timer_time", default_values["session_total_timer_time"]
-                    )
+                    ),
                 ),
                 "total_calories": metadata.get(
                     "total_calories", default_values["total_calories"]
                 ),
                 "session_avg_heart_rate": metadata.get(
-                    "session_avg_heart_rate", metadata.get(
+                    "session_avg_heart_rate",
+                    metadata.get(
                         "avg_heart_rate", default_values["session_avg_heart_rate"]
-                    )
+                    ),
                 ),
                 "max_heart_rate": metadata.get(
                     "max_heart_rate", default_values["max_heart_rate"]

@@ -235,8 +235,12 @@ class TestQueryPerformance:
             .select(
                 [
                     pl.len().alias("count"),
-                    pl.col("session_total_distance").sum().alias("session_total_distance"),
-                    pl.col("session_total_timer_time").sum().alias("session_total_timer_time"),
+                    pl.col("session_total_distance")
+                    .sum()
+                    .alias("session_total_distance"),
+                    pl.col("session_total_timer_time")
+                    .sum()
+                    .alias("session_total_timer_time"),
                 ]
             )
             .collect()
@@ -254,7 +258,9 @@ class TestQueryPerformance:
             [
                 pl.len().alias("count"),
                 pl.col("session_total_distance").sum().alias("session_total_distance"),
-                pl.col("session_total_timer_time").sum().alias("session_total_timer_time"),
+                pl.col("session_total_timer_time")
+                .sum()
+                .alias("session_total_timer_time"),
             ]
         )
         df_time = time.time() - start_time

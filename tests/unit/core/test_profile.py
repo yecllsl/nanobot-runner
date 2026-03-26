@@ -376,6 +376,7 @@ class TestProfileEngine:
     def test_analyze_running_time_preference_morning(self, engine):
         """测试早晨跑步偏好分析"""
         from datetime import timezone
+
         now = datetime.now(timezone.utc)
         timestamps = pl.Series([now.replace(hour=2, minute=0) for _ in range(10)])
 
@@ -385,6 +386,7 @@ class TestProfileEngine:
     def test_analyze_running_time_preference_afternoon(self, engine):
         """测试下午跑步偏好分析"""
         from datetime import timezone
+
         now = datetime.now(timezone.utc)
         timestamps = pl.Series([now.replace(hour=7, minute=0) for _ in range(10)])
 
@@ -394,6 +396,7 @@ class TestProfileEngine:
     def test_analyze_running_time_preference_evening(self, engine):
         """测试晚上跑步偏好分析"""
         from datetime import timezone
+
         now = datetime.now(timezone.utc)
         timestamps = pl.Series([now.replace(hour=15, minute=0) for _ in range(10)])
 

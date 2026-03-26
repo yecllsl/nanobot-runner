@@ -1056,7 +1056,7 @@ class TestStorageManager:
 
     def test_read_parquet_file_with_schema_fix_pyarrow(self):
         """测试使用pyarrow读取Parquet文件"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))
@@ -1091,7 +1091,9 @@ class TestStorageManager:
 
             # Mock pl.read_parquet 和 pyarrow 都失败
             with patch("polars.read_parquet", side_effect=Exception("Polars error")):
-                with patch("pyarrow.parquet.read_table", side_effect=Exception("PyArrow error")):
+                with patch(
+                    "pyarrow.parquet.read_table", side_effect=Exception("PyArrow error")
+                ):
                     result = manager._read_parquet_file_with_schema_fix(filepath)
                     assert result is None
 
@@ -1243,7 +1245,7 @@ class TestStorageManager:
 
     def test_read_parquet_file_with_schema_fix_pyarrow_non_dataframe(self):
         """测试pyarrow返回非DataFrame类型的情况"""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))

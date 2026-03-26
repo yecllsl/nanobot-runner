@@ -67,7 +67,9 @@ class TestImportIntegration:
                 {
                     "activity_id": ["test_001"],
                     "timestamp": [datetime(2024, 1, 1)],
-                    "session_start_time": [datetime(2024, 1, 1, 6, 0)],  # 添加session_start_time
+                    "session_start_time": [
+                        datetime(2024, 1, 1, 6, 0)
+                    ],  # 添加session_start_time
                     "session_total_distance": [5000.0],
                     "session_total_timer_time": [1800],
                     "session_avg_heart_rate": [140],
