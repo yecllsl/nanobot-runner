@@ -298,14 +298,22 @@ class TestCLIStats:
         """测试有数据时的统计"""
         with patch("src.cli.StorageManager") as mock_storage_class:
             mock_storage = Mock()
+            
+            # 创建模拟的 session 聚合数据
+            mock_session_df = Mock()
+            mock_session_df.height = 10  # 10 次跑步
+            mock_session_df.__getitem__ = Mock(
+                side_effect=lambda key: {
+                    "distance": Mock(sum=Mock(return_value=100000), mean=Mock(return_value=10000)),
+                    "duration": Mock(sum=Mock(return_value=36000), mean=Mock(return_value=3600)),
+                    "avg_hr": Mock(mean=Mock(return_value=145)),
+                }[key]
+            )
+            
             mock_df = Mock()
             mock_df.is_empty.return_value = False
-            mock_df.height = 10
-            mock_df.__getitem__ = Mock(
-                return_value=Mock(
-                    sum=Mock(return_value=1000), mean=Mock(return_value=100)
-                )
-            )
+            mock_df.group_by = Mock(return_value=Mock(agg=Mock(return_value=mock_session_df)))
+            
             mock_storage.read_parquet.return_value.collect.return_value = mock_df
             mock_storage_class.return_value = mock_storage
 

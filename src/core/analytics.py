@@ -98,13 +98,25 @@ class AnalyticsEngine:
     ) -> pl.DataFrame:
         """
         获取跑步摘要统计
+        
+        数据模型说明：
+        - 存储的数据包含两类字段：
+          1. 过程数据（record）：timestamp, heart_rate, pace 等，每秒采样一次
+          2. 会话数据（session）：session_total_distance, session_total_timer_time 等，每次跑步一条
+        - 每个采样点都包含会话数据字段，因此需要按 session_start_time 聚合统计
+        - 直接统计行数会将采样点数量误认为跑步次数
+        
+        统计逻辑：
+        1. 按 session_start_time 分组，将会话数据聚合为每条跑步一条记录
+        2. 使用 first() 提取会话数据（同一会话内所有采样点的会话数据相同）
+        3. 对聚合后的数据进行统计（总数、平均值、最大值等）
 
         Args:
             start_date: 开始日期（可选）
             end_date: 结束日期（可选）
 
         Returns:
-            pl.DataFrame: 统计结果
+            pl.DataFrame: 统计结果，包含 total_runs, total_distance, total_timer_time 等字段
         """
         try:
             lf = self.storage.read_parquet()

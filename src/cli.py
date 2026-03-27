@@ -1,9 +1,10 @@
-# CLI入口模块
-# 基于Typer和Rich的本地跑步数据助理
+# CLI 入口模块
+# 基于 Typer 和 Rich 的本地跑步数据助理
 
 from pathlib import Path
 from typing import Optional
 
+import polars as pl
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -196,6 +197,13 @@ def stats(
 ):
     """
     查看跑步统计信息
+    
+    数据模型说明：
+    - 存储的数据包含两类字段：
+      1. 过程数据（record）：timestamp, heart_rate, pace 等，每秒采样一次
+      2. 会话数据（session）：session_total_distance, session_total_timer_time 等，每次跑步一条
+    - 每个采样点都包含会话数据字段，因此需要按 session_start_time 聚合统计
+    - 直接统计行数会将采样点数量误认为跑步次数
     """
     try:
         config = ConfigManager()
@@ -242,12 +250,19 @@ def stats(
             if end_dt:
                 df = df.filter(df["timestamp"] <= str(end_dt))
 
-        total_runs = df.height
-        total_distance = df["session_total_distance"].sum()
-        total_time = df["session_total_timer_time"].sum()
-        avg_distance = df["session_total_distance"].mean()
-        avg_time = df["session_total_timer_time"].mean()
-        avg_hr = df["session_avg_heart_rate"].mean()
+        # 按会话聚合统计（避免重复计算采样点数据）
+        session_df = df.group_by("session_start_time").agg([
+            pl.col("session_total_distance").first().alias("distance"),
+            pl.col("session_total_timer_time").first().alias("duration"),
+            pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+        ])
+
+        total_runs = session_df.height
+        total_distance = session_df["distance"].sum()
+        total_time = session_df["duration"].sum()
+        avg_distance = session_df["distance"].mean()
+        avg_time = session_df["duration"].mean()
+        avg_hr = session_df["avg_hr"].mean()
 
         from src.cli_formatter import format_stats_panel
 
