@@ -84,11 +84,11 @@ def format_stats_panel(data: Dict[str, Any]) -> Panel:
 
     for key, value in data.items():
         if isinstance(value, (int, float)):
-            if "distance" in key.lower():
+            if "距离" in key or "distance" in key.lower():
                 display_value = format_distance(value)
-            elif "time" in key.lower() or "duration" in key.lower():
+            elif "时长" in key or "time" in key.lower() or "duration" in key.lower():
                 display_value = format_duration(value)
-            elif "pace" in key.lower():
+            elif "配速" in key or "pace" in key.lower():
                 display_value = format_pace(value)
             else:
                 display_value = (

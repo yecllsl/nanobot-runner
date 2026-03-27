@@ -591,7 +591,7 @@ def hr_drift(
             console.print(f"[yellow]{result['error']}[/yellow]")
             return
 
-        drift_value = result.get("hr_drift_percent")
+        drift_value = result.get("drift_rate")
         correlation = result.get("correlation")
 
         if drift_value is None:
@@ -604,9 +604,14 @@ def hr_drift(
         )
         corr_color = "green" if correlation and correlation < -0.7 else "yellow"
 
+        corr_value = f"{correlation:.3f}" if correlation else "N/A"
+
+        assessment = result.get("assessment", "")
+
         panel = Panel(
             f"[bold]心率漂移:[/bold] [{drift_color}]{drift_value:.1f}%[/{drift_color}]\n"
-            f"[bold]相关性:[/bold] [{corr_color}]{correlation:.3f if correlation else 'N/A'}[/{corr_color}]\n\n"
+            f"[bold]相关性:[/bold] [{corr_color}]{corr_value}[/{corr_color}]\n"
+            f"[bold]评估:[/bold] {assessment}\n\n"
             f"[dim]心率漂移 < 5%: 有氧基础良好[/dim]\n"
             f"[dim]心率漂移 5-10%: 需要加强有氧训练[/dim]\n"
             f"[dim]心率漂移 > 10%: 有氧能力不足[/dim]",

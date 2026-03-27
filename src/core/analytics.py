@@ -177,19 +177,27 @@ class AnalyticsEngine:
         if not heart_rate or not pace:
             return {"error": "数据量不足"}
 
-        if len(heart_rate) < 10 or len(pace) < 10:
+        hr_clean = []
+        pace_clean = []
+
+        for hr, p in zip(heart_rate, pace):
+            if hr is not None and p is not None and p > 0:
+                hr_clean.append(hr)
+                pace_clean.append(p)
+
+        if len(hr_clean) < 10 or len(pace_clean) < 10:
             return {"error": "数据量不足"}
 
         try:
-            hr_series = pl.Series("heart_rate", heart_rate)
-            pace_series = pl.Series("pace", pace)
+            hr_series = pl.Series("heart_rate", hr_clean)
+            pace_series = pl.Series("pace", pace_clean)
 
             df = pl.DataFrame([hr_series, pace_series])
             correlation = df.corr()[0, 1]
 
-            if len(heart_rate) >= 2:
-                first_half_hr = heart_rate[: len(heart_rate) // 2]
-                second_half_hr = heart_rate[len(heart_rate) // 2 :]
+            if len(hr_clean) >= 2:
+                first_half_hr = hr_clean[: len(hr_clean) // 2]
+                second_half_hr = hr_clean[len(hr_clean) // 2 :]
                 drift = (sum(second_half_hr) / len(second_half_hr)) - (
                     sum(first_half_hr) / len(first_half_hr)
                 )
@@ -197,7 +205,7 @@ class AnalyticsEngine:
                 drift = 0
 
             drift_rate = (
-                (drift / (sum(heart_rate) / len(heart_rate))) * 100 if heart_rate else 0
+                (drift / (sum(hr_clean) / len(hr_clean))) * 100 if hr_clean else 0
             )
 
             if drift_rate > 5:
