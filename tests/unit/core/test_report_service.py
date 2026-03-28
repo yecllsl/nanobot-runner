@@ -254,6 +254,7 @@ class TestReportServicePushReport:
         mock_config = MagicMock(spec=ConfigManager)
         mock_config.base_dir = Path("test_base")
         mock_config.data_dir = Path("test_data")
+        mock_config.get.return_value = None  # 返回 None 表示未配置
 
         storage = MagicMock()
         analytics = MagicMock()

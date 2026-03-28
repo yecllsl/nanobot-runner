@@ -86,19 +86,29 @@ class BaseTool(ABC):
 
     def _run_sync(self, func, *args, **kwargs) -> str:
         """同步调用方法并返回JSON字符串
-        
+
         返回格式统一为: {"success": true/false, "data": ...} 或 {"success": false, "error": ...}
         """
         try:
             result = func(*args, **kwargs)
             # 如果结果已经是 dict 且包含 error 字段，转换为 error 格式
             if isinstance(result, dict) and "error" in result:
-                return json.dumps({"success": False, "error": result["error"]}, ensure_ascii=False, default=str)
+                return json.dumps(
+                    {"success": False, "error": result["error"]},
+                    ensure_ascii=False,
+                    default=str,
+                )
             # 如果结果是 dict 且包含 message 字段（如暂无数据），转换为 error 格式
             if isinstance(result, dict) and "message" in result:
-                return json.dumps({"success": False, "error": result["message"]}, ensure_ascii=False, default=str)
+                return json.dumps(
+                    {"success": False, "error": result["message"]},
+                    ensure_ascii=False,
+                    default=str,
+                )
             # 正常返回数据
-            return json.dumps({"success": True, "data": result}, ensure_ascii=False, default=str)
+            return json.dumps(
+                {"success": True, "data": result}, ensure_ascii=False, default=str
+            )
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
@@ -187,28 +197,27 @@ class CalculateVdotForRunTool(BaseTool):
     async def execute(self, **kwargs: Any) -> str:
         distance_m = kwargs.get("distance_m")
         time_s = kwargs.get("time_s")
-        
+
         if distance_m is None or time_s is None:
             return json.dumps(
                 {"success": False, "error": "缺少必要参数：distance_m（距离，米）和 time_s（用时，秒）"},
-                ensure_ascii=False
+                ensure_ascii=False,
             )
-        
+
         try:
             distance_m = float(distance_m)
             time_s = float(time_s)
         except (TypeError, ValueError):
             return json.dumps(
                 {"success": False, "error": "参数类型错误：distance_m 和 time_s 必须为数字"},
-                ensure_ascii=False
+                ensure_ascii=False,
             )
-        
+
         if distance_m <= 0 or time_s <= 0:
             return json.dumps(
-                {"success": False, "error": "参数值错误：距离和时间必须为正数"},
-                ensure_ascii=False
+                {"success": False, "error": "参数值错误：距离和时间必须为正数"}, ensure_ascii=False
             )
-        
+
         return self._run_sync(
             self.runner_tools.calculate_vdot_for_run, distance_m, time_s
         )
@@ -559,7 +568,7 @@ class RunnerTools:
     ) -> List[Dict[str, Any]]:
         """
         按日期范围查询跑步记录（按会话聚合）
-        
+
         数据模型说明：
         - 存储的数据包含采样点数据和会话数据
         - 需要按 session_start_time 聚合，避免返回重复的采样点数据
@@ -589,9 +598,7 @@ class RunnerTools:
                     pl.col("session_avg_heart_rate").first().alias("avg_hr"),
                 ]
             )
-            .filter(
-                pl.col("session_start").is_between(start_dt, end_dt)
-            )
+            .filter(pl.col("session_start").is_between(start_dt, end_dt))
             .sort("session_start", descending=True)
             .collect()
         )
@@ -604,7 +611,7 @@ class RunnerTools:
             distance = row.get("distance") or 0
             duration = row.get("duration") or 0
             avg_hr = row.get("avg_hr")
-            
+
             distance_km = distance / 1000
             duration_minutes = duration / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
@@ -626,7 +633,7 @@ class RunnerTools:
     ) -> List[Dict[str, Any]]:
         """
         按距离范围查询跑步记录（按会话聚合）
-        
+
         数据模型说明：
         - 存储的数据包含采样点数据和会话数据
         - 需要按 session_start_time 聚合，避免返回重复的采样点数据
@@ -664,7 +671,7 @@ class RunnerTools:
             distance = row.get("distance") or 0
             duration = row.get("duration") or 0
             avg_hr = row.get("avg_hr")
-            
+
             distance_km = distance / 1000
             duration_minutes = duration / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0

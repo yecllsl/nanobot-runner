@@ -228,10 +228,10 @@ class StorageManager:
                 existing_df = pl.read_parquet(filepath)
                 existing_df = self._convert_to_parquet_compatible(existing_df)
                 existing_df, dataframe = self._align_dataframes(existing_df, dataframe)
-                
+
                 combined_df = pl.concat([existing_df, dataframe])
                 combined_df = combined_df.unique()
-                
+
                 combined_df.write_parquet(filepath, compression="snappy")
                 new_records = combined_df.height - existing_df.height
                 logger.info(f"追加数据到 {filename}, 新增 {new_records} 条记录")

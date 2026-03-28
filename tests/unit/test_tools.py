@@ -715,20 +715,20 @@ class TestRunnerTools:
             mock_schema = MagicMock()
             mock_schema.__len__ = MagicMock(return_value=3)  # 3 列
             mock_lf.collect_schema.return_value = mock_schema
-            
+
             # 模拟 group_by().agg().filter().sort().collect() 链式调用
             mock_grouped = MagicMock()
             mock_lf.group_by.return_value = mock_grouped
-            
+
             mock_agged = MagicMock()
             mock_grouped.agg.return_value = mock_agged
-            
+
             mock_filtered = MagicMock()
             mock_agged.filter.return_value = mock_filtered
-            
+
             mock_sorted = MagicMock()
             mock_filtered.sort.return_value = mock_sorted
-            
+
             mock_df = MagicMock()
             mock_df.is_empty.return_value = False
             mock_df.iter_rows.return_value = [
@@ -797,20 +797,20 @@ class TestRunnerTools:
             mock_schema = MagicMock()
             mock_schema.__len__ = MagicMock(return_value=3)  # 3 列
             mock_lf.collect_schema.return_value = mock_schema
-            
+
             # 模拟 filter().group_by().agg().sort().collect() 链式调用
             mock_filtered = MagicMock()
             mock_lf.filter.return_value = mock_filtered
-            
+
             mock_grouped = MagicMock()
             mock_filtered.group_by.return_value = mock_grouped
-            
+
             mock_agged = MagicMock()
             mock_grouped.agg.return_value = mock_agged
-            
+
             mock_sorted = MagicMock()
             mock_agged.sort.return_value = mock_sorted
-            
+
             mock_df = MagicMock()
             mock_df.is_empty.return_value = False
             mock_df.iter_rows.return_value = [

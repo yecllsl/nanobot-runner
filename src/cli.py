@@ -197,7 +197,7 @@ def stats(
 ):
     """
     查看跑步统计信息
-    
+
     数据模型说明：
     - 存储的数据包含两类字段：
       1. 过程数据（record）：timestamp, heart_rate, pace 等，每秒采样一次
@@ -251,11 +251,13 @@ def stats(
                 df = df.filter(df["timestamp"] <= str(end_dt))
 
         # 按会话聚合统计（避免重复计算采样点数据）
-        session_df = df.group_by("session_start_time").agg([
-            pl.col("session_total_distance").first().alias("distance"),
-            pl.col("session_total_timer_time").first().alias("duration"),
-            pl.col("session_avg_heart_rate").first().alias("avg_hr"),
-        ])
+        session_df = df.group_by("session_start_time").agg(
+            [
+                pl.col("session_total_distance").first().alias("distance"),
+                pl.col("session_total_timer_time").first().alias("duration"),
+                pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+            ]
+        )
 
         total_runs = session_df.height
         total_distance = session_df["distance"].sum()

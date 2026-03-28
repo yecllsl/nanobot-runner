@@ -31,6 +31,12 @@ class ConfigManager:
                 "version": "0.1.0",
                 "data_dir": str(self.data_dir),
                 "auto_push_feishu": False,
+                # 飞书应用机器人配置（推荐）
+                "feishu_app_id": "",
+                "feishu_app_secret": "",
+                "feishu_receive_id": "",
+                "feishu_receive_id_type": "user_id",
+                # 兼容旧配置（已废弃）
                 "feishu_webhook": "",
             }
             self.save_config(default_config)
