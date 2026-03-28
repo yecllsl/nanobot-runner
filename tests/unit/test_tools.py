@@ -158,7 +158,9 @@ class TestGetRunningStatsTool:
 
             result = await tool.execute()
 
-            assert "message" in result
+            # 新格式返回 {"success": false, "error": ...}
+            assert "success" in result
+            assert "error" in result
 
 
 class TestGetRecentRunsTool:
@@ -709,14 +711,35 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = [
+            # 模拟 Schema 对象，len() 返回列数
+            mock_schema = MagicMock()
+            mock_schema.__len__ = MagicMock(return_value=3)  # 3 列
+            mock_lf.collect_schema.return_value = mock_schema
+            
+            # 模拟 group_by().agg().filter().sort().collect() 链式调用
+            mock_grouped = MagicMock()
+            mock_lf.group_by.return_value = mock_grouped
+            
+            mock_agged = MagicMock()
+            mock_grouped.agg.return_value = mock_agged
+            
+            mock_filtered = MagicMock()
+            mock_agged.filter.return_value = mock_filtered
+            
+            mock_sorted = MagicMock()
+            mock_filtered.sort.return_value = mock_sorted
+            
+            mock_df = MagicMock()
+            mock_df.is_empty.return_value = False
+            mock_df.iter_rows.return_value = [
                 {
-                    "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                    "avg_heart_rate": 150,
+                    "session_start": datetime(2024, 1, 1, 10, 0, 0),
+                    "distance": 5000,
+                    "duration": 1200,
+                    "avg_hr": 150,
                 }
             ]
+            mock_sorted.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -724,6 +747,7 @@ class TestRunnerTools:
 
             assert isinstance(result, list)
             assert len(result) == 1
+            assert result[0]["distance"] == 5.0
 
     def test_query_by_distance_min_only(self):
         """测试按距离查询仅最小值"""
@@ -769,14 +793,35 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = [
+            # 模拟 Schema 对象，len() 返回列数
+            mock_schema = MagicMock()
+            mock_schema.__len__ = MagicMock(return_value=3)  # 3 列
+            mock_lf.collect_schema.return_value = mock_schema
+            
+            # 模拟 filter().group_by().agg().sort().collect() 链式调用
+            mock_filtered = MagicMock()
+            mock_lf.filter.return_value = mock_filtered
+            
+            mock_grouped = MagicMock()
+            mock_filtered.group_by.return_value = mock_grouped
+            
+            mock_agged = MagicMock()
+            mock_grouped.agg.return_value = mock_agged
+            
+            mock_sorted = MagicMock()
+            mock_agged.sort.return_value = mock_sorted
+            
+            mock_df = MagicMock()
+            mock_df.is_empty.return_value = False
+            mock_df.iter_rows.return_value = [
                 {
-                    "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                    "avg_heart_rate": 150,
+                    "session_start": datetime(2024, 1, 1, 10, 0, 0),
+                    "distance": 5000,
+                    "duration": 1200,
+                    "avg_hr": 150,
                 }
             ]
+            mock_sorted.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -784,6 +829,7 @@ class TestRunnerTools:
 
             assert isinstance(result, list)
             assert len(result) == 1
+            assert result[0]["distance"] == 5.0
 
     def test_tool_descriptions(self):
         """测试工具描述"""
