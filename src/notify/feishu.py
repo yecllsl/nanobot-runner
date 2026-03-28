@@ -233,12 +233,14 @@ class FeishuMessageAPI:
         Returns:
             Dict[str, Any]: API 响应，包含 message_id
         """
+        import json
+
         endpoint = "/messages"
         params = {"receive_id_type": receive_id_type}
         payload = {
             "receive_id": receive_id,
             "msg_type": "interactive",
-            "content": card_content,
+            "content": json.dumps(card_content, ensure_ascii=False),
         }
 
         return self._request("POST", endpoint, params=params, json=payload)
@@ -687,11 +689,20 @@ class FeishuBot:
         card_payload = {
             "config": {"wide_screen_mode": True},
             "header": {
-                "title": {"tag": "plain_text", "content": title},
+                "title": {
+                    "tag": "plain_text",
+                    "content": title,
+                },
                 "template": "blue",
             },
             "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": content}}
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": content,
+                    },
+                },
             ],
         }
 
