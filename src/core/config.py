@@ -3,6 +3,7 @@
 
 import json
 import os
+import shutil
 from pathlib import Path
 
 
@@ -15,14 +16,34 @@ class ConfigManager:
         self.data_dir = self.base_dir / "data"
         self.config_file = self.base_dir / "config.json"
         self.index_file = self.data_dir / "index.json"
+        self.cron_dir = self.base_dir / "cron"
+        self.cron_store = self.cron_dir / "jobs.json"
 
         self._ensure_dirs()
         self._ensure_config()
 
     def _ensure_dirs(self):
-        """确保必要目录存在"""
+        """确保必要目录存在，并迁移旧的定时任务配置"""
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.cron_dir.mkdir(parents=True, exist_ok=True)
+
+        # 迁移旧的定时任务配置
+        self._migrate_old_cron_config()
+
+    def _migrate_old_cron_config(self):
+        """迁移旧的定时任务配置到新位置"""
+        import loguru
+
+        old_cron_store = Path.home() / ".nanobot" / "cron" / "jobs.json"
+        new_cron_store = self.cron_store
+
+        if old_cron_store.exists() and not new_cron_store.exists():
+            try:
+                shutil.copy2(old_cron_store, new_cron_store)
+                loguru.logger.info(f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}")
+            except Exception as e:
+                loguru.logger.warning(f"迁移定时任务配置失败：{e}")
 
     def _ensure_config(self):
         """确保配置文件存在"""
@@ -31,6 +52,12 @@ class ConfigManager:
                 "version": "0.1.0",
                 "data_dir": str(self.data_dir),
                 "auto_push_feishu": False,
+                # 飞书应用机器人配置（推荐）
+                "feishu_app_id": "",
+                "feishu_app_secret": "",
+                "feishu_receive_id": "",
+                "feishu_receive_id_type": "user_id",
+                # 兼容旧配置（已废弃）
                 "feishu_webhook": "",
             }
             self.save_config(default_config)

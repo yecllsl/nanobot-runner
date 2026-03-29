@@ -78,7 +78,8 @@ class TestUpdateMemoryTool:
 
                 result = await tool.execute(note="测试笔记", category="training")
 
-                assert "success" in result or "error" not in result
+                # 新返回格式：成功时直接返回数据，失败时返回 {"error": ...}
+                assert "error" not in result or "成功" in result
 
     @pytest.mark.anyio
     async def test_execute_empty_note(self):
@@ -141,13 +142,13 @@ class TestCreateTools:
     """create_tools 函数测试 - 扩展"""
 
     def test_create_tools_count(self):
-        """测试工具数量（新增后应为 9 个）"""
+        """测试工具数量（新增后应为 10 个）"""
         with patch("src.core.storage.StorageManager"):
             runner_tools = RunnerTools()
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 9
+            assert len(tools) == 10
 
     def test_create_tools_contains_update_memory(self):
         """测试包含 UpdateMemoryTool"""

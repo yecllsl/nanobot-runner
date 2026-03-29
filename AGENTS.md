@@ -1,208 +1,187 @@
 # AGENTS.md
 
-Agent 工作指南。
+Agent 工作指南 - Nanobot Runner (桌面端私人AI跑步助理)
 
-## 项目概述
-
-Nanobot Runner - 基于 nanobot-ai 的桌面端私人 AI 跑步助理。通过 Parquet + Polars 实现本地数据隐私与企业级 BI 能力的平衡。
-
-**核心技术栈**: Python 3.11+, nanobot-ai, Typer + Rich (CLI), Polars (计算引擎), Apache Parquet (存储), fitparse (FIT解析)
-
-**当前版本**: 0.3.1
+**核心栈**: Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 
 ## 常用命令
 
 ```bash
 # 依赖管理
-uv venv                                    # 创建虚拟环境
-uv sync --all-extras                       # 同步依赖
-uv cache clean; if($?) { uv sync --reinstall }  # 清理重装
+uv venv                                          # 创建虚拟环境
+uv sync --all-extras                             # 同步依赖
+uv cache clean; if($?) { uv sync --reinstall }   # 清理重装 (Windows)
 
-# 运行项目
+# 运行
 uv run nanobotrun --help
-uv run nanobotrun import <path> [--force]  # 导入FIT文件/目录
+uv run nanobotrun import <path> [--force]         # 导入FIT
 uv run nanobotrun stats [--year YYYY | --start DATE --end DATE]
-uv run nanobotrun chat                     # Agent交互
-uv run nanobotrun version
+uv run nanobotrun chat                            # Agent交互
 
 # 测试
-uv run pytest                              # 全部测试
-uv run pytest tests/{unit,integration,e2e,performance}/
-uv run pytest --cov=src --cov-report=term-missing --cov-report=html
+uv run pytest                                     # 全部测试（默认 --cov）
+uv run pytest tests/unit/                         # 单元测试
+uv run pytest tests/integration/                  # 集成测试
+uv run pytest tests/e2e/                          # 端到端
+uv run pytest tests/performance/                  # 性能测试
+uv run pytest -k "test_calculate_vdot"            # 按关键字匹配
+uv run pytest tests/unit/test_analytics.py::TestAnalyticsEngine::test_calculate_vdot_success  # 单个测试函数
+uv run pytest -m "not slow"                       # 排除慢速测试
+uv run pytest --no-cov                            # 无覆盖率
 
-# 代码质量
-uv run black src tests; uv run isort src tests; uv run mypy src; uv run bandit -r src
+# 代码质量（CI 强制执行）
+uv run black src tests                            # 格式化 (line-length=88)
+uv run isort src tests                            # 导入排序 (profile=black)
+uv run mypy src                                   # 类型检查
+uv run bandit -r src                              # 安全扫描 (跳过 B101, B601)
 
 # 构建
-uv build                                   # 产物在 dist/
+uv build                                          # 产物在 dist/
 ```
 
-## 架构
+## 代码风格
 
-### 目录结构
+### 导入顺序 (isort profile=black)
+
+```python
+# 1. 标准库    2. 第三方库    3. 本地 (src.*)
+import logging
+from typing import TYPE_CHECKING, Any, Optional
+
+import polars as pl
+from rich.console import Console
+
+from src.core.storage import StorageManager
+
+# 循环导入: TYPE_CHECKING 块 + 字符串类型注解
+if TYPE_CHECKING:
+    from src.core.storage import StorageManager
+```
+
+### 命名约定
+
+类名 PascalCase (`StorageManager`)；函数/变量 snake_case (`calculate_vdot`)；常量 UPPER_SNAKE_CASE (`VDOT_COEFFICIENT`)；私有 `_leading_underscore`；测试类 `Test{ClassName}`；测试函数 `test_{action}_{case}`
+
+### 类型注解
+
+- mypy 宽松：`warn_return_any=false`, `disallow_untyped_defs=false`；新代码建议加注解
+- Polars：`pl.Series`, `pl.DataFrame`, `pl.LazyFrame`；循环引用用 `TYPE_CHECKING` + 字符串注解
+
+### 错误处理
+
+```python
+# 自定义异常继承 NanobotRunnerError (dataclass, 含 error_code + recovery_suggestion)
+@dataclass
+class StorageError(NanobotRunnerError):
+    error_code: str = "STORAGE_ERROR"
+
+# 核心逻辑: raise ... from e
+raise ValueError("距离和时间必须为正数")
+
+# 工具层: @handle_tool_errors 装饰器 (返回 dict)
+@handle_tool_errors(default_response={"error": "操作失败"})
+async def execute(self, **kwargs): ...
+```
+
+### Docstring
+
+```python
+def method(self, distance_m: float, time_s: float) -> float:
+    """计算VDOT值
+
+    Args:  distance_m: 距离（米）   time_s: 用时（秒）
+    Returns: float: VDOT值
+    Raises:  ValueError: 当距离或时间为非正数
+    """
+```
+
+### Polars
+
+- 读取：`pl.scan_parquet()` → LazyFrame；写入：`.collect().write_parquet(path, compression='snappy')`
+- 合并用 `pl.concat()`；类型 Object → String 以兼容 Parquet；常量提取为模块级变量
+
+## 项目架构
 
 ```
 src/
-├── core/           # 核心逻辑: parser, storage, indexer, importer, analytics, config, schema, decorators
-├── agents/tools.py # Agent工具集 (RunnerTools)
-├── notify/feishu.py# 飞书推送 (FeishuBot)
-├── cli.py          # CLI入口
-└── cli_formatter.py
+├── core/            # parser, storage, indexer, importer, analytics, profile, config, schema, exceptions, decorators
+├── agents/tools.py  # BaseTool + RunnerTools (Agent工具集)
+├── notify/feishu.py # FeishuBot (飞书推送)
+├── cli.py           # Typer CLI 入口
+└── cli_formatter.py # Rich 格式化输出
 
 tests/
-├── unit/           # 单元测试
-├── integration/{module,scene}/  # 集成测试
-├── e2e/            # 端到端测试 (含 v0_2_0/)
-├── performance/    # 性能测试
-└── data/{fixtures,real_fit_files,validation}/
-
-docs/               # 项目文档
+├── unit/            # 单元测试
+├── integration/     # 集成测试 (module/, scene/)
+├── e2e/             # 端到端测试
+└── performance/     # 性能测试
 ```
 
 ### 数据流
 
-- **导入**: FIT → `FitParser` → `IndexManager`(去重) → `StorageManager`(Parquet按年分片)
-- **查询**: `StorageManager` → `AnalyticsEngine` → `RunnerTools`
-- **通知**: 结果 → `FeishuBot`
+- **导入**: FIT → `FitParser.parse_file()` → `IndexManager`(SHA256去重) → `StorageManager.save_to_parquet()`(按年分片)
+- **查询**: `StorageManager.read_parquet()` → LazyFrame → `AnalyticsEngine` → `RunnerTools`
 
-### 核心组件
+### 新增 Agent 工具
 
-| 组件 | 职责 |
-|------|------|
-| `ImportService` | 编排导入流程 |
-| `AnalyticsEngine` | 数据分析(VDOT/TSS/心率漂移/训练负荷) |
-| `RunnerTools` | Agent工具层封装 |
-| `StorageManager` | Parquet读写 |
-| `ConfigManager` | 配置管理(~/.nanobot-runner/config.json) |
-| `ParquetSchema` | 数据结构规范与验证 |
-| `decorators` | 通用装饰器(错误处理/存储初始化) |
+1. 继承 `BaseTool`，实现 `name`、`description`、`parameters`、`execute()`
+2. `parameters` 用 OpenAI function calling schema
+3. 在 `RunnerTools` 中注册，更新 `TOOL_DESCRIPTIONS`
 
-### 数据存储
+### 装饰器
 
-**nanobot Workspace 目录结构**：
+`@handle_tool_errors`（异常→dict）、`@handle_errors`（统一错误）、`@require_storage`（存储初始化）、`@handle_empty_data`（空数据兜底）
 
-系统将 `~/.nanobot-runner` 作为 nanobot workspace，遵循 nanobot-ai 标准结构：
+## 数据存储
 
-```
-~/.nanobot-runner/
-├── data/                    # 业务数据存储（本项目扩展）
-│   ├── activities_*.parquet # 运动数据（按年分片）
-│   ├── profile.json         # 结构化画像数据（计算用）
-│   ├── plans/               # 训练计划存储
-│   │   └── {plan_id}.json
-│   └── index.json           # 去重索引（SHA256）
-├── memory/                  # 记忆系统（nanobot标准）
-│   ├── MEMORY.md            # 长期记忆/用户画像（Agent上下文）
-│   └── HISTORY.md           # 事件日志（可搜索历史）
-├── sessions/                # 会话历史（nanobot标准）
-│   └── feishu_{chat_id}.jsonl
-├── skills/                  # 技能扩展（nanobot标准）
-│   ├── training_plan/
-│   │   └── SKILL.md         # 训练计划生成技能
-│   ├── injury_prediction/
-│   │   └── SKILL.md         # 伤病风险预警技能
-│   └── vdot_prediction/
-│       └── SKILL.md         # VDOT预测技能
-├── AGENTS.md                # Agent行为准则
-├── SOUL.md                  # 人格、价值观、语气风格
-├── USER.md                  # 用户画像（辅助）
-├── HEARTBEAT.md             # 定时任务
-└── config.json              # 应用配置
-```
+### 目录结构
 
-**初始化机制**：
+**nanobot-ai 框架配置** (`~/.nanobot/`):
+- `config.json` - LLM Provider、飞书通道、Gateway 等框架配置
+- `cron/` - 定时任务存储（框架功能）
+- `bridge/` - 通道桥接数据
+- `history/` - 框架历史记录
 
-> ⚠️ **重要**：workspace 目录结构由 nanobot-ai 框架自动初始化，无需自定义实现。
+**nanobotrun 业务配置** (`~/.nanobot-runner/` 作为 workspace):
+- `config.json` - 业务配置（数据目录、飞书Webhook等）
+- `data/` - 跑步数据（Parquet文件、画像等）
+- `memory/` - Agent 记忆文件（MEMORY.md）
+- `sessions/` - 会话记录
+- `AGENTS.md`, `SOUL.md`, `USER.md` - Agent 配置文件
 
-当启动 nanobot-runner 应用时，nanobot-ai 框架会检测 `workspace=~/.nanobot-runner` 是否存在或为空，自动创建缺失的标准结构：
+### 配置分离原则
 
-| 自动创建的文件/目录 | 说明 |
-|-------------------|------|
-| `AGENTS.md` | Agent 行为准则模板 |
-| `SOUL.md` | 人格、价值观、语气风格 |
-| `USER.md` | 用户画像模板 |
-| `memory/MEMORY.md` | 长期记忆初始文件 |
-| `memory/HISTORY.md` | 事件日志初始文件 |
-| `skills/` | 技能目录（如版本默认带） |
+| 类型 | 位置 | 说明 |
+|------|------|------|
+| LLM Provider | `~/.nanobot/config.json` | 框架级配置 |
+| 飞书通道 | `~/.nanobot/config.json` | 框架级配置 |
+| Gateway | `~/.nanobot/config.json` | 框架级配置 |
+| 定时任务 | `~/.nanobot/cron/` | 框架功能 |
+| 跑步数据 | `~/.nanobot-runner/data/` | 业务数据 |
+| 用户画像 | `~/.nanobot-runner/data/` | 业务数据 |
+| Agent记忆 | `~/.nanobot-runner/memory/` | 业务数据 |
 
-**应用需自行创建的目录**：
-- `data/`：业务数据存储目录
-- `data/plans/`：训练计划存储目录
-- `logs/`：日志文件目录
+**重要**: `~/.nanobot-runner` 作为 nanobot-ai 的 workspace，存储业务相关数据和配置；框架级配置必须在 `~/.nanobot/` 中。
 
-**设计原则**：完全复用 nanobot 的初始化逻辑，避免重复实现。
+### 数据文件
 
-### Schema 必填字段
+`~/.nanobot-runner/data/activities_{year}.parquet` (snappy, 按年分片)
+`~/.nanobot-runner/data/index.json` (SHA256去重)
+`~/.nanobot-runner/config.json` (业务配置)
 
-`activity_id`, `timestamp`, `source_file`, `filename`, `total_distance`, `total_timer_time`
+Schema 必填: `activity_id`, `timestamp`, `source_file`, `filename`, `total_distance`, `total_timer_time`
 
-## 核心功能
-
-### AnalyticsEngine
-
-VDOT计算、TSS计算、跑步摘要统计、心率漂移分析、训练负荷(ATL/CTL)、VDOT趋势
-
-### RunnerTools 工具
-
-`get_running_stats`, `get_recent_runs`, `calculate_vdot_for_run`, `get_vdot_trend`, `get_hr_drift_analysis`, `get_training_load`, `query_by_date_range`, `query_by_distance`
-
-### FeishuBot
-
-`send_text`, `send_card`, `send_import_notification`, `send_daily_report`
-
-### cli_formatter
-
-`format_duration`, `format_pace`, `format_distance`, `format_stats_panel`, `format_runs_table`, `format_vdot_trend`, `format_agent_response`
-
-### decorators
-
-`handle_tool_errors`(异常捕获), `require_storage`(存储初始化), `handle_empty_data`(空数据处理), `validate_date_format`(日期验证)
-
-## 开发注意事项
-
-### 环境
-
-- Python >= 3.11 (nanobot-ai 要求)
-- Windows PowerShell 5.1: 用 `; if($?) { cmd }` 替代 `&&`
-
-### Polars
-
-- 读取用 `scan_parquet` (LazyFrame), 写入用 `write_parquet(compression='snappy')`
-- 合并用 `pl.concat()`, 相关性用 `pl.corr()`
-
-### FIT文件
-
-Garmin 设备导出，fitparse 解析。测试数据在 `tests/data/`
-
-### Agent工具
-
-新增工具需同时更新 `RunnerTools` 类和 `TOOL_DESCRIPTIONS` 字典
-
-## CI/CD (GitHub Actions)
+## CI/CD
 
 1. **code-quality**: black, isort, mypy, bandit
-2. **test**: pytest (Python 3.11/3.12)
-3. **build**: 构建打包
-4. **release**: main分支打tag触发
-
-覆盖率上传 Codecov
+2. **test**: pytest (Python 3.11/3.12 矩阵)
+3. **build**: 构建 wheel/sdist
+4. **release**: main 分支打 tag → GitHub Release
 
 ## 常见问题
 
 ```bash
-# 依赖问题
-uv cache clean; uv sync --reinstall
-
-# Windows 激活失败
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+uv cache clean; uv sync --reinstall               # 依赖问题
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser  # Win PS激活
+# Windows 多命令: 用 "; if($?) { cmd }" 替代 "&&"
 ```
-
-mypy 配置宽松: `warn_return_any`, `disallow_untyped_defs`, `check_untyped_defs` 均为 false
-
-## 待实现
-
-- [ ] Agent自然语言交互完善
-- [ ] TSS/ATL/CTL完整计算
-- [ ] 每日晨报自动生成
-- [ ] 更多分析指标与可视化
-- [ ] 配速字段存储优化

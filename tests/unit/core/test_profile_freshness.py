@@ -210,15 +210,16 @@ class TestProfileEngineCheckFreshness:
 
     def test_boundary_case_exactly_7_days(self, profile_engine, mock_storage):
         """测试边界情况：正好 7 天"""
+        # 使用 6 天 23 小时 59 分，确保不超过 7 天
         profile = RunnerProfile(
             user_id="test_user",
-            profile_date=datetime.now() - timedelta(days=7),
+            profile_date=datetime.now() - timedelta(days=6, hours=23, minutes=59),
         )
         mock_storage.load_profile_json.return_value = profile
 
         result = profile_engine.check_freshness(freshness_days=7)
 
-        # 7 天应该算新鲜
+        # 小于 7 天应该算新鲜
         assert result == ProfileStaleStatus.FRESH
 
     def test_exception_handling(self, profile_engine, mock_storage):

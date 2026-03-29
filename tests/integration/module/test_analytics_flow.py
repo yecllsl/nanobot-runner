@@ -30,9 +30,13 @@ class TestAnalyticsIntegration:
                 {
                     "activity_id": ["test_001", "test_002"],
                     "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
-                    "total_distance": [5000.0, 10000.0],
-                    "total_timer_time": [1800, 3600],
-                    "avg_heart_rate": [140, 150],
+                    "session_start_time": [
+                        datetime(2024, 1, 1, 6, 0),
+                        datetime(2024, 1, 2, 6, 0),
+                    ],
+                    "session_total_distance": [5000.0, 10000.0],
+                    "session_total_timer_time": [1800, 3600],
+                    "session_avg_heart_rate": [140, 150],
                 }
             )
 
@@ -60,8 +64,12 @@ class TestAnalyticsIntegration:
                 {
                     "activity_id": ["test_001", "test_002"],
                     "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
-                    "total_distance": [5000.0, 10000.0],
-                    "total_timer_time": [1800, 3600],
+                    "session_start_time": [
+                        datetime(2024, 1, 1, 6, 0),
+                        datetime(2024, 1, 2, 6, 0),
+                    ],
+                    "session_total_distance": [5000.0, 10000.0],
+                    "session_total_timer_time": [1800, 3600],
                 }
             )
 

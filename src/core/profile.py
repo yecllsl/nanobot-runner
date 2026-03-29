@@ -68,6 +68,7 @@ class ProfileStorageManager:
                 json.dump(profile_data, f, indent=2, ensure_ascii=False)
 
             logger.info(f"画像已保存到 profile.json: {profile.user_id}")
+
             return True
         except Exception as e:
             logger.error(f"保存 profile.json 失败：{e}")
@@ -1026,18 +1027,60 @@ class ProfileEngine:
         try:
             lf = self.storage.read_parquet()
 
-            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
             if len(lf.collect_schema()) == 0:
                 return lf
 
-            # 过滤日期范围
-            lf = lf.filter(pl.col("timestamp") >= start_date).filter(
-                pl.col("timestamp") <= end_date
-            )
+            lf = self._normalize_column_names(lf)
+
+            if "timestamp" in lf.collect_schema().names():
+                lf = lf.filter(pl.col("timestamp") >= start_date).filter(
+                    pl.col("timestamp") <= end_date
+                )
 
             return lf
         except Exception as e:
             raise RuntimeError(f"读取活动数据失败：{e}") from e
+
+    def _normalize_column_names(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        """
+        规范化列名，将 session_ 前缀的列名映射为标准列名
+
+        Args:
+            lf: LazyFrame 对象
+
+        Returns:
+            pl.LazyFrame: 列名规范化后的 LazyFrame
+        """
+        schema = lf.collect_schema()
+        columns = schema.names()
+
+        column_mapping = {
+            "session_total_distance": "total_distance",
+            "session_total_timer_time": "total_timer_time",
+            "session_avg_heart_rate": "avg_heart_rate",
+            "session_max_heart_rate": "max_heart_rate",
+            "session_avg_speed": "avg_speed",
+            "session_max_speed": "max_speed",
+            "session_avg_cadence": "avg_cadence",
+            "session_max_cadence": "max_cadence",
+            "session_avg_power": "avg_power",
+            "session_max_power": "max_power",
+            "session_total_calories": "total_calories",
+            "session_total_ascent": "total_ascent",
+            "session_total_descent": "total_descent",
+            "session_start_time": "start_time",
+        }
+
+        rename_map = {}
+        for old_name, new_name in column_mapping.items():
+            if old_name in columns and new_name not in columns:
+                rename_map[old_name] = new_name
+
+        if rename_map:
+            lf = lf.rename(rename_map)
+            logger.debug(f"列名映射: {rename_map}")
+
+        return lf
 
     def _is_empty_lazyframe(self, lf: pl.LazyFrame) -> bool:
         """
@@ -1091,11 +1134,27 @@ class ProfileEngine:
             if df.is_empty():
                 return
 
-            profile.total_activities = df.height
-            profile.total_distance_km = float(df["total_distance"].sum()) / 1000.0
-            profile.total_duration_hours = float(df["total_timer_time"].sum()) / 3600.0
+            if "start_time" in df.columns:
+                activities = df.group_by("start_time").agg(
+                    [
+                        pl.col("total_distance").first(),
+                        pl.col("total_timer_time").first(),
+                    ]
+                )
+                profile.total_activities = activities.height
+                profile.total_distance_km = (
+                    float(activities["total_distance"].sum()) / 1000.0
+                )
+                profile.total_duration_hours = (
+                    float(activities["total_timer_time"].sum()) / 3600.0
+                )
+            else:
+                profile.total_activities = df.height
+                profile.total_distance_km = float(df["total_distance"].sum()) / 1000.0
+                profile.total_duration_hours = (
+                    float(df["total_timer_time"].sum()) / 3600.0
+                )
 
-            # 计算平均配速
             if profile.total_distance_km > 0 and profile.total_duration_hours > 0:
                 profile.avg_pace_min_per_km = (
                     profile.total_duration_hours * 60
@@ -1114,7 +1173,6 @@ class ProfileEngine:
         try:
             from src.core.analytics import AnalyticsEngine
 
-            # 创建临时 AnalyticsEngine 实例
             analytics = AnalyticsEngine(self.storage)
 
             df = lf.collect()
@@ -1122,8 +1180,19 @@ class ProfileEngine:
             if df.is_empty():
                 return
 
+            if "start_time" in df.columns:
+                activities = df.group_by("start_time").agg(
+                    [
+                        pl.col("total_distance").first(),
+                        pl.col("total_timer_time").first(),
+                    ]
+                )
+                activity_rows = activities.iter_rows(named=True)
+            else:
+                activity_rows = df.iter_rows(named=True)
+
             vdot_values = []
-            for row in df.iter_rows(named=True):
+            for row in activity_rows:
                 distance = row.get("total_distance", 0)
                 duration = row.get("total_timer_time", 0)
 
@@ -1132,7 +1201,6 @@ class ProfileEngine:
                         vdot = analytics.calculate_vdot(distance, duration)
                         vdot_values.append(vdot)
                     except ValueError:
-                        # VDOT 计算失败，跳过
                         pass
 
             if vdot_values:
@@ -1263,13 +1331,21 @@ class ProfileEngine:
             if df.is_empty():
                 return
 
-            # 分析训练时间偏好
-            if "timestamp" in df.columns:
+            if "start_time" in df.columns:
+                activities = df.group_by("start_time").agg(
+                    [pl.col("start_time").first().alias("activity_start_time")]
+                )
                 profile.favorite_running_time = self._analyze_running_time_preference(
-                    df["timestamp"]
+                    activities["activity_start_time"]
+                )
+            elif "timestamp" in df.columns:
+                activities = df.group_by("timestamp").agg(
+                    [pl.col("timestamp").first().alias("activity_start_time")]
+                )
+                profile.favorite_running_time = self._analyze_running_time_preference(
+                    activities["activity_start_time"]
                 )
 
-            # 计算训练一致性
             profile.consistency_score = self._calculate_consistency_score(df, days)
         except Exception as e:
             logger.warning(f"计算其他指标失败：{e}")
@@ -1279,21 +1355,20 @@ class ProfileEngine:
         分析跑步时间偏好
 
         Args:
-            timestamps: 时间戳序列
+            timestamps: 时间戳序列（UTC 时间）
 
         Returns:
             str: 偏好时间段（morning/afternoon/evening）
         """
         try:
-            # 提取小时
-            hours = timestamps.dt.hour()
+            beijing_hours = [
+                (t + timedelta(hours=8)).hour for t in timestamps.to_list()
+            ]
 
-            # 统计各时段跑步次数
-            morning_count = ((hours >= 5) & (hours < 12)).sum()
-            afternoon_count = ((hours >= 12) & (hours < 18)).sum()
-            evening_count = ((hours >= 18) | (hours < 5)).sum()
+            morning_count = sum(1 for h in beijing_hours if 5 <= h < 12)
+            afternoon_count = sum(1 for h in beijing_hours if 12 <= h < 18)
+            evening_count = sum(1 for h in beijing_hours if h >= 18 or h < 5)
 
-            # 判断偏好
             if morning_count >= afternoon_count and morning_count >= evening_count:
                 return "morning"
             elif afternoon_count >= evening_count:

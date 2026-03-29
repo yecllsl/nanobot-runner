@@ -298,20 +298,20 @@ class TestReportServicePush:
         call_args = mock_service_with_feishu.feishu.send_card.call_args
         assert "每月跑步总结" in call_args[0][0]
 
-    def test_push_report_no_webhook(self):
-        """测试无 Webhook 时推送失败"""
+    def test_push_report_no_feishu_config(self):
+        """测试无飞书配置时推送失败"""
         with patch("src.core.report_service.ConfigManager"):
             with patch("src.core.report_service.StorageManager"):
                 with patch("src.core.report_service.AnalyticsEngine"):
                     with patch("src.core.report_service.CronService"):
                         mock_feishu = Mock()
-                        mock_feishu.webhook = None
+                        mock_feishu.auth.is_configured.return_value = False
 
                         service = ReportService(feishu=mock_feishu)
                         result = service.push_report({}, report_type=ReportType.DAILY)
 
                         assert result["success"] is False
-                        assert "未配置飞书 Webhook" in result["error"]
+                        assert "未配置" in result["error"]
 
 
 class TestReportServiceSchedule:

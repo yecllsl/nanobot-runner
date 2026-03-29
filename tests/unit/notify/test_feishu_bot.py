@@ -71,26 +71,40 @@ class TestFeishuBotInit:
     """测试 FeishuBot 初始化"""
 
     @patch("src.notify.feishu.ConfigManager")
-    def test_init_with_webhook(self, mock_config_manager):
-        """测试使用 Webhook 初始化"""
+    def test_init_with_app_credentials(self, mock_config_manager):
+        """测试使用应用凭证初始化"""
         mock_config_manager.return_value.get.return_value = None
-        bot = FeishuBot(webhook="https://test.webhook.com/test")
+        bot = FeishuBot(
+            app_id="test_app_id",
+            app_secret="test_app_secret",
+            receive_id="test_user_id",
+            receive_id_type="user_id",
+        )
 
-        assert bot.webhook == "https://test.webhook.com/test"
+        assert bot.auth.app_id == "test_app_id"
+        assert bot.auth.app_secret == "test_app_secret"
+        assert bot.receive_id == "test_user_id"
+        assert bot.receive_id_type == "user_id"
         assert bot._nanobot_feishu_enabled is None
         assert bot._feishu_channel is None
         assert len(bot._command_handlers) > 0
 
     @patch("src.notify.feishu.ConfigManager")
-    def test_init_without_webhook_load_from_config(self, mock_config_manager):
-        """测试无 Webhook 时从配置加载"""
-        mock_config_manager.return_value.get.return_value = (
-            "https://config.webhook.com/test"
-        )
+    def test_init_without_credentials_load_from_config(self, mock_config_manager):
+        """测试无凭证时从配置加载"""
+        mock_config = mock_config_manager.return_value
+        mock_config.get.side_effect = lambda key, default=None: {
+            "feishu_app_id": "config_app_id",
+            "feishu_app_secret": "config_app_secret",
+            "feishu_receive_id": "config_user_id",
+            "feishu_receive_id_type": "user_id",
+        }.get(key, default)
+
         bot = FeishuBot()
 
-        assert bot.webhook == "https://config.webhook.com/test"
-        mock_config_manager.return_value.get.assert_called_once_with("feishu_webhook")
+        assert bot.auth.app_id == "config_app_id"
+        assert bot.auth.app_secret == "config_app_secret"
+        assert bot.receive_id == "config_user_id"
 
     @patch("src.notify.feishu.ConfigManager")
     def test_init_command_handlers_registered(self, mock_config_manager):
@@ -623,105 +637,116 @@ class TestFeishuBotSendMessages:
     def bot(self):
         """创建 FeishuBot 实例"""
         with patch("src.notify.feishu.ConfigManager"):
-            return FeishuBot(webhook="https://test.webhook.com/test")
+            return FeishuBot(
+                app_id="test_app_id",
+                app_secret="test_app_secret",
+                receive_id="test_user_id",
+            )
 
-    @patch("src.notify.feishu.requests.post")
-    def test_send_text_success(self, mock_post, bot):
+    @patch.object(FeishuBot, "_send_with_retry")
+    def test_send_text_success(self, mock_send, bot):
         """测试发送文本消息成功"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"code": 0, "msg": "success"}
-        mock_post.return_value = mock_response
+        mock_send.return_value = {"success": True, "data": {"message_id": "123"}}
 
         result = bot.send_text("测试消息")
 
-        assert result["code"] == 0
-        mock_post.assert_called_once()
+        assert result.get("success") is True
+        mock_send.assert_called_once()
 
-    @patch("src.notify.feishu.requests.post")
-    def test_send_text_failure(self, mock_post, bot):
+    @patch.object(FeishuBot, "_send_with_retry")
+    def test_send_text_failure(self, mock_send, bot):
         """测试发送文本消息失败"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"code": 1, "msg": "发送失败"}
-        mock_post.return_value = mock_response
+        mock_send.return_value = {"success": False, "error": "发送失败"}
 
         result = bot.send_text("测试消息")
 
+        assert result.get("success") is False
         assert "error" in result
 
-    def test_send_text_no_webhook(self):
-        """测试无 Webhook 时发送文本消息"""
-        with patch("src.notify.feishu.ConfigManager"):
+    def test_send_text_no_credentials(self):
+        """测试无凭证时发送文本消息"""
+        with patch("src.notify.feishu.ConfigManager") as mock_config:
+            mock_config.return_value.get.return_value = None
             bot = FeishuBot()
-            bot.webhook = None
 
             result = bot.send_text("测试消息")
 
-            assert "error" in result
-            assert "未配置 Webhook" in result["error"] or "未配置Webhook" in result["error"]
+            assert result.get("success") is False
+            assert "未配置飞书应用凭证" in result.get("error", "")
 
-    @patch("src.notify.feishu.requests.post")
-    def test_send_card_success(self, mock_post, bot):
+    @patch.object(FeishuBot, "_send_with_retry")
+    def test_send_card_success(self, mock_send, bot):
         """测试发送卡片消息成功"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"code": 0, "msg": "success"}
-        mock_post.return_value = mock_response
+        mock_send.return_value = {"success": True, "data": {"message_id": "123"}}
 
         result = bot.send_card("标题", "内容")
 
-        assert result["code"] == 0
-        mock_post.assert_called_once()
+        assert result.get("success") is True
+        mock_send.assert_called_once()
 
-    @patch("src.notify.feishu.requests.post")
-    def test_send_import_notification(self, mock_post, bot):
+    @patch.object(FeishuBot, "_send_with_retry")
+    def test_send_import_notification(self, mock_send, bot):
         """测试发送导入通知"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"code": 0, "msg": "success"}
-        mock_post.return_value = mock_response
+        mock_send.return_value = {"success": True, "data": {"message_id": "123"}}
 
         stats = {"total": 10, "added": 8, "skipped": 2, "errors": 0}
         result = bot.send_import_notification(stats)
 
-        assert result["code"] == 0
+        assert result.get("success") is True
 
 
 class TestFeishuBotRetry:
     """测试重试机制"""
 
-    @pytest.fixture
-    def bot(self):
-        """创建 FeishuBot 实例"""
-        with patch("src.notify.feishu.ConfigManager"):
-            return FeishuBot(webhook="https://test.webhook.com/test")
-
-    @patch("src.notify.feishu.requests.post")
-    @patch("src.notify.feishu.time.sleep")
-    def test_retry_on_timeout(self, mock_sleep, mock_post, bot):
+    def test_retry_on_timeout(self):
         """测试超时重试"""
-        # 前两次调用超时，第三次成功
-        mock_post.side_effect = [
-            requests.exceptions.Timeout(),
-            requests.exceptions.Timeout(),
-            MagicMock(json=MagicMock(return_value={"code": 0})),
-        ]
+        with patch("src.notify.feishu.ConfigManager"):
+            bot = FeishuBot(
+                app_id="test_app_id",
+                app_secret="test_app_secret",
+                receive_id="test_user_id",
+            )
 
-        result = bot._send_with_retry({"msg_type": "text"})
+            # 第一次调用抛出异常，第二次成功
+            call_count = 0
 
-        assert result["success"] is True
-        assert mock_post.call_count == 3
-        assert mock_sleep.call_count == 2
+            def mock_send_text(content, receive_id, receive_id_type="user_id"):
+                nonlocal call_count
+                call_count += 1
+                if call_count < 2:
+                    raise RuntimeError("请求超时")
+                return {"code": 0, "msg": "success", "data": {"message_id": "123"}}
 
-    @patch("src.notify.feishu.requests.post")
-    @patch("src.notify.feishu.time.sleep")
-    def test_retry_exhausted(self, mock_sleep, mock_post, bot):
+            with patch.object(bot.message_api, "send_text", side_effect=mock_send_text):
+                result = bot.send_text("测试消息")
+
+                assert result.get("success") is True
+                assert call_count == 2
+
+    def test_retry_exhausted(self):
         """测试重试耗尽"""
-        mock_post.side_effect = requests.exceptions.Timeout()
+        with patch("src.notify.feishu.ConfigManager"):
+            bot = FeishuBot(
+                app_id="test_app_id",
+                app_secret="test_app_secret",
+                receive_id="test_user_id",
+            )
 
-        result = bot._send_with_retry({"msg_type": "text"})
+            # 持续失败
+            call_count = 0
 
-        assert result["success"] is False
-        assert "已重试" in result["error"]
-        # 初始调用 1 次 + 重试 3 次 = 4 次
-        assert mock_post.call_count == 4
+            def mock_send_text(content, receive_id, receive_id_type="user_id"):
+                nonlocal call_count
+                call_count += 1
+                raise RuntimeError("持续失败")
+
+            with patch.object(bot.message_api, "send_text", side_effect=mock_send_text):
+                result = bot.send_text("测试消息")
+
+                assert result.get("success") is False
+                assert "已重试" in result.get("error", "")
+                # 初始调用 1 次 + 重试 3 次 = 4 次
+                assert call_count == 4
 
 
 class TestFeishuBotIntegration:

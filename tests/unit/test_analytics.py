@@ -96,14 +96,20 @@ class TestAnalyticsEngine:
 
     def test_get_running_summary_success(self):
         """测试成功获取跑步摘要"""
+        from datetime import datetime
+
         mock_storage = Mock()
         engine = AnalyticsEngine(mock_storage)
 
         mock_df = pl.DataFrame(
             {
-                "total_distance": [5000.0, 10000.0],
-                "total_timer_time": [1800, 3600],
-                "avg_heart_rate": [140, 150],
+                "session_start_time": [
+                    datetime(2024, 1, 1, 6, 0),
+                    datetime(2024, 1, 2, 6, 0),
+                ],
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1800, 3600],
+                "session_avg_heart_rate": [140, 150],
             }
         )
         mock_lf = mock_df.lazy()
@@ -138,9 +144,10 @@ class TestAnalyticsEngine:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [datetime(2024, 6, 15)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_start_time": [datetime(2024, 6, 15)],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
         mock_lf = mock_df.lazy()
@@ -226,30 +233,30 @@ class TestAnalyticsEngineAdvanced:
         """测试5公里比赛VDOT计算"""
         engine = AnalyticsEngine(Mock())
 
-        # 5公里（5000米）用时1500秒（25分钟）
+        # 5公里（5000米）用时1500秒（25分钟），配速 5 min/km
         vdot = engine.calculate_vdot(5000, 1500)
 
-        # VDOT值在合理范围内（实际计算值约为0.88）
-        assert vdot > 0
-        assert vdot < 2
+        # VDOT值在合理范围内（配速 5 min/km 对应 VDOT ≈ 53.8）
+        assert vdot > 50
+        assert vdot < 60
 
     def test_calculate_vdot_marathon(self):
         """测试马拉松VDOT计算"""
         engine = AnalyticsEngine(Mock())
 
-        # 马拉松（42195米）用时14400秒（4小时）
+        # 马拉松（42195米）用时14400秒（4小时），配速约 5.69 min/km
         vdot = engine.calculate_vdot(42195, 14400)
 
-        # VDOT值在合理范围内（实际计算值约为3.2）
-        assert vdot > 0
-        assert vdot < 10
+        # VDOT值在合理范围内（配速 5.69 min/km 对应 VDOT ≈ 50）
+        assert vdot > 45
+        assert vdot < 55
 
     def test_calculate_vdot_different_distances(self):
         """测试不同距离的VDOT计算"""
         engine = AnalyticsEngine(Mock())
 
-        distances = [1000, 5000, 10000, 21097, 42195]
-        times = [240, 1800, 3600, 7200, 14400]
+        distances = [1500, 5000, 10000, 21097, 42195]
+        times = [360, 1800, 3600, 7200, 14400]
 
         vdots = [engine.calculate_vdot(d, t) for d, t in zip(distances, times)]
 
@@ -296,15 +303,18 @@ class TestAnalyticsEngineAdvanced:
 
     def test_get_running_summary_with_single_record(self):
         """测试单条记录的跑步摘要"""
+        from datetime import datetime
+
         mock_storage = Mock()
         engine = AnalyticsEngine(mock_storage)
 
         # 创建真实的 LazyFrame
         mock_df = pl.DataFrame(
             {
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_start_time": [datetime(2024, 1, 1, 6, 0)],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
         mock_lf = mock_df.lazy()
@@ -522,9 +532,10 @@ class TestAnalyticsEngineAdvanced:
             {
                 "activity_id": ["test_001", "test_002"],
                 "timestamp": [datetime(2024, 1, 1), datetime(2024, 2, 1)],
-                "total_distance": [5000.0, 10000.0],
-                "total_timer_time": [1800, 3600],
-                "avg_heart_rate": [140, 150],
+                "session_start_time": [datetime(2024, 1, 1), datetime(2024, 2, 1)],
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1800, 3600],
+                "session_avg_heart_rate": [140, 150],
                 "distance": [5000.0, 10000.0],
                 "duration": [1800, 3600],
             }
@@ -911,9 +922,9 @@ class TestTrainingLoad:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 5,
-                "total_timer_time": [1800] * 5,
-                "avg_heart_rate": [140] * 5,
+                "session_total_distance": [5000.0] * 5,
+                "session_total_timer_time": [1800] * 5,
+                "session_avg_heart_rate": [140] * 5,
             }
         )
 
@@ -941,9 +952,9 @@ class TestTrainingLoad:
         # 模拟有列的 LazyFrame
         mock_lf.collect_schema.return_value = [
             "timestamp",
-            "total_distance",
-            "total_timer_time",
-            "avg_heart_rate",
+            "session_total_distance",
+            "session_total_timer_time",
+            "session_avg_heart_rate",
         ]
 
         # 创建足够多的数据，但分析周期只有 14 天
@@ -953,9 +964,9 @@ class TestTrainingLoad:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 20,
-                "total_timer_time": [1800] * 20,
-                "avg_heart_rate": [140] * 20,
+                "session_total_distance": [5000.0] * 20,
+                "session_total_timer_time": [1800] * 20,
+                "session_avg_heart_rate": [140] * 20,
             }
         )
 
@@ -987,9 +998,9 @@ class TestTrainingLoad:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 50,
-                "total_timer_time": [1800] * 50,
-                "avg_heart_rate": [140] * 50,
+                "session_total_distance": [5000.0] * 50,
+                "session_total_timer_time": [1800] * 50,
+                "session_avg_heart_rate": [140] * 50,
             }
         )
 
@@ -1112,10 +1123,10 @@ class TestTrainingLoad:
 
         mock_df = pl.DataFrame(
             {
-                "timestamp": timestamps,
-                "total_distance": [5000.0] * 5,
-                "total_timer_time": [1800] * 5,
-                "avg_heart_rate": [140] * 5,
+                "session_start_time": timestamps,
+                "session_total_distance": [5000.0] * 5,
+                "session_total_timer_time": [1800] * 5,
+                "session_avg_heart_rate": [140] * 5,
             }
         )
 
@@ -1128,7 +1139,7 @@ class TestTrainingLoad:
         result = engine.get_training_load(days=7)
 
         # 验证 sort 方法在 LazyFrame 上被调用
-        mock_lf.sort.assert_called_once_with("timestamp")
+        mock_lf.sort.assert_called_once_with("session_start_time")
         assert "atl" in result
 
 
@@ -1986,9 +1997,9 @@ class TestPaceDistribution:
                     today - timedelta(days=20),
                     today - timedelta(days=25),
                 ],
-                "total_distance": [5000.0, 10000.0, 8000.0, 3000.0, 6000.0],
-                "total_timer_time": [1800, 3000, 2400, 1200, 1500],  # 不同配速
-                "avg_heart_rate": [140, 150, 145, 160, 155],
+                "session_total_distance": [5000.0, 10000.0, 8000.0, 3000.0, 6000.0],
+                "session_total_timer_time": [1800, 3000, 2400, 1200, 1500],
+                "session_avg_heart_rate": [140, 150, 145, 160, 155],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2026,9 +2037,9 @@ class TestPaceDistribution:
             {
                 "activity_id": ["test_001"],
                 "timestamp": [datetime(2024, 1, 1)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2064,15 +2075,9 @@ class TestPaceDistribution:
                     datetime(2024, 1, 4),
                     datetime(2024, 1, 5),
                 ],
-                # 配速计算: total_timer_time / (total_distance / 1000)
-                # Z1: 420秒/公里 (7:00/km) - 5000m, 2100s
-                # Z2: 330秒/公里 (5:30/km) - 5000m, 1650s
-                # Z3: 270秒/公里 (4:30/km) - 5000m, 1350s
-                # Z4: 225秒/公里 (3:45/km) - 5000m, 1125s
-                # Z5: 180秒/公里 (3:00/km) - 5000m, 900s
-                "total_distance": [5000.0, 5000.0, 5000.0, 5000.0, 5000.0],
-                "total_timer_time": [2100, 1650, 1350, 1125, 900],
-                "avg_heart_rate": [130, 140, 150, 160, 170],
+                "session_total_distance": [5000.0, 5000.0, 5000.0, 5000.0, 5000.0],
+                "session_total_timer_time": [2100, 1650, 1350, 1125, 900],
+                "session_avg_heart_rate": [130, 140, 150, 160, 170],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2118,9 +2123,9 @@ class TestPaceDistribution:
                     datetime(2024, 1, 2),
                     datetime(2024, 1, 3),
                 ],
-                "total_distance": [5000.0, 10000.0, 8000.0],
-                "total_timer_time": [2100, 4200, 3360],  # 都是 420 秒/公里 (7:00/km) - Z1 区间
-                "avg_heart_rate": [140, 145, 150],
+                "session_total_distance": [5000.0, 10000.0, 8000.0],
+                "session_total_timer_time": [2100, 4200, 3360],
+                "session_avg_heart_rate": [140, 145, 150],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2145,9 +2150,9 @@ class TestPaceDistribution:
             {
                 "activity_id": ["run_1", "run_2"],
                 "timestamp": [today - timedelta(days=10), today - timedelta(days=5)],
-                "total_distance": [5000.0, 10000.0],
-                "total_timer_time": [1800, 3000],
-                "avg_heart_rate": [140, 150],
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1800, 3000],
+                "session_avg_heart_rate": [140, 150],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2178,9 +2183,9 @@ class TestPaceDistribution:
                     datetime(2024, 1, 2),
                     datetime(2024, 1, 3),
                 ],
-                "total_distance": [5000.0, 0.0, 5000.0],
-                "total_timer_time": [1800, 1800, 0],
-                "avg_heart_rate": [140, 145, 150],
+                "session_total_distance": [5000.0, 0.0, 5000.0],
+                "session_total_timer_time": [1800, 1800, 0],
+                "session_avg_heart_rate": [140, 145, 150],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2209,9 +2214,9 @@ class TestPaceDistribution:
             {
                 "activity_id": [f"run_{i}" for i in range(1000)],
                 "timestamp": timestamps,
-                "total_distance": distances,
-                "total_timer_time": times,
-                "avg_heart_rate": [140 + i % 20 for i in range(1000)],
+                "session_total_distance": distances,
+                "session_total_timer_time": times,
+                "session_avg_heart_rate": [140 + i % 20 for i in range(1000)],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2237,9 +2242,9 @@ class TestPaceDistribution:
             {
                 "activity_id": ["run_1", "run_2"],
                 "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
-                "total_distance": [5000.0, 5000.0],
-                "total_timer_time": [2100, 1650],  # Z1 和 Z2 配速
-                "avg_heart_rate": [140, 145],
+                "session_total_distance": [5000.0, 5000.0],
+                "session_total_timer_time": [2100, 1650],
+                "session_avg_heart_rate": [140, 145],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2284,9 +2289,9 @@ class TestPaceDistribution:
             {
                 "activity_id": ["test_run"],
                 "timestamp": [datetime(2024, 1, 1)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2315,9 +2320,9 @@ class TestPaceDistribution:
                     today - timedelta(days=10),
                     today - timedelta(days=15),
                 ],
-                "total_distance": [5000.0, 6000.0, 7000.0],
-                "total_timer_time": [1650, 1980, 2310],  # 都是 330 秒/公里 (5:30/km)
-                "avg_heart_rate": [140, 145, 150],
+                "session_total_distance": [5000.0, 6000.0, 7000.0],
+                "session_total_timer_time": [1650, 1980, 2310],
+                "session_avg_heart_rate": [140, 145, 150],
             }
         )
         mock_lf = mock_df.lazy()
@@ -2367,9 +2372,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=i) for i in range(5)],
-                "total_distance": [5000.0] * 5,
-                "total_timer_time": [1800] * 5,
-                "avg_heart_rate": [None] * 5,
+                "session_total_distance": [5000.0] * 5,
+                "session_total_timer_time": [1800] * 5,
+                "session_avg_heart_rate": [None] * 5,
             }
         )
 
@@ -2401,9 +2406,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 10,
-                "total_timer_time": [1800] * 10,
-                "avg_heart_rate": [140] * 10,
+                "session_total_distance": [5000.0] * 10,
+                "session_total_timer_time": [1800] * 10,
+                "session_avg_heart_rate": [140] * 10,
             }
         )
 
@@ -2451,9 +2456,9 @@ class TestTrainingLoadTrend:
                     datetime(2024, 1, 5),
                     datetime(2024, 1, 10),
                 ],
-                "total_distance": [5000.0, 6000.0, 7000.0],
-                "total_timer_time": [1800, 2100, 2400],
-                "avg_heart_rate": [140, 145, 150],
+                "session_total_distance": [5000.0, 6000.0, 7000.0],
+                "session_total_timer_time": [1800, 2100, 2400],
+                "session_avg_heart_rate": [140, 145, 150],
             }
         )
 
@@ -2501,9 +2506,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=5)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
 
@@ -2536,9 +2541,9 @@ class TestTrainingLoadTrend:
                     same_day.replace(hour=8),
                     same_day.replace(hour=18),
                 ],
-                "total_distance": [5000.0, 3000.0],
-                "total_timer_time": [1800, 1200],
-                "avg_heart_rate": [140, 130],
+                "session_total_distance": [5000.0, 3000.0],
+                "session_total_timer_time": [1800, 1200],
+                "session_avg_heart_rate": [140, 130],
             }
         )
 
@@ -2571,9 +2576,9 @@ class TestTrainingLoadTrend:
                     datetime(2024, 1, 1),
                     datetime(2024, 1, 5),
                 ],
-                "total_distance": [5000.0, 5000.0],
-                "total_timer_time": [1800, 1800],
-                "avg_heart_rate": [140, 140],
+                "session_total_distance": [5000.0, 5000.0],
+                "session_total_timer_time": [1800, 1800],
+                "session_avg_heart_rate": [140, 140],
             }
         )
 
@@ -2609,9 +2614,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 50,
-                "total_timer_time": [1800] * 50,
-                "avg_heart_rate": [140] * 50,
+                "session_total_distance": [5000.0] * 50,
+                "session_total_timer_time": [1800] * 50,
+                "session_avg_heart_rate": [140] * 50,
             }
         )
 
@@ -2646,9 +2651,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [15000.0] * 14,  # 高训练量
-                "total_timer_time": [5400] * 14,  # 1.5 小时
-                "avg_heart_rate": [170] * 14,  # 高心率
+                "session_total_distance": [15000.0] * 14,
+                "session_total_timer_time": [5400] * 14,
+                "session_avg_heart_rate": [170] * 14,
             }
         )
 
@@ -2686,9 +2691,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 90,
-                "total_timer_time": [1800] * 90,
-                "avg_heart_rate": [140] * 90,
+                "session_total_distance": [5000.0] * 90,
+                "session_total_timer_time": [1800] * 90,
+                "session_avg_heart_rate": [140] * 90,
             }
         )
 
@@ -2719,9 +2724,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=10)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
 
@@ -2749,9 +2754,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=i) for i in range(7, 0, -1)],
-                "total_distance": [5000.0] * 7,
-                "total_timer_time": [1800] * 7,
-                "avg_heart_rate": [140] * 7,
+                "session_total_distance": [5000.0] * 7,
+                "session_total_timer_time": [1800] * 7,
+                "session_avg_heart_rate": [140] * 7,
             }
         )
 
@@ -2786,9 +2791,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": timestamps,
-                "total_distance": [5000.0] * 60,
-                "total_timer_time": [1800] * 60,
-                "avg_heart_rate": [140] * 60,
+                "session_total_distance": [5000.0] * 60,
+                "session_total_timer_time": [1800] * 60,
+                "session_avg_heart_rate": [140] * 60,
             }
         )
 
@@ -2822,9 +2827,9 @@ class TestTrainingLoadTrend:
                     today - timedelta(days=2),
                     today - timedelta(days=1),
                 ],
-                "total_distance": [5000.0, 5000.0],
-                "total_timer_time": [1800, 1800],
-                "avg_heart_rate": [140, None],  # 第二条无心率
+                "session_total_distance": [5000.0, 5000.0],
+                "session_total_timer_time": [1800, 1800],
+                "session_avg_heart_rate": [140, None],
             }
         )
 
@@ -2852,9 +2857,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=i) for i in range(5, 0, -1)],
-                "total_distance": [5000.0] * 5,
-                "total_timer_time": [1800] * 5,
-                "avg_heart_rate": [140] * 5,
+                "session_total_distance": [5000.0] * 5,
+                "session_total_timer_time": [1800] * 5,
+                "session_avg_heart_rate": [140] * 5,
             }
         )
 
@@ -2884,9 +2889,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=i) for i in range(14, 0, -1)],
-                "total_distance": [3000.0 + i * 500 for i in range(14)],
-                "total_timer_time": [1200 + i * 200 for i in range(14)],
-                "avg_heart_rate": [130 + i * 3 for i in range(14)],
+                "session_total_distance": [3000.0 + i * 500 for i in range(14)],
+                "session_total_timer_time": [1200 + i * 200 for i in range(14)],
+                "session_avg_heart_rate": [130 + i * 3 for i in range(14)],
             }
         )
 
@@ -2915,9 +2920,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [datetime.now() - timedelta(days=5)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
 
@@ -2944,9 +2949,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [today - timedelta(days=i) for i in range(7, 0, -1)],
-                "total_distance": [5000.0] * 7,
-                "total_timer_time": [1800] * 7,
-                "avg_heart_rate": [140] * 7,
+                "session_total_distance": [5000.0] * 7,
+                "session_total_timer_time": [1800] * 7,
+                "session_avg_heart_rate": [140] * 7,
             }
         )
 
@@ -2974,9 +2979,9 @@ class TestTrainingLoadTrend:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [datetime(2024, 1, 1)],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
 
@@ -3006,10 +3011,10 @@ class TestTrainingLoadTrend:
         today = datetime.now()
         mock_df = pl.DataFrame(
             {
-                "timestamp": [today - timedelta(days=100)],  # 很久以前的数据
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "timestamp": [today - timedelta(days=100)],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
 
@@ -3314,9 +3319,9 @@ class TestDailyReport:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [datetime.combine(yesterday, datetime.min.time())],
-                "total_distance": [8500.0],
-                "total_timer_time": [2700],  # 45分钟
-                "avg_heart_rate": [145],
+                "session_total_distance": [8500.0],
+                "session_total_timer_time": [2700],
+                "session_avg_heart_rate": [145],
             }
         )
 
@@ -3672,9 +3677,9 @@ class TestDailyReport:
         mock_df = pl.DataFrame(
             {
                 "timestamp": [datetime.combine(yesterday, datetime.min.time())],
-                "total_distance": [5000.0],
-                "total_timer_time": [1800],
-                "avg_heart_rate": [140],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+                "session_avg_heart_rate": [140],
             }
         )
 
@@ -3899,9 +3904,9 @@ class TestDailyReport:
                     datetime.combine(yesterday, datetime.min.time())
                     + timedelta(hours=12),
                 ],
-                "total_distance": [5000.0, 3000.0],
-                "total_timer_time": [1800, 1200],
-                "avg_heart_rate": [140, 135],
+                "session_total_distance": [5000.0, 3000.0],
+                "session_total_timer_time": [1800, 1200],
+                "session_avg_heart_rate": [140, 135],
             }
         )
 

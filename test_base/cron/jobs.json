@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "9307f48c",
+      "name": "weekly_report",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "atMs": 1774832400000,
+        "everyMs": null,
+        "expr": null,
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "{\"push\": true, \"age\": 30, \"time\": \"09:00\", \"type\": \"weekly\"}",
+        "deliver": false,
+        "channel": null,
+        "to": null
+      },
+      "state": {
+        "nextRunAtMs": 1774832400000,
+        "lastRunAtMs": null,
+        "lastStatus": null,
+        "lastError": null
+      },
+      "createdAtMs": 1774777336522,
+      "updatedAtMs": 1774777336522,
+      "deleteAfterRun": false
+    },
+    {
+      "id": "035a151a",
+      "name": "monthly_report",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "atMs": 1774836000000,
+        "everyMs": null,
+        "expr": null,
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "{\"push\": true, \"age\": 30, \"time\": \"10:00\", \"type\": \"monthly\"}",
+        "deliver": false,
+        "channel": null,
+        "to": null
+      },
+      "state": {
+        "nextRunAtMs": 1774836000000,
+        "lastRunAtMs": null,
+        "lastStatus": null,
+        "lastError": null
+      },
+      "createdAtMs": 1774777336540,
+      "updatedAtMs": 1774777336540,
+      "deleteAfterRun": false
+    },
+    {
+      "id": "8781ce29",
+      "name": "daily_report",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "atMs": 1774828800000,
+        "everyMs": null,
+        "expr": null,
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "{\"push\": true, \"age\": 30, \"time\": \"08:00\", \"type\": \"daily\"}",
+        "deliver": false,
+        "channel": null,
+        "to": null
+      },
+      "state": {
+        "nextRunAtMs": 1774828800000,
+        "lastRunAtMs": null,
+        "lastStatus": null,
+        "lastError": null
+      },
+      "createdAtMs": 1774777336582,
+      "updatedAtMs": 1774777336582,
+      "deleteAfterRun": false
+    }
+  ]
+}

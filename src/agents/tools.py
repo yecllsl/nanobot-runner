@@ -85,11 +85,33 @@ class BaseTool(ABC):
         return errors
 
     def _run_sync(self, func, *args, **kwargs) -> str:
-        """同步调用方法并返回JSON字符串"""
+        """同步调用方法并返回 JSON 字符串
+
+        返回格式：直接返回数据本身（dict/list 等），错误时返回包含 error 字段的 dict
+        """
         try:
+            logger.info(f"工具调用开始: {func.__name__}, 参数: {kwargs}")
             result = func(*args, **kwargs)
-            return json.dumps(result, ensure_ascii=False, default=str)
+            logger.info(
+                f"工具调用成功: {func.__name__}, 结果类型: {type(result)}, 结果: {str(result)[:200]}"
+            )
+
+            # 如果结果已经是 dict 且包含 error 字段，直接返回
+            if isinstance(result, dict) and "error" in result:
+                logger.warning(f"工具返回错误: {result}")
+                return json.dumps(result, ensure_ascii=False, default=str)
+            # 如果结果是 dict 且包含 message 字段（如暂无数据），转换为 error 格式
+            if isinstance(result, dict) and "message" in result:
+                logger.info(f"工具返回消息: {result}")
+                return json.dumps(
+                    {"error": result["message"]}, ensure_ascii=False, default=str
+                )
+            # 正常返回数据（直接返回，不包装）
+            json_result = json.dumps(result, ensure_ascii=False, default=str)
+            logger.info(f"工具返回 JSON 长度: {len(json_result)}")
+            return json_result
         except Exception as e:
+            logger.error(f"工具调用异常: {func.__name__}, 错误: {str(e)}", exc_info=True)
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
@@ -175,8 +197,29 @@ class CalculateVdotForRunTool(BaseTool):
         }
 
     async def execute(self, **kwargs: Any) -> str:
-        distance_m = kwargs.get("distance_m", 0)
-        time_s = kwargs.get("time_s", 0)
+        distance_m = kwargs.get("distance_m")
+        time_s = kwargs.get("time_s")
+
+        if distance_m is None or time_s is None:
+            return json.dumps(
+                {"success": False, "error": "缺少必要参数：distance_m（距离，米）和 time_s（用时，秒）"},
+                ensure_ascii=False,
+            )
+
+        try:
+            distance_m = float(distance_m)
+            time_s = float(time_s)
+        except (TypeError, ValueError):
+            return json.dumps(
+                {"success": False, "error": "参数类型错误：distance_m 和 time_s 必须为数字"},
+                ensure_ascii=False,
+            )
+
+        if distance_m <= 0 or time_s <= 0:
+            return json.dumps(
+                {"success": False, "error": "参数值错误：距离和时间必须为正数"}, ensure_ascii=False
+            )
+
         return self._run_sync(
             self.runner_tools.calculate_vdot_for_run, distance_m, time_s
         )
@@ -191,7 +234,7 @@ class GetVdotTrendTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "获取VDOT趋势变化，了解跑步能力的变化趋势"
+        return "获取VDOT（跑力值）趋势变化，自动从历史跑步数据计算每次跑步的VDOT值。当用户询问'我的VDOT是多少'、'我的跑力值'或'查看VDOT趋势'时使用此工具。不需要用户提供任何参数，工具会自动从已导入的跑步数据中计算VDOT"
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -355,6 +398,39 @@ class UpdateMemoryTool(BaseTool):
         return self._run_sync(self.runner_tools.update_memory, note, category)
 
 
+class GenerateTrainingPlanTool(BaseTool):
+    """生成训练计划工具"""
+
+    @property
+    def name(self) -> str:
+        return "generate_training_plan"
+
+    @property
+    def description(self) -> str:
+        return "根据用户目标生成个性化训练计划"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "goal_distance_km": {
+                    "type": "number",
+                    "description": "目标比赛距离（公里），例如：5, 10, 21.0975, 42.195",
+                },
+                "goal_date": {"type": "string", "description": "目标比赛日期（YYYY-MM-DD）"},
+            },
+            "required": ["goal_distance_km", "goal_date"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        goal_distance_km = float(kwargs.get("goal_distance_km", 0))
+        goal_date = kwargs.get("goal_date", "")
+        return self._run_sync(
+            self.runner_tools.generate_training_plan, goal_distance_km, goal_date
+        )
+
+
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
@@ -385,13 +461,34 @@ class RunnerTools:
 
     def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
         lf = self.storage.read_parquet()
-        df = lf.sort("timestamp", descending=True).limit(limit).collect()
+
+        session_df = (
+            lf.group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("timestamp"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                    pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                ]
+            )
+            .sort("timestamp", descending=True)
+            .limit(limit)
+            .collect()
+        )
 
         runs = []
-        for row in df.iter_rows(named=True):
-            distance_km = row.get("total_distance", 0) / 1000
-            duration_min = row.get("total_timer_time", 0) / 60
+        for row in session_df.iter_rows(named=True):
+            distance = row.get("distance") or 0
+            duration = row.get("duration") or 0
+            distance_km = distance / 1000
+            duration_min = duration / 60
             pace = duration_min / distance_km if distance_km > 0 else 0
+
+            # 计算VDOT值
+            vdot = None
+            if distance > 0 and duration > 0:
+                vdot = self.analytics.calculate_vdot(distance, duration)
 
             runs.append(
                 {
@@ -399,8 +496,8 @@ class RunnerTools:
                     "distance_km": round(distance_km, 2),
                     "duration_min": round(duration_min, 1),
                     "avg_pace_sec_km": round(pace, 1) if pace > 0 else None,
-                    "avg_heart_rate": row.get("avg_heart_rate"),
-                    "vdot": row.get("vdot_estimate"),
+                    "avg_heart_rate": row.get("avg_hr"),
+                    "vdot": round(vdot, 2) if vdot else None,
                 }
             )
 
@@ -411,12 +508,25 @@ class RunnerTools:
 
     def get_vdot_trend(self, limit: int = 20) -> List[Dict[str, Any]]:
         lf = self.storage.read_parquet()
-        df = lf.sort("timestamp", descending=True).limit(limit).collect()
+
+        session_df = (
+            lf.group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("timestamp"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                ]
+            )
+            .sort("timestamp", descending=True)
+            .limit(limit)
+            .collect()
+        )
 
         vdot_trend = []
-        for row in df.iter_rows(named=True):
-            distance = row.get("total_distance", 0)
-            duration = row.get("total_timer_time", 0)
+        for row in session_df.iter_rows(named=True):
+            distance = row.get("distance", 0)
+            duration = row.get("duration", 0)
 
             if distance > 0 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
@@ -437,10 +547,20 @@ class RunnerTools:
         if df.height == 0:
             return {"error": "暂无数据"}
 
-        heart_rate = df.select(pl.col("heart_rate")).to_series().to_list()
-        pace = df.select(pl.col("pace")).to_series().to_list()
+        if "heart_rate" not in df.columns:
+            return {"error": "暂无心率数据"}
 
-        return self.analytics.analyze_hr_drift(heart_rate, pace)
+        heart_rate = df.select(pl.col("heart_rate")).to_series().to_list()
+
+        pace_list: List[float] = []
+        if "speed" in df.columns:
+            speed_values = df.select(pl.col("speed")).to_series().to_list()
+            pace_list = [1000 / s for s in speed_values if s and s > 0]
+        elif "enhanced_speed" in df.columns:
+            speed_values = df.select(pl.col("enhanced_speed")).to_series().to_list()
+            pace_list = [1000 / s for s in speed_values if s and s > 0]
+
+        return self.analytics.analyze_hr_drift(heart_rate, pace_list)
 
     def get_training_load(self, days: int = 42) -> Dict[str, Any]:
         return self.analytics.get_training_load(days)
@@ -448,39 +568,62 @@ class RunnerTools:
     def query_by_date_range(
         self, start_date: str, end_date: str
     ) -> List[Dict[str, Any]]:
+        """
+        按日期范围查询跑步记录（按会话聚合）
+
+        数据模型说明：
+        - 存储的数据包含采样点数据和会话数据
+        - 需要按 session_start_time 聚合，避免返回重复的采样点数据
+        - 使用 session_start_time 进行日期过滤，而不是 timestamp
+        - 结束日期包含当天一整天
+        """
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
         except ValueError:
             return [{"error": "日期格式错误，应为 YYYY-MM-DD"}]
 
         lf = self.storage.read_parquet()
 
-        filtered_lf = lf.filter(pl.col("timestamp").is_between(start_dt, end_dt))
+        # 检查空数据
+        if len(lf.collect_schema()) == 0:
+            return []
 
-        selected_lf = filtered_lf.select(
-            [
-                "timestamp",
-                "total_distance",
-                "total_timer_time",
-                "avg_heart_rate",
-            ]
+        # 按会话聚合，使用 session_start_time 进行过滤
+        session_df = (
+            lf.group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("session_start"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                    pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                ]
+            )
+            .filter(pl.col("session_start").is_between(start_dt, end_dt))
+            .sort("session_start", descending=True)
+            .collect()
         )
 
-        df = selected_lf.sort("timestamp", descending=True).collect()
+        if session_df.is_empty():
+            return []
 
         results = []
-        for row in df.iter_rows(named=True):
-            distance_km = row.get("total_distance", 0) / 1000
-            duration_minutes = row.get("total_timer_time", 0) / 60
+        for row in session_df.iter_rows(named=True):
+            distance = row.get("distance") or 0
+            duration = row.get("duration") or 0
+            avg_hr = row.get("avg_hr")
+
+            distance_km = distance / 1000
+            duration_minutes = duration / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
 
             results.append(
                 {
-                    "timestamp": str(row.get("timestamp", "N/A")),
+                    "timestamp": str(row.get("session_start", "N/A")),
                     "distance": round(distance_km, 2),
-                    "duration": row.get("total_timer_time", 0),
-                    "heart_rate": row.get("avg_heart_rate", "N/A"),
+                    "duration": duration,
+                    "heart_rate": avg_hr if avg_hr is not None else "N/A",
                     "pace": round(pace, 2),
                 }
             )
@@ -490,41 +633,57 @@ class RunnerTools:
     def query_by_distance(
         self, min_distance: float, max_distance: Optional[float] = None
     ) -> List[Dict[str, Any]]:
+        """
+        按距离范围查询跑步记录（按会话聚合）
+
+        数据模型说明：
+        - 存储的数据包含采样点数据和会话数据
+        - 需要按 session_start_time 聚合，避免返回重复的采样点数据
+        """
         min_meters = min_distance * 1000
         max_meters = max_distance * 1000 if max_distance else None
 
         lf = self.storage.read_parquet()
 
         if max_meters:
-            distance_filter = pl.col("total_distance").is_between(
+            distance_filter = pl.col("session_total_distance").is_between(
                 min_meters, max_meters
             )
         else:
-            distance_filter = pl.col("total_distance") >= min_meters
+            distance_filter = pl.col("session_total_distance") >= min_meters
 
-        filtered_lf = lf.filter(distance_filter).select(
-            [
-                "timestamp",
-                "total_distance",
-                "total_timer_time",
-                "avg_heart_rate",
-            ]
+        # 按会话聚合，避免返回重复的采样点数据
+        session_df = (
+            lf.filter(distance_filter)
+            .group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("session_start"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                    pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                ]
+            )
+            .sort("session_start", descending=True)
+            .collect()
         )
 
-        df = filtered_lf.sort("timestamp", descending=True).collect()
-
         results = []
-        for row in df.iter_rows(named=True):
-            distance_km = row.get("total_distance", 0) / 1000
-            duration_minutes = row.get("total_timer_time", 0) / 60
+        for row in session_df.iter_rows(named=True):
+            distance = row.get("distance") or 0
+            duration = row.get("duration") or 0
+            avg_hr = row.get("avg_hr")
+
+            distance_km = distance / 1000
+            duration_minutes = duration / 60
             pace = duration_minutes / distance_km if distance_km > 0 else 0
 
             results.append(
                 {
-                    "timestamp": str(row.get("timestamp", "N/A")),
+                    "timestamp": str(row.get("session_start", "N/A")),
                     "distance": round(distance_km, 2),
-                    "duration": row.get("total_timer_time", 0),
-                    "heart_rate": row.get("avg_heart_rate", "N/A"),
+                    "duration": duration,
+                    "heart_rate": avg_hr if avg_hr is not None else "N/A",
                     "pace": round(pace, 2),
                 }
             )
@@ -578,6 +737,57 @@ class RunnerTools:
             logger.error(f"更新记忆失败：{e}")
             return {"error": f"更新记忆失败：{str(e)}"}
 
+    def generate_training_plan(
+        self, goal_distance_km: float, goal_date: str
+    ) -> Dict[str, Any]:
+        """
+        生成训练计划
+
+        Args:
+            goal_distance_km: 目标比赛距离（公里）
+            goal_date: 目标比赛日期（YYYY-MM-DD）
+
+        Returns:
+            Dict: 包含训练计划信息
+        """
+        try:
+            from src.core.training_plan import TrainingPlanEngine
+
+            # 获取用户画像
+            profile = self.profile_storage.load_profile_json()
+            if not profile:
+                return {"error": "未找到用户画像，请先导入跑步数据"}
+
+            profile_dict = profile.to_dict()
+            vdot = profile_dict.get("estimated_vdot", 35.0)
+            volume = profile_dict.get("weekly_avg_distance", 30.0)
+            age = profile_dict.get("age", 30)
+            resting_hr = profile_dict.get("resting_hr", 60)
+
+            # 生成训练计划
+            engine = TrainingPlanEngine()
+            plan = engine.generate_plan(
+                user_id="default",
+                goal_distance_km=goal_distance_km,
+                goal_date=goal_date,
+                current_vdot=vdot,
+                current_weekly_distance_km=volume,
+                age=age,
+                resting_hr=resting_hr,
+            )
+
+            return {
+                "success": True,
+                "message": f"已生成{goal_distance_km}km 训练计划，共{len(plan.weeks)}周",
+                "fitness_level": plan.fitness_level.value,
+                "total_weeks": len(plan.weeks),
+                "total_distance": sum(ws.weekly_distance_km for ws in plan.weeks),
+            }
+
+        except Exception as e:
+            logger.error(f"生成训练计划失败：{e}")
+            return {"error": str(e)}
+
 
 def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
@@ -591,28 +801,29 @@ def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
         QueryByDateRangeTool(runner_tools),
         QueryByDistanceTool(runner_tools),
         UpdateMemoryTool(runner_tools),
+        GenerateTrainingPlanTool(runner_tools),
     ]
 
 
 TOOL_DESCRIPTIONS = {
     "get_running_stats": {
-        "description": "获取跑步统计数据，包括总次数、总距离、平均距离等",
+        "description": "获取跑步统计数据，包括总次数、总距离、平均距离等。返回JSON格式：{success: true, data: {total_runs: 总次数, total_distance: 总距离(米), total_duration: 总时长(秒), avg_distance: 平均距离(米), avg_duration: 平均时长(秒), max_distance: 最大距离(米), avg_heart_rate: 平均心率}} 或 {success: false, error: 错误信息}",
         "parameters": {
             "start_date": "开始日期（可选，格式：YYYY-MM-DD）",
             "end_date": "结束日期（可选，格式：YYYY-MM-DD）",
         },
     },
     "get_recent_runs": {
-        "description": "获取最近的跑步记录",
+        "description": "获取最近的跑步记录列表。返回JSON格式：{success: true, data: [{timestamp: 时间, distance_km: 距离(公里), duration_min: 时长(分钟), avg_pace_sec_km: 配速(秒/公里), avg_heart_rate: 平均心率, vdot: VDOT值}, ...]} 或 {success: false, error: 错误信息}。注意：vdot字段已包含计算好的VDOT值，直接使用即可，不要自己计算",
         "parameters": {"limit": "返回数量限制（默认 10 条）"},
     },
     "calculate_vdot_for_run": {
-        "description": "计算单次跑步的 VDOT 值（跑力值）",
+        "description": "计算单次跑步的VDOT值（跑力值），使用Jack Daniels公式自动计算。注意：VDOT计算公式复杂，请使用此工具计算，不要自己用简单公式计算",
         "parameters": {"distance_m": "距离（米）", "time_s": "用时（秒）"},
     },
     "get_vdot_trend": {
-        "description": "获取 VDOT 趋势变化",
-        "parameters": {"limit": "返回数量限制（默认 20 条）"},
+        "description": "获取VDOT（跑力值）趋势变化，自动从历史跑步数据计算每次跑步的VDOT值。当用户询问'我的VDOT是多少'、'我的跑力值'或'查看VDOT趋势'时使用此工具。不需要用户提供任何参数。返回JSON格式：{success: true, data: [{timestamp: 时间, distance: 距离(米), vdot: VDOT值}, ...]} 或 {success: false, error: 错误信息}",
+        "parameters": {"limit": "返回数量限制（默认 20 条，可选）"},
     },
     "get_hr_drift_analysis": {
         "description": "分析心率漂移情况",
@@ -623,14 +834,14 @@ TOOL_DESCRIPTIONS = {
         "parameters": {"days": "分析天数（默认 42 天）"},
     },
     "query_by_date_range": {
-        "description": "按日期范围查询跑步记录",
+        "description": "按日期范围查询跑步记录。返回JSON格式：{success: true, data: [{timestamp: 时间, distance: 距离(公里), duration: 时长(秒), heart_rate: 平均心率, pace: 配速(分钟/公里)}, ...]} 或 {success: false, error: 错误信息}",
         "parameters": {
             "start_date": "开始日期（格式：YYYY-MM-DD）",
             "end_date": "结束日期（格式：YYYY-MM-DD）",
         },
     },
     "query_by_distance": {
-        "description": "按距离范围查询跑步记录",
+        "description": "按距离范围查询跑步记录。返回JSON格式：{success: true, data: [{timestamp: 时间, distance: 距离(公里), duration: 时长(秒), heart_rate: 平均心率, pace: 配速(分钟/公里)}, ...]} 或 {success: false, error: 错误信息}",
         "parameters": {
             "min_distance": "最小距离（公里）",
             "max_distance": "最大距离（公里，可选）",

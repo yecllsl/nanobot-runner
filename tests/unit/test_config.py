@@ -21,6 +21,8 @@ class TestConfigManager:
             assert cm.data_dir == cm.base_dir / "data"
             assert cm.config_file == cm.base_dir / "config.json"
             assert cm.index_file == cm.data_dir / "index.json"
+            assert cm.cron_dir == cm.base_dir / "cron"
+            assert cm.cron_store == cm.cron_dir / "jobs.json"
 
     def test_ensure_dirs(self, tmp_path):
         """测试确保目录存在"""
@@ -28,6 +30,7 @@ class TestConfigManager:
             cm = ConfigManager()
             assert cm.base_dir.exists()
             assert cm.data_dir.exists()
+            assert cm.cron_dir.exists()
 
     def test_ensure_config_default(self, tmp_path):
         """测试创建默认配置"""
@@ -109,3 +112,25 @@ class TestConfigManager:
         """测试全局单例实例"""
         assert config is not None
         assert isinstance(config, ConfigManager)
+
+    def test_migrate_old_cron_config(self, tmp_path):
+        """测试迁移旧的定时任务配置"""
+        with patch.object(Path, "home", return_value=tmp_path):
+            old_cron_dir = tmp_path / ".nanobot" / "cron"
+            old_cron_dir.mkdir(parents=True, exist_ok=True)
+
+            old_cron_store = old_cron_dir / "jobs.json"
+            old_jobs = {"jobs": [{"id": "test1", "name": "test_job"}]}
+            with open(old_cron_store, "w", encoding="utf-8") as f:
+                json.dump(old_jobs, f)
+
+            cm = ConfigManager()
+
+            new_cron_store = cm.cron_store
+            assert new_cron_store.exists()
+
+            with open(new_cron_store, "r", encoding="utf-8") as f:
+                migrated_jobs = json.load(f)
+
+            assert migrated_jobs["jobs"][0]["id"] == "test1"
+            assert migrated_jobs["jobs"][0]["name"] == "test_job"

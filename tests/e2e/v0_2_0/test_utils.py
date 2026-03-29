@@ -164,7 +164,7 @@ class TestEnvironment:
         # 按年份分组保存
         yearly_data = {}
         for record in test_data:
-            year = record["timestamp"].year
+            year = record["session_start_time"].year  # 使用 session_ 前缀
             if year not in yearly_data:
                 yearly_data[year] = []
             yearly_data[year].append(record)
@@ -188,7 +188,7 @@ class TestEnvironment:
         # 保存测试数据
         yearly_data = {}
         for record in test_data:
-            year = record["timestamp"].year
+            year = record["session_start_time"].year  # 使用 session_ 前缀
             if year not in yearly_data:
                 yearly_data[year] = []
             yearly_data[year].append(record)
@@ -403,13 +403,13 @@ class DataGenerator:
 
             record = {
                 "activity_id": f"test_{i:06d}",
-                "timestamp": run_date,
+                "session_start_time": run_date,  # 使用 session_ 前缀
                 "source_file": f"/test/data/run_{i}.fit",
                 "filename": f"run_{i}.fit",
-                "total_distance": distance,
-                "total_timer_time": int(duration),
+                "session_total_distance": distance,  # 使用 session_ 前缀
+                "session_total_timer_time": int(duration),  # 使用 session_ 前缀
                 "total_calories": random.randint(200, 800),
-                "avg_heart_rate": avg_heart_rate,
+                "session_avg_heart_rate": avg_heart_rate,  # 使用 session_ 前缀
                 "max_heart_rate": avg_heart_rate + random.randint(10, 30),
                 "record_count": random.randint(100, 500),
                 "avg_pace": duration / (distance / 1000) if distance > 0 else 0,
@@ -426,7 +426,7 @@ class DataGenerator:
         # 添加VDOT相关字段
         for record in base_data:
             # 模拟VDOT计算（基于距离和配速）
-            distance_km = record["total_distance"] / 1000
+            distance_km = record["session_total_distance"] / 1000  # 使用 session_ 前缀
             pace_min_km = record["avg_pace"] / 60 if record["avg_pace"] > 0 else 6.0
 
             # 简化的VDOT估算公式

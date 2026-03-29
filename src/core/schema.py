@@ -23,10 +23,10 @@ class ParquetSchema:
         "filename": pl.String,
         "serial_number": pl.String,
         "time_created": pl.Datetime,
-        "total_distance": pl.Float64,
-        "total_timer_time": pl.Float64,
+        "session_total_distance": pl.Float64,
+        "session_total_timer_time": pl.Float64,
         "total_calories": pl.Int64,
-        "avg_heart_rate": pl.Int64,
+        "session_avg_heart_rate": pl.Int64,
         "max_heart_rate": pl.Int64,
         "record_count": pl.Int64,
     }
@@ -55,18 +55,18 @@ class ParquetSchema:
         "timestamp",
         "source_file",
         "filename",
-        "total_distance",
-        "total_timer_time",
+        "session_total_distance",
+        "session_total_timer_time",
     }
 
     # 默认值映射
     DEFAULT_VALUES = {
         "serial_number": "UNKNOWN",
         "time_created": datetime(1970, 1, 1),
-        "total_distance": 0.0,
-        "total_timer_time": 0.0,
+        "session_total_distance": 0.0,
+        "session_total_timer_time": 0.0,
         "total_calories": 0,
-        "avg_heart_rate": None,
+        "session_avg_heart_rate": None,
         "max_heart_rate": None,
         "record_count": 0,
         "position_lat": None,
@@ -217,17 +217,26 @@ def create_schema_dataframe(
                 "time_created": metadata.get(
                     "time_created", default_values["time_created"]
                 ),
-                "total_distance": metadata.get(
-                    "total_distance", default_values["total_distance"]
+                "session_total_distance": metadata.get(
+                    "session_total_distance",
+                    metadata.get(
+                        "total_distance", default_values["session_total_distance"]
+                    ),
                 ),
-                "total_timer_time": metadata.get(
-                    "total_timer_time", default_values["total_timer_time"]
+                "session_total_timer_time": metadata.get(
+                    "session_total_timer_time",
+                    metadata.get(
+                        "total_timer_time", default_values["session_total_timer_time"]
+                    ),
                 ),
                 "total_calories": metadata.get(
                     "total_calories", default_values["total_calories"]
                 ),
-                "avg_heart_rate": metadata.get(
-                    "avg_heart_rate", default_values["avg_heart_rate"]
+                "session_avg_heart_rate": metadata.get(
+                    "session_avg_heart_rate",
+                    metadata.get(
+                        "avg_heart_rate", default_values["session_avg_heart_rate"]
+                    ),
                 ),
                 "max_heart_rate": metadata.get(
                     "max_heart_rate", default_values["max_heart_rate"]

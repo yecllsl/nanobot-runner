@@ -1,7 +1,9 @@
 # Agent工具集单元测试
 
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import polars as pl
 import pytest
 
 from src.agents.tools import (
@@ -156,7 +158,8 @@ class TestGetRunningStatsTool:
 
             result = await tool.execute()
 
-            assert "message" in result
+            # 新格式返回 {"error": "..."}
+            assert "error" in result
 
 
 class TestGetRecentRunsTool:
@@ -399,7 +402,7 @@ class TestCreateTools:
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 9
+            assert len(tools) == 10
 
     def test_create_tools_contains_all_tools(self):
         """测试包含所有工具"""
@@ -519,20 +522,23 @@ class TestRunnerTools:
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
 
-            # 正确设置 mock 链
+            # Mock group_by chain
+            mock_grouped = MagicMock()
+            mock_agg = MagicMock()
             mock_sorted = MagicMock()
             mock_limited = MagicMock()
             mock_df = MagicMock()
-            mock_lf.sort.return_value = mock_sorted
+            mock_lf.group_by.return_value = mock_grouped
+            mock_grouped.agg.return_value = mock_agg
+            mock_agg.sort.return_value = mock_sorted
             mock_sorted.limit.return_value = mock_limited
             mock_limited.collect.return_value = mock_df
             mock_df.iter_rows.return_value = [
                 {
                     "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                    "avg_heart_rate": 150,
-                    "vdot_estimate": 45,
+                    "distance": 5000,
+                    "duration": 1200,
+                    "avg_hr": 150,
                 }
             ]
 
@@ -572,24 +578,32 @@ class TestRunnerTools:
 
     def test_get_vdot_trend_with_data(self):
         """测试获取VDOT趋势有数据"""
+        from datetime import datetime
+
         with patch("src.core.storage.StorageManager") as MockStorage:
             mock_storage = MagicMock()
             MockStorage.return_value = mock_storage
 
+            mock_df = pl.DataFrame(
+                [
+                    {
+                        "timestamp": datetime(2024, 1, 1),
+                        "distance": 5000.0,
+                        "duration": 1200.0,
+                    },
+                    {
+                        "timestamp": datetime(2024, 1, 2),
+                        "distance": 10000.0,
+                        "duration": 2400.0,
+                    },
+                ]
+            )
+
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = [
-                {
-                    "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                },
-                {
-                    "timestamp": "2024-01-02",
-                    "total_distance": 10000,
-                    "total_timer_time": 2400,
-                },
-            ]
+            mock_lf.group_by.return_value.agg.return_value.sort.return_value.limit.return_value.collect.return_value = (
+                mock_df
+            )
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -624,11 +638,12 @@ class TestRunnerTools:
             mock_storage.read_parquet.return_value = mock_lf
             mock_df = MagicMock()
             mock_df.height = 1
-            mock_df.select.return_value.to_series.return_value.to_list.return_value = [
-                150,
-                155,
-                160,
-            ]
+            mock_df.columns = ["heart_rate"]
+            mock_df.select.side_effect = lambda col: MagicMock(
+                to_series=lambda: MagicMock(
+                    to_list=lambda: [150, 155, 160, 165, 170, 175, 180, 185, 190, 195]
+                )
+            )
             mock_lf.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
@@ -695,14 +710,35 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = [
+            # 模拟 Schema 对象，len() 返回列数
+            mock_schema = MagicMock()
+            mock_schema.__len__ = MagicMock(return_value=3)  # 3 列
+            mock_lf.collect_schema.return_value = mock_schema
+
+            # 模拟 group_by().agg().filter().sort().collect() 链式调用
+            mock_grouped = MagicMock()
+            mock_lf.group_by.return_value = mock_grouped
+
+            mock_agged = MagicMock()
+            mock_grouped.agg.return_value = mock_agged
+
+            mock_filtered = MagicMock()
+            mock_agged.filter.return_value = mock_filtered
+
+            mock_sorted = MagicMock()
+            mock_filtered.sort.return_value = mock_sorted
+
+            mock_df = MagicMock()
+            mock_df.is_empty.return_value = False
+            mock_df.iter_rows.return_value = [
                 {
-                    "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                    "avg_heart_rate": 150,
+                    "session_start": datetime(2024, 1, 1, 10, 0, 0),
+                    "distance": 5000,
+                    "duration": 1200,
+                    "avg_hr": 150,
                 }
             ]
+            mock_sorted.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -710,6 +746,7 @@ class TestRunnerTools:
 
             assert isinstance(result, list)
             assert len(result) == 1
+            assert result[0]["distance"] == 5.0
 
     def test_query_by_distance_min_only(self):
         """测试按距离查询仅最小值"""
@@ -755,14 +792,35 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = [
+            # 模拟 Schema 对象，len() 返回列数
+            mock_schema = MagicMock()
+            mock_schema.__len__ = MagicMock(return_value=3)  # 3 列
+            mock_lf.collect_schema.return_value = mock_schema
+
+            # 模拟 filter().group_by().agg().sort().collect() 链式调用
+            mock_filtered = MagicMock()
+            mock_lf.filter.return_value = mock_filtered
+
+            mock_grouped = MagicMock()
+            mock_filtered.group_by.return_value = mock_grouped
+
+            mock_agged = MagicMock()
+            mock_grouped.agg.return_value = mock_agged
+
+            mock_sorted = MagicMock()
+            mock_agged.sort.return_value = mock_sorted
+
+            mock_df = MagicMock()
+            mock_df.is_empty.return_value = False
+            mock_df.iter_rows.return_value = [
                 {
-                    "timestamp": "2024-01-01",
-                    "total_distance": 5000,
-                    "total_timer_time": 1200,
-                    "avg_heart_rate": 150,
+                    "session_start": datetime(2024, 1, 1, 10, 0, 0),
+                    "distance": 5000,
+                    "duration": 1200,
+                    "avg_hr": 150,
                 }
             ]
+            mock_sorted.collect.return_value = mock_df
 
             tools = RunnerTools(storage=mock_storage)
 
@@ -770,6 +828,7 @@ class TestRunnerTools:
 
             assert isinstance(result, list)
             assert len(result) == 1
+            assert result[0]["distance"] == 5.0
 
     def test_tool_descriptions(self):
         """测试工具描述"""

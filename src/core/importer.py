@@ -8,6 +8,7 @@ import polars as pl
 from rich.console import Console
 from rich.progress import Progress, TaskID
 
+from src.core.exceptions import ParseError
 from src.core.indexer import IndexManager
 from src.core.logger import get_logger
 from src.core.parser import FitParser
@@ -56,8 +57,16 @@ class ImportService:
             "message": "",
         }
 
-        metadata = self.parser.parse_file_metadata(filepath)
-        if not metadata.get("serial_number"):
+        try:
+            metadata = self.parser.parse_file_metadata(filepath)
+        except ParseError as e:
+            result["status"] = "error"
+            result["message"] = f"解析元数据失败: {e.message}"
+            logger.warning(f"解析元数据失败: {filepath}, 原因: {e.message}")
+            progress.update(task_id, advance=1)
+            return result
+
+        if not metadata.get("time_created"):
             result["message"] = "无法解析文件元数据"
             logger.warning(f"无法解析文件元数据: {filepath}")
             progress.update(task_id, advance=1)
@@ -100,8 +109,14 @@ class ImportService:
         self.console.print(f"[bold]正在处理: {filepath.name}[/bold]")
         logger.debug(f"开始导入文件: {filepath}")
 
-        metadata = self.parser.parse_file_metadata(filepath)
-        if not metadata.get("serial_number"):
+        try:
+            metadata = self.parser.parse_file_metadata(filepath)
+        except ParseError as e:
+            self.console.print(f"[red]错误: 解析元数据失败[/red]")
+            logger.warning(f"解析元数据失败: {filepath}, 原因: {e.message}")
+            return {"status": "error", "message": f"解析元数据失败: {e.message}"}
+
+        if not metadata.get("time_created"):
             self.console.print("[red]错误: 无法解析文件元数据[/red]")
             logger.error(f"无法解析文件元数据: {filepath}")
             return {"status": "error", "message": "无法解析元数据"}

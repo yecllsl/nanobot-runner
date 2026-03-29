@@ -1,11 +1,13 @@
-# CLI入口模块
-# 基于Typer和Rich的本地跑步数据助理
+# CLI 入口模块
+# 基于 Typer 和 Rich 的本地跑步数据助理
 
 from pathlib import Path
 from typing import Optional
 
+import polars as pl
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     Progress,
@@ -15,12 +17,14 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 from rich.prompt import Prompt
+from rich.table import Table
 from rich.text import Text
 
 from src.core.config import ConfigManager
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.parser import FitParser
+from src.core.profile import ProfileEngine, ProfileStorageManager
 from src.core.storage import StorageManager
 
 app = typer.Typer(
@@ -28,6 +32,9 @@ app = typer.Typer(
     help="Nanobot Runner - 本地跑步数据助理",
     add_completion=False,
 )
+
+profile_app = typer.Typer(help="用户画像管理")
+app.add_typer(profile_app, name="profile")
 
 console = Console()
 
@@ -190,6 +197,13 @@ def stats(
 ):
     """
     查看跑步统计信息
+
+    数据模型说明：
+    - 存储的数据包含两类字段：
+      1. 过程数据（record）：timestamp, heart_rate, pace 等，每秒采样一次
+      2. 会话数据（session）：session_total_distance, session_total_timer_time 等，每次跑步一条
+    - 每个采样点都包含会话数据字段，因此需要按 session_start_time 聚合统计
+    - 直接统计行数会将采样点数量误认为跑步次数
     """
     try:
         config = ConfigManager()
@@ -236,12 +250,21 @@ def stats(
             if end_dt:
                 df = df.filter(df["timestamp"] <= str(end_dt))
 
-        total_runs = df.height
-        total_distance = df["total_distance"].sum()
-        total_time = df["total_timer_time"].sum()
-        avg_distance = df["total_distance"].mean()
-        avg_time = df["total_timer_time"].mean()
-        avg_hr = df["avg_heart_rate"].mean()
+        # 按会话聚合统计（避免重复计算采样点数据）
+        session_df = df.group_by("session_start_time").agg(
+            [
+                pl.col("session_total_distance").first().alias("distance"),
+                pl.col("session_total_timer_time").first().alias("duration"),
+                pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+            ]
+        )
+
+        total_runs = session_df.height
+        total_distance = session_df["distance"].sum()
+        total_time = session_df["duration"].sum()
+        avg_distance = session_df["distance"].mean()
+        avg_time = session_df["duration"].mean()
+        avg_hr = session_df["avg_hr"].mean()
 
         from src.cli_formatter import format_stats_panel
 
@@ -372,6 +395,747 @@ def version():
     from . import __version__
 
     console.print(f"[bold]Nanobot Runner[/bold] v{__version__}")
+
+
+@app.command()
+def vdot(
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近N条记录"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="输出文件路径（JSON）"),
+):
+    """
+    查看VDOT趋势
+
+    示例:
+        nanobotrun vdot
+        nanobotrun vdot -n 20
+        nanobotrun vdot -o vdot_trend.json
+    """
+    import json
+
+    from src.agents.tools import RunnerTools
+
+    try:
+        storage = StorageManager()
+        tools = RunnerTools(storage)
+
+        console.print(f"[bold]VDOT趋势分析[/bold] (最近 {limit} 次训练)")
+
+        trend_data = tools.get_vdot_trend(limit=limit)
+
+        if not trend_data:
+            console.print("[yellow]暂无VDOT数据[/yellow]")
+            console.print("[dim]提示: 需要导入跑步数据后才能计算VDOT[/dim]")
+            return
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("日期", width=12)
+        table.add_column("距离(km)", justify="right")
+        table.add_column("VDOT", justify="right", style="yellow")
+
+        for item in trend_data:
+            distance_km = item.get("distance", 0) / 1000
+            table.add_row(
+                item.get("timestamp", "N/A")[:10],
+                f"{distance_km:.2f}",
+                f"{item.get('vdot', 0):.1f}",
+            )
+
+        console.print(table)
+
+        if trend_data:
+            vdot_values = [
+                item.get("vdot", 0) for item in trend_data if item.get("vdot")
+            ]
+            if vdot_values:
+                avg_vdot = sum(vdot_values) / len(vdot_values)
+                max_vdot = max(vdot_values)
+                min_vdot = min(vdot_values)
+                console.print(
+                    f"\n[dim]统计: 平均VDOT {avg_vdot:.1f} | 最高 {max_vdot:.1f} | 最低 {min_vdot:.1f}[/dim]"
+                )
+
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(trend_data, f, ensure_ascii=False, indent=2)
+            console.print(f"\n[green]✓[/green] 数据已保存到: [cyan]{output}[/cyan]")
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="load")
+def training_load(
+    days: int = typer.Option(42, "--days", "-d", help="分析天数"),
+):
+    """
+    查看训练负荷（ATL/CTL/TSB）
+
+    示例:
+        nanobotrun load
+        nanobotrun load -d 30
+    """
+    from src.core.analytics import AnalyticsEngine
+
+    try:
+        storage = StorageManager()
+        engine = AnalyticsEngine(storage)
+
+        console.print(f"[bold]训练负荷分析[/bold] (最近 {days} 天)")
+
+        load_data = engine.get_training_load(days=days)
+
+        if load_data.get("message"):
+            console.print(f"[yellow]{load_data['message']}[/yellow]")
+            return
+
+        atl = load_data.get("atl", 0)
+        ctl = load_data.get("ctl", 0)
+        tsb = load_data.get("tsb", 0)
+        status = load_data.get("fitness_status", "未知")
+        advice = load_data.get("training_advice", "")
+
+        status_color = "green" if tsb > 0 else "yellow" if tsb > -10 else "red"
+
+        panel = Panel(
+            f"[bold]ATL (急性训练负荷):[/bold] {atl:.1f}\n"
+            f"[bold]CTL (慢性训练负荷):[/bold] {ctl:.1f}\n"
+            f"[bold]TSB (训练压力平衡):[/bold] [{status_color}]{tsb:.1f}[/{status_color}]\n\n"
+            f"[bold]体能状态:[/bold] {status}\n"
+            f"[bold]训练建议:[/bold] {advice}",
+            title="[Training Load] 训练负荷",
+            border_style="blue",
+        )
+        console.print(panel)
+
+        console.print(
+            f"\n[dim]分析天数: {load_data.get('days_analyzed', days)} | 跑步次数: {load_data.get('runs_count', 0)}[/dim]"
+        )
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
+def recent(
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近N次训练"),
+):
+    """
+    查看最近训练记录
+
+    示例:
+        nanobotrun recent
+        nanobotrun recent -n 5
+    """
+    from src.agents.tools import RunnerTools
+
+    try:
+        storage = StorageManager()
+        tools = RunnerTools(storage)
+
+        console.print(f"[bold]最近 {limit} 次训练记录[/bold]")
+
+        runs = tools.get_recent_runs(limit=limit)
+
+        if not runs:
+            console.print("[yellow]暂无训练记录[/yellow]")
+            console.print("[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]")
+            return
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("日期", width=12)
+        table.add_column("距离(km)", justify="right")
+        table.add_column("时长", justify="right")
+        table.add_column("配速", justify="right")
+        table.add_column("平均心率", justify="right")
+
+        for run in runs:
+            timestamp = run.get("timestamp", "N/A")
+            if len(timestamp) > 10:
+                timestamp = timestamp[:10]
+
+            duration_min = run.get("duration_min", 0)
+            hours = int(duration_min // 60)
+            minutes = int(duration_min % 60)
+            duration_str = f"{hours}:{minutes:02d}" if hours > 0 else f"{minutes}分"
+
+            pace_sec = run.get("avg_pace_sec_km")
+            if pace_sec:
+                pace_min = int(pace_sec // 60)
+                pace_sec_remainder = int(pace_sec % 60)
+                pace_str = f"{pace_min}'{pace_sec_remainder:02d}\""
+            else:
+                pace_str = "-"
+
+            table.add_row(
+                timestamp,
+                f"{run.get('distance_km', 0):.2f}",
+                duration_str,
+                pace_str,
+                str(run.get("avg_heart_rate", "-") or "-"),
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="hr-drift")
+def hr_drift(
+    limit: int = typer.Option(10, "--limit", "-n", help="分析最近N次训练"),
+):
+    """
+    查看心率漂移分析
+
+    示例:
+        nanobotrun hr-drift
+        nanobotrun hr-drift -n 5
+    """
+    from src.agents.tools import RunnerTools
+
+    try:
+        storage = StorageManager()
+        tools = RunnerTools(storage)
+
+        console.print(f"[bold]心率漂移分析[/bold] (最近 {limit} 次训练)")
+
+        result = tools.get_hr_drift_analysis()
+
+        if result.get("error"):
+            console.print(f"[yellow]{result['error']}[/yellow]")
+            return
+
+        drift_value = result.get("drift_rate")
+        correlation = result.get("correlation")
+
+        if drift_value is None:
+            console.print("[yellow]暂无心率漂移数据[/yellow]")
+            console.print("[dim]提示: 需要包含心率数据的跑步记录[/dim]")
+            return
+
+        drift_color = (
+            "green" if drift_value < 5 else "yellow" if drift_value < 10 else "red"
+        )
+        corr_color = "green" if correlation and correlation < -0.7 else "yellow"
+
+        corr_value = f"{correlation:.3f}" if correlation else "N/A"
+
+        assessment = result.get("assessment", "")
+
+        panel = Panel(
+            f"[bold]心率漂移:[/bold] [{drift_color}]{drift_value:.1f}%[/{drift_color}]\n"
+            f"[bold]相关性:[/bold] [{corr_color}]{corr_value}[/{corr_color}]\n"
+            f"[bold]评估:[/bold] {assessment}\n\n"
+            f"[dim]心率漂移 < 5%: 有氧基础良好[/dim]\n"
+            f"[dim]心率漂移 5-10%: 需要加强有氧训练[/dim]\n"
+            f"[dim]心率漂移 > 10%: 有氧能力不足[/dim]",
+            title="[HR Drift] 心率漂移分析",
+            border_style="blue",
+        )
+        console.print(panel)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
+def memory(
+    action: str = typer.Argument(..., help="操作：show/edit/clear"),
+):
+    """
+    管理 Agent 记忆
+
+    示例:
+        nanobotrun memory show
+        nanobotrun memory edit
+        nanobotrun memory clear
+    """
+    from src.core.profile import ProfileStorageManager
+
+    try:
+        profile_storage = ProfileStorageManager()
+        memory_file = profile_storage.memory_md_path
+
+        if action == "show":
+            if not memory_file.exists():
+                console.print("[yellow]记忆文件不存在[/yellow]")
+                return
+
+            with open(memory_file, encoding="utf-8") as f:
+                content = f.read()
+
+            console.print(f"[bold]Agent 记忆:[/bold] {memory_file}")
+            console.print(content)
+
+        elif action == "clear":
+            if not memory_file.exists():
+                console.print("[yellow]记忆文件不存在[/yellow]")
+                return
+
+            from rich.prompt import Confirm
+
+            if Confirm.ask("[red]确定要清空记忆文件吗？此操作不可恢复[/red]"):
+                with open(memory_file, "w", encoding="utf-8") as f:
+                    f.write("# Agent 记忆\n\n")
+                console.print("[green]✓[/green] 记忆文件已清空")
+
+        else:
+            console.print("[red]未知操作[/red]")
+            console.print("[dim]可用操作：show, edit, clear[/dim]")
+            raise typer.Exit(1)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
+def init():
+    """
+    初始化工作区
+
+    将 ~/.nanobot-runner/ 作为 nanobot-ai 的 workspace 进行初始化，
+    创建必要的目录结构和模板文件。
+    """
+    from nanobot.utils.helpers import sync_workspace_templates
+
+    config = ConfigManager()
+    workspace = config.data_dir.parent
+
+    console.print(f"[bold]初始化工作区:[/bold] {workspace}")
+
+    if not workspace.exists():
+        workspace.mkdir(parents=True, exist_ok=True)
+        console.print(f"[green]✓[/green] 创建工作区目录")
+
+    data_dir = config.data_dir
+    if not data_dir.exists():
+        data_dir.mkdir(parents=True, exist_ok=True)
+        console.print(f"[green]✓[/green] 创建数据目录: {data_dir}")
+
+    added = sync_workspace_templates(workspace)
+    if added:
+        console.print("[green]✓[/green] 同步模板文件:")
+        for name in added:
+            console.print(f"  [dim]{name}[/dim]")
+    else:
+        console.print("[dim]模板文件已是最新[/dim]")
+
+    console.print(f"\n[bold green]工作区初始化完成！[/bold green]")
+    console.print(f"工作区路径: [cyan]{workspace}[/cyan]")
+    console.print(f"数据路径: [cyan]{data_dir}[/cyan]")
+    console.print("\n下一步:")
+    console.print("  1. 导入数据: [cyan]nanobotrun import-data <FIT文件路径>[/cyan]")
+    console.print("  2. 查看统计: [cyan]nanobotrun stats[/cyan]")
+    console.print("  3. 查看画像: [cyan]nanobotrun profile show[/cyan]")
+
+
+plan_app = typer.Typer(help="训练计划管理")
+app.add_typer(plan_app, name="plan")
+
+
+@plan_app.command("generate")
+def generate_plan(
+    goal_distance: float = typer.Option(
+        ..., "--goal-distance", "-d", help="目标比赛距离（公里）"
+    ),
+    goal_date: str = typer.Option(..., "--goal-date", "-t", help="目标比赛日期（YYYY-MM-DD）"),
+    current_vdot: Optional[float] = typer.Option(
+        None, "--vdot", "-v", help="当前VDOT（可选，默认从画像获取）"
+    ),
+    weekly_volume: Optional[float] = typer.Option(
+        None, "--volume", help="当前周跑量（公里，可选）"
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="输出文件路径（JSON格式）"
+    ),
+):
+    """
+    生成个性化训练计划
+
+    基于用户画像和历史数据，生成科学的训练计划。
+
+    示例:
+        nanobotrun plan generate --goal-distance 21.0975 --goal-date 2026-06-01
+        nanobotrun plan generate -d 42.195 -t 2026-10-15 -v 45.0
+    """
+    import json
+
+    from src.core.analytics import AnalyticsEngine
+    from src.core.profile import ProfileStorageManager
+    from src.core.training_plan import TrainingPlanEngine
+
+    try:
+        storage = StorageManager()
+        analytics = AnalyticsEngine(storage)
+        profile_storage = ProfileStorageManager()
+        engine = TrainingPlanEngine()
+
+        profile = profile_storage.load_profile_json()
+        if not profile:
+            console.print("[red]错误: 未找到用户画像[/red]")
+            console.print("请先运行 [cyan]nanobotrun import[/cyan] 导入数据")
+            raise typer.Exit(1)
+
+        profile_dict = profile.to_dict()
+        vdot = current_vdot or profile_dict.get("estimated_vdot", 35.0)
+        volume = weekly_volume or profile_dict.get("weekly_avg_distance", 30.0)
+        age = profile_dict.get("age", 30)
+        resting_hr = profile_dict.get("resting_hr", 60)
+
+        console.print(f"[bold]生成训练计划[/bold]")
+        console.print(f"  目标距离: [cyan]{goal_distance} km[/cyan]")
+        console.print(f"  目标日期: [cyan]{goal_date}[/cyan]")
+        console.print(f"  当前VDOT: [yellow]{vdot}[/yellow]")
+        console.print(f"  周跑量: [yellow]{volume:.1f} km[/yellow]")
+
+        plan = engine.generate_plan(
+            user_id="default",
+            goal_distance_km=goal_distance,
+            goal_date=goal_date,
+            current_vdot=vdot,
+            current_weekly_distance_km=volume,
+            age=age,
+            resting_hr=resting_hr,
+        )
+
+        console.print(f"\n[bold green]训练计划生成成功！[/bold green]")
+        console.print(f"  体能水平: [yellow]{plan.fitness_level.value}[/yellow]")
+        console.print(f"  训练周数: [yellow]{len(plan.weeks)} 周[/yellow]")
+
+        total_distance = sum(ws.weekly_distance_km for ws in plan.weeks)
+        console.print(f"  总跑量: [yellow]{total_distance:.1f} km[/yellow]")
+
+        console.print(f"\n[bold]训练计划概览:[/bold]")
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("周次", style="dim", width=6)
+        table.add_column("日期范围", width=22)
+        table.add_column("周跑量(km)", justify="right")
+        table.add_column("重点", style="green")
+
+        for ws in plan.weeks[:8]:
+            table.add_row(
+                f"第{ws.week_number}周",
+                f"{ws.start_date} ~ {ws.end_date}",
+                f"{ws.weekly_distance_km:.1f}",
+                ws.focus or "-",
+            )
+
+        if len(plan.weeks) > 8:
+            table.add_row("...", "...", "...", "...")
+
+        console.print(table)
+
+        if output:
+            plan_dict = plan.to_dict()
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(plan_dict, f, ensure_ascii=False, indent=2)
+            console.print(f"\n[green]✓[/green] 计划已保存到: [cyan]{output}[/cyan]")
+
+    except ValueError as e:
+        print_error(CLIError.config_missing(str(e)))
+        raise typer.Exit(1)
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@plan_app.command("show")
+def show_plan(
+    plan_file: Path = typer.Argument(..., help="训练计划文件路径（JSON）"),
+    week: Optional[int] = typer.Option(None, "--week", "-w", help="显示指定周的计划"),
+):
+    """
+    显示训练计划详情
+
+    示例:
+        nanobotrun plan show plan.json
+        nanobotrun plan show plan.json --week 4
+    """
+    import json
+
+    if not plan_file.exists():
+        print_error(CLIError.path_not_found(str(plan_file)))
+        raise typer.Exit(1)
+
+    try:
+        with open(plan_file, encoding="utf-8") as f:
+            plan_data = json.load(f)
+
+        console.print(
+            f"[bold]训练计划: {plan_data.get('goal_distance_km', '未知')}km比赛[/bold]"
+        )
+        console.print(f"  目标日期: [cyan]{plan_data.get('goal_date', '未知')}[/cyan]")
+        console.print(
+            f"  体能水平: [yellow]{plan_data.get('fitness_level', 'N/A')}[/yellow]"
+        )
+
+        weeks = plan_data.get("weeks", [])
+
+        if week:
+            if week < 1 or week > len(weeks):
+                console.print(f"[red]无效的周次: {week}[/red]")
+                raise typer.Exit(1)
+
+            ws = weeks[week - 1]
+            console.print(f"\n[bold]第{week}周详情:[/bold]")
+            console.print(f"  日期: {ws.get('start_date')} ~ {ws.get('end_date')}")
+            console.print(f"  周跑量: {ws.get('weekly_distance_km', 0):.1f} km")
+            console.print(f"  重点: {ws.get('focus', '-')}")
+
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("日期", width=12)
+            table.add_column("训练类型", width=10)
+            table.add_column("距离(km)", justify="right")
+            table.add_column("时长(分)", justify="right")
+            table.add_column("说明")
+
+            for dp in ws.get("daily_plans", []):
+                table.add_row(
+                    dp.get("date", "-"),
+                    dp.get("workout_type", "-"),
+                    f"{dp.get('distance_km', 0):.1f}",
+                    str(dp.get("duration_min", 0)),
+                    dp.get("notes", "-"),
+                )
+
+            console.print(table)
+        else:
+            console.print(f"\n[bold]计划概览 ({len(weeks)}周):[/bold]")
+
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("周次", style="dim", width=6)
+            table.add_column("日期范围", width=22)
+            table.add_column("周跑量(km)", justify="right")
+            table.add_column("重点", style="green")
+
+            for ws in weeks:
+                table.add_row(
+                    f"第{ws.get('week_number', 0)}周",
+                    f"{ws.get('start_date')} ~ {ws.get('end_date')}",
+                    f"{ws.get('weekly_distance_km', 0):.1f}",
+                    ws.get("focus", "-"),
+                )
+
+            console.print(table)
+
+    except json.JSONDecodeError:
+        print_error(CLIError.storage_error("无效的JSON文件"))
+        raise typer.Exit(1)
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command()
+def gateway(
+    port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
+    logs: bool = typer.Option(False, "--logs", "-l", help="启用日志输出"),
+):
+    """
+    启动飞书机器人Gateway服务
+
+    启动后可通过飞书App与"Nanobot-ai助手"机器人交互：
+
+    命令示例:
+        /stats              # 查看训练统计
+        /recent 5           # 查看最近5次训练
+        /vd                 # 查看VDOT趋势
+        /help               # 显示帮助
+
+    自然语言示例:
+        我最近跑得怎么样？
+        给我一个训练建议
+        我的VDOT是多少？
+    """
+    import asyncio
+
+    from loguru import logger
+    from nanobot.agent import AgentLoop
+    from nanobot.agent.tools import ToolRegistry
+    from nanobot.bus import MessageBus
+    from nanobot.channels.manager import ChannelManager
+    from nanobot.cli.commands import _make_provider
+    from nanobot.config.loader import get_data_dir, load_config
+    from nanobot.cron.service import CronService
+    from nanobot.cron.types import CronJob
+    from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.session.manager import SessionManager
+    from nanobot.utils.helpers import sync_workspace_templates
+
+    from src.agents.tools import RunnerTools, create_tools
+
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    if logs:
+        logger.enable("nanobot")
+        logger.enable("src")
+    else:
+        logger.disable("nanobot")
+
+    console.print("[bold green]🐈 Nanobot Runner Gateway[/bold green]")
+    console.print(f"[dim]启动 Gateway 服务，端口: {port}[/dim]")
+    console.print("=" * 60)
+
+    config = load_config()
+    workspace = Path.home() / ".nanobot-runner"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    sync_workspace_templates(workspace)
+
+    config.agents.defaults.workspace = str(workspace)
+
+    bus = MessageBus()
+    provider = _make_provider(config)
+    session_manager = SessionManager(workspace)
+
+    config_manager = ConfigManager()
+    cron_store_path = config_manager.cron_store
+    cron = CronService(cron_store_path)
+
+    storage = StorageManager()
+    runner_tools = RunnerTools(storage)
+
+    registry = ToolRegistry()
+    for tool in create_tools(runner_tools):
+        registry.register(tool)
+
+    agent = AgentLoop(
+        bus=bus,
+        provider=provider,
+        workspace=workspace,
+        model=config.agents.defaults.model,
+        temperature=config.agents.defaults.temperature,
+        max_tokens=config.agents.defaults.max_tokens,
+        max_iterations=config.agents.defaults.max_tool_iterations,
+        memory_window=config.agents.defaults.memory_window,
+        reasoning_effort=config.agents.defaults.reasoning_effort,
+        cron_service=cron,
+        restrict_to_workspace=config.tools.restrict_to_workspace,
+        session_manager=session_manager,
+        mcp_servers=config.tools.mcp_servers,
+        channels_config=config.channels,
+    )
+
+    agent.tools = registry
+
+    async def on_cron_job(job: CronJob) -> str | None:
+        response = await agent.process_direct(
+            job.payload.message,
+            session_key=f"cron:{job.id}",
+            channel=job.payload.channel or "cli",
+            chat_id=job.payload.to or "direct",
+        )
+        if job.payload.deliver and job.payload.to:
+            from nanobot.bus.events import OutboundMessage
+
+            await bus.publish_outbound(
+                OutboundMessage(
+                    channel=job.payload.channel or "cli",
+                    chat_id=job.payload.to,
+                    content=response or "",
+                )
+            )
+        return response
+
+    cron.on_job = on_cron_job
+
+    channels = ChannelManager(config, bus)
+
+    def _pick_heartbeat_target() -> tuple[str, str]:
+        enabled = set(channels.enabled_channels)
+        for item in session_manager.list_sessions():
+            key = item.get("key") or ""
+            if ":" not in key:
+                continue
+            channel, chat_id = key.split(":", 1)
+            if channel in {"cli", "system"}:
+                continue
+            if channel in enabled and chat_id:
+                return channel, chat_id
+        return "cli", "direct"
+
+    async def on_heartbeat_execute(tasks: str) -> str:
+        channel, chat_id = _pick_heartbeat_target()
+
+        async def _silent(*_args, **_kwargs):
+            pass
+
+        return await agent.process_direct(
+            tasks,
+            session_key="heartbeat",
+            channel=channel,
+            chat_id=chat_id,
+            on_progress=_silent,
+        )
+
+    async def on_heartbeat_notify(response: str) -> None:
+        from nanobot.bus.events import OutboundMessage
+
+        channel, chat_id = _pick_heartbeat_target()
+        if channel == "cli":
+            return
+        await bus.publish_outbound(
+            OutboundMessage(channel=channel, chat_id=chat_id, content=response)
+        )
+
+    hb_cfg = config.gateway.heartbeat
+    heartbeat = HeartbeatService(
+        workspace=workspace,
+        provider=provider,
+        model=agent.model,
+        on_execute=on_heartbeat_execute,
+        on_notify=on_heartbeat_notify,
+        interval_s=hb_cfg.interval_s,
+        enabled=hb_cfg.enabled,
+    )
+
+    if channels.enabled_channels:
+        console.print(f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}")
+    else:
+        console.print("[yellow]警告: 未启用任何通道[/yellow]")
+
+    cron_status = cron.status()
+    if cron_status["jobs"] > 0:
+        console.print(f"[green]✓[/green] 定时任务: {cron_status['jobs']} 个")
+
+    console.print(f"[green]✓[/green] 心跳检测: 每 {hb_cfg.interval_s} 秒")
+    console.print()
+    console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
+    console.print("  • /stats - 查看训练统计")
+    console.print("  • /recent [数量] - 查看最近训练")
+    console.print("  • /vd - 查看VDOT趋势")
+    console.print("  • /hr_drift - 查看心率漂移")
+    console.print("  • /help - 显示帮助")
+    console.print()
+    console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
+
+    async def run():
+        try:
+            await cron.start()
+            await heartbeat.start()
+            await asyncio.gather(
+                agent.run(),
+                channels.start_all(),
+            )
+        except KeyboardInterrupt:
+            console.print("\n[yellow]正在关闭...[/yellow]")
+        finally:
+            await agent.close_mcp()
+            heartbeat.stop()
+            cron.stop()
+            agent.stop()
+            await channels.stop_all()
+
+    asyncio.run(run())
 
 
 @app.command()
@@ -583,6 +1347,188 @@ def _display_report(report_data: dict):
             else:
                 plan_table.add_row(f"{day_str} {date_str}", plan_str)
         console.print(plan_table)
+
+
+@profile_app.command("show")
+def profile_show(
+    days: int = typer.Option(90, "--days", "-d", help="分析天数"),
+    age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+    resting_hr: int = typer.Option(60, "--resting-hr", "-r", help="静息心率"),
+    rebuild: bool = typer.Option(False, "--rebuild", help="重新构建画像"),
+):
+    """
+    显示用户画像信息
+
+    包含：平均 VDOT、健身水平、训练模式、受伤风险评估等
+    """
+    from rich.panel import Panel
+    from rich.table import Table
+
+    try:
+        config = ConfigManager()
+        storage = StorageManager(config.data_dir)
+        profile_storage = ProfileStorageManager()
+        profile = None
+
+        if rebuild:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task("正在构建用户画像...", total=None)
+                engine = ProfileEngine(storage)
+                profile = engine.build_profile(
+                    user_id="default_user",
+                    days=days,
+                    age=age,
+                    resting_hr=resting_hr,
+                )
+                profile_storage.save_profile_json(profile)
+        else:
+            profile = profile_storage.load_profile_json()
+
+            if profile is None:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    transient=True,
+                ) as progress:
+                    progress.add_task("首次运行，正在构建用户画像...", total=None)
+                    engine = ProfileEngine(storage)
+                    profile = engine.build_profile(
+                        user_id="default_user",
+                        days=days,
+                        age=age,
+                        resting_hr=resting_hr,
+                    )
+                    profile_storage.save_profile_json(profile)
+
+        if profile is None or profile.total_activities == 0:
+            console.print(
+                Panel(
+                    "[yellow]暂无跑步数据[/yellow]\n\n" "使用 'nanobotrun import <路径>' 导入FIT文件",
+                    title="用户画像",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        console.print()
+        console.print(
+            Panel(
+                f"[bold]用户 ID:[/bold] {profile.user_id}\n"
+                f"[bold]画像日期:[/bold] {profile.profile_date.strftime('%Y-%m-%d %H:%M')}\n"
+                f"[bold]分析周期:[/bold] {profile.analysis_period_days} 天",
+                title="[Profile] 用户画像",
+                border_style="blue",
+            )
+        )
+
+        basic_table = Table(title="基础统计", show_header=False)
+        basic_table.add_column("指标", style="cyan")
+        basic_table.add_column("数值", style="green")
+        basic_table.add_row("总活动次数", str(profile.total_activities))
+        basic_table.add_row("总跑量", f"{profile.total_distance_km:.2f} km")
+        basic_table.add_row("总时长", f"{profile.total_duration_hours:.2f} 小时")
+        basic_table.add_row("平均配速", f"{profile.avg_pace_min_per_km:.2f} min/km")
+        console.print(basic_table)
+
+        fitness_table = Table(title="体能指标", show_header=False)
+        fitness_table.add_column("指标", style="cyan")
+        fitness_table.add_column("数值", style="green")
+
+        vdot_color = (
+            "green"
+            if profile.avg_vdot >= 45
+            else "yellow"
+            if profile.avg_vdot >= 30
+            else "red"
+        )
+        fitness_table.add_row(
+            "平均 VDOT", f"[{vdot_color}]{profile.avg_vdot:.2f}[/{vdot_color}]"
+        )
+        fitness_table.add_row("最大 VDOT", f"{profile.max_vdot:.2f}")
+        fitness_table.add_row("体能水平", f"[bold]{profile.fitness_level.value}[/bold]")
+        console.print(fitness_table)
+
+        training_table = Table(title="训练模式", show_header=False)
+        training_table.add_column("指标", style="cyan")
+        training_table.add_column("数值", style="green")
+        training_table.add_row("周平均跑量", f"{profile.weekly_avg_distance_km:.2f} km")
+        training_table.add_row("周平均时长", f"{profile.weekly_avg_duration_hours:.2f} 小时")
+        training_table.add_row("训练模式", f"[bold]{profile.training_pattern.value}[/bold]")
+        training_table.add_row("训练一致性", f"{profile.consistency_score:.1f}/100")
+        console.print(training_table)
+
+        load_table = Table(title="训练负荷", show_header=False)
+        load_table.add_column("指标", style="cyan")
+        load_table.add_column("数值", style="green")
+
+        atl_color = (
+            "green" if profile.atl < 50 else "yellow" if profile.atl < 100 else "red"
+        )
+        ctl_color = (
+            "green" if profile.ctl < 50 else "yellow" if profile.ctl < 100 else "red"
+        )
+        tsb_color = (
+            "green" if profile.tsb > 0 else "yellow" if profile.tsb > -20 else "red"
+        )
+
+        load_table.add_row("ATL (疲劳)", f"[{atl_color}]{profile.atl:.2f}[/{atl_color}]")
+        load_table.add_row("CTL (体能)", f"[{ctl_color}]{profile.ctl:.2f}[/{ctl_color}]")
+        load_table.add_row("TSB (状态)", f"[{tsb_color}]{profile.tsb:.2f}[/{tsb_color}]")
+        console.print(load_table)
+
+        risk_color = (
+            "green"
+            if profile.injury_risk_level.value == "低"
+            else "yellow"
+            if profile.injury_risk_level.value == "中"
+            else "red"
+        )
+        console.print(
+            Panel(
+                f"[bold]伤病风险等级:[/bold] [{risk_color}]{profile.injury_risk_level.value}[/{risk_color}]\n"
+                f"[bold]风险评分:[/bold] {profile.injury_risk_score:.1f}",
+                title="伤病风险评估",
+                border_style=risk_color,
+            )
+        )
+
+        if (
+            profile.avg_heart_rate
+            or profile.max_heart_rate
+            or profile.resting_heart_rate
+        ):
+            hr_table = Table(title="心率指标", show_header=False)
+            hr_table.add_column("指标", style="cyan")
+            hr_table.add_column("数值", style="green")
+            if profile.avg_heart_rate:
+                hr_table.add_row("平均心率", f"{profile.avg_heart_rate:.1f} bpm")
+            if profile.max_heart_rate:
+                hr_table.add_row("最大心率", f"{profile.max_heart_rate:.1f} bpm")
+            if profile.resting_heart_rate:
+                hr_table.add_row("静息心率", f"{profile.resting_heart_rate:.1f} bpm")
+            console.print(hr_table)
+
+        console.print(
+            Panel(
+                f"[bold]数据质量评分:[/bold] {profile.data_quality_score:.1f}/100\n"
+                f"[bold]偏好训练时间:[/bold] {profile.favorite_running_time}",
+                title="其他信息",
+                border_style="dim",
+            )
+        )
+
+    except Exception as e:
+        print_error(
+            {
+                "message": f"获取用户画像失败: {str(e)}",
+                "suggestion": "请确保已导入跑步数据，或使用 --rebuild 重新构建画像",
+            }
+        )
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

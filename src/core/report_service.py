@@ -45,14 +45,20 @@ class ReportService:
         self.analytics = analytics or AnalyticsEngine(self.storage)
         self.feishu = feishu
 
-        self.cron_store = self.config.base_dir / "cron"
-        self.cron_store.mkdir(parents=True, exist_ok=True)
+        self.cron_store = self.config.cron_store
+        self.cron_store.parent.mkdir(parents=True, exist_ok=True)
         self.cron_service = CronService(store_path=self.cron_store)
         logger.debug("ReportService 初始化完成")
 
     def _get_feishu_bot(self) -> FeishuBot:
         if self.feishu is None:
-            self.feishu = FeishuBot()
+            # 使用新的应用机器人配置
+            self.feishu = FeishuBot(
+                app_id=self.config.get("feishu_app_id"),
+                app_secret=self.config.get("feishu_app_secret"),
+                receive_id=self.config.get("feishu_receive_id"),
+                receive_id_type=self.config.get("feishu_receive_id_type", "user_id"),
+            )
         return self.feishu
 
     def generate_report(
@@ -351,9 +357,13 @@ class ReportService:
         """
         feishu = self._get_feishu_bot()
 
-        if not feishu.webhook:
-            logger.warning("未配置飞书 Webhook")
-            return {"success": False, "error": "未配置飞书 Webhook"}
+        if not feishu.auth.is_configured():
+            logger.warning("未配置飞书应用机器人")
+            return {"success": False, "error": "未配置飞书应用机器人"}
+
+        if not feishu.receive_id:
+            logger.warning("未配置飞书接收者 ID")
+            return {"success": False, "error": "未配置飞书接收者 ID"}
 
         # 根据报告类型格式化内容
         if report_type == ReportType.DAILY:

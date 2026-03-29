@@ -11,10 +11,10 @@ if TYPE_CHECKING:
     from src.core.storage import StorageManager
 
 # VDOT 计算常量 (Jack Daniels 公式)
-VDOT_COEFFICIENT = 0.0001
+VDOT_COEFFICIENT = 0.000104
 VDOT_DISTANCE_EXPONENT = 1.06
-VDOT_TIME_EXPONENT = 0.43
-VDOT_MULTIPLIER = 24.6
+VDOT_TIME_EXPONENT = 0.5
+VDOT_MULTIPLIER = 100
 
 # TSS 计算常量
 DEFAULT_LTHR = 180  # 默认乳酸阈值心率
@@ -40,6 +40,8 @@ class AnalyticsEngine:
         """
         计算VDOT值（跑力值）
 
+        使用 Jack Daniels 的 VDOT 表近似公式
+
         Args:
             distance_m: 距离（米）
             time_s: 用时（秒）
@@ -53,10 +55,15 @@ class AnalyticsEngine:
         if distance_m <= 0 or time_s <= 0:
             raise ValueError("距离和时间必须为正数")
 
-        vdot = (
-            VDOT_COEFFICIENT * (distance_m**VDOT_DISTANCE_EXPONENT) * VDOT_MULTIPLIER
-        ) / (time_s**VDOT_TIME_EXPONENT)
-        return round(vdot, 2)
+        if distance_m < 1500:
+            return 0.0
+
+        time_min = time_s / 60.0
+        pace_min_per_km = time_min / (distance_m / 1000.0)
+
+        vdot = 85.46 - 7.08 * pace_min_per_km + 0.15 * pace_min_per_km**2
+
+        return round(max(0.0, vdot), 2)
 
     def calculate_tss(
         self, heart_rate_data: pl.Series, duration_s: float, ftp: int = 200
@@ -92,12 +99,24 @@ class AnalyticsEngine:
         """
         获取跑步摘要统计
 
+        数据模型说明：
+        - 存储的数据包含两类字段：
+          1. 过程数据（record）：timestamp, heart_rate, pace 等，每秒采样一次
+          2. 会话数据（session）：session_total_distance, session_total_timer_time 等，每次跑步一条
+        - 每个采样点都包含会话数据字段，因此需要按 session_start_time 聚合统计
+        - 直接统计行数会将采样点数量误认为跑步次数
+
+        统计逻辑：
+        1. 按 session_start_time 分组，将会话数据聚合为每条跑步一条记录
+        2. 使用 first() 提取会话数据（同一会话内所有采样点的会话数据相同）
+        3. 对聚合后的数据进行统计（总数、平均值、最大值等）
+
         Args:
             start_date: 开始日期（可选）
             end_date: 结束日期（可选）
 
         Returns:
-            pl.DataFrame: 统计结果
+            pl.DataFrame: 统计结果，包含 total_runs, total_distance, total_timer_time 等字段
         """
         try:
             lf = self.storage.read_parquet()
@@ -115,20 +134,40 @@ class AnalyticsEngine:
                     end_dt = end_dt + timedelta(days=1)
                     lf = lf.filter(pl.col("timestamp") < end_dt)
 
-            result = lf.select(
-                [
-                    pl.len().alias("total_runs"),
-                    pl.col("total_distance").sum().alias("total_distance"),
-                    pl.col("total_timer_time").sum().alias("total_timer_time"),
-                    pl.col("total_distance").mean().alias("avg_distance"),
-                    pl.col("total_timer_time").mean().alias("avg_timer_time"),
-                    pl.col("total_distance").max().alias("max_distance"),
-                    pl.col("avg_heart_rate").mean().alias("avg_heart_rate"),
-                ]
-            ).collect()
+            session_df = (
+                lf.group_by("session_start_time")
+                .agg(
+                    [
+                        pl.col("session_total_distance").first().alias("distance"),
+                        pl.col("session_total_timer_time").first().alias("duration"),
+                        pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                    ]
+                )
+                .collect()
+            )
 
-            if result.is_empty() or result["total_runs"][0] == 0:
+            if session_df.is_empty():
                 return pl.DataFrame()
+
+            total_runs = session_df.height
+            total_distance = session_df["distance"].sum()
+            total_timer_time = session_df["duration"].sum()
+            avg_distance = session_df["distance"].mean()
+            avg_timer_time = session_df["duration"].mean()
+            max_distance = session_df["distance"].max()
+            avg_heart_rate = session_df["avg_hr"].mean()
+
+            result = pl.DataFrame(
+                {
+                    "total_runs": [total_runs],
+                    "total_distance": [total_distance],
+                    "total_timer_time": [total_timer_time],
+                    "avg_distance": [avg_distance],
+                    "avg_timer_time": [avg_timer_time],
+                    "max_distance": [max_distance],
+                    "avg_heart_rate": [avg_heart_rate],
+                }
+            )
 
             return result
         except Exception as e:
@@ -150,19 +189,27 @@ class AnalyticsEngine:
         if not heart_rate or not pace:
             return {"error": "数据量不足"}
 
-        if len(heart_rate) < 10 or len(pace) < 10:
+        hr_clean = []
+        pace_clean = []
+
+        for hr, p in zip(heart_rate, pace):
+            if hr is not None and p is not None and p > 0:
+                hr_clean.append(hr)
+                pace_clean.append(p)
+
+        if len(hr_clean) < 10 or len(pace_clean) < 10:
             return {"error": "数据量不足"}
 
         try:
-            hr_series = pl.Series("heart_rate", heart_rate)
-            pace_series = pl.Series("pace", pace)
+            hr_series = pl.Series("heart_rate", hr_clean)
+            pace_series = pl.Series("pace", pace_clean)
 
             df = pl.DataFrame([hr_series, pace_series])
             correlation = df.corr()[0, 1]
 
-            if len(heart_rate) >= 2:
-                first_half_hr = heart_rate[: len(heart_rate) // 2]
-                second_half_hr = heart_rate[len(heart_rate) // 2 :]
+            if len(hr_clean) >= 2:
+                first_half_hr = hr_clean[: len(hr_clean) // 2]
+                second_half_hr = hr_clean[len(hr_clean) // 2 :]
                 drift = (sum(second_half_hr) / len(second_half_hr)) - (
                     sum(first_half_hr) / len(first_half_hr)
                 )
@@ -170,7 +217,7 @@ class AnalyticsEngine:
                 drift = 0
 
             drift_rate = (
-                (drift / (sum(heart_rate) / len(heart_rate))) * 100 if heart_rate else 0
+                (drift / (sum(hr_clean) / len(hr_clean))) * 100 if hr_clean else 0
             )
 
             if drift_rate > 5:
@@ -282,7 +329,6 @@ class AnalyticsEngine:
             years = [year] if year else None
             lf = self.storage.read_parquet(years)
 
-            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
             if len(lf.collect_schema()) == 0:
                 return {
                     "total_runs": 0,
@@ -291,28 +337,32 @@ class AnalyticsEngine:
                     "avg_heart_rate": 0.0,
                 }
 
-            result = lf.select(
-                [
-                    pl.len().alias("total_runs"),
-                    pl.col("total_distance").sum().alias("total_distance"),
-                    pl.col("total_timer_time").sum().alias("total_duration"),
-                    pl.col("avg_heart_rate").mean().alias("avg_heart_rate"),
-                ]
-            ).collect()
+            session_df = (
+                lf.group_by("session_start_time")
+                .agg(
+                    [
+                        pl.col("session_total_distance").first().alias("distance"),
+                        pl.col("session_total_timer_time").first().alias("duration"),
+                        pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                    ]
+                )
+                .collect()
+            )
 
-            if result.is_empty() or result["total_runs"][0] == 0:
+            if session_df.is_empty():
                 return {"total_runs": 0, "total_distance": 0.0, "total_duration": 0.0}
 
-            total_runs = result["total_runs"][0]
-            total_distance = result["total_distance"][0]
-            total_duration = result["total_duration"][0]
-            avg_heart_rate = result["avg_heart_rate"][0]
+            total_runs = session_df.height
+            total_distance = session_df["distance"].sum()
+            total_duration = session_df["duration"].sum()
+            avg_heart_rate_result = session_df["avg_hr"].mean()
+            avg_heart_rate = float(avg_heart_rate_result) if avg_heart_rate_result is not None else 0.0  # type: ignore
 
             stats = {
                 "total_runs": total_runs,
                 "total_distance": round(total_distance / 1000, 2),
                 "total_duration": round(total_duration / 3600, 2),
-                "avg_heart_rate": round(avg_heart_rate, 1) if avg_heart_rate else 0,
+                "avg_heart_rate": round(avg_heart_rate, 1),
                 "avg_pace": self._calculate_avg_pace_from_values(
                     total_distance, total_duration
                 ),
@@ -398,8 +448,14 @@ class AnalyticsEngine:
 
             trend_data = []
             for row in df.iter_rows(named=True):
-                distance = row.get("total_distance", row.get("distance", 0))
-                duration = row.get("total_timer_time", row.get("duration", 0))
+                distance = row.get(
+                    "session_total_distance",
+                    row.get("total_distance", row.get("distance", 0)),
+                )
+                duration = row.get(
+                    "session_total_timer_time",
+                    row.get("total_timer_time", row.get("duration", 0)),
+                )
                 vdot = self.calculate_vdot(distance, duration)
                 trend_data.append(
                     {
@@ -525,8 +581,8 @@ class AnalyticsEngine:
             }
 
         df = (
-            lf.filter(pl.col("timestamp").is_between(start_date, end_date))
-            .sort("timestamp")
+            lf.filter(pl.col("session_start_time").is_between(start_date, end_date))
+            .sort("session_start_time")
             .collect()
         )
 
@@ -545,9 +601,9 @@ class AnalyticsEngine:
         tss_values = []
         for row in df.iter_rows(named=True):
             tss = self.calculate_tss_for_run(
-                distance_m=row.get("total_distance", 0),
-                duration_s=row.get("total_timer_time", 0),
-                avg_heart_rate=row.get("avg_heart_rate"),
+                distance_m=row.get("session_total_distance", 0),
+                duration_s=row.get("session_total_timer_time", 0),
+                avg_heart_rate=row.get("session_avg_heart_rate"),
             )
             tss_values.append(tss)
 
@@ -1054,10 +1110,18 @@ class AnalyticsEngine:
         Returns:
             Dict[str, Any]: 心率区间分析结果
         """
-        # 过滤有平均心率的活动
-        hr_df = df.filter(
-            pl.col("avg_heart_rate").is_not_null() & (pl.col("avg_heart_rate") > 0)
+        hr_col = (
+            "session_avg_heart_rate"
+            if "session_avg_heart_rate" in df.columns
+            else "avg_heart_rate"
         )
+        duration_col = (
+            "session_total_timer_time"
+            if "session_total_timer_time" in df.columns
+            else "total_timer_time"
+        )
+
+        hr_df = df.filter(pl.col(hr_col).is_not_null() & (pl.col(hr_col) > 0))
 
         if hr_df.is_empty():
             return {
@@ -1068,13 +1132,12 @@ class AnalyticsEngine:
                 "message": "暂无有效心率数据",
             }
 
-        # 使用活动时长作为权重计算区间分布
         zone_times = {zone: 0 for zone in zone_boundaries.keys()}
         total_time = 0
 
         for row in hr_df.iter_rows(named=True):
-            avg_hr = row.get("avg_heart_rate", 0)
-            duration = row.get("total_timer_time", 0)
+            avg_hr = row.get(hr_col, 0)
+            duration = row.get(duration_col, 0)
 
             if avg_hr <= 0 or duration <= 0:
                 continue
@@ -1248,16 +1311,16 @@ class AnalyticsEngine:
                 return None
 
             # 计算昨日训练汇总
-            total_distance = df["total_distance"].sum()
-            total_duration = df["total_timer_time"].sum()
+            total_distance = df["session_total_distance"].sum()
+            total_duration = df["session_total_timer_time"].sum()
 
             # 计算TSS
             tss_values = []
             for row in df.iter_rows(named=True):
                 tss = self.calculate_tss_for_run(
-                    distance_m=row.get("total_distance", 0),
-                    duration_s=row.get("total_timer_time", 0),
-                    avg_heart_rate=row.get("avg_heart_rate"),
+                    distance_m=row.get("session_total_distance", 0),
+                    duration_s=row.get("session_total_timer_time", 0),
+                    avg_heart_rate=row.get("session_avg_heart_rate"),
                 )
                 tss_values.append(tss)
             total_tss = sum(tss_values)
@@ -1536,9 +1599,9 @@ class AnalyticsEngine:
         tss_records = []
         for row in df.iter_rows(named=True):
             tss = self.calculate_tss_for_run(
-                distance_m=row.get("total_distance", 0),
-                duration_s=row.get("total_timer_time", 0),
-                avg_heart_rate=row.get("avg_heart_rate"),
+                distance_m=row.get("session_total_distance", 0),
+                duration_s=row.get("session_total_timer_time", 0),
+                avg_heart_rate=row.get("session_avg_heart_rate"),
             )
             timestamp = row.get("timestamp")
             if timestamp and tss > 0:
@@ -1696,14 +1759,14 @@ class AnalyticsEngine:
                 lf.with_columns(
                     [
                         (
-                            pl.col("total_timer_time")
-                            / (pl.col("total_distance") / 1000)
+                            pl.col("session_total_timer_time")
+                            / (pl.col("session_total_distance") / 1000)
                         ).alias("avg_pace_sec_per_km")
                     ]
                 )
                 .filter(
-                    (pl.col("total_distance") > 0)
-                    & (pl.col("total_timer_time") > 0)
+                    (pl.col("session_total_distance") > 0)
+                    & (pl.col("session_total_timer_time") > 0)
                     & (pl.col("avg_pace_sec_per_km").is_not_null())
                 )
                 .with_columns(
@@ -1724,8 +1787,8 @@ class AnalyticsEngine:
                     [
                         pl.col("pace_zone"),
                         pl.col("timestamp"),
-                        pl.col("total_distance"),
-                        pl.col("total_timer_time"),
+                        pl.col("session_total_distance"),
+                        pl.col("session_total_timer_time"),
                         pl.col("avg_pace_sec_per_km"),
                     ]
                 )
@@ -1738,9 +1801,9 @@ class AnalyticsEngine:
             zone_stats = result.group_by("pace_zone").agg(
                 [
                     pl.len().alias("count"),
-                    pl.col("total_distance").sum().alias("total_distance"),
+                    pl.col("session_total_distance").sum().alias("total_distance"),
                     pl.col("avg_pace_sec_per_km").mean().alias("avg_pace"),
-                    pl.col("total_timer_time").sum().alias("total_time"),
+                    pl.col("session_total_timer_time").sum().alias("total_time"),
                 ]
             )
 
@@ -1767,7 +1830,12 @@ class AnalyticsEngine:
                     }
 
             trend_df = result.sort("timestamp").select(
-                ["timestamp", "avg_pace_sec_per_km", "total_distance", "pace_zone"]
+                [
+                    "timestamp",
+                    "avg_pace_sec_per_km",
+                    "session_total_distance",
+                    "pace_zone",
+                ]
             )
 
             trend_data = []
@@ -1778,7 +1846,7 @@ class AnalyticsEngine:
                         if hasattr(row["timestamp"], "strftime")
                         else str(row["timestamp"]),
                         "pace": round(row["avg_pace_sec_per_km"], 2),
-                        "distance": round(row["total_distance"], 2),
+                        "distance": round(row["session_total_distance"], 2),
                         "zone": row["pace_zone"],
                     }
                 )
@@ -1787,7 +1855,7 @@ class AnalyticsEngine:
                 "zones": zones_result,
                 "trend": trend_data,
                 "total_runs": result.height,
-                "total_distance": round(result["total_distance"].sum(), 2),
+                "total_distance": round(result["session_total_distance"].sum(), 2),
             }
 
         except Exception as e:

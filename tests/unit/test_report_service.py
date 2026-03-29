@@ -106,20 +106,21 @@ class TestPushReport:
             assert result.get("success") is True
             mock_feishu.send_card.assert_called_once()
 
-    def test_push_report_no_webhook(self):
-        """测试未配置 Webhook"""
+    def test_push_report_no_feishu_config(self):
+        """测试未配置飞书应用机器人"""
         mock_config = Mock()
         mock_config.base_dir = Path("/tmp/test")
+        mock_config.get.return_value = None  # 返回 None 表示未配置
 
         mock_feishu = Mock()
-        mock_feishu.webhook = None
+        mock_feishu.auth.is_configured.return_value = False
 
         with patch("src.core.report_service.CronService"):
             service = ReportService(config=mock_config, feishu=mock_feishu)
             result = service.push_report({"date": "test"})
 
             assert result.get("success") is False
-            assert "Webhook" in result.get("error", "")
+            assert "未配置" in result.get("error", "")
 
     def test_push_report_send_error(self):
         """测试发送失败"""

@@ -40,6 +40,165 @@ class StorageManager:
 
         return df
 
+    def _align_dataframes(
+        self, df1: pl.DataFrame, df2: pl.DataFrame
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        all_columns = sorted(set(df1.columns) | set(df2.columns))
+
+        for col in all_columns:
+            if col not in df1.columns:
+                df1 = df1.with_columns(pl.lit(None).alias(col))
+            if col not in df2.columns:
+                df2 = df2.with_columns(pl.lit(None).alias(col))
+
+        schema1 = df1.schema
+        schema2 = df2.schema
+
+        for col in all_columns:
+            type1 = schema1[col]
+            type2 = schema2[col]
+
+            if type1 == pl.Null and type2 != pl.Null:
+                df1 = df1.with_columns(pl.col(col).cast(type2))
+            elif type2 == pl.Null and type1 != pl.Null:
+                df2 = df2.with_columns(pl.col(col).cast(type1))
+            elif type1 != type2:
+                if type1 in (pl.Float64, pl.Float32) or type2 in (
+                    pl.Float64,
+                    pl.Float32,
+                ):
+                    df1 = df1.with_columns(pl.col(col).cast(pl.Float64))
+                    df2 = df2.with_columns(pl.col(col).cast(pl.Float64))
+                elif type1.is_integer() and type2.is_integer():
+                    df1 = df1.with_columns(pl.col(col).cast(pl.Int64))
+                    df2 = df2.with_columns(pl.col(col).cast(pl.Int64))
+                else:
+                    df1 = df1.with_columns(pl.col(col).cast(pl.String))
+                    df2 = df2.with_columns(pl.col(col).cast(pl.String))
+
+        df1 = df1.select(all_columns)
+        df2 = df2.select(all_columns)
+
+        return df1, df2
+
+    def _concat_with_schema_alignment(
+        self, lazy_frames: List[pl.LazyFrame]
+    ) -> pl.LazyFrame:
+        if not lazy_frames:
+            return pl.LazyFrame()
+
+        if len(lazy_frames) == 1:
+            return lazy_frames[0]
+
+        try:
+            schemas = [lf.collect_schema() for lf in lazy_frames]
+            all_columns = sorted(set().union(*[set(s.names()) for s in schemas]))
+
+            aligned_frames = []
+            for lf, schema in zip(lazy_frames, schemas):
+                missing_cols = set(all_columns) - set(schema.names())
+                if missing_cols:
+                    for col in missing_cols:
+                        lf = lf.with_columns(pl.lit(None).alias(col))
+                lf = lf.select(all_columns)
+                aligned_frames.append(lf)
+
+            return pl.concat(aligned_frames)
+        except Exception as e:
+            logger.warning(f"LazyFrame schema 对齐失败，尝试使用 DataFrame: {e}")
+            dfs = [lf.collect() for lf in lazy_frames]
+            if not dfs:
+                return pl.LazyFrame()
+
+            schemas = [df.schema for df in dfs]
+            all_columns = sorted(set().union(*[set(s.keys()) for s in schemas]))
+
+            aligned_dfs = []
+            for df, schema in zip(dfs, schemas):
+                missing_cols = set(all_columns) - set(schema.keys())
+                if missing_cols:
+                    for col in missing_cols:
+                        df = df.with_columns(pl.lit(None).alias(col))
+                df = df.select(all_columns)
+                aligned_dfs.append(df)
+
+            return pl.concat(aligned_dfs).lazy()
+
+    def _read_parquet_with_schema_fix(self, filepath: Path) -> pl.LazyFrame:
+        try:
+            return pl.scan_parquet(filepath)
+        except Exception as e:
+            logger.warning(f"scan_parquet 失败，使用 read_parquet: {e}")
+            df = pl.read_parquet(filepath)
+            return df.lazy()
+
+    def _read_and_concat_parquet_files(self, parquet_files: List[Path]) -> pl.LazyFrame:
+        if not parquet_files:
+            return pl.LazyFrame()
+
+        dfs = []
+        for filepath in parquet_files:
+            try:
+                df = self._read_parquet_file_with_schema_fix(filepath)
+                if df is not None:
+                    dfs.append(df)
+            except Exception as e:
+                logger.warning(f"读取文件失败 {filepath}: {e}")
+                continue
+
+        if not dfs:
+            return pl.LazyFrame()
+
+        if len(dfs) == 1:
+            return dfs[0].lazy()
+
+        all_schemas = {}
+        for df in dfs:
+            for col_name, col_type in df.schema.items():
+                if col_name not in all_schemas:
+                    all_schemas[col_name] = col_type
+                elif col_type != pl.Null and all_schemas[col_name] == pl.Null:
+                    all_schemas[col_name] = col_type
+
+        all_columns = sorted(all_schemas.keys())
+
+        aligned_dfs = []
+        for df in dfs:
+            df_schema = df.schema
+            missing_cols = set(all_columns) - set(df_schema.keys())
+            if missing_cols:
+                for col in missing_cols:
+                    target_type = all_schemas[col]
+                    df = df.with_columns(pl.lit(None).cast(target_type).alias(col))
+            df = df.select(all_columns)
+            aligned_dfs.append(df)
+
+        result = pl.concat(aligned_dfs)
+        logger.debug(f"合并 {len(dfs)} 个文件，共 {result.height} 条记录")
+        return result.lazy()
+
+    def _read_parquet_file_with_schema_fix(
+        self, filepath: Path
+    ) -> Optional[pl.DataFrame]:
+        try:
+            return pl.read_parquet(filepath)
+        except Exception as e:
+            logger.warning(f"pl.read_parquet 失败，尝试使用 pyarrow: {e}")
+            try:
+                import pyarrow.parquet as pq
+
+                table = pq.read_table(filepath)
+                result = pl.from_arrow(table)
+                if isinstance(result, pl.DataFrame):
+                    logger.info(f"使用 pyarrow 成功读取文件: {filepath}")
+                    return result
+                else:
+                    logger.error(f"pyarrow 返回非 DataFrame 类型")
+                    return None
+            except Exception as e2:
+                logger.error(f"pyarrow 读取也失败: {e2}")
+                return None
+
     def save_to_parquet(
         self, dataframe: pl.DataFrame, year: int, allow_empty: bool = False
     ) -> bool:
@@ -68,9 +227,14 @@ class StorageManager:
             if filepath.exists():
                 existing_df = pl.read_parquet(filepath)
                 existing_df = self._convert_to_parquet_compatible(existing_df)
+                existing_df, dataframe = self._align_dataframes(existing_df, dataframe)
+
                 combined_df = pl.concat([existing_df, dataframe])
+                combined_df = combined_df.unique()
+
                 combined_df.write_parquet(filepath, compression="snappy")
-                logger.info(f"追加数据到 {filename}, 新增 {dataframe.height} 条记录")
+                new_records = combined_df.height - existing_df.height
+                logger.info(f"追加数据到 {filename}, 新增 {new_records} 条记录")
             else:
                 dataframe.write_parquet(filepath, compression="snappy")
                 logger.info(f"创建新文件 {filename}, 写入 {dataframe.height} 条记录")
@@ -141,7 +305,7 @@ class StorageManager:
                     return pl.LazyFrame()
 
                 logger.debug(f"读取 {len(parquet_files)} 个数据文件")
-                return pl.concat([pl.scan_parquet(f) for f in parquet_files])
+                return self._read_and_concat_parquet_files(parquet_files)
             else:
                 parquet_files = list(self.data_dir.glob("activities_*.parquet"))
                 if not parquet_files:
@@ -149,7 +313,7 @@ class StorageManager:
                     return pl.LazyFrame()
 
                 logger.debug(f"读取全部 {len(parquet_files)} 个数据文件")
-                return pl.concat([pl.scan_parquet(f) for f in parquet_files])
+                return self._read_and_concat_parquet_files(parquet_files)
         except Exception as e:
             logger.error(f"读取Parquet数据失败: {e}")
             raise StorageError(
@@ -348,10 +512,10 @@ class StorageManager:
             )
 
         if min_distance is not None:
-            lf = lf.filter(pl.col("total_distance") >= min_distance)
+            lf = lf.filter(pl.col("session_total_distance") >= min_distance)
 
         if min_heart_rate is not None:
-            lf = lf.filter(pl.col("avg_heart_rate") >= min_heart_rate)
+            lf = lf.filter(pl.col("session_avg_heart_rate") >= min_heart_rate)
 
         return lf.collect()
 

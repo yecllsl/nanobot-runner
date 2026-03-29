@@ -57,14 +57,15 @@ class TestReportPerformance:
             activity = {
                 "activity_id": f'run_{activity_date.strftime("%Y%m%d")}_{i:04d}',
                 "timestamp": activity_date,
+                "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": activity_date,
-                "total_distance": distance_m,
-                "total_timer_time": duration,
+                "session_total_distance": distance_m,
+                "session_total_timer_time": duration,
                 "total_calories": 300 + (i % 10) * 50,
-                "avg_heart_rate": 140 + (i % 20),  # 心率数据用于TSS计算
+                "session_avg_heart_rate": 140 + (i % 20),  # 心率数据用于TSS计算
                 "max_heart_rate": 160 + (i % 20),
                 "record_count": 100 + (i % 50),
             }
@@ -113,14 +114,15 @@ class TestReportPerformance:
         yesterday_activity = {
             "activity_id": f'run_{yesterday.strftime("%Y%m%d")}_9999',
             "timestamp": yesterday,
+            "session_start_time": yesterday,  # 添加session_start_time
             "source_file": "yesterday_run.fit",
             "filename": "yesterday_run.fit",
             "serial_number": "TEST9999",
             "time_created": yesterday,
-            "total_distance": 10000.0,  # 10公里（使用Float类型保持一致）
-            "total_timer_time": 3600,  # 1小时
+            "session_total_distance": 10000.0,  # 10公里（使用Float类型保持一致）
+            "session_total_timer_time": 3600,  # 1小时
             "total_calories": 500,
-            "avg_heart_rate": 150,
+            "session_avg_heart_rate": 150,
             "max_heart_rate": 170,
             "record_count": 200,
         }
@@ -164,14 +166,15 @@ class TestReportPerformance:
             activity = {
                 "activity_id": f'run_large_{activity_date.strftime("%Y%m%d")}_{i:04d}',
                 "timestamp": activity_date,
+                "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_large_{i}.fit",
                 "filename": f"test_large_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": activity_date,
-                "total_distance": distance_m,
-                "total_timer_time": duration,
+                "session_total_distance": distance_m,
+                "session_total_timer_time": duration,
                 "total_calories": 300 + (i % 10) * 50,
-                "avg_heart_rate": 140 + (i % 20),
+                "session_avg_heart_rate": 140 + (i % 20),
                 "max_heart_rate": 160 + (i % 20),
                 "record_count": 100 + (i % 50),
             }
