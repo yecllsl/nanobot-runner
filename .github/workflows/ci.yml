@@ -41,6 +41,7 @@ jobs:
         echo "依赖安装完成"
         echo "安装额外依赖..."
         pip install pytest-cov pytest-mock --no-cache-dir
+        pip install types-requests --no-cache-dir
         echo "额外依赖安装完成"
         
     - name: Verify tool installations
