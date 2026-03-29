@@ -2,35 +2,7 @@
   "version": 1,
   "jobs": [
     {
-      "id": "27a168c3",
-      "name": "daily_report",
-      "enabled": true,
-      "schedule": {
-        "kind": "at",
-        "atMs": 1774828800000,
-        "everyMs": null,
-        "expr": null,
-        "tz": null
-      },
-      "payload": {
-        "kind": "agent_turn",
-        "message": "{\"push\": true, \"age\": 30, \"time\": \"08:00\", \"type\": \"daily\"}",
-        "deliver": false,
-        "channel": null,
-        "to": null
-      },
-      "state": {
-        "nextRunAtMs": 1774828800000,
-        "lastRunAtMs": null,
-        "lastStatus": null,
-        "lastError": null
-      },
-      "createdAtMs": 1774775844423,
-      "updatedAtMs": 1774775844423,
-      "deleteAfterRun": false
-    },
-    {
-      "id": "439e18be",
+      "id": "9307f48c",
       "name": "weekly_report",
       "enabled": true,
       "schedule": {
@@ -53,12 +25,12 @@
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774775844440,
-      "updatedAtMs": 1774775844440,
+      "createdAtMs": 1774777336522,
+      "updatedAtMs": 1774777336522,
       "deleteAfterRun": false
     },
     {
-      "id": "47d4d5fe",
+      "id": "035a151a",
       "name": "monthly_report",
       "enabled": true,
       "schedule": {
@@ -81,8 +53,36 @@
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774775844459,
-      "updatedAtMs": 1774775844459,
+      "createdAtMs": 1774777336540,
+      "updatedAtMs": 1774777336540,
+      "deleteAfterRun": false
+    },
+    {
+      "id": "8781ce29",
+      "name": "daily_report",
+      "enabled": true,
+      "schedule": {
+        "kind": "at",
+        "atMs": 1774828800000,
+        "everyMs": null,
+        "expr": null,
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "{\"push\": true, \"age\": 30, \"time\": \"08:00\", \"type\": \"daily\"}",
+        "deliver": false,
+        "channel": null,
+        "to": null
+      },
+      "state": {
+        "nextRunAtMs": 1774828800000,
+        "lastRunAtMs": null,
+        "lastStatus": null,
+        "lastError": null
+      },
+      "createdAtMs": 1774777336582,
+      "updatedAtMs": 1774777336582,
       "deleteAfterRun": false
     }
   ]

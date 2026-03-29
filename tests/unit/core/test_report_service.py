@@ -380,6 +380,7 @@ class TestReportServiceGetJobName:
         mock_config = MagicMock(spec=ConfigManager)
         mock_config.base_dir = Path("test_base")
         mock_config.data_dir = Path("test_data")
+        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
 
         service = ReportService(
             config=mock_config,
@@ -395,6 +396,7 @@ class TestReportServiceGetJobName:
         mock_config = MagicMock(spec=ConfigManager)
         mock_config.base_dir = Path("test_base")
         mock_config.data_dir = Path("test_data")
+        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
 
         service = ReportService(
             config=mock_config,
@@ -410,6 +412,7 @@ class TestReportServiceGetJobName:
         mock_config = MagicMock(spec=ConfigManager)
         mock_config.base_dir = Path("test_base")
         mock_config.data_dir = Path("test_data")
+        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
 
         service = ReportService(
             config=mock_config,
@@ -429,6 +432,7 @@ class TestReportServiceIntegration:
         mock_config = MagicMock(spec=ConfigManager)
         mock_config.base_dir = Path("test_base")
         mock_config.data_dir = Path("test_data")
+        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
 
         storage = MagicMock()
         analytics = MagicMock()

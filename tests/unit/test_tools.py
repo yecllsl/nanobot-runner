@@ -158,8 +158,7 @@ class TestGetRunningStatsTool:
 
             result = await tool.execute()
 
-            # 新格式返回 {"success": false, "error": ...}
-            assert "success" in result
+            # 新格式返回 {"error": "..."}
             assert "error" in result
 
 
