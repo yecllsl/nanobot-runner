@@ -67,7 +67,7 @@ jobs:
     - name: Type checking with mypy
       run: |
         echo "开始类型检查..."
-        python -m mypy src/ --ignore-missing-imports
+        python -m mypy src/ --ignore-missing-imports --install-types --non-interactive
         
     - name: Security scan with bandit
       run: |
