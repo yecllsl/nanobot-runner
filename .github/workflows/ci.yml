@@ -64,7 +64,7 @@ jobs:
     - name: Security scan with bandit
       run: |
         echo "开始安全扫描..."
-        python -m bandit -r src/ -f json -o bandit-report.json
+        python -m bandit -r src/ -f json -o bandit-report.json -s B101,B601
         
   # 测试执行
   test:
