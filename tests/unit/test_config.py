@@ -118,19 +118,19 @@ class TestConfigManager:
         with patch.object(Path, "home", return_value=tmp_path):
             old_cron_dir = tmp_path / ".nanobot" / "cron"
             old_cron_dir.mkdir(parents=True, exist_ok=True)
-            
+
             old_cron_store = old_cron_dir / "jobs.json"
             old_jobs = {"jobs": [{"id": "test1", "name": "test_job"}]}
             with open(old_cron_store, "w", encoding="utf-8") as f:
                 json.dump(old_jobs, f)
-            
+
             cm = ConfigManager()
-            
+
             new_cron_store = cm.cron_store
             assert new_cron_store.exists()
-            
+
             with open(new_cron_store, "r", encoding="utf-8") as f:
                 migrated_jobs = json.load(f)
-            
+
             assert migrated_jobs["jobs"][0]["id"] == "test1"
             assert migrated_jobs["jobs"][0]["name"] == "test_job"

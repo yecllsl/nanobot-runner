@@ -355,13 +355,14 @@ class AnalyticsEngine:
             total_runs = session_df.height
             total_distance = session_df["distance"].sum()
             total_duration = session_df["duration"].sum()
-            avg_heart_rate = session_df["avg_hr"].mean()
+            avg_heart_rate_result = session_df["avg_hr"].mean()
+            avg_heart_rate = float(avg_heart_rate_result) if avg_heart_rate_result is not None else 0.0  # type: ignore
 
             stats = {
                 "total_runs": total_runs,
                 "total_distance": round(total_distance / 1000, 2),
                 "total_duration": round(total_duration / 3600, 2),
-                "avg_heart_rate": round(avg_heart_rate, 1) if avg_heart_rate else 0,
+                "avg_heart_rate": round(avg_heart_rate, 1),
                 "avg_pace": self._calculate_avg_pace_from_values(
                     total_distance, total_duration
                 ),

@@ -27,17 +27,17 @@ class ConfigManager:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.cron_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 迁移旧的定时任务配置
         self._migrate_old_cron_config()
 
     def _migrate_old_cron_config(self):
         """迁移旧的定时任务配置到新位置"""
         import loguru
-        
+
         old_cron_store = Path.home() / ".nanobot" / "cron" / "jobs.json"
         new_cron_store = self.cron_store
-        
+
         if old_cron_store.exists() and not new_cron_store.exists():
             try:
                 shutil.copy2(old_cron_store, new_cron_store)

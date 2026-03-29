@@ -92,8 +92,10 @@ class BaseTool(ABC):
         try:
             logger.info(f"工具调用开始: {func.__name__}, 参数: {kwargs}")
             result = func(*args, **kwargs)
-            logger.info(f"工具调用成功: {func.__name__}, 结果类型: {type(result)}, 结果: {str(result)[:200]}")
-            
+            logger.info(
+                f"工具调用成功: {func.__name__}, 结果类型: {type(result)}, 结果: {str(result)[:200]}"
+            )
+
             # 如果结果已经是 dict 且包含 error 字段，直接返回
             if isinstance(result, dict) and "error" in result:
                 logger.warning(f"工具返回错误: {result}")
@@ -550,15 +552,15 @@ class RunnerTools:
 
         heart_rate = df.select(pl.col("heart_rate")).to_series().to_list()
 
-        pace = None
+        pace_list: List[float] = []
         if "speed" in df.columns:
             speed_values = df.select(pl.col("speed")).to_series().to_list()
-            pace = [1000 / s if s and s > 0 else None for s in speed_values]
+            pace_list = [1000 / s for s in speed_values if s and s > 0]
         elif "enhanced_speed" in df.columns:
             speed_values = df.select(pl.col("enhanced_speed")).to_series().to_list()
-            pace = [1000 / s if s and s > 0 else None for s in speed_values]
+            pace_list = [1000 / s for s in speed_values if s and s > 0]
 
-        return self.analytics.analyze_hr_drift(heart_rate, pace)
+        return self.analytics.analyze_hr_drift(heart_rate, pace_list)
 
     def get_training_load(self, days: int = 42) -> Dict[str, Any]:
         return self.analytics.get_training_load(days)
