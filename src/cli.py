@@ -997,7 +997,8 @@ def gateway(
     provider = _make_provider(config)
     session_manager = SessionManager(workspace)
 
-    cron_store_path = get_data_dir() / "cron" / "jobs.json"
+    config_manager = ConfigManager()
+    cron_store_path = config_manager.cron_store
     cron = CronService(cron_store_path)
 
     storage = StorageManager()

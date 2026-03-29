@@ -45,8 +45,8 @@ class ReportService:
         self.analytics = analytics or AnalyticsEngine(self.storage)
         self.feishu = feishu
 
-        self.cron_store = self.config.base_dir / "cron"
-        self.cron_store.mkdir(parents=True, exist_ok=True)
+        self.cron_store = self.config.cron_store
+        self.cron_store.parent.mkdir(parents=True, exist_ok=True)
         self.cron_service = CronService(store_path=self.cron_store)
         logger.debug("ReportService 初始化完成")
 
