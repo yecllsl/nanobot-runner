@@ -29,7 +29,7 @@ dev = [
     "bandit>=1.7.0,<2.0.0",
     "safety>=2.0.0,<3.0.0",
     "pre-commit>=3.0.0,<4.0.0",
-    "types-requests>=2.0.0",
+    "types-requests>=2.33.0",
 ]
 
 [project.scripts]
