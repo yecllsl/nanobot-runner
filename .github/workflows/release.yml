@@ -50,6 +50,7 @@ jobs:
       run: |
         echo "开始构建包..."
         python -m build
+        echo "构建完成"
         
     - name: Verify build artifacts
       run: |
