@@ -78,7 +78,8 @@ class TestUpdateMemoryTool:
 
                 result = await tool.execute(note="测试笔记", category="training")
 
-                assert "success" in result or "error" not in result
+                # 新返回格式：成功时直接返回数据，失败时返回 {"error": ...}
+                assert "error" not in result or "成功" in result
 
     @pytest.mark.anyio
     async def test_execute_empty_note(self):

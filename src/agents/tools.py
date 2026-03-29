@@ -85,32 +85,32 @@ class BaseTool(ABC):
         return errors
 
     def _run_sync(self, func, *args, **kwargs) -> str:
-        """同步调用方法并返回JSON字符串
+        """同步调用方法并返回 JSON 字符串
 
-        返回格式统一为: {"success": true/false, "data": ...} 或 {"success": false, "error": ...}
+        返回格式：直接返回数据本身（dict/list 等），错误时返回包含 error 字段的 dict
         """
         try:
+            logger.info(f"工具调用开始: {func.__name__}, 参数: {kwargs}")
             result = func(*args, **kwargs)
-            # 如果结果已经是 dict 且包含 error 字段，转换为 error 格式
+            logger.info(f"工具调用成功: {func.__name__}, 结果类型: {type(result)}, 结果: {str(result)[:200]}")
+            
+            # 如果结果已经是 dict 且包含 error 字段，直接返回
             if isinstance(result, dict) and "error" in result:
-                return json.dumps(
-                    {"success": False, "error": result["error"]},
-                    ensure_ascii=False,
-                    default=str,
-                )
+                logger.warning(f"工具返回错误: {result}")
+                return json.dumps(result, ensure_ascii=False, default=str)
             # 如果结果是 dict 且包含 message 字段（如暂无数据），转换为 error 格式
             if isinstance(result, dict) and "message" in result:
+                logger.info(f"工具返回消息: {result}")
                 return json.dumps(
-                    {"success": False, "error": result["message"]},
-                    ensure_ascii=False,
-                    default=str,
+                    {"error": result["message"]}, ensure_ascii=False, default=str
                 )
-            # 正常返回数据
-            return json.dumps(
-                {"success": True, "data": result}, ensure_ascii=False, default=str
-            )
+            # 正常返回数据（直接返回，不包装）
+            json_result = json.dumps(result, ensure_ascii=False, default=str)
+            logger.info(f"工具返回 JSON 长度: {len(json_result)}")
+            return json_result
         except Exception as e:
-            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+            logger.error(f"工具调用异常: {func.__name__}, 错误: {str(e)}", exc_info=True)
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
 class GetRunningStatsTool(BaseTool):

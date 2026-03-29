@@ -935,6 +935,7 @@ def show_plan(
 def gateway(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
+    logs: bool = typer.Option(False, "--logs", "-l", help="启用日志输出"),
 ):
     """
     启动飞书机器人Gateway服务
@@ -954,6 +955,7 @@ def gateway(
     """
     import asyncio
 
+    from loguru import logger
     from nanobot.agent import AgentLoop
     from nanobot.agent.tools import ToolRegistry
     from nanobot.bus import MessageBus
@@ -972,6 +974,12 @@ def gateway(
         import logging
 
         logging.basicConfig(level=logging.DEBUG)
+
+    if logs:
+        logger.enable("nanobot")
+        logger.enable("src")
+    else:
+        logger.disable("nanobot")
 
     console.print("[bold green]🐈 Nanobot Runner Gateway[/bold green]")
     console.print(f"[dim]启动 Gateway 服务，端口: {port}[/dim]")
