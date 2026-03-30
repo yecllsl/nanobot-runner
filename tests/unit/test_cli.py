@@ -787,7 +787,17 @@ class TestCLIProfileShow:
             mock_profile_storage.return_value = mock_storage_instance
 
             result = runner.invoke(
-                app, ["profile", "show", "--days", "60", "--age", "35", "--resting-hr", "65"]
+                app,
+                [
+                    "profile",
+                    "show",
+                    "--days",
+                    "60",
+                    "--age",
+                    "35",
+                    "--resting-hr",
+                    "65",
+                ],
             )
             assert result.exit_code == 0 or result.exit_code == 1
 
@@ -997,9 +1007,7 @@ class TestCLITrainingLoad:
         """测试 training-load 无数据"""
         with patch("src.core.analytics.AnalyticsEngine") as mock_engine_class:
             mock_engine = Mock()
-            mock_engine.get_training_load.return_value = {
-                "message": "暂无训练数据"
-            }
+            mock_engine.get_training_load.return_value = {"message": "暂无训练数据"}
             mock_engine_class.return_value = mock_engine
 
             result = runner.invoke(app, ["load"])
@@ -1189,7 +1197,14 @@ class TestCLIPlan:
 
                 result = runner.invoke(
                     app,
-                    ["plan", "generate", "--goal-distance", "21.0975", "--goal-date", "2024-06-01"],
+                    [
+                        "plan",
+                        "generate",
+                        "--goal-distance",
+                        "21.0975",
+                        "--goal-date",
+                        "2024-06-01",
+                    ],
                 )
                 assert result.exit_code == 0
 
@@ -1202,7 +1217,14 @@ class TestCLIPlan:
 
             result = runner.invoke(
                 app,
-                ["plan", "generate", "--goal-distance", "21.0975", "--goal-date", "2024-06-01"],
+                [
+                    "plan",
+                    "generate",
+                    "--goal-distance",
+                    "21.0975",
+                    "--goal-date",
+                    "2024-06-01",
+                ],
             )
             assert result.exit_code == 1
 
@@ -1319,7 +1341,14 @@ class TestCLIPlan:
 
                 result = runner.invoke(
                     app,
-                    ["plan", "generate", "--goal-distance", "21.0975", "--goal-date", "2024-06-01"],
+                    [
+                        "plan",
+                        "generate",
+                        "--goal-distance",
+                        "21.0975",
+                        "--goal-date",
+                        "2024-06-01",
+                    ],
                 )
                 assert result.exit_code == 1
 
@@ -1335,8 +1364,8 @@ class TestCLIPlan:
 
     def test_plan_show_success(self):
         """测试 plan show 成功"""
-        import tempfile
         import json
+        import tempfile
 
         plan_data = {
             "goal_distance_km": 21.0975,
@@ -1362,7 +1391,9 @@ class TestCLIPlan:
             ],
         }
 
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False, mode="w"
+        ) as tmpfile:
             json.dump(plan_data, tmpfile)
             tmpfile_path = Path(tmpfile.name)
 
@@ -1374,8 +1405,8 @@ class TestCLIPlan:
 
     def test_plan_show_with_week(self):
         """测试 plan show 指定周次"""
-        import tempfile
         import json
+        import tempfile
 
         plan_data = {
             "goal_distance_km": 21.0975,
@@ -1401,20 +1432,24 @@ class TestCLIPlan:
             ],
         }
 
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False, mode="w"
+        ) as tmpfile:
             json.dump(plan_data, tmpfile)
             tmpfile_path = Path(tmpfile.name)
 
         try:
-            result = runner.invoke(app, ["plan", "show", str(tmpfile_path), "--week", "2"])
+            result = runner.invoke(
+                app, ["plan", "show", str(tmpfile_path), "--week", "2"]
+            )
             assert result.exit_code == 0
         finally:
             tmpfile_path.unlink(missing_ok=True)
 
     def test_plan_show_invalid_week(self):
         """测试 plan show 无效周次"""
-        import tempfile
         import json
+        import tempfile
 
         plan_data = {
             "goal_distance_km": 21.0975,
@@ -1431,12 +1466,16 @@ class TestCLIPlan:
             ],
         }
 
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False, mode="w"
+        ) as tmpfile:
             json.dump(plan_data, tmpfile)
             tmpfile_path = Path(tmpfile.name)
 
         try:
-            result = runner.invoke(app, ["plan", "show", str(tmpfile_path), "--week", "10"])
+            result = runner.invoke(
+                app, ["plan", "show", str(tmpfile_path), "--week", "10"]
+            )
             assert result.exit_code == 1
         finally:
             tmpfile_path.unlink(missing_ok=True)
@@ -1445,7 +1484,9 @@ class TestCLIPlan:
         """测试 plan show 无效 JSON"""
         import tempfile
 
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False, mode="w"
+        ) as tmpfile:
             tmpfile.write("invalid json")
             tmpfile_path = Path(tmpfile.name)
 
@@ -1457,8 +1498,8 @@ class TestCLIPlan:
 
     def test_plan_show_exception(self):
         """测试 plan show 异常处理"""
-        import tempfile
         import json
+        import tempfile
 
         plan_data = {
             "goal_distance_km": 21.0975,
@@ -1467,7 +1508,9 @@ class TestCLIPlan:
             "weeks": [],
         }
 
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False, mode="w"
+        ) as tmpfile:
             json.dump(plan_data, tmpfile)
             tmpfile_path = Path(tmpfile.name)
 

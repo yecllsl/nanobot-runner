@@ -53,7 +53,7 @@ class TestConfigManager:
             test_config = {
                 "version": "0.2.0",
                 "data_dir": str(tmp_path / "data"),
-                "custom_key": "custom_value"
+                "custom_key": "custom_value",
             }
             cm.save_config(test_config)
 
@@ -73,7 +73,7 @@ class TestConfigManager:
             test_config = {
                 "version": "0.1.0",
                 "data_dir": str(tmp_path / "data"),
-                "test_key": "test_value"
+                "test_key": "test_value",
             }
             cm.save_config(test_config)
 
@@ -86,11 +86,13 @@ class TestConfigManager:
             cm = ConfigManager()
 
             # 设置测试配置
-            cm.save_config({
-                "version": "0.1.0",
-                "data_dir": str(tmp_path / "data"),
-                "test_key": "test_value"
-            })
+            cm.save_config(
+                {
+                    "version": "0.1.0",
+                    "data_dir": str(tmp_path / "data"),
+                    "test_key": "test_value",
+                }
+            )
 
             value = cm.get("test_key")
             assert value == "test_value"
