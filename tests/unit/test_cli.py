@@ -788,8 +788,13 @@ class TestCLIProfileShow:
                         if result.exit_code != 0:
                             print(f"Exception: {result.exception}")
                             import traceback
+
                             if result.exception:
-                                traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+                                traceback.print_exception(
+                                    type(result.exception),
+                                    result.exception,
+                                    result.exception.__traceback__,
+                                )
                         assert result.exit_code == 0
 
     def test_profile_show_with_custom_params(self):
