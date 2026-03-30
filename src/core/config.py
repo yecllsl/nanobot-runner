@@ -6,6 +6,8 @@ import os
 import shutil
 from pathlib import Path
 
+from src.core.config_schema import AppConfig
+
 
 class ConfigManager:
     """配置管理器，管理项目配置和本地数据目录"""
@@ -54,34 +56,93 @@ class ConfigManager:
                 "auto_push_feishu": False,
                 # 飞书应用机器人配置（推荐）
                 "feishu_app_id": "",
-                "feishu_app_secret": "",
+                "feishu_app_secret": "",  # nosec B105
                 "feishu_receive_id": "",
                 "feishu_receive_id_type": "user_id",
                 # 兼容旧配置（已废弃）
-                "feishu_webhook": "",
+                "feishu_webhook": "",  # nosec B105
             }
             self.save_config(default_config)
 
     def save_config(self, config: dict):
-        """保存配置"""
+        """保存配置
+
+        Args:
+            config: 配置字典
+
+        Raises:
+            ValueError: 配置验证失败时抛出
+        """
+        # 保存前验证配置
+        is_valid, errors = AppConfig.validate(config)
+        if not is_valid:
+            error_msg = "配置验证失败，无法保存:\n" + "\n".join(f"  - {e}" for e in errors)
+            raise ValueError(error_msg)
+
         with open(self.config_file, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
     def load_config(self) -> dict:
-        """加载配置"""
+        """加载配置
+
+        Returns:
+            dict: 配置字典
+
+        Raises:
+            ValueError: 配置验证失败时抛出
+        """
         with open(self.config_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            config = json.load(f)
+
+        # 加载后验证配置
+        is_valid, errors = AppConfig.validate(config)
+        if not is_valid:
+            error_msg = "配置文件验证失败:\n" + "\n".join(f"  - {e}" for e in errors)
+            raise ValueError(error_msg)
+
+        return config
 
     def get(self, key: str, default=None):
-        """获取配置项"""
+        """获取配置项
+
+        Args:
+            key: 配置项键名
+            default: 默认值
+
+        Returns:
+            配置项值
+
+        Raises:
+            ValueError: 配置验证失败时抛出
+        """
         config = self.load_config()
         return config.get(key, default)
 
     def set(self, key: str, value):
-        """设置配置项"""
+        """设置配置项
+
+        Args:
+            key: 配置项键名
+            value: 配置项值
+
+        Raises:
+            ValueError: 配置验证失败时抛出
+        """
         config = self.load_config()
         config[key] = value
         self.save_config(config)
+
+    def get_typed_config(self) -> AppConfig:
+        """获取类型化的配置对象
+
+        Returns:
+            AppConfig: 类型化的配置实例
+
+        Raises:
+            ValueError: 配置验证失败时抛出
+        """
+        config = self.load_config()
+        return AppConfig.from_dict(config)
 
 
 config = ConfigManager()

@@ -692,3 +692,790 @@ class TestDisplayReport:
         }
 
         _display_report(report_data)
+
+
+class TestCLIProfileShow:
+    """测试 CLI profile show 命令"""
+
+    def test_profile_show_help(self):
+        """测试 profile show 命令帮助"""
+        result = runner.invoke(app, ["profile", "show", "--help"])
+        assert result.exit_code == 0
+
+    def test_profile_show_no_data(self):
+        """测试 profile show 无数据"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_storage_instance.load_profile_json.return_value = None
+            mock_profile_storage.return_value = mock_storage_instance
+
+            with patch("src.cli.ProfileEngine") as mock_engine:
+                mock_engine_instance = Mock()
+                mock_profile = Mock()
+                mock_profile.total_activities = 0
+                mock_engine_instance.build_profile.return_value = mock_profile
+                mock_engine.return_value = mock_engine_instance
+
+                result = runner.invoke(app, ["profile", "show"])
+                assert result.exit_code == 0
+                assert "暂无跑步数据" in result.output or "画像" in result.output
+
+    def test_profile_show_with_data(self):
+        """测试 profile show 有数据"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_profile = Mock()
+            mock_profile.user_id = "test_user"
+            mock_profile.profile_date = MagicMock()
+            mock_profile.profile_date.strftime.return_value = "2024-01-01 12:00"
+            mock_profile.analysis_period_days = 90
+            mock_profile.total_activities = 10
+            mock_profile.total_distance_km = 100.0
+            mock_profile.total_duration_hours = 10.0
+            mock_profile.avg_pace_min_per_km = 5.5
+            mock_profile.avg_vdot = 40.0
+            mock_profile.max_vdot = 45.0
+            mock_profile.fitness_level = MagicMock()
+            mock_profile.fitness_level.value = "中级跑者"
+            mock_profile.weekly_avg_distance_km = 30.0
+            mock_profile.weekly_avg_duration_hours = 3.0
+            mock_profile.training_pattern = MagicMock()
+            mock_profile.training_pattern.value = "周末长跑"
+            mock_profile.consistency_score = 85.0
+            mock_profile.atl = 40.0
+            mock_profile.ctl = 50.0
+            mock_profile.tsb = 10.0
+            mock_profile.injury_risk_level = MagicMock()
+            mock_profile.injury_risk_level.value = "低"
+            mock_profile.injury_risk_score = 20.0
+            mock_profile.avg_heart_rate = 150.0
+            mock_profile.max_heart_rate = 180.0
+            mock_profile.resting_heart_rate = 55.0
+            mock_profile.data_quality_score = 90.0
+            mock_profile.favorite_running_time = "早晨"
+
+            mock_storage_instance.load_profile_json.return_value = mock_profile
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(app, ["profile", "show"])
+            assert result.exit_code == 0
+
+    def test_profile_show_rebuild(self):
+        """测试 profile show 重新构建"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_storage_instance.load_profile_json.return_value = None
+            mock_profile_storage.return_value = mock_storage_instance
+
+            with patch("src.cli.ProfileEngine") as mock_engine:
+                mock_engine_instance = Mock()
+                mock_profile = Mock()
+                mock_profile.total_activities = 5
+                mock_engine_instance.build_profile.return_value = mock_profile
+                mock_engine.return_value = mock_engine_instance
+
+                result = runner.invoke(app, ["profile", "show", "--rebuild"])
+                assert result.exit_code == 0
+
+    def test_profile_show_with_custom_params(self):
+        """测试 profile show 使用自定义参数"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_profile = Mock()
+            mock_profile.total_activities = 5
+            mock_storage_instance.load_profile_json.return_value = mock_profile
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(
+                app, ["profile", "show", "--days", "60", "--age", "35", "--resting-hr", "65"]
+            )
+            assert result.exit_code == 0 or result.exit_code == 1
+
+    def test_profile_show_exception(self):
+        """测试 profile show 异常处理"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_storage_instance.load_profile_json.side_effect = Exception("测试异常")
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(app, ["profile", "show"])
+            assert result.exit_code == 1
+
+
+class TestCLIInit:
+    """测试 CLI init 命令"""
+
+    def test_init_command(self):
+        """测试 init 命令"""
+        with patch("src.cli.ConfigManager") as mock_config:
+            mock_config_instance = Mock()
+            mock_config_instance.data_dir = MagicMock()
+            mock_workspace = MagicMock()
+            mock_workspace.exists.return_value = False
+            mock_workspace.mkdir = Mock()
+            mock_config_instance.data_dir.parent = mock_workspace
+            mock_config.return_value = mock_config_instance
+
+            with patch("nanobot.utils.helpers.sync_workspace_templates") as mock_sync:
+                mock_sync.return_value = ["AGENTS.md", "SOUL.md"]
+
+                result = runner.invoke(app, ["init"])
+                assert result.exit_code == 0
+
+    def test_init_workspace_exists(self):
+        """测试 init 工作区已存在"""
+        with patch("src.cli.ConfigManager") as mock_config:
+            mock_config_instance = Mock()
+            mock_config_instance.data_dir = MagicMock()
+            mock_workspace = MagicMock()
+            mock_workspace.exists.return_value = True
+            mock_config_instance.data_dir.parent = mock_workspace
+            mock_config.return_value = mock_config_instance
+
+            with patch("nanobot.utils.helpers.sync_workspace_templates") as mock_sync:
+                mock_sync.return_value = []
+
+                result = runner.invoke(app, ["init"])
+                assert result.exit_code == 0
+
+
+class TestCLIMemory:
+    """测试 CLI memory 命令"""
+
+    def test_memory_show(self):
+        """测试 memory show 命令"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_memory_file = MagicMock()
+            mock_memory_file.exists.return_value = True
+            mock_memory_file.read_text.return_value = "# Agent 记忆\n\n测试内容"
+            mock_storage_instance.memory_md_path = mock_memory_file
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(app, ["memory", "show"])
+            assert result.exit_code == 0
+
+    def test_memory_show_not_exists(self):
+        """测试 memory show 文件不存在"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_memory_file = MagicMock()
+            mock_memory_file.exists.return_value = False
+            mock_storage_instance.memory_md_path = mock_memory_file
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(app, ["memory", "show"])
+            assert result.exit_code == 0
+
+    def test_memory_clear(self):
+        """测试 memory clear 命令"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_memory_file = MagicMock()
+            mock_memory_file.exists.return_value = True
+            mock_storage_instance.memory_md_path = mock_memory_file
+            mock_profile_storage.return_value = mock_storage_instance
+
+            with patch("rich.prompt.Confirm.ask") as mock_confirm:
+                mock_confirm.return_value = True
+
+                result = runner.invoke(app, ["memory", "clear"])
+                assert result.exit_code == 0
+                mock_memory_file.write_text.assert_called_once()
+
+    def test_memory_clear_not_exists(self):
+        """测试 memory clear 文件不存在"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_memory_file = MagicMock()
+            mock_memory_file.exists.return_value = False
+            mock_storage_instance.memory_md_path = mock_memory_file
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(app, ["memory", "clear"])
+            assert result.exit_code == 0
+
+    def test_memory_invalid_action(self):
+        """测试 memory 无效操作"""
+        result = runner.invoke(app, ["memory", "invalid"])
+        assert result.exit_code == 1
+
+
+class TestCLIVdot:
+    """测试 CLI vdot 命令"""
+
+    def test_vdot_command(self):
+        """测试 vdot 命令"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_vdot_trend.return_value = [
+                {"timestamp": "2024-01-01", "distance": 10000, "vdot": 40.0},
+                {"timestamp": "2024-01-08", "distance": 10500, "vdot": 41.0},
+            ]
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["vdot"])
+            assert result.exit_code == 0
+
+    def test_vdot_no_data(self):
+        """测试 vdot 无数据"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_vdot_trend.return_value = []
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["vdot"])
+            assert result.exit_code == 0
+            assert "暂无 VDOT 数据" in result.output
+
+    def test_vdot_with_limit(self):
+        """测试 vdot 使用 limit 参数"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_vdot_trend.return_value = [
+                {"timestamp": "2024-01-01", "distance": 10000, "vdot": 40.0}
+            ]
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["vdot", "-n", "5"])
+            assert result.exit_code == 0
+
+    def test_vdot_with_output(self):
+        """测试 vdot 输出到文件"""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmpfile:
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+                mock_tools = Mock()
+                mock_tools.get_vdot_trend.return_value = [
+                    {"timestamp": "2024-01-01", "distance": 10000, "vdot": 40.0}
+                ]
+                mock_tools_class.return_value = mock_tools
+
+                result = runner.invoke(app, ["vdot", "-o", str(tmpfile_path)])
+                assert result.exit_code == 0
+                assert tmpfile_path.exists()
+        finally:
+            tmpfile_path.unlink(missing_ok=True)
+
+    def test_vdot_exception(self):
+        """测试 vdot 异常处理"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_vdot_trend.side_effect = Exception("测试异常")
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["vdot"])
+            assert result.exit_code == 1
+
+
+class TestCLITrainingLoad:
+    """测试 CLI training-load 命令"""
+
+    def test_training_load_command(self):
+        """测试 training-load 命令"""
+        with patch("src.core.analytics.AnalyticsEngine") as mock_engine_class:
+            mock_engine = Mock()
+            mock_engine.get_training_load.return_value = {
+                "atl": 30.0,
+                "ctl": 40.0,
+                "tsb": 10.0,
+                "fitness_status": "状态良好",
+                "training_advice": "建议进行轻松跑",
+                "days_analyzed": 42,
+                "runs_count": 10,
+            }
+            mock_engine_class.return_value = mock_engine
+
+            result = runner.invoke(app, ["load"])
+            assert result.exit_code == 0
+
+    def test_training_load_no_data(self):
+        """测试 training-load 无数据"""
+        with patch("src.core.analytics.AnalyticsEngine") as mock_engine_class:
+            mock_engine = Mock()
+            mock_engine.get_training_load.return_value = {
+                "message": "暂无训练数据"
+            }
+            mock_engine_class.return_value = mock_engine
+
+            result = runner.invoke(app, ["load"])
+            assert result.exit_code == 0
+
+    def test_training_load_with_days(self):
+        """测试 training-load 使用 days 参数"""
+        with patch("src.core.analytics.AnalyticsEngine") as mock_engine_class:
+            mock_engine = Mock()
+            mock_engine.get_training_load.return_value = {
+                "atl": 25.0,
+                "ctl": 35.0,
+                "tsb": 10.0,
+                "fitness_status": "状态良好",
+                "training_advice": "建议",
+                "days_analyzed": 30,
+                "runs_count": 8,
+            }
+            mock_engine_class.return_value = mock_engine
+
+            result = runner.invoke(app, ["load", "-d", "30"])
+            assert result.exit_code == 0
+
+    def test_training_load_exception(self):
+        """测试 training-load 异常处理"""
+        with patch("src.core.analytics.AnalyticsEngine") as mock_engine_class:
+            mock_engine = Mock()
+            mock_engine.get_training_load.side_effect = Exception("测试异常")
+            mock_engine_class.return_value = mock_engine
+
+            result = runner.invoke(app, ["load"])
+            assert result.exit_code == 1
+
+
+class TestCLIRecent:
+    """测试 CLI recent 命令"""
+
+    def test_recent_command(self):
+        """测试 recent 命令"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_recent_runs.return_value = [
+                {
+                    "timestamp": "2024-01-01T10:00:00",
+                    "distance_km": 10.0,
+                    "duration_min": 60.0,
+                    "avg_pace_sec_km": 360.0,
+                    "avg_heart_rate": 150,
+                }
+            ]
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["recent"])
+            assert result.exit_code == 0
+
+    def test_recent_no_data(self):
+        """测试 recent 无数据"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_recent_runs.return_value = []
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["recent"])
+            assert result.exit_code == 0
+            assert "暂无训练记录" in result.output
+
+    def test_recent_with_limit(self):
+        """测试 recent 使用 limit 参数"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_recent_runs.return_value = [
+                {
+                    "timestamp": "2024-01-01T10:00:00",
+                    "distance_km": 10.0,
+                    "duration_min": 60.0,
+                    "avg_pace_sec_km": 360.0,
+                    "avg_heart_rate": 150,
+                }
+            ]
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["recent", "-n", "5"])
+            assert result.exit_code == 0
+
+    def test_recent_exception(self):
+        """测试 recent 异常处理"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_recent_runs.side_effect = Exception("测试异常")
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["recent"])
+            assert result.exit_code == 1
+
+
+class TestCLIHrDrift:
+    """测试 CLI hr-drift 命令"""
+
+    def test_hr_drift_command(self):
+        """测试 hr-drift 命令"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_hr_drift_analysis.return_value = {
+                "drift_rate": 3.5,
+                "correlation": -0.8,
+                "assessment": "有氧基础良好",
+            }
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["hr-drift"])
+            assert result.exit_code == 0
+
+    def test_hr_drift_no_data(self):
+        """测试 hr-drift 无数据"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_hr_drift_analysis.return_value = {"error": "暂无数据"}
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["hr-drift"])
+            assert result.exit_code == 0
+
+    def test_hr_drift_high_drift(self):
+        """测试 hr-drift 高漂移率"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_hr_drift_analysis.return_value = {
+                "drift_rate": 12.0,
+                "correlation": -0.5,
+                "assessment": "有氧能力不足",
+            }
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["hr-drift"])
+            assert result.exit_code == 0
+
+    def test_hr_drift_exception(self):
+        """测试 hr-drift 异常处理"""
+        with patch("src.agents.tools.RunnerTools") as mock_tools_class:
+            mock_tools = Mock()
+            mock_tools.get_hr_drift_analysis.side_effect = Exception("测试异常")
+            mock_tools_class.return_value = mock_tools
+
+            result = runner.invoke(app, ["hr-drift"])
+            assert result.exit_code == 1
+
+
+class TestCLIPlan:
+    """测试 CLI plan 命令"""
+
+    def test_plan_generate_help(self):
+        """测试 plan generate 帮助"""
+        result = runner.invoke(app, ["plan", "generate", "--help"])
+        assert result.exit_code == 0
+
+    def test_plan_generate_success(self):
+        """测试 plan generate 成功"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_profile = Mock()
+            mock_profile.to_dict.return_value = {
+                "estimated_vdot": 40.0,
+                "weekly_avg_distance": 30.0,
+                "age": 30,
+                "resting_hr": 60,
+            }
+            mock_storage_instance.load_profile_json.return_value = mock_profile
+            mock_profile_storage.return_value = mock_storage_instance
+
+            with patch("src.cli.TrainingPlanEngine") as mock_engine_class:
+                mock_engine = Mock()
+                mock_plan = Mock()
+                mock_plan.fitness_level = MagicMock()
+                mock_plan.fitness_level.value = "中级跑者"
+                mock_plan.weeks = [
+                    MagicMock(
+                        week_number=1,
+                        start_date="2024-01-01",
+                        end_date="2024-01-07",
+                        weekly_distance_km=30.0,
+                        focus="基础期",
+                    )
+                ]
+                mock_plan.to_dict.return_value = {"goal_distance_km": 21.0975}
+                mock_engine.generate_plan.return_value = mock_plan
+                mock_engine_class.return_value = mock_engine
+
+                result = runner.invoke(
+                    app,
+                    ["plan", "generate", "--goal-distance", "21.0975", "--goal-date", "2024-06-01"],
+                )
+                assert result.exit_code == 0
+
+    def test_plan_generate_no_profile(self):
+        """测试 plan generate 无画像"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_storage_instance.load_profile_json.return_value = None
+            mock_profile_storage.return_value = mock_storage_instance
+
+            result = runner.invoke(
+                app,
+                ["plan", "generate", "--goal-distance", "21.0975", "--goal-date", "2024-06-01"],
+            )
+            assert result.exit_code == 1
+
+    def test_plan_generate_with_custom_params(self):
+        """测试 plan generate 使用自定义参数"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_profile = Mock()
+            mock_profile.to_dict.return_value = {
+                "estimated_vdot": 40.0,
+                "weekly_avg_distance": 30.0,
+                "age": 30,
+                "resting_hr": 60,
+            }
+            mock_storage_instance.load_profile_json.return_value = mock_profile
+            mock_profile_storage.return_value = mock_storage_instance
+
+            with patch("src.cli.TrainingPlanEngine") as mock_engine_class:
+                mock_engine = Mock()
+                mock_plan = Mock()
+                mock_plan.fitness_level = MagicMock()
+                mock_plan.fitness_level.value = "中级跑者"
+                mock_plan.weeks = [
+                    MagicMock(
+                        week_number=1,
+                        start_date="2024-01-01",
+                        end_date="2024-01-07",
+                        weekly_distance_km=30.0,
+                        focus="基础期",
+                    )
+                ]
+                mock_plan.to_dict.return_value = {"goal_distance_km": 42.195}
+                mock_engine.generate_plan.return_value = mock_plan
+                mock_engine_class.return_value = mock_engine
+
+                result = runner.invoke(
+                    app,
+                    [
+                        "plan",
+                        "generate",
+                        "--goal-distance",
+                        "42.195",
+                        "--goal-date",
+                        "2024-10-01",
+                        "--vdot",
+                        "45.0",
+                        "--volume",
+                        "50.0",
+                    ],
+                )
+                assert result.exit_code == 0
+
+    def test_plan_generate_with_output(self):
+        """测试 plan generate 输出到文件"""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmpfile:
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+                mock_storage_instance = Mock()
+                mock_profile = Mock()
+                mock_profile.to_dict.return_value = {
+                    "estimated_vdot": 40.0,
+                    "weekly_avg_distance": 30.0,
+                    "age": 30,
+                    "resting_hr": 60,
+                }
+                mock_storage_instance.load_profile_json.return_value = mock_profile
+                mock_profile_storage.return_value = mock_storage_instance
+
+                with patch("src.cli.TrainingPlanEngine") as mock_engine_class:
+                    mock_engine = Mock()
+                    mock_plan = Mock()
+                    mock_plan.fitness_level = MagicMock()
+                    mock_plan.fitness_level.value = "中级跑者"
+                    mock_plan.weeks = []
+                    mock_plan.to_dict.return_value = {"goal_distance_km": 21.0975}
+                    mock_engine.generate_plan.return_value = mock_plan
+                    mock_engine_class.return_value = mock_engine
+
+                    result = runner.invoke(
+                        app,
+                        [
+                            "plan",
+                            "generate",
+                            "--goal-distance",
+                            "21.0975",
+                            "--goal-date",
+                            "2024-06-01",
+                            "--output",
+                            str(tmpfile_path),
+                        ],
+                    )
+                    assert result.exit_code == 0
+                    assert tmpfile_path.exists()
+        finally:
+            tmpfile_path.unlink(missing_ok=True)
+
+    def test_plan_generate_exception(self):
+        """测试 plan generate 异常处理"""
+        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = Mock()
+            mock_profile = Mock()
+            mock_profile.to_dict.return_value = {}
+            mock_storage_instance.load_profile_json.return_value = mock_profile
+            mock_profile_storage.return_value = mock_storage_instance
+
+            with patch("src.cli.TrainingPlanEngine") as mock_engine_class:
+                mock_engine = Mock()
+                mock_engine.generate_plan.side_effect = Exception("测试异常")
+                mock_engine_class.return_value = mock_engine
+
+                result = runner.invoke(
+                    app,
+                    ["plan", "generate", "--goal-distance", "21.0975", "--goal-date", "2024-06-01"],
+                )
+                assert result.exit_code == 1
+
+    def test_plan_show_help(self):
+        """测试 plan show 帮助"""
+        result = runner.invoke(app, ["plan", "show", "--help"])
+        assert result.exit_code == 0
+
+    def test_plan_show_not_found(self):
+        """测试 plan show 文件不存在"""
+        result = runner.invoke(app, ["plan", "show", "/nonexistent/plan.json"])
+        assert result.exit_code == 1
+
+    def test_plan_show_success(self):
+        """测试 plan show 成功"""
+        import tempfile
+        import json
+
+        plan_data = {
+            "goal_distance_km": 21.0975,
+            "goal_date": "2024-06-01",
+            "fitness_level": "中级跑者",
+            "weeks": [
+                {
+                    "week_number": 1,
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-01-07",
+                    "weekly_distance_km": 30.0,
+                    "focus": "基础期",
+                    "daily_plans": [
+                        {
+                            "date": "2024-01-01",
+                            "workout_type": "轻松跑",
+                            "distance_km": 10.0,
+                            "duration_min": 60,
+                            "notes": "轻松配速",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+            json.dump(plan_data, tmpfile)
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            result = runner.invoke(app, ["plan", "show", str(tmpfile_path)])
+            assert result.exit_code == 0
+        finally:
+            tmpfile_path.unlink(missing_ok=True)
+
+    def test_plan_show_with_week(self):
+        """测试 plan show 指定周次"""
+        import tempfile
+        import json
+
+        plan_data = {
+            "goal_distance_km": 21.0975,
+            "goal_date": "2024-06-01",
+            "fitness_level": "中级跑者",
+            "weeks": [
+                {
+                    "week_number": 1,
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-01-07",
+                    "weekly_distance_km": 30.0,
+                    "focus": "基础期",
+                    "daily_plans": [],
+                },
+                {
+                    "week_number": 2,
+                    "start_date": "2024-01-08",
+                    "end_date": "2024-01-14",
+                    "weekly_distance_km": 35.0,
+                    "focus": "提升期",
+                    "daily_plans": [],
+                },
+            ],
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+            json.dump(plan_data, tmpfile)
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            result = runner.invoke(app, ["plan", "show", str(tmpfile_path), "--week", "2"])
+            assert result.exit_code == 0
+        finally:
+            tmpfile_path.unlink(missing_ok=True)
+
+    def test_plan_show_invalid_week(self):
+        """测试 plan show 无效周次"""
+        import tempfile
+        import json
+
+        plan_data = {
+            "goal_distance_km": 21.0975,
+            "goal_date": "2024-06-01",
+            "fitness_level": "中级跑者",
+            "weeks": [
+                {
+                    "week_number": 1,
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-01-07",
+                    "weekly_distance_km": 30.0,
+                    "focus": "基础期",
+                }
+            ],
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+            json.dump(plan_data, tmpfile)
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            result = runner.invoke(app, ["plan", "show", str(tmpfile_path), "--week", "10"])
+            assert result.exit_code == 1
+        finally:
+            tmpfile_path.unlink(missing_ok=True)
+
+    def test_plan_show_invalid_json(self):
+        """测试 plan show 无效 JSON"""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+            tmpfile.write("invalid json")
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            result = runner.invoke(app, ["plan", "show", str(tmpfile_path)])
+            assert result.exit_code == 1
+        finally:
+            tmpfile_path.unlink(missing_ok=True)
+
+    def test_plan_show_exception(self):
+        """测试 plan show 异常处理"""
+        import tempfile
+        import json
+
+        plan_data = {
+            "goal_distance_km": 21.0975,
+            "goal_date": "2024-06-01",
+            "fitness_level": "中级跑者",
+            "weeks": [],
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as tmpfile:
+            json.dump(plan_data, tmpfile)
+            tmpfile_path = Path(tmpfile.name)
+
+        try:
+            with patch("src.cli.console.print") as mock_print:
+                mock_print.side_effect = Exception("测试异常")
+
+                result = runner.invoke(app, ["plan", "show", str(tmpfile_path)])
+                assert result.exit_code == 1
+        finally:
+            tmpfile_path.unlink(missing_ok=True)

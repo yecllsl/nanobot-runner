@@ -2,7 +2,7 @@
 # 基于 Typer 和 Rich 的本地跑步数据助理
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import polars as pl
 import typer
@@ -85,14 +85,23 @@ class CLIError:
         }
 
 
-def print_error(error_info: dict) -> None:
-    """打印带恢复建议的错误消息"""
+def print_error(error_info: dict[str, Any]) -> None:
+    """打印带恢复建议的错误消息
+
+    Args:
+        error_info: 错误信息字典，包含 message 和 suggestion 键
+    """
     console.print(f"[red bold]错误:[/red bold] {error_info['message']}")
     console.print(f"[yellow]建议:[/yellow] {error_info['suggestion']}")
 
 
 def print_status(message: str, status: str = "info") -> None:
-    """打印带状态颜色的消息"""
+    """打印带状态颜色的消息
+
+    Args:
+        message: 消息内容
+        status: 状态类型 (success/error/warning/info)
+    """
     colors = {
         "success": "green",
         "error": "red",
@@ -105,11 +114,15 @@ def print_status(message: str, status: str = "info") -> None:
 
 @app.command()
 def import_data(
-    path: str = typer.Argument(..., help="FIT文件或目录路径"),
+    path: str = typer.Argument(..., help="FIT 文件或目录路径"),
     force: bool = typer.Option(False, "--force", "-f", help="强制导入，跳过去重"),
-):
+) -> None:
     """
-    导入FIT文件数据
+    导入 FIT 文件数据
+
+    Args:
+        path: FIT 文件或目录路径
+        force: 是否强制导入，跳过重复检查
     """
     path_obj = Path(path)
 
@@ -194,7 +207,7 @@ def stats(
     end_date: Optional[str] = typer.Option(
         None, "--end", "-e", help="结束日期 (YYYY-MM-DD)"
     ),
-):
+) -> None:
     """
     查看跑步统计信息
 
@@ -204,6 +217,11 @@ def stats(
       2. 会话数据（session）：session_total_distance, session_total_timer_time 等，每次跑步一条
     - 每个采样点都包含会话数据字段，因此需要按 session_start_time 聚合统计
     - 直接统计行数会将采样点数量误认为跑步次数
+
+    Args:
+        year: 指定年份
+        start_date: 开始日期 (YYYY-MM-DD)
+        end_date: 结束日期 (YYYY-MM-DD)
     """
     try:
         config = ConfigManager()
@@ -293,7 +311,7 @@ def stats(
 
 
 @app.command()
-def chat():
+def chat() -> None:
     """
     启动自然语言交互模式
     """
@@ -302,7 +320,8 @@ def chat():
     asyncio.run(_run_chat())
 
 
-async def _run_chat():
+async def _run_chat() -> None:
+    """异步聊天循环函数"""
     from nanobot.agent import AgentLoop
     from nanobot.agent.tools import ToolRegistry
     from nanobot.bus import MessageBus
@@ -388,7 +407,7 @@ async def _run_chat():
 
 
 @app.command()
-def version():
+def version() -> None:
     """
     显示版本信息
     """
@@ -399,16 +418,20 @@ def version():
 
 @app.command()
 def vdot(
-    limit: int = typer.Option(10, "--limit", "-n", help="显示最近N条记录"),
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近 N 条记录"),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="输出文件路径（JSON）"),
-):
+) -> None:
     """
-    查看VDOT趋势
+    查看 VDOT 趋势
 
     示例:
         nanobotrun vdot
         nanobotrun vdot -n 20
         nanobotrun vdot -o vdot_trend.json
+
+    Args:
+        limit: 显示最近 N 条记录
+        output: 输出文件路径（JSON）
     """
     import json
 
@@ -467,13 +490,16 @@ def vdot(
 @app.command(name="load")
 def training_load(
     days: int = typer.Option(42, "--days", "-d", help="分析天数"),
-):
+) -> None:
     """
     查看训练负荷（ATL/CTL/TSB）
 
     示例:
         nanobotrun load
         nanobotrun load -d 30
+
+    Args:
+        days: 分析天数
     """
     from src.core.analytics import AnalyticsEngine
 
@@ -519,14 +545,17 @@ def training_load(
 
 @app.command()
 def recent(
-    limit: int = typer.Option(10, "--limit", "-n", help="显示最近N次训练"),
-):
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近 N 次训练"),
+) -> None:
     """
     查看最近训练记录
 
     示例:
         nanobotrun recent
         nanobotrun recent -n 5
+
+    Args:
+        limit: 显示最近 N 次训练
     """
     from src.agents.tools import RunnerTools
 
@@ -585,14 +614,17 @@ def recent(
 
 @app.command(name="hr-drift")
 def hr_drift(
-    limit: int = typer.Option(10, "--limit", "-n", help="分析最近N次训练"),
-):
+    limit: int = typer.Option(10, "--limit", "-n", help="分析最近 N 次训练"),
+) -> None:
     """
     查看心率漂移分析
 
     示例:
         nanobotrun hr-drift
         nanobotrun hr-drift -n 5
+
+    Args:
+        limit: 分析最近 N 次训练
     """
     from src.agents.tools import RunnerTools
 
@@ -645,7 +677,7 @@ def hr_drift(
 @app.command()
 def memory(
     action: str = typer.Argument(..., help="操作：show/edit/clear"),
-):
+) -> None:
     """
     管理 Agent 记忆
 
@@ -653,6 +685,9 @@ def memory(
         nanobotrun memory show
         nanobotrun memory edit
         nanobotrun memory clear
+
+    Args:
+        action: 操作类型 (show/edit/clear)
     """
     from src.core.profile import ProfileStorageManager
 
@@ -694,7 +729,7 @@ def memory(
 
 
 @app.command()
-def init():
+def init() -> None:
     """
     初始化工作区
 
@@ -745,15 +780,15 @@ def generate_plan(
     ),
     goal_date: str = typer.Option(..., "--goal-date", "-t", help="目标比赛日期（YYYY-MM-DD）"),
     current_vdot: Optional[float] = typer.Option(
-        None, "--vdot", "-v", help="当前VDOT（可选，默认从画像获取）"
+        None, "--vdot", "-v", help="当前 VDOT（可选，默认从画像获取）"
     ),
     weekly_volume: Optional[float] = typer.Option(
         None, "--volume", help="当前周跑量（公里，可选）"
     ),
     output: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="输出文件路径（JSON格式）"
+        None, "--output", "-o", help="输出文件路径（JSON 格式）"
     ),
-):
+) -> None:
     """
     生成个性化训练计划
 
@@ -762,6 +797,13 @@ def generate_plan(
     示例:
         nanobotrun plan generate --goal-distance 21.0975 --goal-date 2026-06-01
         nanobotrun plan generate -d 42.195 -t 2026-10-15 -v 45.0
+
+    Args:
+        goal_distance: 目标比赛距离（公里）
+        goal_date: 目标比赛日期（YYYY-MM-DD）
+        current_vdot: 当前 VDOT（可选，默认从画像获取）
+        weekly_volume: 当前周跑量（公里，可选）
+        output: 输出文件路径（JSON 格式）
     """
     import json
 
@@ -848,13 +890,17 @@ def generate_plan(
 def show_plan(
     plan_file: Path = typer.Argument(..., help="训练计划文件路径（JSON）"),
     week: Optional[int] = typer.Option(None, "--week", "-w", help="显示指定周的计划"),
-):
+) -> None:
     """
     显示训练计划详情
 
     示例:
         nanobotrun plan show plan.json
         nanobotrun plan show plan.json --week 4
+
+    Args:
+        plan_file: 训练计划文件路径（JSON）
+        week: 显示指定周的计划（可选）
     """
     import json
 
