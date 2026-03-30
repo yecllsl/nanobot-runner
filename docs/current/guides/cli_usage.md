@@ -47,13 +47,13 @@ uv run nanobotrun version
 
 ```bash
 # 导入单个FIT文件
-uv run nanobotrun import path/to/activity.fit
+uv run nanobotrun import-data path/to/activity.fit
 
 # 导入目录下所有FIT文件
-uv run nanobotrun import path/to/fit/files/
+uv run nanobotrun import-data path/to/fit/files/
 
 # 强制重新导入（跳过去重检查）
-uv run nanobotrun import path/to/activity.fit --force
+uv run nanobotrun import-data path/to/activity.fit --force
 ```
 
 **导入流程**：
@@ -182,7 +182,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ```bash
 # 导入多个目录
-uv run nanobotrun import dir1/ dir2/ dir3/
+uv run nanobotrun import-data dir1/ dir2/ dir3/
 ```
 
 ### 7.2 数据验证

@@ -235,7 +235,7 @@ class AgentTestHelper:
 
     def import_test_data(self, data_path: str) -> str:
         """导入测试数据"""
-        cmd = f"uv run nanobotrun import {data_path}"
+        cmd = f"uv run nanobotrun import-data {data_path}"
         stdout, stderr, returncode = run_command(cmd, self.project_root, 60)
 
         if returncode != 0:

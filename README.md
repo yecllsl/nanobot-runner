@@ -45,13 +45,13 @@ source .venv/bin/activate
 
 ```bash
 # 导入 FIT 文件
-uv run nanobotrun import /path/to/activity.fit
+uv run nanobotrun import-data /path/to/activity.fit
 
 # 导入整个目录
-uv run nanobotrun import /path/to/activities/
+uv run nanobotrun import-data /path/to/activities/
 
 # 强制重新导入（跳过去重）
-uv run nanobotrun import /path/to/activity.fit --force
+uv run nanobotrun import-data /path/to/activity.fit --force
 ```
 
 ### 查看统计

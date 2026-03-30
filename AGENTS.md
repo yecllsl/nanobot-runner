@@ -14,7 +14,7 @@ uv cache clean; if($?) { uv sync --reinstall }   # 清理重装 (Windows)
 
 # 运行
 uv run nanobotrun --help
-uv run nanobotrun import <path> [--force]        # 导入FIT
+uv run nanobotrun import-data <path> [--force]   # 导入FIT
 uv run nanobotrun stats [--year YYYY | --start DATE --end DATE]
 uv run nanobotrun chat                           # Agent交互
 

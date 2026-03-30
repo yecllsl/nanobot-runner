@@ -67,7 +67,7 @@ class CLIError:
     def storage_error(error: str) -> dict:
         return {
             "message": f"存储错误: {error}",
-            "suggestion": "请检查数据目录权限，或运行 'nanobotrun import' 导入数据",
+            "suggestion": "请检查数据目录权限，或运行 'nanobotrun import-data' 导入数据",
         }
 
     @staticmethod
@@ -243,7 +243,7 @@ def stats(
 
         if df.is_empty():
             print_status("暂无跑步数据", "warning")
-            console.print("[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]")
+            console.print("[dim]提示: 使用 'nanobotrun import-data <路径>' 导入FIT文件[/dim]")
             return
 
         from datetime import datetime
@@ -820,7 +820,7 @@ def generate_plan(
         profile = profile_storage.load_profile_json()
         if not profile:
             console.print("[red]错误: 未找到用户画像[/red]")
-            console.print("请先运行 [cyan]nanobotrun import[/cyan] 导入数据")
+            console.print("请先运行 [cyan]nanobotrun import-data[/cyan] 导入数据")
             raise typer.Exit(1)
 
         profile_dict = profile.to_dict()
@@ -1276,7 +1276,7 @@ def report(
             print_error(
                 {
                     "message": f"生成晨报失败: {result.get('error', '未知错误')}",
-                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun import' 导入数据",
+                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun import-data' 导入数据",
                 }
             )
             raise typer.Exit(1)
@@ -1453,7 +1453,7 @@ def profile_show(
         if profile is None or profile.total_activities == 0:
             console.print(
                 Panel(
-                    "[yellow]暂无跑步数据[/yellow]\n\n" "使用 'nanobotrun import <路径>' 导入FIT文件",
+                    "[yellow]暂无跑步数据[/yellow]\n\n" "使用 'nanobotrun import-data <路径>' 导入FIT文件",
                     title="用户画像",
                     border_style="yellow",
                 )
