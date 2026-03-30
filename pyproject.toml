@@ -47,11 +47,12 @@ build-backend = "setuptools.build_meta"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+pythonpath = ["."]
 addopts = "-v --cov=src --cov-report=term-missing --cov-report=html --cov-report=xml --timeout=30 --timeout-method=thread"
 # 注册自定义标记
 markers = [
     "e2e: 端到端测试",
-    "slow: 慢速测试（执行时间>5秒）",
+    "slow: 慢速测试（执行时间>5 秒）",
     "performance: 性能测试",
     "integration: 集成测试",
     "unit: 单元测试",

@@ -1,7 +1,8 @@
-# CLI单元测试
+# CLI 单元测试
 # 测试命令行界面的功能
 
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -762,20 +763,34 @@ class TestCLIProfileShow:
 
     def test_profile_show_rebuild(self):
         """测试 profile show 重新构建"""
-        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
-            mock_storage_instance = Mock()
-            mock_storage_instance.load_profile_json.return_value = None
-            mock_profile_storage.return_value = mock_storage_instance
+        with patch("src.cli.ConfigManager") as mock_config:
+            mock_config_instance = Mock()
+            mock_config_instance.data_dir = Path("/fake/data/dir")
+            mock_config.return_value = mock_config_instance
 
-            with patch("src.cli.ProfileEngine") as mock_engine:
-                mock_engine_instance = Mock()
-                mock_profile = Mock()
-                mock_profile.total_activities = 5
-                mock_engine_instance.build_profile.return_value = mock_profile
-                mock_engine.return_value = mock_engine_instance
+            with patch("src.cli.StorageManager"):
+                with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
+                    mock_storage_instance = Mock()
+                    mock_storage_instance.load_profile_json.return_value = None
+                    mock_profile_storage.return_value = mock_storage_instance
 
-                result = runner.invoke(app, ["profile", "show", "--rebuild"])
-                assert result.exit_code == 0
+                    with patch("src.cli.ProfileEngine") as mock_engine:
+                        mock_engine_instance = Mock()
+                        mock_profile = Mock()
+                        mock_profile.total_activities = 5
+                        mock_profile.user_id = "default_user"
+                        mock_profile.profile_date = datetime.now()
+                        mock_profile.analysis_period_days = 90
+                        mock_engine_instance.build_profile.return_value = mock_profile
+                        mock_engine.return_value = mock_engine_instance
+
+                        result = runner.invoke(app, ["profile", "show", "--rebuild"])
+                        if result.exit_code != 0:
+                            print(f"Exception: {result.exception}")
+                            import traceback
+                            if result.exception:
+                                traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+                        assert result.exit_code == 0
 
     def test_profile_show_with_custom_params(self):
         """测试 profile show 使用自定义参数"""
