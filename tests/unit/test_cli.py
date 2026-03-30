@@ -978,7 +978,7 @@ class TestCLIVdot:
             result = runner.invoke(app, ["vdot"])
             assert result.exit_code == 0
             # 移除 ANSI 转义码后检查输出
-            clean_output = re.sub(r'\x1b\[[0-9;]*m', '', result.output)
+            clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
             # 实际输出是"暂无VDOT数据"（无空格）
             assert "暂无VDOT数据" in clean_output
 
