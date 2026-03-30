@@ -64,8 +64,113 @@ if TYPE_CHECKING:
 
 ### 类型注解
 
-- mypy 宽松：`warn_return_any=false`, `disallow_untyped_defs=false`；新代码建议加注解
-- Polars：`pl.Series`, `pl.DataFrame`, `pl.LazyFrame`；循环引用用 `TYPE_CHECKING` + 字符串注解
+#### 基本要求
+
+- **新代码必须**添加类型注解，这是v0.4.1版本后的强制要求
+- **核心模块**（core/、agents/）类型覆盖率目标≥80%
+- **工具函数**必须标注参数类型和返回值类型
+- Polars类型：`pl.Series`, `pl.DataFrame`, `pl.LazyFrame`
+- 循环引用处理：使用 `TYPE_CHECKING` 块 + 字符串类型注解
+
+#### 类型注解规范
+
+```python
+# 标准库导入
+from typing import TYPE_CHECKING, Any, Optional, Union, Callable
+
+# 函数类型注解示例
+def calculate_vdot(distance_m: float, time_s: float) -> float:
+    """计算VDOT值
+    
+    Args:
+        distance_m: 距离（米），必须为正数
+        time_s: 用时（秒），必须为正数
+        
+    Returns:
+        float: VDOT值
+        
+    Raises:
+        ValueError: 当距离或时间为非正数
+    """
+    if distance_m <= 0 or time_s <= 0:
+        raise ValueError("距离和时间必须为正数")
+    return (distance_m / time_s) * 3.5  # 简化公式
+
+# 类方法类型注解示例
+class StorageManager:
+    def __init__(self, data_dir: Path, compression: str = "snappy") -> None:
+        self.data_dir = data_dir
+        self.compression = compression
+    
+    def read_parquet(
+        self, 
+        year: int, 
+        columns: Optional[list[str]] = None
+    ) -> pl.LazyFrame:
+        """读取Parquet文件
+        
+        Args:
+            year: 年份
+            columns: 可选的列筛选列表
+            
+        Returns:
+            pl.LazyFrame: 懒加载数据框
+        """
+        path = self.data_dir / f"activities_{year}.parquet"
+        return pl.scan_parquet(path, columns=columns)
+    
+    def save_records(
+        self, 
+        records: list[dict[str, Any]], 
+        year: int
+    ) -> tuple[bool, str]:
+        """保存记录到Parquet
+        
+        Args:
+            records: 记录列表
+            year: 年份
+            
+        Returns:
+            tuple[bool, str]: (成功状态, 消息)
+        """
+        try:
+            df = pl.DataFrame(records)
+            path = self.data_dir / f"activities_{year}.parquet"
+            df.write_parquet(path, compression=self.compression)
+            return True, f"已保存 {len(records)} 条记录"
+        except Exception as e:
+            return False, str(e)
+
+# 复杂类型别名
+from typing import TypeAlias
+
+ActivityRecord: TypeAlias = dict[str, Union[str, int, float, datetime]]
+ConfigDict: TypeAlias = dict[str, Any]
+HandlerFunc: TypeAlias = Callable[[str], bool]
+
+# 泛型使用
+from typing import TypeVar
+
+T = TypeVar('T')
+
+def first_or_default(items: list[T], default: T) -> T:
+    """获取列表第一个元素，或默认值"""
+    return items[0] if items else default
+```
+
+#### mypy配置说明
+
+项目使用宽松的mypy配置（见pyproject.toml），但新代码应尽可能完整注解：
+
+```toml
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = false          # 暂时关闭Any返回警告
+disallow_untyped_defs = false    # 暂时允许无类型定义（新代码应添加）
+check_untyped_defs = false       # 暂时关闭无类型定义检查
+```
+
+**目标**：逐步收紧配置，最终达到 `disallow_untyped_defs = true`
 
 ### 错误处理
 
@@ -173,15 +278,164 @@ Schema 必填: `activity_id`, `timestamp`, `source_file`, `filename`, `total_dis
 
 ## CI/CD
 
+### Pipeline流程
+
 1. **code-quality**: black, isort, mypy, bandit
 2. **test**: pytest (Python 3.11/3.12 矩阵)
 3. **build**: 构建 wheel/sdist
 4. **release**: main 分支打 tag → GitHub Release
 
+### 质量门禁（v0.4.1强化）
+
+#### 代码质量门禁
+
+| 检查项 | 工具 | 门禁要求 | 失败处理 |
+|--------|------|----------|----------|
+| 代码格式化 | black | 零警告 | 阻断合并 |
+| 导入排序 | isort | 零警告 | 阻断合并 |
+| 类型检查 | mypy | 警告可接受 | 非阻断（逐步收紧） |
+| 安全扫描 | bandit | 高危漏洞=0 | 阻断合并 |
+
+#### 测试质量门禁
+
+| 检查项 | 要求 | 失败处理 |
+|--------|------|----------|
+| 单元测试通过率 | 100% | 阻断合并 |
+| 集成测试通过率 | 100% | 阻断合并 |
+| 代码覆盖率 | core≥80%, agents≥70%, cli≥60% | 阻断合并 |
+| 测试执行时间 | 单测试<30秒 | 标记慢测试 |
+
+#### 本地预检查（推荐）
+
+提交前在本地执行质量检查，避免CI失败：
+
+```bash
+# 完整预检查脚本
+uv run black --check src/ tests/                      # 格式化检查
+uv run isort --check-only src/ tests/                 # 导入排序检查
+uv run mypy src/ --ignore-missing-imports             # 类型检查
+uv run bandit -r src/ -s B101,B601                    # 安全扫描
+uv run pytest tests/unit/ --cov=src --cov-fail-under=80  # 单元测试+覆盖率
+```
+
+#### CI环境差异处理
+
+v0.4.1版本发现CI环境与本地环境差异问题，解决方案：
+
+```bash
+# 1. 确保types-requests已安装
+pip install types-requests
+
+# 2. 清理缓存（遇到奇怪问题时）
+uv cache clean; uv sync --reinstall
+
+# 3. CI配置使用--no-cache-dir避免缓存污染
+pip install -e .[dev,test] --no-cache-dir
+```
+
+### 发布流程
+
+```bash
+# 1. 确保所有检查通过
+uv run pytest
+uv run black src tests
+uv run isort src tests
+
+# 2. 更新版本号（pyproject.toml）
+# version = "x.y.z"
+
+# 3. 创建tag并推送
+git tag -a vx.y.z -m "Release version x.y.z"
+git push origin vx.y.z
+
+# 4. GitHub Actions自动执行发布
+```
+
+## 依赖管理（统一使用uv）
+
+### uv安装与配置
+
+```bash
+# 安装uv (Windows)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 验证安装
+uv --version
+```
+
+### 常用uv命令
+
+```bash
+# 环境管理
+uv venv                                          # 创建虚拟环境
+.venv\Scripts\activate                           # Windows激活
+source .venv/bin/activate                        # Linux/Mac激活
+
+# 依赖同步
+uv sync                                          # 同步基础依赖
+uv sync --all-extras                             # 同步所有依赖（含dev/test）
+uv sync --extra dev                              # 仅同步开发依赖
+uv sync --extra test                             # 仅同步测试依赖
+
+# 依赖维护
+uv cache clean                                   # 清理缓存
+uv cache clean; if($?) { uv sync --reinstall }   # 清理重装 (Windows)
+uv pip list                                      # 查看已安装包
+
+# 运行命令
+uv run python script.py                          # 在虚拟环境中运行
+uv run pytest                                    # 运行测试
+uv run nanobotrun --help                         # 运行CLI
+```
+
+### pyproject.toml依赖配置
+
+```toml
+[project]
+dependencies = [
+    "nanobot-ai>=0.1.4",
+    "typer[all]>=0.12.0",
+    "rich>=13.0.0",
+    "polars>=0.20.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+dev = [
+    "black>=23.0.0,<24.0.0",
+    "isort>=5.12.0,<6.0.0",
+    "mypy>=1.0.0,<2.0.0",
+]
+```
+
+### 依赖问题解决
+
+```bash
+# 问题1: 依赖冲突
+uv cache clean; uv sync --reinstall
+
+# 问题2: 类型存根缺失（CI常见）
+pip install types-requests types-setuptools
+
+# 问题3: Windows执行策略
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# 问题4: Windows多命令链
+# 用 "; if($?) { cmd }" 替代 "&&"
+uv cache clean; if($?) { uv sync --reinstall }
+```
+
 ## 常见问题
 
 ```bash
-uv cache clean; uv sync --reinstall               # 依赖问题
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser  # Win PS激活
-# Windows 多命令: 用 "; if($?) { cmd }" 替代 "&&"
+# 依赖问题
+uv cache clean; uv sync --reinstall
+
+# Windows PowerShell激活
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Windows多命令链: 用 "; if($?) { cmd }" 替代 "&&"
 ```

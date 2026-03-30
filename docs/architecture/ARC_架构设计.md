@@ -123,6 +123,8 @@ graph TB
 │   ├── profile.json         # 结构化画像数据（计算用）
 │   └── plans/               # 训练计划存储
 │       └── {plan_id}.json
+├── cron/                    # 定时任务配置（v0.4.1新增，业务目录）
+│   └── jobs.json            # 定时任务存储
 ├── memory/                  # 记忆系统（nanobot标准）
 │   ├── MEMORY.md            # 长期记忆/用户画像（Agent上下文）
 │   └── HISTORY.md           # 事件日志（可搜索历史）
@@ -155,13 +157,43 @@ graph TB
 | `memory/MEMORY.md` | 长期记忆初始文件 |
 | `memory/HISTORY.md` | 事件日志初始文件 |
 | `skills/` | 技能目录（如版本默认带） |
+| `cron/jobs.json` | 定时任务配置（v0.4.1新增，业务目录） |
 
 **设计依据**：
 - `data/`：本项目特有，存储 Parquet 业务数据，需应用自行创建
+- `cron/`：v0.4.1新增，定时任务配置从框架目录迁移到业务目录
 - `memory/`、`sessions/`、`skills/`、`AGENTS.md`、`USER.md` 等：由 nanobot-ai 框架自动初始化
 - **完全复用 nanobot 的初始化逻辑**，避免重复实现
 
-#### 4.1.4 配置管理架构
+#### 4.1.4 定时任务存储架构（v0.4.1更新）
+
+**架构变更**：
+- **旧位置**: `~/.nanobot/cron/jobs.json`（框架目录，违反配置分离原则）
+- **新位置**: `~/.nanobot-runner/cron/jobs.json`（业务目录，符合架构原则）
+
+**迁移机制**：
+```python
+# ConfigManager._migrate_old_cron_config()
+def _migrate_old_cron_config(self):
+    """迁移旧版定时任务配置"""
+    old_cron_store = Path.home() / ".nanobot" / "cron" / "jobs.json"
+    new_cron_store = self.cron_store
+    
+    if old_cron_store.exists() and not new_cron_store.exists():
+        try:
+            shutil.copy2(old_cron_store, new_cron_store)
+            logger.info(f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}")
+        except Exception as e:
+            logger.warning(f"迁移定时任务配置失败：{e}")
+```
+
+**设计要点**：
+1. **存储路径统一**: 通过 `ConfigManager.cron_store` 统一管理
+2. **自动迁移**: 首次启动时自动检测并迁移旧配置
+3. **失败降级**: 迁移失败仅记录日志，不影响主流程
+4. **向后兼容**: 保留旧配置，不删除原文件
+
+#### 4.1.5 配置管理架构（v0.4.1更新）
 
 **三级配置体系**：
 
@@ -208,14 +240,59 @@ graph TB
 `~/.nanobot-runner/config.json`（应用配置）：
 ```json
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "data_dir": "~/.nanobot-runner/data",
-  "feishu_webhook": "https://open.feishu.cn/...",
   "auto_push_feishu": false,
-  "vdot_params": {
-    "min_distance": 1500
-  }
+  "feishu_app_id": "",
+  "feishu_app_secret": "",
+  "feishu_receive_id": "",
+  "feishu_receive_id_type": "user_id",
+  "feishu_webhook": ""
 }
+```
+
+**配置Schema验证建议（v0.4.1新增）**：
+
+为提升配置管理的健壮性，建议在后续版本中引入配置Schema验证：
+
+```python
+# 建议实现（src/core/config_schema.py）
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class AppConfigSchema:
+    """应用配置Schema定义"""
+    version: str
+    data_dir: str
+    auto_push_feishu: bool = False
+    feishu_app_id: Optional[str] = None
+    feishu_app_secret: Optional[str] = None
+    feishu_receive_id: Optional[str] = None
+    feishu_receive_id_type: str = "user_id"
+    feishu_webhook: Optional[str] = None
+    
+    REQUIRED_FIELDS = ["version", "data_dir"]
+    
+    @classmethod
+    def validate(cls, config: dict) -> tuple[bool, list[str]]:
+        """验证配置是否符合Schema
+        
+        Returns:
+            (是否有效, 错误信息列表)
+        """
+        errors = []
+        
+        # 检查必填字段
+        for field in cls.REQUIRED_FIELDS:
+            if field not in config:
+                errors.append(f"缺少必填字段: {field}")
+        
+        # 检查类型
+        if "auto_push_feishu" in config and not isinstance(config["auto_push_feishu"], bool):
+            errors.append("auto_push_feishu 必须是布尔值")
+        
+        return len(errors) == 0, errors
 ```
 
 ### 4.2 数据导入流程设计
@@ -350,6 +427,96 @@ nanobot-runner/
 └── README.md
 ```
 
+### 6.1 CI/CD架构设计（v0.4.1更新）
+
+**工作流架构**：
+```mermaid
+graph TB
+    subgraph "代码提交"
+        A[代码推送] --> B[CI Pipeline]
+        C[Pull Request] --> B
+    end
+    
+    subgraph "CI Pipeline"
+        B --> D[代码质量检查]
+        D --> E[单元测试]
+        E --> F[集成测试]
+        F --> G[构建验证]
+    end
+    
+    subgraph "发布流程"
+        H[Tag推送] --> I[Release Pipeline]
+        I --> J[GitHub Release]
+        I --> K[PyPI发布]
+    end
+    
+    G -->|通过| L[合并到main]
+    L --> H
+```
+
+**权限配置要求（v0.4.1新增）**：
+
+为避免发布过程中的权限错误，CI/CD工作流必须明确声明所需权限：
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # 创建GitHub Release必需
+  packages: write  # 发布到GitHub Packages（如需要）
+  id-token: write  # 用于OIDC认证（如需要）
+
+jobs:
+  publish-github:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # ... 其他步骤
+```
+
+**本地CI验证脚本（v0.4.1新增建议）**：
+
+为消除本地与CI环境差异，建议创建本地验证脚本：
+
+```bash
+#!/bin/bash
+# scripts/verify_ci.sh - 本地CI验证脚本
+
+set -e
+
+echo "=== 本地CI验证 ==="
+
+echo "1. 代码格式化检查..."
+uv run black --check src/ tests/
+
+echo "2. 导入排序检查..."
+uv run isort --check-only src/ tests/
+
+echo "3. 类型检查..."
+uv run mypy src/ --ignore-missing-imports
+
+echo "4. 安全扫描..."
+uv run bandit -r src/ -s B101,B601
+
+echo "5. 单元测试..."
+uv run pytest tests/unit/ -v --cov=src
+
+echo "=== 验证通过 ==="
+```
+
+**环境一致性保障（v0.4.1新增）**：
+
+1. **依赖锁定**: 使用 `uv.lock` 或 `requirements.txt` 锁定依赖版本
+2. **Python版本**: CI和本地统一使用 Python 3.11+
+3. **类型存根**: 明确安装 `types-requests` 等类型存根包
+4. **缓存策略**: 使用 `actions/setup-python` 的缓存功能
+
 ## 7. 非功能性设计
 
 ### 7.1 性能指标
@@ -382,6 +549,10 @@ nanobot-runner/
 |--------|----------|----------|----------|----------|
 | R-007 | 数据量增长导致性能下降 | 高 | 存储层、查询层 | 监控中 |
 | R-010 | 文档与代码不同步 | 中 | 维护性 | 已识别 |
+| R-011 | 配置管理架构缺陷 | 高 | 发布流程、环境一致性 | v0.4.1已识别 |
+| R-012 | CI/CD流程架构不完善 | 高 | 发布效率、团队信心 | v0.4.1已识别 |
+| R-013 | 定时任务存储设计缺陷 | 中 | 配置迁移、数据一致性 | v0.4.1已修复 |
+| R-014 | 飞书集成架构风险 | 中 | 消息推送、用户体验 | v0.4.1已识别 |
 
 ### 8.2 R-007: 数据量增长性能风险
 
@@ -438,6 +609,73 @@ nanobot-runner/
 3. **定期审查**: 每个迭代周期结束前进行文档一致性检查
 4. **自动化检查**: 通过CI检查Schema定义与文档的一致性
 
+### 8.4 R-011: 配置管理架构缺陷（v0.4.1新增）
+
+#### 风险描述
+当前配置管理架构存在以下问题：
+1. **配置验证机制缺失**: 无Schema验证、类型检查、必填项校验
+2. **配置迁移逻辑耦合**: 迁移逻辑与配置管理强耦合，无重试机制
+3. **配置路径不一致**: 历史原因导致配置分散在多处
+
+#### 影响分析
+- 发布过程中配置不一致导致功能异常
+- 配置迁移失败导致定时任务丢失
+- 环境差异导致本地与CI行为不一致
+
+#### 应对措施
+1. **短期（v0.4.2）**: 引入配置Schema验证，实现配置迁移状态管理
+2. **中期（v0.5.0）**: 重构配置管理模块，实现配置抽象接口
+3. **长期（v1.0）**: 支持多环境配置隔离
+
+### 8.5 R-012: CI/CD流程架构不完善（v0.4.1新增）
+
+#### 风险描述
+v0.4.1发布过程中暴露的问题：
+1. **环境差异未隔离**: 本地与CI环境配置不一致
+2. **权限配置缺失**: 未声明必要的GitHub Actions权限
+3. **错误处理机制薄弱**: 错误被静默忽略
+
+#### 影响分析
+- 发布延迟约2小时
+- CI Pipeline失败8次
+- Release Pipeline因权限问题阻塞
+
+#### 应对措施
+1. **短期（v0.4.2）**: 完善CI/CD权限配置，建立本地CI验证脚本
+2. **中期（v0.5.0）**: 统一本地与CI环境，消除环境差异
+3. **长期（v1.0）**: 建立发布流程自动化，实现一键发布
+
+### 8.6 R-013: 定时任务存储设计缺陷（v0.4.1已修复）
+
+#### 风险描述
+定时任务配置存储在框架目录（`~/.nanobot/cron/`），违反配置分离原则。
+
+#### 修复措施（v0.4.1已实施）
+1. 将定时任务配置迁移到业务目录（`~/.nanobot-runner/cron/`）
+2. 实现自动迁移逻辑
+3. 统一通过 `ConfigManager.cron_store` 管理路径
+
+#### 状态
+✅ **已修复** - v0.4.1版本已实施
+
+### 8.7 R-014: 飞书集成架构风险（v0.4.1新增）
+
+#### 风险描述
+飞书集成存在以下问题：
+1. **API契约理解偏差**: 未建立API契约验证机制
+2. **配置分散**: 同一功能的配置分散在多处
+3. **错误处理不完善**: 未区分错误类型，无重试机制
+
+#### 影响分析
+- 消息推送失败
+- 用户无法收到通知
+- Gateway交互异常
+
+#### 应对措施
+1. **短期（v0.4.2）**: 统一飞书配置管理，建立API契约验证
+2. **中期（v0.5.0）**: 完善错误处理机制，实现错误分类和重试
+3. **长期（v1.0）**: 建立第三方集成抽象层
+
 ## 9. 扩展性设计建议
 
 ### 9.1 数据分区扩展
@@ -484,34 +722,42 @@ class QueryCache:
 | 0.3.0 | 2024-03 | 新增Agent工具集、飞书推送、每日晨报 | 架构师 | - |
 | 0.3.1 | 2026-03-17 | **风险复盘架构调整** | 架构师 | R-007, R-010 |
 | 0.4.0 | 2026-03-19 | **架构评审修订**：新增workspace结构、配置管理、Channel集成机制、Agent监控指标 | 架构师 | R-010 |
+| 0.4.1 | 2026-03-29 | **v0.4.1发布专项更新**：定时任务存储迁移、配置管理Schema验证建议、CI/CD权限配置说明、新增风险识别（R-011至R-014） | 架构师 | R-011, R-012, R-013, R-014 |
 
-### 0.3.1 版本变更详情
+### 0.4.1 版本变更详情
 
 #### 新增内容
-1. **第8章 已知架构风险**
-   - 新增风险识别清单
-   - 详细分析R-007数据量增长性能风险
-   - 详细分析R-010文档与代码不同步风险
-   - 制定短中长期应对策略
+1. **第4.1.4节 定时任务存储架构（v0.4.1更新）**
+   - 文档化定时任务存储从框架目录迁移到业务目录的架构变更
+   - 详细说明迁移机制和向后兼容策略
 
-2. **第9章 扩展性设计建议**
-   - 数据分区扩展策略
-   - 缓存机制设计建议
-   - 数据压缩优化建议
+2. **第4.1.5节 配置管理架构（v0.4.1更新）**
+   - 补充配置Schema验证建议
+   - 提供配置验证的参考实现
+
+3. **第6.1节 CI/CD架构设计（v0.4.1更新）**
+   - 新增权限配置要求说明
+   - 提供本地CI验证脚本建议
+   - 补充环境一致性保障措施
+
+4. **第8节 已知架构风险**
+   - 新增风险R-011：配置管理架构缺陷
+   - 新增风险R-012：CI/CD流程架构不完善
+   - 新增风险R-013：定时任务存储设计缺陷（已修复）
+   - 新增风险R-014：飞书集成架构风险
 
 #### 修正内容
-1. **技术栈版本**: Python 3.10+ 修正为 3.11+（nanobot-ai要求）
-2. **Schema描述**: 补充完整字段列表，区分必填/可选字段
-3. **模块结构**: 更新目录结构，补充新增模块（report_service, exceptions等）
-4. **CLI命令**: 补充完整的命令参数说明
-5. **架构图**: 更新组件名称与实际代码一致
+1. **定时任务存储路径**: 更新为 `~/.nanobot-runner/cron/jobs.json`
+2. **Workspace目录结构**: 补充 `cron/` 目录说明
+3. **风险清单**: 更新风险状态和应对措施
 
 #### 架构决策记录
-- **决策**: 保持按年分区策略，但增加文件大小监控
-- **理由**: 当前数据量下按年分区足够，过早优化会增加复杂度
-- **触发条件**: 单文件超过500MB或查询响应时间超过2秒时启动分区粒度调整
+- **决策**: 定时任务配置从框架目录迁移到业务目录
+- **理由**: 符合配置分离原则，避免框架与业务配置混杂
+- **实施版本**: v0.4.1
+- **向后兼容**: 自动迁移旧配置，保留原文件
 
 ---
-*文档版本: 0.3.1*
-*最后更新: 2026-03-17*
-*审核状态: 已同步代码状态*
+*文档版本: 0.4.1*
+*最后更新: 2026-03-29*
+*审核状态: 已同步v0.4.1代码状态*

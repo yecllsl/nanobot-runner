@@ -50,13 +50,18 @@ class TestConfigManager:
         """测试保存配置"""
         with patch.object(Path, "home", return_value=tmp_path):
             cm = ConfigManager()
-            test_config = {"version": "0.2.0", "custom_key": "custom_value"}
+            test_config = {
+                "version": "0.2.0",
+                "data_dir": str(tmp_path / "data"),
+                "custom_key": "custom_value",
+            }
             cm.save_config(test_config)
 
             with open(cm.config_file, "r", encoding="utf-8") as f:
                 saved_config = json.load(f)
 
             assert saved_config["version"] == "0.2.0"
+            assert saved_config["data_dir"] == str(tmp_path / "data")
             assert saved_config["custom_key"] == "custom_value"
 
     def test_load_config(self, tmp_path):
@@ -65,7 +70,11 @@ class TestConfigManager:
             cm = ConfigManager()
 
             # 先保存测试配置
-            test_config = {"test_key": "test_value"}
+            test_config = {
+                "version": "0.1.0",
+                "data_dir": str(tmp_path / "data"),
+                "test_key": "test_value",
+            }
             cm.save_config(test_config)
 
             loaded_config = cm.load_config()
@@ -77,7 +86,13 @@ class TestConfigManager:
             cm = ConfigManager()
 
             # 设置测试配置
-            cm.save_config({"test_key": "test_value"})
+            cm.save_config(
+                {
+                    "version": "0.1.0",
+                    "data_dir": str(tmp_path / "data"),
+                    "test_key": "test_value",
+                }
+            )
 
             value = cm.get("test_key")
             assert value == "test_value"

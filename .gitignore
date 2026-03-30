@@ -99,3 +99,4 @@ ehthumbs.db
 # Project specific exclusions
 # Keep test data fixtures but ignore other .fit files
 !tests/data/fixtures/
+test_base/
