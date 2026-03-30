@@ -2,12 +2,12 @@
   "version": 1,
   "jobs": [
     {
-      "id": "dd91b269",
+      "id": "cc72f831",
       "name": "weekly_report",
       "enabled": true,
       "schedule": {
         "kind": "at",
-        "atMs": 1774832400000,
+        "atMs": 1774918800000,
         "everyMs": null,
         "expr": null,
         "tz": null
@@ -20,22 +20,22 @@
         "to": null
       },
       "state": {
-        "nextRunAtMs": 1774832400000,
+        "nextRunAtMs": 1774918800000,
         "lastRunAtMs": null,
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774826956464,
-      "updatedAtMs": 1774826956464,
+      "createdAtMs": 1774837847637,
+      "updatedAtMs": 1774837847637,
       "deleteAfterRun": false
     },
     {
-      "id": "6561b8ab",
+      "id": "d31e3e90",
       "name": "monthly_report",
       "enabled": true,
       "schedule": {
         "kind": "at",
-        "atMs": 1774836000000,
+        "atMs": 1774922400000,
         "everyMs": null,
         "expr": null,
         "tz": null
@@ -48,22 +48,22 @@
         "to": null
       },
       "state": {
-        "nextRunAtMs": 1774836000000,
+        "nextRunAtMs": 1774922400000,
         "lastRunAtMs": null,
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774826956479,
-      "updatedAtMs": 1774826956479,
+      "createdAtMs": 1774837847654,
+      "updatedAtMs": 1774837847654,
       "deleteAfterRun": false
     },
     {
-      "id": "cfd5e340",
+      "id": "22ae3fd1",
       "name": "daily_report",
       "enabled": true,
       "schedule": {
         "kind": "at",
-        "atMs": 1774828800000,
+        "atMs": 1774915200000,
         "everyMs": null,
         "expr": null,
         "tz": null
@@ -76,13 +76,13 @@
         "to": null
       },
       "state": {
-        "nextRunAtMs": 1774828800000,
+        "nextRunAtMs": 1774915200000,
         "lastRunAtMs": null,
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774826956510,
-      "updatedAtMs": 1774826956510,
+      "createdAtMs": 1774837847690,
+      "updatedAtMs": 1774837847690,
       "deleteAfterRun": false
     }
   ]
