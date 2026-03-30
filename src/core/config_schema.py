@@ -2,7 +2,7 @@
 # 提供配置数据结构定义和验证机制
 
 from dataclasses import dataclass, field
-from typing import Optional, Type, Union
+from typing import ClassVar, Optional, Type, Union
 
 
 @dataclass
@@ -31,11 +31,11 @@ class AppConfig:
     feishu_receive_id_type: str = "user_id"
     feishu_webhook: Optional[str] = None
 
-    # 必填字段列表
-    REQUIRED_FIELDS = ["version", "data_dir"]
+    # 必填字段列表（类变量，非实例字段）
+    REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
 
-    # 字段类型映射
-    FIELD_TYPES: dict[str, type | tuple[type, ...]] = {
+    # 字段类型映射（类变量，非实例字段）
+    FIELD_TYPES: ClassVar[dict[str, type | tuple[type, ...]]] = {
         "version": str,
         "data_dir": str,
         "auto_push_feishu": bool,
