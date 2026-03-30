@@ -1,9 +1,14 @@
-# Python
+# ======================
+# Python 开发环境
+# ======================
+
+# 字节码和缓存
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
+
+# 包构建产物
 build/
 develop-eggs/
 dist/
@@ -22,7 +27,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# 虚拟环境
 .venv/
 venv/
 env/
@@ -30,64 +35,36 @@ ENV/
 env.bak/
 venv.bak/
 
-# IDE and editor files
+# 包管理器锁定文件
+uv.lock
+Pipfile.lock
+poetry.lock
+
+# ======================
+# IDE 和编辑器
+# ======================
+
+# VS Code
 .vscode/
+
+# PyCharm/IntelliJ
 .idea/
+
+# Vim/Neovim
 *.swp
 *.swo
 *~
 
-# OS generated files
+# ======================
+# 操作系统文件
+# ======================
+
+# macOS
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
-
-# Project specific
-.parquet/
-.parquet_data/
-.fit_cache/
-*.fit
-!tests/data/fixtures/*.fit
-
-# Test and coverage
-.coverage
-.coverage.*
-coverage.xml
-htmlcov/
-.pytest_cache/
-.tox/
-
-# Logs
-*.log
-logs/
-
-# Configuration files with sensitive data
-.env
-.env.local
-.env.production
-secrets.json
-config.local.json
-
-# Package manager specific
-uv.lock
-Pipfile.lock
-poetry.lock
-
-# Documentation build
-_build/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# PyCharm
-.idea/
-
-# macOS
-.DS_Store
 
 # Windows
 Thumbs.db
@@ -96,7 +73,59 @@ ehthumbs.db
 # Linux
 *~
 
-# Project specific exclusions
-# Keep test data fixtures but ignore other .fit files
-!tests/data/fixtures/
+# ======================
+# 项目特定配置
+# ======================
+
+# 数据缓存和临时文件
+.parquet/
+.parquet_data/
+.fit_cache/
+
+# FIT 文件（仅保留测试数据）
+*.fit
+!tests/data/fixtures/*.fit
+
+# 测试和覆盖率
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+
+# ======================
+# 敏感配置文件
+# ======================
+
+# 环境变量文件
+.env
+.env.*
+!.env.example
+
+# 本地配置文件
+config.local.json
+secrets.json
+
+# ======================
+# 文档和构建
+# ======================
+
+# 文档构建
+_build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# ======================
+# 测试基础目录（不跟踪）
+# ======================
 test_base/
