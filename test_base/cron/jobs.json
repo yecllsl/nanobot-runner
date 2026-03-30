@@ -2,7 +2,7 @@
   "version": 1,
   "jobs": [
     {
-      "id": "cc72f831",
+      "id": "393782ad",
       "name": "weekly_report",
       "enabled": true,
       "schedule": {
@@ -25,12 +25,12 @@
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774837847637,
-      "updatedAtMs": 1774837847637,
+      "createdAtMs": 1774845469918,
+      "updatedAtMs": 1774845469918,
       "deleteAfterRun": false
     },
     {
-      "id": "d31e3e90",
+      "id": "ea6a9df9",
       "name": "monthly_report",
       "enabled": true,
       "schedule": {
@@ -53,12 +53,12 @@
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774837847654,
-      "updatedAtMs": 1774837847654,
+      "createdAtMs": 1774845469940,
+      "updatedAtMs": 1774845469940,
       "deleteAfterRun": false
     },
     {
-      "id": "22ae3fd1",
+      "id": "6e026454",
       "name": "daily_report",
       "enabled": true,
       "schedule": {
@@ -81,8 +81,8 @@
         "lastStatus": null,
         "lastError": null
       },
-      "createdAtMs": 1774837847690,
-      "updatedAtMs": 1774837847690,
+      "createdAtMs": 1774845469982,
+      "updatedAtMs": 1774845469982,
       "deleteAfterRun": false
     }
   ]
