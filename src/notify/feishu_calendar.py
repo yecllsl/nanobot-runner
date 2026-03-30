@@ -55,7 +55,7 @@ class FeishuCalendarAPI:
     """飞书日历 API 封装"""
 
     BASE_URL = "https://open.feishu.cn/open-apis/calendar/v4"
-    TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"  # nosec B105
 
     def __init__(self, app_id: str, app_secret: str):
         """
