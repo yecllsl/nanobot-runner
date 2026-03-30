@@ -931,18 +931,19 @@ class TestCLIMemory:
 
     def test_memory_clear_not_exists(self):
         """测试 memory clear 文件不存在"""
-        with patch("src.cli.ProfileStorageManager") as mock_profile_storage:
-            mock_storage_instance = Mock()
+        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+            mock_storage_instance = MagicMock()
             mock_memory_file = MagicMock()
             # 设置文件不存在
             mock_memory_file.exists.return_value = False
-            # 直接设置 memory_md_path 属性返回 mock_memory_file
-            type(mock_storage_instance).memory_md_path = mock_memory_file
+            # 直接设置 memory_md_path 属性
+            mock_storage_instance.memory_md_path = mock_memory_file
             mock_profile_storage.return_value = mock_storage_instance
 
             result = runner.invoke(app, ["memory", "clear"])
-            # 文件不存在时会打印消息，但因为 Confirm.ask 会触发 EOFError，退出码为 1
-            assert result.exit_code == 1
+            # 文件不存在时会打印警告消息并正常返回，退出码为 0
+            assert result.exit_code == 0
+            assert "记忆文件不存在" in result.output
 
     def test_memory_invalid_action(self):
         """测试 memory 无效操作"""
