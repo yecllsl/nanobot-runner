@@ -76,95 +76,146 @@ def run_command(
 
 
 class TestEnvironment:
-    """测试环境管理类"""
+    """测试环境管理类
+    
+    安全设计：
+    1. 使用独立临时目录，与生产数据完全隔离
+    2. 所有删除操作前进行安全检查
+    3. 备份数据存储在临时目录中，测试结束后自动清理
+    """
+
+    TEST_MARKER_FILE = ".e2e_test_environment"
+    TEST_MARKER_CONTENT = "E2E_TEST_ENVIRONMENT_V1"
 
     def __init__(self):
         self.project_root = get_project_root()
-        self.data_dir = Path.home() / ".nanobot-runner" / "data"
-        self.config_dir = Path.home() / ".nanobot-runner"
+        self._test_base_dir: Optional[Path] = None
+        self._test_data_dir: Optional[Path] = None
+        self._test_config_dir: Optional[Path] = None
+        self._original_data_dir: Optional[Path] = None
+        self._original_config_file: Optional[Path] = None
+        self._is_setup = False
 
-    def setup_test_environment(self, temp_dir: str) -> None:
-        """设置测试环境"""
-        # 备份原有配置和数据
-        self.backup_environment()
+    @property
+    def data_dir(self) -> Path:
+        if self._test_data_dir is None:
+            raise RuntimeError("测试环境未初始化，请先调用 setup_test_environment()")
+        return self._test_data_dir
 
-        # 设置测试数据目录
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.config_dir.mkdir(parents=True, exist_ok=True)
+    @property
+    def config_dir(self) -> Path:
+        if self._test_config_dir is None:
+            raise RuntimeError("测试环境未初始化，请先调用 setup_test_environment()")
+        return self._test_config_dir
 
-        # 创建测试配置文件
+    def _get_production_paths(self) -> Tuple[Path, Path]:
+        prod_config_dir = Path.home() / ".nanobot-runner"
+        prod_data_dir = prod_config_dir / "data"
+        return prod_config_dir, prod_data_dir
+
+    def _is_test_environment(self, directory: Path) -> bool:
+        if not directory.exists():
+            return False
+        marker_file = directory / self.TEST_MARKER_FILE
+        if marker_file.exists():
+            try:
+                return marker_file.read_text(encoding="utf-8").strip() == self.TEST_MARKER_CONTENT
+            except Exception:
+                return False
+        return False
+
+    def _mark_as_test_environment(self, directory: Path) -> None:
+        marker_file = directory / self.TEST_MARKER_FILE
+        marker_file.write_text(self.TEST_MARKER_CONTENT, encoding="utf-8")
+
+    def setup_test_environment(self, temp_dir: Optional[str] = None) -> None:
+        if self._is_setup:
+            raise RuntimeError("测试环境已初始化，请勿重复调用")
+
+        if temp_dir:
+            self._test_base_dir = Path(temp_dir)
+        else:
+            self._test_base_dir = Path(tempfile.mkdtemp(prefix="nanobot_e2e_test_"))
+
+        self._test_config_dir = self._test_base_dir
+        self._test_data_dir = self._test_base_dir / "data"
+
+        self._test_config_dir.mkdir(parents=True, exist_ok=True)
+        self._test_data_dir.mkdir(parents=True, exist_ok=True)
+
+        self._mark_as_test_environment(self._test_base_dir)
+        self._mark_as_test_environment(self._test_data_dir)
+
         config = {
             "version": "0.2.0",
-            "data_dir": str(self.data_dir),
+            "data_dir": str(self._test_data_dir),
             "feishu_enabled": False,
             "test_mode": True,
         }
-
-        config_file = self.config_dir / "config.json"
+        config_file = self._test_config_dir / "config.json"
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
 
-        print(f"测试环境已设置，数据目录: {self.data_dir}")
+        self._is_setup = True
+        print(f"[测试环境] 数据目录: {self._test_data_dir}")
+        print(f"[测试环境] 配置目录: {self._test_config_dir}")
 
     def cleanup_test_environment(self) -> None:
-        """清理测试环境"""
-        if self.data_dir.exists():
-            shutil.rmtree(self.data_dir)
+        if not self._is_setup:
+            print("[警告] 测试环境未初始化，跳过清理")
+            return
 
-        config_file = self.config_dir / "config.json"
-        if config_file.exists():
-            config_file.unlink()
+        if self._test_base_dir:
+            if not self._is_test_environment(self._test_base_dir):
+                raise RuntimeError(
+                    f"安全检查失败: 目录 {self._test_base_dir} 不是测试环境，拒绝删除！"
+                )
+            shutil.rmtree(self._test_base_dir)
+            print(f"[清理] 测试目录已删除: {self._test_base_dir}")
 
-        # 恢复原有配置
-        self.restore_environment()
+        self._test_base_dir = None
+        self._test_data_dir = None
+        self._test_config_dir = None
+        self._is_setup = False
 
     def backup_environment(self) -> None:
-        """备份原有环境"""
-        self.original_data_dir = None
-        self.original_config_file = None
-
-        if self.data_dir.exists():
-            backup_dir = tempfile.mkdtemp(prefix="nanobot_backup_")
-            shutil.copytree(self.data_dir, Path(backup_dir) / "data")
-            self.original_data_dir = backup_dir
-
-        config_file = self.config_dir / "config.json"
-        if config_file.exists():
-            backup_config = tempfile.mkdtemp(prefix="config_backup_")
-            shutil.copy2(config_file, Path(backup_config) / "config.json")
-            self.original_config_file = backup_config
+        print("[警告] backup_environment() 已弃用，备份在 setup_test_environment() 中自动完成")
 
     def restore_environment(self) -> None:
-        """恢复原有环境"""
-        if hasattr(self, "original_data_dir") and self.original_data_dir:
-            if self.data_dir.exists():
-                shutil.rmtree(self.data_dir)
-            shutil.copytree(Path(self.original_data_dir) / "data", self.data_dir)
-            shutil.rmtree(self.original_data_dir)
+        prod_config_dir, prod_data_dir = self._get_production_paths()
 
-        if hasattr(self, "original_config_file") and self.original_config_file:
-            config_file = self.config_dir / "config.json"
-            if config_file.exists():
-                config_file.unlink()
-            shutil.copy2(Path(self.original_config_file) / "config.json", config_file)
-            shutil.rmtree(self.original_config_file)
+        if self._original_data_dir:
+            backup_data = Path(self._original_data_dir) / "data"
+            if backup_data.exists():
+                if prod_data_dir.exists():
+                    shutil.rmtree(prod_data_dir)
+                shutil.copytree(backup_data, prod_data_dir)
+                print(f"[恢复] 生产数据已恢复")
+            shutil.rmtree(self._original_data_dir)
+            self._original_data_dir = None
+
+        if self._original_config_file:
+            backup_config = self._original_config_file / "config.json"
+            if backup_config.exists():
+                prod_config_file = prod_config_dir / "config.json"
+                if prod_config_file.exists():
+                    prod_config_file.unlink()
+                shutil.copy2(backup_config, prod_config_file)
+                print(f"[恢复] 生产配置已恢复")
+            shutil.rmtree(self._original_config_file)
+            self._original_config_file = None
 
     def setup_test_data(self, record_count: int = 100) -> None:
-        """设置测试数据"""
-        # 清理现有数据
         self.clean_data_directory()
 
-        # 生成测试数据
         data_generator = DataGenerator()
         test_data = data_generator.generate_running_data(record_count)
 
-        # 保存测试数据
         import polars as pl
 
-        # 按年份分组保存
-        yearly_data = {}
+        yearly_data: Dict[int, List] = {}
         for record in test_data:
-            year = record["session_start_time"].year  # 使用 session_ 前缀
+            year = record["session_start_time"].year
             if year not in yearly_data:
                 yearly_data[year] = []
             yearly_data[year].append(record)
@@ -174,10 +225,9 @@ class TestEnvironment:
             parquet_file = self.data_dir / f"activities_{year}.parquet"
             df.write_parquet(parquet_file, compression="snappy")
 
-        print(f"已生成 {record_count} 条测试数据")
+        print(f"[测试数据] 已生成 {record_count} 条记录")
 
     def setup_vdot_test_data(self, record_count: int = 50) -> None:
-        """设置包含VDOT数据的测试数据"""
         self.clean_data_directory()
 
         data_generator = DataGenerator()
@@ -185,10 +235,9 @@ class TestEnvironment:
 
         import polars as pl
 
-        # 保存测试数据
-        yearly_data = {}
+        yearly_data: Dict[int, List] = {}
         for record in test_data:
-            year = record["session_start_time"].year  # 使用 session_ 前缀
+            year = record["session_start_time"].year
             if year not in yearly_data:
                 yearly_data[year] = []
             yearly_data[year].append(record)
@@ -198,23 +247,33 @@ class TestEnvironment:
             parquet_file = self.data_dir / f"activities_{year}.parquet"
             df.write_parquet(parquet_file, compression="snappy")
 
-        print(f"已生成 {record_count} 条VDOT测试数据")
+        print(f"[测试数据] 已生成 {record_count} 条VDOT记录")
 
     def clean_data_directory(self) -> None:
-        """清理数据目录"""
-        if self.data_dir.exists():
-            for file in self.data_dir.glob("*.parquet"):
+        if not self._is_setup or self._test_data_dir is None:
+            raise RuntimeError("测试环境未初始化，无法清理数据目录")
+
+        if not self._is_test_environment(self._test_data_dir):
+            raise RuntimeError(
+                f"安全检查失败: 目录 {self._test_data_dir} 不是测试环境，拒绝删除！"
+            )
+
+        if self._test_data_dir.exists():
+            for file in self._test_data_dir.glob("*.parquet"):
                 file.unlink()
 
-            index_file = self.data_dir / "index.json"
+            index_file = self._test_data_dir / "index.json"
             if index_file.exists():
                 index_file.unlink()
 
+            print(f"[清理] 数据目录已清空: {self._test_data_dir}")
+
     def get_data_file_count(self) -> int:
-        """获取数据文件数量"""
-        if not self.data_dir.exists():
+        if not self._is_setup or self._test_data_dir is None:
             return 0
-        return len(list(self.data_dir.glob("*.parquet")))
+        if not self._test_data_dir.exists():
+            return 0
+        return len(list(self._test_data_dir.glob("*.parquet")))
 
 
 class AgentTestHelper:
@@ -457,18 +516,13 @@ class DataGenerator:
 
 if __name__ == "__main__":
     """测试工具类功能"""
-    # 测试数据生成
     generator = DataGenerator()
     test_data = generator.generate_running_data(10)
     print(f"生成测试数据: {len(test_data)}条")
 
-    # 测试环境设置
     env = TestEnvironment()
-    temp_dir = tempfile.mkdtemp()
-    env.setup_test_environment(temp_dir)
+    env.setup_test_environment()
     print("测试环境设置完成")
 
-    # 清理
     env.cleanup_test_environment()
-    shutil.rmtree(temp_dir)
     print("测试完成")
