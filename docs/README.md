@@ -6,10 +6,35 @@
 
 ```
 docs/
-├── current/          # 当前版本文档（最新稳定版本）
-├── history/          # 版本历史归档
-├── features/         # 功能特性文档
-└── archive/          # 深度归档（压缩存储）
+├── README.md                   # 文档中心首页（本文件）
+├── api/                        # API 参考文档
+│   ├── analytics_engine.md
+│   ├── api_reference.md
+│   ├── runner_tools.md
+│   └── storage_manager.md
+├── architecture/               # 架构设计文档
+│   └── 架构设计说明书.md
+├── devops/                     # 运维与发布文档
+│   ├── release_checklist.md
+│   └── 分支管理与发布流程规范.md
+├── guides/                     # 使用指南
+│   ├── agent_config_guide.md
+│   └── cli_usage.md
+├── requirements/               # 需求文档
+│   └── REQ_需求规格说明书.md
+├── history/                    # 版本历史归档
+│   ├── VERSION_HISTORY.md
+│   ├── v0.4.0/
+│   │   └── release_notes.md
+│   └── v0.4.3/
+│       └── release_notes.md
+└── archive/                    # 深度归档（压缩存储）
+    ├── bugfix-reports.zip
+    ├── development-reports.zip
+    ├── test-reports.zip
+    ├── v0.1.0-archive.zip
+    ├── v0.2.0-archive.zip
+    └── v0.3.0-archive.zip
 ```
 
 ## 🚀 快速导航
@@ -17,24 +42,24 @@ docs/
 ### 📖 当前版本文档
 
 #### 架构设计
-- [架构设计说明书](./current/architecture/架构设计说明书.md) - 系统整体架构设计
+- [架构设计说明书](./architecture/架构设计说明书.md) - 系统整体架构设计
 
 #### API 文档
-- [API 参考文档](./current/api/api_reference.md) - 完整的 API 接口说明
-- [数据分析引擎](./current/api/analytics_engine.md) - Analytics Engine API
-- [Runner 工具集](./current/api/runner_tools.md) - Agent 工具 API
-- [存储管理器](./current/api/storage_manager.md) - Storage Manager API
+- [API 参考文档](./api/api_reference.md) - 完整的 API 接口说明
+- [数据分析引擎](./api/analytics_engine.md) - Analytics Engine API
+- [Runner 工具集](./api/runner_tools.md) - Agent 工具 API
+- [存储管理器](./api/storage_manager.md) - Storage Manager API
 
 #### 使用指南
-- [CLI 使用指南](./current/guides/cli_usage.md) - 命令行工具使用说明
-- [Agent 配置指南](./current/guides/agent_config_guide.md) - Agent 配置方法
+- [CLI 使用指南](./guides/cli_usage.md) - 命令行工具使用说明
+- [Agent 配置指南](./guides/agent_config_guide.md) - Agent 配置方法
 
 #### 运维文档
-- [分支管理与发布流程规范](./current/devops/分支管理与发布流程规范.md) - Git 工作流程
-- [发布检查清单](./current/devops/release_checklist.md) - 版本发布检查项
+- [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md) - Git 工作流程
+- [发布检查清单](./devops/release_checklist.md) - 版本发布检查项
 
 #### 需求文档
-- [需求规格说明书](./current/requirements/需求规格说明书.md) - 产品需求规格
+- [需求规格说明书](./requirements/REQ_需求规格说明书.md) - 产品需求规格
 
 ### 📅 版本历史
 
@@ -42,11 +67,7 @@ docs/
 - [v0.4.3 Release Notes](./history/v0.4.3/release_notes.md) - 最新版本发布说明
 - [v0.4.0 Release Notes](./history/v0.4.0/release_notes.md) - v0.4.0 发布说明
 
-### 🎯 功能特性
 
-#### v0.5.0 (开发中)
-- [功能需求文档](./features/v0.5.0_llm_training_plan.md) - LLM 训练计划与飞书日历同步
-- [开发任务清单](./features/v0.5.0_development_tasks.md) - v0.5.0 开发任务规划
 
 ### 📦 归档文档
 
@@ -64,21 +85,21 @@ docs/
 ### 按角色分类
 
 #### 开发者
-- [架构设计说明书](./current/architecture/架构设计说明书.md)
-- [API 参考文档](./current/api/api_reference.md)
-- [分支管理与发布流程规范](./current/devops/分支管理与发布流程规范.md)
+- [架构设计说明书](./architecture/架构设计说明书.md)
+- [API 参考文档](./api/api_reference.md)
+- [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md)
 
 #### 运维人员
-- [发布检查清单](./current/devops/release_checklist.md)
-- [分支管理与发布流程规范](./current/devops/分支管理与发布流程规范.md)
+- [发布检查清单](./devops/release_checklist.md)
+- [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md)
 
 #### 产品经理
-- [需求规格说明书](./current/requirements/需求规格说明书.md)
+- [需求规格说明书](./requirements/REQ_需求规格说明书.md)
 - [版本历史汇总](./history/VERSION_HISTORY.md)
 
 #### 用户
-- [CLI 使用指南](./current/guides/cli_usage.md)
-- [Agent 配置指南](./current/guides/agent_config_guide.md)
+- [CLI 使用指南](./guides/cli_usage.md)
+- [Agent 配置指南](./guides/agent_config_guide.md)
 
 ### 按主题分类
 

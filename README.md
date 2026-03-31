@@ -179,25 +179,25 @@ nanobot-runner/
 
 ### API 参考
 
-- [AnalyticsEngine API](./docs/current/api/analytics_engine.md) - 数据分析引擎
-- [StorageManager API](./docs/current/api/storage_manager.md) - 存储管理器
-- [RunnerTools API](./docs/current/api/runner_tools.md) - Agent 工具集
-- [API Reference](./docs/current/api/api_reference.md) - 完整 API 参考
+- [AnalyticsEngine API](./docs/api/analytics_engine.md) - 数据分析引擎
+- [StorageManager API](./docs/api/storage_manager.md) - 存储管理器
+- [RunnerTools API](./docs/api/runner_tools.md) - Agent 工具集
+- [API Reference](./docs/api/api_reference.md) - 完整 API 参考
 
 ### 用户指南
 
-- [CLI 使用指南](./docs/current/guides/cli_usage.md) - 完整命令行使用说明
-- [Agent 配置指南](./docs/current/guides/agent_config_guide.md) - Agent 配置说明
+- [CLI 使用指南](./docs/guides/cli_usage.md) - 完整命令行使用说明
+- [Agent 配置指南](./docs/guides/agent_config_guide.md) - Agent 配置说明
 
 ### 架构与流程
 
-- [架构设计说明书](./docs/current/architecture/架构设计说明书.md) - 系统架构设计
-- [需求规格说明书](./docs/current/requirements/REQ_需求规格说明书.md) - 功能需求说明
+- [架构设计说明书](./docs/architecture/架构设计说明书.md) - 系统架构设计
+- [需求规格说明书](./docs/requirements/REQ_需求规格说明书.md) - 功能需求说明
 
 ### DevOps
 
-- [发布检查清单](./docs/current/devops/release_checklist.md) - 发布流程检查
-- [分支管理与发布流程规范](./docs/current/devops/分支管理与发布流程规范.md) - Git 工作流
+- [发布检查清单](./docs/devops/release_checklist.md) - 发布流程检查
+- [分支管理与发布流程规范](./docs/devops/分支管理与发布流程规范.md) - Git 工作流
 
 ## 开发
 

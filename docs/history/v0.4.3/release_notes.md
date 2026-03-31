@@ -235,9 +235,8 @@ uv run isort --check-only src tests
 
 ## 🔗 相关链接
 
-- [技术债偿还任务规划](../../planning/v0.4.3_技术债偿还任务规划.md)
-- [技术债务登记册](../../../project/TECH_DEBT.md)
-- [变更日志](../../../../CHANGELOG.md)
+- [版本历史汇总](../VERSION_HISTORY.md) - 查看完整版本发展历程
+- [文档中心](../../README.md) - 返回文档首页
 
 ---
 
