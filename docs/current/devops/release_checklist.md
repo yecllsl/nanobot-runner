@@ -71,7 +71,13 @@
 - [ ] **禁止**：在 PR 合并前推送标签（会导致发布包不完整）
 - [ ] **验证**：确认 pyproject.toml 中的版本号与标签一致
 
-#### 2.4.2 紧急修复流程
+#### 2.4.2 发布时机检查清单
+- [ ] **关键**：确保修复代码已合并到 main 分支
+- [ ] **验证**：pyproject.toml 版本号与标签一致
+- [ ] **禁止**：在 PR 合并前推送标签
+- [ ] **确认**：CI 检查全部通过
+
+#### 2.4.3 紧急修复流程
 - [ ] 创建 hotfix 分支：`git checkout -b hotfix/issue-description main`
 - [ ] 修复问题并提交
 - [ ] 推送分支：`git push origin hotfix/issue-description`
