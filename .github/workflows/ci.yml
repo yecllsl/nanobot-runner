@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]  # 仅对 main 分支推送触发
+    branches: [ main, feature/*, hotfix/* ]  # 对 main、feature、hotfix 分支推送触发
   pull_request:
-    branches: [ main, develop ]  # 对 main 和 develop 的 PR 触发
+    branches: [ main ]  # 仅对 main 分支的 PR 触发（单人开发模式）
     types: [opened, reopened, synchronize]
 
 env:
