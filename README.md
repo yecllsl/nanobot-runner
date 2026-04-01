@@ -126,11 +126,13 @@ uv run nanobotrun chat
 
 ### 6. 飞书推送
 
-支持周报/月报自动推送到飞书，配置简单：
+支持周报/月报自动推送到飞书，使用飞书应用机器人：
 
 ```json
 {
-  "feishu_webhook": "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+  "feishu_app_id": "your_app_id",
+  "feishu_app_secret": "your_app_secret",
+  "feishu_receive_id": "your_user_id"
 }
 ```
 

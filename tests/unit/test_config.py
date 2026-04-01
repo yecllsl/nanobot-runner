@@ -44,7 +44,7 @@ class TestConfigManager:
             assert config_data["version"] == "0.1.0"
             assert "data_dir" in config_data
             assert "auto_push_feishu" in config_data
-            assert "feishu_webhook" in config_data
+            assert "feishu_app_id" in config_data
 
     def test_save_config(self, tmp_path):
         """测试保存配置"""

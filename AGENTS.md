@@ -22,7 +22,7 @@
 src/
 ├── core/            # 核心模块: parser, storage, indexer, analytics, profile, config, exceptions...
 ├── agents/tools.py  # Agent 工具集: BaseTool + RunnerTools
-├── notify/          # 飞书通知: feishu.py, feishu_calendar.py, feishu_webhook.py
+├── notify/          # 飞书通知: feishu.py, feishu_calendar.py
 ├── cli.py           # CLI 入口
 └── cli_formatter.py # Rich 格式化输出
 ```

@@ -103,7 +103,6 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 ```json
 {
   "data_dir": "~/.nanobot-runner/data",
-  "feishu_webhook": "",
   "default_year": 2024,
   "timezone": "Asia/Shanghai"
 }
@@ -114,7 +113,6 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 | 配置项 | 类型 | 说明 |
 |--------|------|------|
 | `data_dir` | string | 数据存储目录 |
-| `feishu_webhook` | string | 飞书推送Webhook URL |
 | `default_year` | int | 默认查询年份 |
 | `timezone` | string | 时区设置 |
 
@@ -179,15 +177,17 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 
 ## 7. 飞书通知配置
 
-### 7.1 Webhook 配置
+### 7.1 飞书应用配置
 
-1. 在飞书群组中添加自定义机器人
-2. 获取 Webhook URL
+1. 在飞书开放平台创建企业自建应用
+2. 获取 App ID 和 App Secret
 3. 配置到 `config.json`:
 
 ```json
 {
-  "feishu_webhook": "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+  "feishu_app_id": "your_app_id",
+  "feishu_app_secret": "your_app_secret",
+  "feishu_receive_id": "your_user_id"
 }
 ```
 

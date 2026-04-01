@@ -79,8 +79,6 @@ class ConfigManager:
                 "feishu_app_secret": "",  # nosec B105
                 "feishu_receive_id": "",
                 "feishu_receive_id_type": "user_id",
-                # 兼容旧配置（已废弃）
-                "feishu_webhook": "",  # nosec B105
             }
             self.save_config(default_config)
 

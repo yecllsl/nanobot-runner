@@ -91,7 +91,6 @@ class TestAppConfigValidate:
             "feishu_app_secret": "secret123",
             "feishu_receive_id": "user123",
             "feishu_receive_id_type": "user_id",
-            "feishu_webhook": "https://example.com/webhook",
         }
         is_valid, errors = AppConfig.validate(config)
         assert is_valid is True
@@ -182,10 +181,9 @@ class TestAppConfigToDict:
             feishu_app_secret="secret123",
             feishu_receive_id="user123",
             feishu_receive_id_type="open_id",
-            feishu_webhook="https://example.com",
         )
         config_dict = app_config.to_dict()
-        assert len(config_dict) == 8
+        assert len(config_dict) == 7
         assert config_dict["feishu_receive_id_type"] == "open_id"
 
 
@@ -208,7 +206,6 @@ class TestAppConfigInit:
             feishu_app_secret="secret456",
             feishu_receive_id="user456",
             feishu_receive_id_type="union_id",
-            feishu_webhook="https://test.com",
         )
         assert app_config.version == "0.2.0"
         assert app_config.auto_push_feishu is True
