@@ -165,11 +165,13 @@ class StorageManager:
                         all_schemas[col_name] = col_type
                     elif col_type != existing_type:
                         # 选择更宽泛的类型
-                        if (existing_type == pl.Int32 and col_type == pl.Int64) or \
-                           (existing_type == pl.Float32 and col_type == pl.Float64):
+                        if (existing_type == pl.Int32 and col_type == pl.Int64) or (
+                            existing_type == pl.Float32 and col_type == pl.Float64
+                        ):
                             all_schemas[col_name] = col_type  # 升级到更宽泛的类型
-                        elif (existing_type == pl.Int64 and col_type == pl.Int32) or \
-                             (existing_type == pl.Float64 and col_type == pl.Float32):
+                        elif (existing_type == pl.Int64 and col_type == pl.Int32) or (
+                            existing_type == pl.Float64 and col_type == pl.Float32
+                        ):
                             pass  # 保持现有的更宽泛类型
                         else:
                             # 对于不兼容的类型，统一转换为字符串类型
@@ -185,12 +187,12 @@ class StorageManager:
                 for col in missing_cols:
                     target_type = all_schemas[col]
                     df = df.with_columns(pl.lit(None).cast(target_type).alias(col))
-            
+
             # 确保所有列的类型与目标类型一致
             for col in df_schema.keys():
                 if col in all_schemas and df_schema[col] != all_schemas[col]:
                     df = df.with_columns(pl.col(col).cast(all_schemas[col]))
-            
+
             df = df.select(all_columns)
             aligned_dfs.append(df)
 
@@ -205,9 +207,11 @@ class StorageManager:
             # 将所有列转换为字符串类型进行合并
             string_dfs = []
             for df in aligned_dfs:
-                string_df = df.select([pl.col(col).cast(pl.Utf8) for col in all_columns])
+                string_df = df.select(
+                    [pl.col(col).cast(pl.Utf8) for col in all_columns]
+                )
                 string_dfs.append(string_df)
-            
+
             result = pl.concat(string_dfs)
             logger.warning(f"使用宽松策略合并 {len(dfs)} 个文件，共 {result.height} 条记录")
             return result.lazy()
