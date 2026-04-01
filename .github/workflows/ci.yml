@@ -120,7 +120,7 @@ jobs:
     - name: Run E2E tests
       run: |
         echo "开始端到端测试..."
-        timeout 300 python -m pytest tests/e2e/ -v --tb=short  # 5分钟超时
+        timeout 300s python -m pytest tests/e2e/ -v --tb=short  # 5分钟超时
         echo "E2E测试完成"
         
     - name: Generate coverage report
