@@ -38,9 +38,11 @@ class ConfigManager:
             if "data_dir" in config:
                 self.data_dir = Path(config["data_dir"])
                 self.index_file = self.data_dir / "index.json"
-        except Exception:
-            # 如果读取配置失败，继续使用默认路径
-            pass
+        except Exception as e:
+            # 如果读取配置失败，继续使用默认路径，记录警告日志
+            import loguru
+
+            loguru.logger.debug(f"读取配置文件失败，使用默认路径: {e}")
 
     def _ensure_dirs(self):
         """确保必要目录存在，并迁移旧的定时任务配置"""
