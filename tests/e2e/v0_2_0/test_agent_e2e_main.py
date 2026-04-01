@@ -55,12 +55,21 @@ class TestAgentE2EMain:
 
         cls.test_env.setup_test_environment()
 
+        # 设置环境变量，指向测试环境的配置目录
+        os.environ["NANOBOT_CONFIG_DIR"] = str(cls.test_env.config_dir)
+        print(f"测试环境配置目录: {cls.test_env.config_dir}")
+
         print(f"测试环境已初始化")
 
     @classmethod
     def teardown_class(cls):
         """测试类清理"""
         cls.test_env.cleanup_test_environment()
+
+        # 清理环境变量
+        if "NANOBOT_CONFIG_DIR" in os.environ:
+            del os.environ["NANOBOT_CONFIG_DIR"]
+
         print("测试环境已清理")
 
     def setup_method(self):
