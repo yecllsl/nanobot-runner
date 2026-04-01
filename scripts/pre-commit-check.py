@@ -25,6 +25,16 @@ from typing import Dict, List, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
+# ========== 全局编码设置（Windows 兼容）==========
+if sys.platform == "win32":
+    # 强制 Python 标准输出为 UTF-8
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    # 强制 subprocess 默认使用 UTF-8
+    os.environ["PYTHONUTF8"] = "1"   # Python 3.7+ 的 UTF-8 模式
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+# ================================================
+
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
