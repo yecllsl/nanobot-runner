@@ -180,7 +180,12 @@ def setup_e2e_test_environment() -> Path:
         测试数据目录路径
     """
     # 创建测试数据目录
-    test_data_dir = Path.home() / ".nanobot-runner" / "test_data"
+    # 在CI环境中使用临时目录，在生产环境中使用用户主目录
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        base_dir = Path("/tmp") / ".nanobot-runner"
+    else:
+        base_dir = Path.home() / ".nanobot-runner"
+    test_data_dir = base_dir / "test_data"
     test_data_dir.mkdir(parents=True, exist_ok=True)
 
     # 清理现有测试数据
@@ -308,7 +313,12 @@ def validate_test_data() -> bool:
     """
     print("验证测试数据完整性...")
 
-    test_data_dir = Path.home() / ".nanobot-runner" / "test_data"
+    # 在CI环境中使用临时目录，在生产环境中使用用户主目录
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        base_dir = Path("/tmp") / ".nanobot-runner"
+    else:
+        base_dir = Path.home() / ".nanobot-runner"
+    test_data_dir = base_dir / "test_data"
 
     if not test_data_dir.exists():
         print("❌ 测试数据目录不存在")
@@ -394,7 +404,12 @@ def main():
 
     elif args.action == "clean":
         # 清理测试数据
-        test_data_dir = Path.home() / ".nanobot-runner" / "test_data"
+        # 在CI环境中使用临时目录，在生产环境中使用用户主目录
+        if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+            base_dir = Path("/tmp") / ".nanobot-runner"
+        else:
+            base_dir = Path.home() / ".nanobot-runner"
+        test_data_dir = base_dir / "test_data"
         if test_data_dir.exists():
             import shutil
 

@@ -109,7 +109,12 @@ class TestEnvironment:
         return self._test_config_dir
 
     def _get_production_paths(self) -> Tuple[Path, Path]:
-        prod_config_dir = Path.home() / ".nanobot-runner"
+        # 在CI环境中使用临时目录，在生产环境中使用用户主目录
+        if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+            base_dir = Path("/tmp") / ".nanobot-runner"
+        else:
+            base_dir = Path.home() / ".nanobot-runner"
+        prod_config_dir = base_dir
         prod_data_dir = prod_config_dir / "data"
         return prod_config_dir, prod_data_dir
 
