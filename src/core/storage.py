@@ -1,6 +1,7 @@
 # Parquet存储管理器
 # 管理跑步数据的Parquet文件读写
 
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,7 +18,25 @@ class StorageManager:
     """Parquet存储管理器，管理跑步数据的存储"""
 
     def __init__(self, data_dir: Optional[Path] = None) -> None:
-        self.data_dir = data_dir or Path.home() / ".nanobot-runner" / "data"
+        if data_dir:
+            self.data_dir = data_dir
+        else:
+            # 优先级：1. 参数 2. 环境变量 3. ConfigManager 4. 默认路径
+            config_dir = os.environ.get("NANOBOT_CONFIG_DIR")
+            if config_dir:
+                # 如果设置了环境变量，从配置文件读取 data_dir
+                try:
+                    from src.core.config import ConfigManager
+
+                    config_manager = ConfigManager()
+                    self.data_dir = config_manager.data_dir
+                except Exception:
+                    # 如果读取配置失败，使用默认路径
+                    self.data_dir = Path(config_dir) / "data"
+            else:
+                # 使用默认路径
+                self.data_dir = Path.home() / ".nanobot-runner" / "data"
+
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
             logger.debug(f"存储管理器初始化，数据目录: {self.data_dir}")
