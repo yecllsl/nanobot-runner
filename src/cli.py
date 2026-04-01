@@ -1245,7 +1245,8 @@ def profile_show(
         if profile is None or profile.total_activities == 0:
             console.print(
                 Panel(
-                    "[yellow]暂无跑步数据[/yellow]\n\n" "使用 'nanobotrun import-data <路径>' 导入FIT文件",
+                    "[yellow]暂无跑步数据[/yellow]\n\n"
+                    "使用 'nanobotrun import-data <路径>' 导入FIT文件",
                     title="用户画像",
                     border_style="yellow",
                 )

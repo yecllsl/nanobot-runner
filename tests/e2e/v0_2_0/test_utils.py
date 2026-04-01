@@ -77,7 +77,7 @@ def run_command(
 
 class TestEnvironment:
     """测试环境管理类
-    
+
     安全设计：
     1. 使用独立临时目录，与生产数据完全隔离
     2. 所有删除操作前进行安全检查
@@ -119,7 +119,10 @@ class TestEnvironment:
         marker_file = directory / self.TEST_MARKER_FILE
         if marker_file.exists():
             try:
-                return marker_file.read_text(encoding="utf-8").strip() == self.TEST_MARKER_CONTENT
+                return (
+                    marker_file.read_text(encoding="utf-8").strip()
+                    == self.TEST_MARKER_CONTENT
+                )
             except Exception:
                 return False
         return False
@@ -167,9 +170,7 @@ class TestEnvironment:
 
         if self._test_base_dir:
             if not self._is_test_environment(self._test_base_dir):
-                raise RuntimeError(
-                    f"安全检查失败: 目录 {self._test_base_dir} 不是测试环境，拒绝删除！"
-                )
+                raise RuntimeError(f"安全检查失败: 目录 {self._test_base_dir} 不是测试环境，拒绝删除！")
             shutil.rmtree(self._test_base_dir)
             print(f"[清理] 测试目录已删除: {self._test_base_dir}")
 
@@ -254,9 +255,7 @@ class TestEnvironment:
             raise RuntimeError("测试环境未初始化，无法清理数据目录")
 
         if not self._is_test_environment(self._test_data_dir):
-            raise RuntimeError(
-                f"安全检查失败: 目录 {self._test_data_dir} 不是测试环境，拒绝删除！"
-            )
+            raise RuntimeError(f"安全检查失败: 目录 {self._test_data_dir} 不是测试环境，拒绝删除！")
 
         if self._test_data_dir.exists():
             for file in self._test_data_dir.glob("*.parquet"):

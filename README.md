@@ -221,16 +221,16 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 
 ```bash
 # 格式化代码
-uv run black src tests
+uv run black src/ tests/
 
 # 导入排序
-uv run isort src tests
+uv run isort src/ tests/
 
 # 类型检查
-uv run mypy src
+uv run mypy src/ --ignore-missing-imports
 
 # 安全扫描
-uv run bandit -r src -s B101,B601
+uv run bandit -r src/ -s B101,B601
 ```
 
 ### 质量门禁
