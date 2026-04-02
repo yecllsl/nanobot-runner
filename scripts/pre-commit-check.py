@@ -83,6 +83,8 @@ class PreCommitChecker:
                 shell=True,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 cwd=self.project_root,
                 timeout=300  # 5分钟超时
             )

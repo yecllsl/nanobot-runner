@@ -71,3 +71,11 @@ class ImportError(NanobotRunnerError):
 
     error_code: str = "IMPORT_ERROR"
     recovery_suggestion: Optional[str] = "请检查文件路径和文件格式"
+
+
+@dataclass
+class LLMError(NanobotRunnerError):
+    """LLM调用相关错误"""
+
+    error_code: str = "LLM_ERROR"
+    recovery_suggestion: Optional[str] = "请检查LLM服务配置或稍后重试"
