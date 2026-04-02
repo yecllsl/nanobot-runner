@@ -54,13 +54,19 @@
 
 #### 2.2.2 单人开发模式（推荐）
 - [ ] 确保 feature 分支已合并到 main
-- [ ] 确认 CI 检查全部通过（无需人工审查）
-- [ ] 直接推送标签触发发布
+- [ ] 更新 pyproject.toml 版本号
+- [ ] 提交版本号变更：`git commit -m "chore: bump version to X.Y.Z"`
+- [ ] **关键**：推送 main 分支到远程：`git push origin main`
+- [ ] **关键**：等待 CI 检查通过（验证版本号变更正确性）
+- [ ] CI 通过后，创建并推送标签触发发布
 
 ### 2.3 标签管理
 
+**前置条件**：确保 main 分支已推送到远程且 CI 检查通过
+
 - [ ] 切换到 main 分支：`git checkout main`
 - [ ] 拉取最新代码：`git pull origin main`
+- [ ] **验证**：确认 CI Pipeline 已通过（`gh run list --limit 1`）
 - [ ] 创建标签：`git tag -a vX.Y.Z -m "Release vX.Y.Z"`
 - [ ] 推送标签：`git push origin vX.Y.Z`
 
@@ -160,7 +166,7 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 
 ---
 
-**文档版本**: v0.4.5  
-**最后更新**: 2026-03-31  
+**文档版本**: v0.6.0  
+**最后更新**: 2026-04-02  
 **关联文档**: [分支管理与发布流程规范](./分支管理与发布流程规范.md)  
-**更新说明**: 新增单人开发模式流程，优化热修复发布注意事项
+**更新说明**: 优化单人开发模式发布流程，强调版本号更新后必须先推送main分支验证CI

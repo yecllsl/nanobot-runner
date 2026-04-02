@@ -20,13 +20,16 @@ description: 执行单人开发模式的版本发布，确保Tag创建成功、C
     *   确认所有feature分支已合并到main分支
     *   确认工作区干净（无未提交的更改）
     *   拉取最新的main分支代码：`git pull origin main`
-2. **验证CI检查**：
+2. **更新版本号**：
+    *   更新pyproject.toml中的版本号
+    *   提交版本号变更：`git commit -m "chore: bump version to {版本号}"`
+    *   **关键**：推送main分支到远程：`git push origin main`
+    *   **关键**：等待CI Pipeline通过（验证版本号变更正确性）
+    *   使用 `gh run list --limit 1` 确认CI状态
+3. **验证CI检查**：
     *   确认GitHub Actions CI检查全部通过
     *   检查代码质量门禁：black、isort、mypy、bandit
     *   检查测试覆盖率：core≥80%, agents≥70%, cli≥60%
-3. **验证版本号**：
-    *   确认pyproject.toml中的版本号与发布版本号一致
-    *   确认版本号符合语义化版本规范
 
 ## 第三步：执行发布
 1. **创建版本Tag**：
@@ -72,16 +75,21 @@ description: 执行单人开发模式的版本发布，确保Tag创建成功、C
 
 ## 关键注意事项
 1. **发布时机**：
+    *   **关键**：版本号更新后必须先推送main分支，等待CI通过后再创建标签
     *   确保所有代码已合并到main分支后再创建标签
     *   禁止在PR合并前推送标签（会导致发布包不完整）
     *   验证pyproject.toml中的版本号与标签一致
 
-2. **单人开发模式优势**：
+2. **CI验证顺序**：
+    *   正确流程：推送main → CI通过 → 创建Tag → 推送Tag → Release
+    *   错误流程：创建Tag → 推送Tag（跳过main推送验证）
+
+3. **单人开发模式优势**：
     *   简化流程：跳过release分支和develop分支同步
     *   快速迭代：feature分支直接合并到main
     *   自动化质量保障：依赖CI检查作为质量门禁
 
-3. **紧急回滚**：
+4. **紧急回滚**：
     *   若发布后发现严重问题，立即创建hotfix分支
     *   修复后发布新版本（修订版本号递增）
     *   更新文档说明推荐使用修复版本

@@ -3,9 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
-    branches:
-      - main  # 限制只有main分支的标签推送才触发发布
+      - 'v*'  # 只在推送 v* 标签时触发
 
 env:
   PYTHON_VERSION: '3.11'
@@ -18,6 +16,8 @@ jobs:
   build:
     name: Build Package
     runs-on: ubuntu-latest
+    # 验证标签是否指向 main 分支
+    if: github.event.base_ref == 'refs/heads/main'
     
     steps:
     - name: Checkout code
