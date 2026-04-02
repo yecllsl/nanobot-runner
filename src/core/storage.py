@@ -1,6 +1,7 @@
 # Parquet存储管理器
 # 管理跑步数据的Parquet文件读写
 
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,7 +18,25 @@ class StorageManager:
     """Parquet存储管理器，管理跑步数据的存储"""
 
     def __init__(self, data_dir: Optional[Path] = None) -> None:
-        self.data_dir = data_dir or Path.home() / ".nanobot-runner" / "data"
+        if data_dir:
+            self.data_dir = data_dir
+        else:
+            # 优先级：1. 参数 2. 环境变量 3. ConfigManager 4. 默认路径
+            config_dir = os.environ.get("NANOBOT_CONFIG_DIR")
+            if config_dir:
+                # 如果设置了环境变量，从配置文件读取 data_dir
+                try:
+                    from src.core.config import ConfigManager
+
+                    config_manager = ConfigManager()
+                    self.data_dir = config_manager.data_dir
+                except Exception:
+                    # 如果读取配置失败，使用默认路径
+                    self.data_dir = Path(config_dir) / "data"
+            else:
+                # 使用默认路径
+                self.data_dir = Path.home() / ".nanobot-runner" / "data"
+
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
             logger.debug(f"存储管理器初始化，数据目录: {self.data_dir}")
@@ -152,13 +171,30 @@ class StorageManager:
         if len(dfs) == 1:
             return dfs[0].lazy()
 
+        # 改进的 Schema 对齐逻辑：处理类型兼容性问题
         all_schemas = {}
         for df in dfs:
             for col_name, col_type in df.schema.items():
                 if col_name not in all_schemas:
                     all_schemas[col_name] = col_type
-                elif col_type != pl.Null and all_schemas[col_name] == pl.Null:
-                    all_schemas[col_name] = col_type
+                else:
+                    # 处理类型兼容性：Int32 < Int64，Float32 < Float64
+                    existing_type = all_schemas[col_name]
+                    if col_type != pl.Null and existing_type == pl.Null:
+                        all_schemas[col_name] = col_type
+                    elif col_type != existing_type:
+                        # 选择更宽泛的类型
+                        if (existing_type == pl.Int32 and col_type == pl.Int64) or (
+                            existing_type == pl.Float32 and col_type == pl.Float64
+                        ):
+                            all_schemas[col_name] = col_type  # 升级到更宽泛的类型
+                        elif (existing_type == pl.Int64 and col_type == pl.Int32) or (
+                            existing_type == pl.Float64 and col_type == pl.Float32
+                        ):
+                            pass  # 保持现有的更宽泛类型
+                        else:
+                            # 对于不兼容的类型，统一转换为字符串类型
+                            all_schemas[col_name] = pl.Utf8  # type: ignore
 
         all_columns = sorted(all_schemas.keys())
 
@@ -170,12 +206,34 @@ class StorageManager:
                 for col in missing_cols:
                     target_type = all_schemas[col]
                     df = df.with_columns(pl.lit(None).cast(target_type).alias(col))
+
+            # 确保所有列的类型与目标类型一致
+            for col in df_schema.keys():
+                if col in all_schemas and df_schema[col] != all_schemas[col]:
+                    df = df.with_columns(pl.col(col).cast(all_schemas[col]))
+
             df = df.select(all_columns)
             aligned_dfs.append(df)
 
-        result = pl.concat(aligned_dfs)
-        logger.debug(f"合并 {len(dfs)} 个文件，共 {result.height} 条记录")
-        return result.lazy()
+        try:
+            result = pl.concat(aligned_dfs)
+            logger.debug(f"合并 {len(dfs)} 个文件，共 {result.height} 条记录")
+            return result.lazy()
+        except Exception as e:
+            logger.error(f"合并文件失败: {e}")
+            # 如果合并失败，尝试使用更宽松的策略
+            logger.info("尝试使用宽松合并策略...")
+            # 将所有列转换为字符串类型进行合并
+            string_dfs = []
+            for df in aligned_dfs:
+                string_df = df.select(
+                    [pl.col(col).cast(pl.Utf8) for col in all_columns]
+                )
+                string_dfs.append(string_df)
+
+            result = pl.concat(string_dfs)
+            logger.warning(f"使用宽松策略合并 {len(dfs)} 个文件，共 {result.height} 条记录")
+            return result.lazy()
 
     def _read_parquet_file_with_schema_fix(
         self, filepath: Path

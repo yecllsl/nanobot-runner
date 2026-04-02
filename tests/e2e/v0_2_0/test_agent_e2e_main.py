@@ -53,18 +53,24 @@ class TestAgentE2EMain:
         cls.performance_validator = PerformanceValidator()
         cls.data_generator = DataGenerator()
 
-        # 创建临时测试目录
-        cls.temp_dir = tempfile.mkdtemp(prefix="nanobot_test_")
-        cls.test_env.setup_test_environment(cls.temp_dir)
+        cls.test_env.setup_test_environment()
 
-        print(f"测试环境已初始化，临时目录: {cls.temp_dir}")
+        # 设置环境变量，指向测试环境的配置目录
+        os.environ["NANOBOT_CONFIG_DIR"] = str(cls.test_env.config_dir)
+        print(f"测试环境配置目录: {cls.test_env.config_dir}")
+
+        print(f"测试环境已初始化")
 
     @classmethod
     def teardown_class(cls):
         """测试类清理"""
-        if hasattr(cls, "temp_dir") and os.path.exists(cls.temp_dir):
-            shutil.rmtree(cls.temp_dir)
-            print(f"测试环境已清理: {cls.temp_dir}")
+        cls.test_env.cleanup_test_environment()
+
+        # 清理环境变量
+        if "NANOBOT_CONFIG_DIR" in os.environ:
+            del os.environ["NANOBOT_CONFIG_DIR"]
+
+        print("测试环境已清理")
 
     def setup_method(self):
         """每个测试方法前执行"""

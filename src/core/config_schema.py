@@ -19,7 +19,6 @@ class AppConfig:
         feishu_app_secret: 飞书应用 App Secret
         feishu_receive_id: 飞书接收者 ID
         feishu_receive_id_type: 飞书接收者 ID 类型
-        feishu_webhook: 飞书 Webhook URL（已废弃，保留向后兼容）
     """
 
     version: str
@@ -29,7 +28,6 @@ class AppConfig:
     feishu_app_secret: Optional[str] = None
     feishu_receive_id: Optional[str] = None
     feishu_receive_id_type: str = "user_id"
-    feishu_webhook: Optional[str] = None
 
     # 必填字段列表（类变量，非实例字段）
     REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
@@ -43,7 +41,6 @@ class AppConfig:
         "feishu_app_secret": (str, type(None)),
         "feishu_receive_id": (str, type(None)),
         "feishu_receive_id_type": str,
-        "feishu_webhook": (str, type(None)),
     }
 
     @classmethod
@@ -164,7 +161,6 @@ class AppConfig:
             "feishu_app_secret": self.feishu_app_secret,
             "feishu_receive_id": self.feishu_receive_id,
             "feishu_receive_id_type": self.feishu_receive_id_type,
-            "feishu_webhook": self.feishu_webhook,
         }
 
     def __post_init__(self):

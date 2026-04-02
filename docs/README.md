@@ -1,161 +1,175 @@
-# 项目文档导航
+# Nanobot Runner 文档中心
 
-本文档提供 Nanobot Runner 项目的完整文档索引，帮助您快速定位所需信息。
+欢迎来到 Nanobot Runner 项目文档中心。本文档系统采用分层归档策略，为您提供清晰、高效的文档导航体验。
 
-## 📚 文档分类
-
-### 核心文档
-
-| 文档 | 说明 | 位置 |
-|------|------|------|
-| **项目说明** | 项目简介、快速开始、功能介绍 | [README.md](../README.md) |
-| **Agent 工作指南** | 开发命令、架构细节、开发注意事项 | [AGENTS.md](../AGENTS.md) |
-| **CLI 使用指南** | 完整命令行使用说明 | [CLI Usage](./guides/cli_usage.md) |
-
-### API 参考文档
-
-| 模块 | 说明 |
-|------|------|
-| [AnalyticsEngine](./api/analytics_engine.md) | 数据分析引擎（VDOT/TSS/心率漂移/训练负荷） |
-| [StorageManager](./api/storage_manager.md) | Parquet 存储管理器 |
-| [RunnerTools](./api/runner_tools.md) | Agent 工具集 |
-
-### 架构设计
-
-| 文档 | 说明 |
-|------|------|
-| [架构设计总览](./architecture/ARC_架构设计.md) | 项目整体架构设计 |
-| [v0.3.0 架构评审](./architecture/review/ARC_v0.3.0_架构符合性评审报告.md) | 最新版架构符合性评审 |
-
-### 需求规格
-
-| 文档 | 说明 |
-|------|------|
-| [需求规格说明书](./requirement/REQ_需求规格说明书.md) | 主需求文档 |
-| [v0.3.0 迭代需求](./requirement/0.3.0/迭代需求规格说明书.md) | 当前迭代需求 |
-
-### 开发文档
-
-| 文档 | 说明 |
-|------|------|
-| [v0.3.0 交付报告](./development/DEV_v0.3.0_交付报告.md) | 最新版开发交付报告 |
-
-### 测试文档
-
-| 文档 | 说明 |
-|------|------|
-| [v0.3.0 回归测试与质量评估](./test/TST_v0.3.0_回归测试与质量评估报告.md) | 最新版测试报告 |
-| [性能基准测试](./test/performance/TST_v0.3.0_性能基准测试报告.md) | 性能测试结果 |
-
-### 运维文档
-
-| 文档 | 说明 |
-|------|------|
-| [项目部署手册](./devops/OPS_项目部署手册.md) | 部署指南 |
-| [CICD 流水线配置](./devops/OPS_CICD 流水线配置说明.md) | CI/CD 配置说明 |
-| [版本发布说明](./devops/release_notes/release.md) | 所有版本发布记录 |
-
-### 规划文档
-
-| 文档 | 说明 |
-|------|------|
-| [v0.3.0 任务清单](./planning/PLN_v0.3.0_任务清单.md) | 当前迭代任务规划 |
-
-## 📁 文档目录结构
+## 📂 文档结构
 
 ```
 docs/
-├── README.md                 # 📍 本文档
-├── api/                      # API 参考文档
+├── README.md                   # 文档中心首页（本文件）
+├── api/                        # API 参考文档
 │   ├── analytics_engine.md
-│   ├── storage_manager.md
-│   └── runner_tools.md
-├── guides/                   # 用户指南
+│   ├── api_reference.md
+│   ├── runner_tools.md
+│   └── storage_manager.md
+├── architecture/               # 架构设计文档
+│   └── 架构设计说明书.md
+├── devops/                     # 运维与发布文档
+│   ├── release_checklist.md
+│   └── 分支管理与发布流程规范.md
+├── guides/                     # 使用指南
+│   ├── agent_config_guide.md
 │   └── cli_usage.md
-├── architecture/             # 架构设计
-│   ├── ARC_架构设计.md
-│   └── review/
-│       └── ARC_v0.3.0_架构符合性评审报告.md
-├── requirement/              # 需求规格
-│   ├── REQ_需求规格说明书.md
-│   └── 0.3.0/
-│       └── 迭代需求规格说明书.md
-├── planning/                 # 任务规划
-│   └── PLN_v0.3.0_任务清单.md
-├── development/              # 开发报告
-│   └── DEV_v0.3.0_交付报告.md
-├── test/                     # 测试报告
-│   ├── TST_v0.3.0_回归测试与质量评估报告.md
-│   └── performance/
-│       └── TST_v0.3.0_性能基准测试报告.md
-├── devops/                   # 运维文档
-│   ├── OPS_项目部署手册.md
-│   ├── OPS_CICD 流水线配置说明.md
-│   └── release_notes/
-│       └── release.md
-└── archive/                  # 历史归档
-    ├── v0.1.0/
-    └── v0.2.0/
+├── requirements/               # 需求文档
+│   └── REQ_需求规格说明书.md
+├── history/                    # 版本历史归档
+│   ├── VERSION_HISTORY.md
+│   ├── v0.4.0/
+│   │   └── release_notes.md
+│   └── v0.4.3/
+│       └── release_notes.md
+└── archive/                    # 深度归档（压缩存储）
+    ├── bugfix-reports.zip
+    ├── development-reports.zip
+    ├── test-reports.zip
+    ├── v0.1.0-archive.zip
+    ├── v0.2.0-archive.zip
+    └── v0.3.0-archive.zip
 ```
 
-## 🏷️ 版本历史
+## 🚀 快速导航
 
-| 版本 | 发布日期 | 说明 | 文档位置 |
-|------|---------|------|---------|
-| **v0.3.0** | 2026-03-17 | 训练负荷完整实现与智能晨报 | [当前版本](#) |
-| v0.2.0 | 2024-03-04 | Agent 自然语言交互完善 | [归档](./archive/v0.2.0/) |
-| v0.1.0 | 2024-02-01 | 基础功能实现 | [归档](./archive/v0.1.0/) |
+### 📖 当前版本文档
 
-## 🔍 快速检索
+#### 架构设计
+- [架构设计说明书](./architecture/架构设计说明书.md) - 系统整体架构设计
 
-### 按主题查找
+#### API 文档
+- [API 参考文档](./api/api_reference.md) - 完整的 API 接口说明
+- [数据分析引擎](./api/analytics_engine.md) - Analytics Engine API
+- [Runner 工具集](./api/runner_tools.md) - Agent 工具 API
+- [存储管理器](./api/storage_manager.md) - Storage Manager API
 
-- **数据导入**: [CLI 使用指南 - import 命令](./guides/cli_usage.md#import-命令)
-- **数据分析**: [AnalyticsEngine API](./api/analytics_engine.md)
-- **Agent 工具**: [RunnerTools API](./api/runner_tools.md)
-- **飞书推送**: [项目部署手册 - 飞书配置](./devops/OPS_项目部署手册.md#飞书推送配置)
-- **CI/CD**: [CICD 流水线配置](./devops/OPS_CICD 流水线配置说明.md)
+#### 使用指南
+- [CLI 使用指南](./guides/cli_usage.md) - 命令行工具使用说明
+- [Agent 配置指南](./guides/agent_config_guide.md) - Agent 配置方法
 
-### 按角色查找
+#### 运维文档
+- [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md) - Git 工作流程
+- [发布检查清单](./devops/release_checklist.md) - 版本发布检查项
 
-**开发者**:
-1. [AGENTS.md](../AGENTS.md) - 开发环境配置
-2. [CLI 使用指南](./guides/cli_usage.md) - 本地调试
-3. [API 参考](#api-参考文档) - 接口文档
+#### 需求文档
+- [需求规格说明书](./requirements/REQ_需求规格说明书.md) - 产品需求规格
 
-**测试工程师**:
-1. [测试报告](#测试文档) - 测试策略与结果
-2. [AGENTS.md - 测试命令](../AGENTS.md#常用命令) - 测试执行
+### 📅 版本历史
 
-**运维工程师**:
-1. [项目部署手册](./devops/OPS_项目部署手册.md) - 部署指南
-2. [CICD 流水线配置](./devops/OPS_CICD 流水线配置说明.md) - 发布流程
-3. [版本发布说明](./devops/release_notes/release.md) - 发布记录
+- [版本历史汇总](./history/VERSION_HISTORY.md) - 完整的版本发展历程
+- [v0.4.3 Release Notes](./history/v0.4.3/release_notes.md) - 最新版本发布说明
+- [v0.4.0 Release Notes](./history/v0.4.0/release_notes.md) - v0.4.0 发布说明
+
+
+
+### 📦 归档文档
+
+历史版本和临时报告已压缩归档，存储在 `archive/` 目录：
+
+- `development-reports.zip` - 开发报告归档
+- `test-reports.zip` - 测试报告归档
+- `bugfix-reports.zip` - 修复报告归档
+- `v0.1.0-archive.zip` - v0.1.0 版本归档
+- `v0.2.0-archive.zip` - v0.2.0 版本归档
+- `v0.3.0-archive.zip` - v0.3.0 版本归档
+
+## 🔍 文档分类
+
+### 按角色分类
+
+#### 开发者
+- [架构设计说明书](./architecture/架构设计说明书.md)
+- [API 参考文档](./api/api_reference.md)
+- [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md)
+
+#### 运维人员
+- [发布检查清单](./devops/release_checklist.md)
+- [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md)
+
+#### 产品经理
+- [需求规格说明书](./requirements/REQ_需求规格说明书.md)
+- [版本历史汇总](./history/VERSION_HISTORY.md)
+
+#### 用户
+- [CLI 使用指南](./guides/cli_usage.md)
+- [Agent 配置指南](./guides/agent_config_guide.md)
+
+### 按主题分类
+
+#### 架构与设计
+- 架构设计说明书
+- API 参考文档
+- 数据分析引擎
+
+#### 开发与测试
+- 分支管理与发布流程规范
+- 发布检查清单
+- API 文档
+
+#### 部署与运维
+- 发布检查清单
+- 分支管理与发布流程规范
 
 ## 📊 文档统计
 
-- **总文档数**: ~75 个（已归档历史版本）
-- **核心文档**: 15 个
-- **API 文档**: 3 个
-- **测试文档**: 5 个
-- **运维文档**: 8 个
+- **当前版本核心文档**: 10 个
+- **版本历史文档**: 7 个版本
+- **功能特性文档**: 2 个
+- **归档压缩包**: 6 个
+
+## 🔗 外部资源
+
+- [项目仓库](https://github.com/yecllsl/nanobot-runner)
+- [问题反馈](https://github.com/yecllsl/nanobot-runner/issues)
+- [项目 Wiki](https://github.com/yecllsl/nanobot-runner/wiki)
 
 ## 📝 文档维护
 
-### 文档更新规范
+### 文档更新流程
 
-1. **新增功能**: 同步更新 API 文档和用户指南
-2. **版本迭代**: 创建新版本目录，旧版本归档到 `archive/`
-3. **文档修订**: 更新文档顶部版本号
+1. **新增文档**: 在相应目录下创建新文档
+2. **更新文档**: 直接修改现有文档内容
+3. **归档文档**: 将历史版本文档移动到 archive 目录
+4. **更新索引**: 修改本 README.md 文件
 
-### 文档生命周期
+### 文档命名规范
 
-```
-新建 → 审核 → 发布 → 维护 → 归档
-```
+- 使用中文命名，便于理解
+- 采用描述性名称，避免缩写
+- 版本相关文档包含版本号
+
+### 文档格式规范
+
+- 使用 Markdown 格式
+- 包含清晰的标题层级
+- 添加必要的代码示例
+- 提供相关文档链接
+
+## 🆘 获取帮助
+
+如果您在使用过程中遇到问题：
+
+1. **查阅文档**: 首先查看相关文档章节
+2. **搜索历史**: 查看版本历史和归档文档
+3. **提交问题**: 在 GitHub Issues 中提问
+4. **联系团队**: 联系项目维护团队
+
+## 📅 文档更新记录
+
+- **2026-03-30**: 文档系统重构，采用分层归档策略
+- **2026-03-28**: v0.4.1 版本文档更新
+- **2026-03-25**: v0.4.0 版本文档发布
+- **2026-03-20**: v0.3.0 版本文档归档
 
 ---
 
-**最后更新**: 2026-03-17  
-**当前版本**: v0.3.0  
-**维护者**: 项目团队
+**文档维护团队**: Nanobot Runner 项目组  
+**最后更新**: 2026-03-30  
+**文档版本**: v2.0

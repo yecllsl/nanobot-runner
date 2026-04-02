@@ -45,20 +45,26 @@ source .venv/bin/activate
 
 ```bash
 # 导入 FIT 文件
-uv run nanobotrun import /path/to/activity.fit
+uv run nanobotrun import-data /path/to/activity.fit
 
 # 导入整个目录
-uv run nanobotrun import /path/to/activities/
+uv run nanobotrun import-data /path/to/activities/
+
+# 强制重新导入（跳过去重）
+uv run nanobotrun import-data /path/to/activity.fit --force
 ```
 
 ### 查看统计
 
 ```bash
-# 查看所有统计
+# 查看当前年份统计
 uv run nanobotrun stats
 
 # 查看指定年份
 uv run nanobotrun stats --year 2024
+
+# 查看日期范围
+uv run nanobotrun stats --start 2024-01-01 --end 2024-12-31
 ```
 
 ### AI 交互
@@ -103,11 +109,11 @@ uv run nanobotrun chat
 
 | 指标 | 说明 |
 |------|------|
-| **VDOT** | 跑力值评估（Powers 公式） |
-| **TSS** | 训练压力分数 |
-| **ATL/CTL** | 急/慢性训练负荷 |
+| **VDOT** | 跑力值评估（Powers 公式，距离≥1500m） |
+| **TSS** | 训练压力分数（时长×IF²×100） |
+| **ATL/CTL** | 急/慢性训练负荷（7天/42天 EWMA） |
 | **TSB** | 训练压力平衡 |
-| **心率漂移** | 有氧能力评估 |
+| **心率漂移** | 有氧能力评估（相关性<-0.7判定为漂移） |
 | **配速分布** | 训练强度区间分析 |
 
 ### 5. Agent 交互
@@ -120,14 +126,13 @@ uv run nanobotrun chat
 
 ### 6. 飞书推送
 
-支持周报/月报自动推送到飞书，配置简单：
+支持周报/月报自动推送到飞书，使用飞书应用机器人：
 
 ```json
 {
-  "feishu": {
-    "enabled": true,
-    "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-  }
+  "feishu_app_id": "your_app_id",
+  "feishu_app_secret": "your_app_secret",
+  "feishu_receive_id": "your_user_id"
 }
 ```
 
@@ -166,8 +171,7 @@ nanobot-runner/
 │   ├── e2e/               # 端到端测试
 │   └── performance/       # 性能测试
 ├── docs/                  # 文档
-│   ├── api/               # API 参考文档
-│   └── guides/            # 用户指南
+│   └── current/           # 当前版本文档
 ├── data/                  # 本地数据目录
 ├── pyproject.toml         # 项目配置
 └── README.md              # 项目说明
@@ -180,10 +184,22 @@ nanobot-runner/
 - [AnalyticsEngine API](./docs/api/analytics_engine.md) - 数据分析引擎
 - [StorageManager API](./docs/api/storage_manager.md) - 存储管理器
 - [RunnerTools API](./docs/api/runner_tools.md) - Agent 工具集
+- [API Reference](./docs/api/api_reference.md) - 完整 API 参考
 
 ### 用户指南
 
 - [CLI 使用指南](./docs/guides/cli_usage.md) - 完整命令行使用说明
+- [Agent 配置指南](./docs/guides/agent_config_guide.md) - Agent 配置说明
+
+### 架构与流程
+
+- [架构设计说明书](./docs/architecture/架构设计说明书.md) - 系统架构设计
+- [需求规格说明书](./docs/requirements/REQ_需求规格说明书.md) - 功能需求说明
+
+### DevOps
+
+- [发布检查清单](./docs/devops/release_checklist.md) - 发布流程检查
+- [分支管理与发布流程规范](./docs/devops/分支管理与发布流程规范.md) - Git 工作流
 
 ## 开发
 
@@ -198,97 +214,88 @@ uv run pytest --cov=src --cov-report=term-missing --cov-report=html
 
 # 运行特定测试
 uv run pytest tests/unit/test_analytics.py -v
+
+# 运行单元测试（覆盖率要求80%）
+uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 ```
 
 ### 代码质量
 
 ```bash
 # 格式化代码
-uv run black src tests
-uv run isort src tests
+uv run black src/ tests/
+
+# 导入排序
+uv run isort src/ tests/
 
 # 类型检查
-uv run mypy src
+uv run mypy src/ --ignore-missing-imports
 
-# 安全检查
-uv run bandit -r src
+# 安全扫描
+uv run bandit -r src/ -s B101,B601
 ```
 
-### 测试覆盖率
+### 质量门禁
 
-| 模块 | 覆盖率 | 状态 |
-|------|--------|------|
-| `src/core/analytics.py` | 92% | ✅ |
-| `src/core/decorators.py` | 100% | ✅ |
-| `src/core/exceptions.py` | 100% | ✅ |
-| `src/core/logger.py` | 100% | ✅ |
-| `src/core/parser.py` | 99% | ✅ |
-| `src/core/storage.py` | 95% | ✅ |
-| `src/agents/tools.py` | 94% | ✅ |
-| **总体** | **90%** | ✅ |
+| 检查项 | 工具 | 门禁要求 |
+|--------|------|----------|
+| 代码格式化 | black | 零警告 |
+| 导入排序 | isort | 零警告 |
+| 类型检查 | mypy | 警告可接受 |
+| 安全扫描 | bandit | 高危漏洞=0 |
+| 单元测试 | pytest | 通过率100% |
+| 代码覆盖率 | pytest-cov | core≥80%, agents≥70%, cli≥60% |
 
-## 数据隐私
+## 数据存储
 
-- 所有数据存储在本地 `~/.nanobot-runner/` 目录
-- 默认零外联，不上传任何原始数据
-- 仅在配置飞书推送时发送摘要消息
-- 支持数据导出和备份
+### 目录结构
 
-## 路线图
+```
+~/.nanobot-runner/
+├── data/                    # 业务数据存储
+│   ├── activities_*.parquet # 运动数据（按年分片）
+│   ├── profile.json         # 结构化画像数据
+│   └── index.json           # 去重索引
+├── memory/                  # 记忆系统
+│   ├── MEMORY.md            # 长期记忆/用户画像
+│   └── HISTORY.md           # 事件日志
+├── sessions/                # 会话历史
+├── AGENTS.md                # Agent行为准则
+├── SOUL.md                  # 人格设定
+├── USER.md                  # 用户画像
+└── config.json              # 应用配置
+```
 
-### v0.3.0
+### 配置分离
 
-- ✅ FIT 文件导入与解析
-- ✅ Parquet 存储与去重
-- ✅ VDOT/TSS/心率漂移分析
-- ✅ 训练负荷计算 (ATL/CTL/TSB)
-- ✅ Agent 自然语言交互
-- ✅ 飞书推送集成
-- ✅ 结构化日志系统
-- ✅ Polars LazyFrame 优化
-
-### v0.4.0 (规划中)
-
-- 📊 数据可视化图表
-- 📅 每日晨报自动生成
-- 🏃 训练计划建议
-- 📈 更多分析指标
-- 🌐 Web 界面
+| 类型 | 位置 | 说明 |
+|------|------|------|
+| LLM Provider | `~/.nanobot/config.json` | 框架级配置 |
+| 飞书通道 | `~/.nanobot/config.json` | 框架级配置 |
+| 跑步数据 | `~/.nanobot-runner/data/` | 业务数据 |
+| Agent记忆 | `~/.nanobot-runner/memory/` | 业务数据 |
 
 ## 常见问题
 
-### 1. uv 安装依赖失败
-
-```bash
-# 清理缓存后重试
-uv cache clean
-uv sync --reinstall
-```
-
-### 2. 虚拟环境激活失败（Windows）
+### Windows PowerShell 执行策略
 
 ```powershell
-# 设置执行策略
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.venv\Scripts\Activate.ps1
 ```
 
-### 3. 导入 FIT 文件失败
+### 依赖问题解决
 
-- 确认文件为有效的 FIT 格式
-- 检查文件是否损坏
-- 查看日志：`~/.nanobot-runner/logs/nanobot-runner.log`
-
-更多问题请查看 [CLI 用户指南](./docs/guides/cli_usage.md#故障排查)。
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+```bash
+# 清理缓存并重新安装
+uv cache clean; if($?) { uv sync --reinstall }  # Windows
+uv cache clean && uv sync --reinstall           # Linux/macOS
+```
 
 ## 许可证
 
-MIT License
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 
-*Made with ❤️ for runners*
+**版本**: v0.4.1  
+**最后更新**: 2026-03-30

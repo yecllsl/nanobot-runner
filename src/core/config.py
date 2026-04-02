@@ -14,15 +14,35 @@ class ConfigManager:
 
     def __init__(self):
         """初始化配置管理器"""
-        self.base_dir = Path.home() / ".nanobot-runner"
-        self.data_dir = self.base_dir / "data"
+        # 支持通过环境变量指定配置目录（用于CI环境）
+        if os.environ.get("NANOBOT_CONFIG_DIR"):
+            self.base_dir = Path(os.environ.get("NANOBOT_CONFIG_DIR"))
+        else:
+            self.base_dir = Path.home() / ".nanobot-runner"
+
         self.config_file = self.base_dir / "config.json"
+
+        # 先初始化默认路径
+        self.data_dir = self.base_dir / "data"
         self.index_file = self.data_dir / "index.json"
         self.cron_dir = self.base_dir / "cron"
         self.cron_store = self.cron_dir / "jobs.json"
 
+        # 确保目录和配置文件存在
         self._ensure_dirs()
         self._ensure_config()
+
+        # 尝试从配置文件读取 data_dir，如果存在则更新
+        try:
+            config = self.load_config()
+            if "data_dir" in config:
+                self.data_dir = Path(config["data_dir"])
+                self.index_file = self.data_dir / "index.json"
+        except Exception as e:
+            # 如果读取配置失败，继续使用默认路径，记录警告日志
+            import loguru
+
+            loguru.logger.debug(f"读取配置文件失败，使用默认路径: {e}")
 
     def _ensure_dirs(self):
         """确保必要目录存在，并迁移旧的定时任务配置"""
@@ -59,8 +79,6 @@ class ConfigManager:
                 "feishu_app_secret": "",  # nosec B105
                 "feishu_receive_id": "",
                 "feishu_receive_id_type": "user_id",
-                # 兼容旧配置（已废弃）
-                "feishu_webhook": "",  # nosec B105
             }
             self.save_config(default_config)
 

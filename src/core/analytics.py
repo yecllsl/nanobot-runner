@@ -353,8 +353,8 @@ class AnalyticsEngine:
                 return {"total_runs": 0, "total_distance": 0.0, "total_duration": 0.0}
 
             total_runs = session_df.height
-            total_distance = session_df["distance"].sum()
-            total_duration = session_df["duration"].sum()
+            total_distance = float(session_df["distance"].sum())
+            total_duration = float(session_df["duration"].sum())
             avg_heart_rate_result = session_df["avg_hr"].mean()
             avg_heart_rate = float(avg_heart_rate_result) if avg_heart_rate_result is not None else 0.0  # type: ignore
 

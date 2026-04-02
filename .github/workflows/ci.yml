@@ -2,9 +2,10 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, develop, 'feature/*' ]
+    branches: [ main, feature/*, hotfix/* ]  # 对 main、feature、hotfix 分支推送触发
   pull_request:
-    branches: [ main ]
+    branches: [ main ]  # 仅对 main 分支的 PR 触发（单人开发模式）
+    types: [opened, reopened, synchronize]
 
 env:
   PYTHON_VERSION: '3.11'
@@ -58,14 +59,12 @@ jobs:
     - name: Type checking with mypy
       run: |
         echo "开始类型检查..."
-        python -m mypy src/ --ignore-missing-imports --install-types --non-interactive || echo "mypy检查失败，但继续执行"
-      continue-on-error: true
+        python -m mypy src/ --ignore-missing-imports
         
     - name: Security scan with bandit
       run: |
         echo "开始安全扫描..."
-        python -m bandit -r src/ -f json -o bandit-report.json -s B101,B601 || echo "bandit检查失败，但继续执行"
-      continue-on-error: true
+        python -m bandit -r src/ -f json -o bandit-report.json -s B101,B601
         
   # 测试执行
   test:
@@ -97,7 +96,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .[test] --no-cache-dir
+        pip install -e .[test,dev] --no-cache-dir
         
     - name: Verify test dependencies
       run: |
@@ -121,7 +120,8 @@ jobs:
     - name: Run E2E tests
       run: |
         echo "开始端到端测试..."
-        python -m pytest tests/e2e/ -v --tb=short
+        timeout 300s python -m pytest tests/e2e/ -v --tb=short  # 5分钟超时
+        echo "E2E测试完成"
         
     - name: Generate coverage report
       run: |

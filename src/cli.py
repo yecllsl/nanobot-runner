@@ -67,7 +67,7 @@ class CLIError:
     def storage_error(error: str) -> dict:
         return {
             "message": f"存储错误: {error}",
-            "suggestion": "请检查数据目录权限，或运行 'nanobotrun import' 导入数据",
+            "suggestion": "请检查数据目录权限，或运行 'nanobotrun import-data' 导入数据",
         }
 
     @staticmethod
@@ -243,7 +243,7 @@ def stats(
 
         if df.is_empty():
             print_status("暂无跑步数据", "warning")
-            console.print("[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]")
+            console.print("[dim]提示: 使用 'nanobotrun import-data <路径>' 导入FIT文件[/dim]")
             return
 
         from datetime import datetime
@@ -769,214 +769,6 @@ def init() -> None:
     console.print("  3. 查看画像: [cyan]nanobotrun profile show[/cyan]")
 
 
-plan_app = typer.Typer(help="训练计划管理")
-app.add_typer(plan_app, name="plan")
-
-
-@plan_app.command("generate")
-def generate_plan(
-    goal_distance: float = typer.Option(
-        ..., "--goal-distance", "-d", help="目标比赛距离（公里）"
-    ),
-    goal_date: str = typer.Option(..., "--goal-date", "-t", help="目标比赛日期（YYYY-MM-DD）"),
-    current_vdot: Optional[float] = typer.Option(
-        None, "--vdot", "-v", help="当前 VDOT（可选，默认从画像获取）"
-    ),
-    weekly_volume: Optional[float] = typer.Option(
-        None, "--volume", help="当前周跑量（公里，可选）"
-    ),
-    output: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="输出文件路径（JSON 格式）"
-    ),
-) -> None:
-    """
-    生成个性化训练计划
-
-    基于用户画像和历史数据，生成科学的训练计划。
-
-    示例:
-        nanobotrun plan generate --goal-distance 21.0975 --goal-date 2026-06-01
-        nanobotrun plan generate -d 42.195 -t 2026-10-15 -v 45.0
-
-    Args:
-        goal_distance: 目标比赛距离（公里）
-        goal_date: 目标比赛日期（YYYY-MM-DD）
-        current_vdot: 当前 VDOT（可选，默认从画像获取）
-        weekly_volume: 当前周跑量（公里，可选）
-        output: 输出文件路径（JSON 格式）
-    """
-    import json
-
-    from src.core.analytics import AnalyticsEngine
-    from src.core.profile import ProfileStorageManager
-    from src.core.training_plan import TrainingPlanEngine
-
-    try:
-        storage = StorageManager()
-        analytics = AnalyticsEngine(storage)
-        profile_storage = ProfileStorageManager()
-        engine = TrainingPlanEngine()
-
-        profile = profile_storage.load_profile_json()
-        if not profile:
-            console.print("[red]错误: 未找到用户画像[/red]")
-            console.print("请先运行 [cyan]nanobotrun import[/cyan] 导入数据")
-            raise typer.Exit(1)
-
-        profile_dict = profile.to_dict()
-        vdot = current_vdot or profile_dict.get("estimated_vdot", 35.0)
-        volume = weekly_volume or profile_dict.get("weekly_avg_distance", 30.0)
-        age = profile_dict.get("age", 30)
-        resting_hr = profile_dict.get("resting_hr", 60)
-
-        console.print(f"[bold]生成训练计划[/bold]")
-        console.print(f"  目标距离: [cyan]{goal_distance} km[/cyan]")
-        console.print(f"  目标日期: [cyan]{goal_date}[/cyan]")
-        console.print(f"  当前VDOT: [yellow]{vdot}[/yellow]")
-        console.print(f"  周跑量: [yellow]{volume:.1f} km[/yellow]")
-
-        plan = engine.generate_plan(
-            user_id="default",
-            goal_distance_km=goal_distance,
-            goal_date=goal_date,
-            current_vdot=vdot,
-            current_weekly_distance_km=volume,
-            age=age,
-            resting_hr=resting_hr,
-        )
-
-        console.print(f"\n[bold green]训练计划生成成功！[/bold green]")
-        console.print(f"  体能水平: [yellow]{plan.fitness_level.value}[/yellow]")
-        console.print(f"  训练周数: [yellow]{len(plan.weeks)} 周[/yellow]")
-
-        total_distance = sum(ws.weekly_distance_km for ws in plan.weeks)
-        console.print(f"  总跑量: [yellow]{total_distance:.1f} km[/yellow]")
-
-        console.print(f"\n[bold]训练计划概览:[/bold]")
-        table = Table(show_header=True, header_style="bold cyan")
-        table.add_column("周次", style="dim", width=6)
-        table.add_column("日期范围", width=22)
-        table.add_column("周跑量(km)", justify="right")
-        table.add_column("重点", style="green")
-
-        for ws in plan.weeks[:8]:
-            table.add_row(
-                f"第{ws.week_number}周",
-                f"{ws.start_date} ~ {ws.end_date}",
-                f"{ws.weekly_distance_km:.1f}",
-                ws.focus or "-",
-            )
-
-        if len(plan.weeks) > 8:
-            table.add_row("...", "...", "...", "...")
-
-        console.print(table)
-
-        if output:
-            plan_dict = plan.to_dict()
-            with open(output, "w", encoding="utf-8") as f:
-                json.dump(plan_dict, f, ensure_ascii=False, indent=2)
-            console.print(f"\n[green]✓[/green] 计划已保存到: [cyan]{output}[/cyan]")
-
-    except ValueError as e:
-        print_error(CLIError.config_missing(str(e)))
-        raise typer.Exit(1)
-    except Exception as e:
-        print_error(CLIError.storage_error(str(e)))
-        raise typer.Exit(1)
-
-
-@plan_app.command("show")
-def show_plan(
-    plan_file: Path = typer.Argument(..., help="训练计划文件路径（JSON）"),
-    week: Optional[int] = typer.Option(None, "--week", "-w", help="显示指定周的计划"),
-) -> None:
-    """
-    显示训练计划详情
-
-    示例:
-        nanobotrun plan show plan.json
-        nanobotrun plan show plan.json --week 4
-
-    Args:
-        plan_file: 训练计划文件路径（JSON）
-        week: 显示指定周的计划（可选）
-    """
-    import json
-
-    if not plan_file.exists():
-        print_error(CLIError.path_not_found(str(plan_file)))
-        raise typer.Exit(1)
-
-    try:
-        with open(plan_file, encoding="utf-8") as f:
-            plan_data = json.load(f)
-
-        console.print(
-            f"[bold]训练计划: {plan_data.get('goal_distance_km', '未知')}km比赛[/bold]"
-        )
-        console.print(f"  目标日期: [cyan]{plan_data.get('goal_date', '未知')}[/cyan]")
-        console.print(
-            f"  体能水平: [yellow]{plan_data.get('fitness_level', 'N/A')}[/yellow]"
-        )
-
-        weeks = plan_data.get("weeks", [])
-
-        if week:
-            if week < 1 or week > len(weeks):
-                console.print(f"[red]无效的周次: {week}[/red]")
-                raise typer.Exit(1)
-
-            ws = weeks[week - 1]
-            console.print(f"\n[bold]第{week}周详情:[/bold]")
-            console.print(f"  日期: {ws.get('start_date')} ~ {ws.get('end_date')}")
-            console.print(f"  周跑量: {ws.get('weekly_distance_km', 0):.1f} km")
-            console.print(f"  重点: {ws.get('focus', '-')}")
-
-            table = Table(show_header=True, header_style="bold cyan")
-            table.add_column("日期", width=12)
-            table.add_column("训练类型", width=10)
-            table.add_column("距离(km)", justify="right")
-            table.add_column("时长(分)", justify="right")
-            table.add_column("说明")
-
-            for dp in ws.get("daily_plans", []):
-                table.add_row(
-                    dp.get("date", "-"),
-                    dp.get("workout_type", "-"),
-                    f"{dp.get('distance_km', 0):.1f}",
-                    str(dp.get("duration_min", 0)),
-                    dp.get("notes", "-"),
-                )
-
-            console.print(table)
-        else:
-            console.print(f"\n[bold]计划概览 ({len(weeks)}周):[/bold]")
-
-            table = Table(show_header=True, header_style="bold cyan")
-            table.add_column("周次", style="dim", width=6)
-            table.add_column("日期范围", width=22)
-            table.add_column("周跑量(km)", justify="right")
-            table.add_column("重点", style="green")
-
-            for ws in weeks:
-                table.add_row(
-                    f"第{ws.get('week_number', 0)}周",
-                    f"{ws.get('start_date')} ~ {ws.get('end_date')}",
-                    f"{ws.get('weekly_distance_km', 0):.1f}",
-                    ws.get("focus", "-"),
-                )
-
-            console.print(table)
-
-    except json.JSONDecodeError:
-        print_error(CLIError.storage_error("无效的JSON文件"))
-        raise typer.Exit(1)
-    except Exception as e:
-        print_error(CLIError.storage_error(str(e)))
-        raise typer.Exit(1)
-
-
 @app.command()
 def gateway(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
@@ -1276,7 +1068,7 @@ def report(
             print_error(
                 {
                     "message": f"生成晨报失败: {result.get('error', '未知错误')}",
-                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun import' 导入数据",
+                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun import-data' 导入数据",
                 }
             )
             raise typer.Exit(1)
@@ -1453,7 +1245,8 @@ def profile_show(
         if profile is None or profile.total_activities == 0:
             console.print(
                 Panel(
-                    "[yellow]暂无跑步数据[/yellow]\n\n" "使用 'nanobotrun import <路径>' 导入FIT文件",
+                    "[yellow]暂无跑步数据[/yellow]\n\n"
+                    "使用 'nanobotrun import-data <路径>' 导入FIT文件",
                     title="用户画像",
                     border_style="yellow",
                 )

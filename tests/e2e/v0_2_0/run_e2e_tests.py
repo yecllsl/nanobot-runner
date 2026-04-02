@@ -81,7 +81,12 @@ def check_environment() -> Dict[str, Any]:
             environment_info["issues"].append(f"依赖检查失败: {e}")
 
     # 检查测试数据
-    test_data_dir = Path.home() / ".nanobot-runner" / "test_data"
+    # 在CI环境中使用临时目录，在生产环境中使用用户主目录
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        base_dir = Path("/tmp") / ".nanobot-runner"
+    else:
+        base_dir = Path.home() / ".nanobot-runner"
+    test_data_dir = base_dir / "test_data"
     if test_data_dir.exists():
         parquet_files = list(test_data_dir.glob("*.parquet"))
         if parquet_files:

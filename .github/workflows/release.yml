@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main  # 限制只有main分支的标签推送才触发发布
 
 env:
   PYTHON_VERSION: '3.11'
