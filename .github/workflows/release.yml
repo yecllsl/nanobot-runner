@@ -16,12 +16,23 @@ jobs:
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    # 验证标签是否指向 main 分支
-    if: github.event.base_ref == 'refs/heads/main'
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 需要完整历史来验证分支
+    
+    - name: Verify tag is on main branch
+      run: |
+        # 检查标签指向的提交是否在 main 分支上
+        if git branch --contains ${{ github.ref_name }} | grep -q "main"; then
+          echo "✅ Tag ${{ github.ref_name }} is on main branch"
+        else
+          echo "❌ Tag ${{ github.ref_name }} is NOT on main branch"
+          echo "Only tags on main branch can trigger release"
+          exit 1
+        fi
       
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
