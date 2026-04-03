@@ -30,7 +30,7 @@ class HealthCheckItem(str, Enum):
     """健康检查项"""
 
     NETWORK = "network"
-    TOKEN = "token"
+    TOKEN = "token"  # nosec B105  # 枚举值，非真实密码
     CALENDAR_PERMISSION = "calendar_permission"
     CALENDAR_ID = "calendar_id"
 
