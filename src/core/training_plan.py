@@ -59,6 +59,7 @@ class DailyPlan:
     actual_avg_hr: Optional[int] = None  # 实际平均心率
     rpe: Optional[int] = None  # 主观疲劳度 (1-10)
     hr_drift: Optional[float] = None  # 心率漂移 (%)
+    event_id: Optional[str] = None  # 日历事件ID
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -84,6 +85,7 @@ class DailyPlan:
             "hr_drift": (
                 round(self.hr_drift, 2) if self.hr_drift is not None else None
             ),
+            "event_id": self.event_id,
         }
 
 
@@ -147,6 +149,70 @@ class TrainingPlan:
             "updated_at": self.updated_at.isoformat(),
             "notes": self.notes,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TrainingPlan":
+        """从字典创建训练计划"""
+        weeks = []
+        for week_data in data.get("weeks", []):
+            daily_plans = []
+            for day_data in week_data.get("daily_plans", []):
+                daily_plan = DailyPlan(
+                    date=day_data["date"],
+                    workout_type=WorkoutType(day_data["workout_type"]),
+                    distance_km=day_data["distance_km"],
+                    duration_min=day_data["duration_min"],
+                    target_pace_min_per_km=day_data.get("target_pace_min_per_km"),
+                    target_hr_zone=day_data.get("target_hr_zone"),
+                    notes=day_data.get("notes", ""),
+                    completed=day_data.get("completed", False),
+                    actual_distance_km=day_data.get("actual_distance_km"),
+                    actual_duration_min=day_data.get("actual_duration_min"),
+                    actual_avg_hr=day_data.get("actual_avg_hr"),
+                    rpe=day_data.get("rpe"),
+                    hr_drift=day_data.get("hr_drift"),
+                    event_id=day_data.get("event_id"),
+                )
+                daily_plans.append(daily_plan)
+
+            week = WeeklySchedule(
+                week_number=week_data["week_number"],
+                start_date=week_data["start_date"],
+                end_date=week_data["end_date"],
+                daily_plans=daily_plans,
+                weekly_distance_km=week_data.get("weekly_distance_km", 0.0),
+                weekly_duration_min=week_data.get("weekly_duration_min", 0),
+                focus=week_data.get("focus", ""),
+                notes=week_data.get("notes", ""),
+            )
+            weeks.append(week)
+
+        created_at = data.get("created_at")
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+        elif created_at is None:
+            created_at = datetime.now()
+
+        updated_at = data.get("updated_at")
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at)
+        elif updated_at is None:
+            updated_at = datetime.now()
+
+        return cls(
+            plan_id=data["plan_id"],
+            user_id=data["user_id"],
+            plan_type=PlanType(data["plan_type"]),
+            fitness_level=FitnessLevel(data["fitness_level"]),
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            goal_distance_km=data["goal_distance_km"],
+            goal_date=data["goal_date"],
+            weeks=weeks,
+            created_at=created_at,
+            updated_at=updated_at,
+            notes=data.get("notes", ""),
+        )
 
 
 # 阶段配置：定义各训练阶段的特点
