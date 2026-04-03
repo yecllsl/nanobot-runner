@@ -233,7 +233,12 @@ class TestNotifyToolSendReminder:
         daily_plan = create_test_daily_plan()
         user_context = create_test_user_context()
 
-        result = notify_tool.send_reminder(daily_plan, user_context)
+        # Mock时间，避免免打扰时段检查（10:00不在免打扰时段）
+        with patch("src.core.plan.notify_tool.datetime") as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 4, 3, 10, 0, 0)
+            mock_datetime.strftime = datetime.strftime
+
+            result = notify_tool.send_reminder(daily_plan, user_context)
 
         assert isinstance(result, NotifyResult)
         assert result.sent is True
@@ -280,7 +285,12 @@ class TestNotifyToolSendReminder:
         daily_plan = create_test_daily_plan()
         user_context = create_test_user_context()
 
-        result = notify_tool.send_reminder(daily_plan, user_context)
+        # Mock时间，避免免打扰时段检查
+        with patch("src.core.plan.notify_tool.datetime") as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 4, 3, 10, 0, 0)
+            mock_datetime.strftime = datetime.strftime
+
+            result = notify_tool.send_reminder(daily_plan, user_context)
 
         assert result.sent is False
         assert result.skipped is True
@@ -317,7 +327,12 @@ class TestNotifyToolSendReminder:
         daily_plan = create_test_daily_plan()
         user_context = create_test_user_context()
 
-        result = notify_tool.send_reminder(daily_plan, user_context)
+        # Mock时间，避免免打扰时段检查
+        with patch("src.core.plan.notify_tool.datetime") as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 4, 3, 10, 0, 0)
+            mock_datetime.strftime = datetime.strftime
+
+            result = notify_tool.send_reminder(daily_plan, user_context)
 
         assert result.sent is False
         assert result.skipped is False
@@ -330,7 +345,12 @@ class TestNotifyToolSendReminder:
         daily_plan = create_test_daily_plan()
         user_context = create_test_user_context()
 
-        result = notify_tool.send_reminder(daily_plan, user_context)
+        # Mock时间，避免免打扰时段检查
+        with patch("src.core.plan.notify_tool.datetime") as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 4, 3, 10, 0, 0)
+            mock_datetime.strftime = datetime.strftime
+
+            result = notify_tool.send_reminder(daily_plan, user_context)
 
         assert result.sent is False
         assert result.skipped is False
@@ -594,7 +614,12 @@ class TestNotifyToolWeatherAlertDisabled:
         daily_plan = create_test_daily_plan()
         user_context = create_test_user_context(weather_alert=False)
 
-        result = notify_tool.send_reminder(daily_plan, user_context)
+        # Mock时间，避免免打扰时段检查
+        with patch("src.core.plan.notify_tool.datetime") as mock_datetime:
+            mock_datetime.now.return_value = datetime(2026, 4, 3, 10, 0, 0)
+            mock_datetime.strftime = datetime.strftime
+
+            result = notify_tool.send_reminder(daily_plan, user_context)
 
         # 天气预警禁用，应该发送成功
         assert result.sent is True
