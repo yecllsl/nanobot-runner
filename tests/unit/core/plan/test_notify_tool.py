@@ -45,6 +45,7 @@ def create_test_user_context(
     has_activity_today: bool = False,
     leave_dates: list = None,
     business_trip_dates: list = None,
+    activity_date: str = None,
 ) -> UserContext:
     """创建测试用户上下文"""
     # 创建用户画像
@@ -60,7 +61,10 @@ def create_test_user_context(
     recent_activities = []
     if has_activity_today:
         activity = Mock()
-        activity.timestamp = datetime.now()
+        if activity_date:
+            activity.timestamp = datetime.strptime(activity_date, "%Y-%m-%d")
+        else:
+            activity.timestamp = datetime.now()
         recent_activities.append(activity)
 
     # 创建训练负荷
@@ -259,7 +263,9 @@ class TestNotifyToolSendReminder:
     def test_send_reminder_training_completed(self, notify_tool):
         """测试已完成训练"""
         daily_plan = create_test_daily_plan()
-        user_context = create_test_user_context(has_activity_today=True)
+        user_context = create_test_user_context(
+            has_activity_today=True, activity_date="2026-04-03"
+        )
 
         result = notify_tool.send_reminder(daily_plan, user_context)
 
