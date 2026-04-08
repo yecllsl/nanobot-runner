@@ -149,3 +149,120 @@ class TestConfigManager:
 
             assert migrated_jobs["jobs"][0]["id"] == "test1"
             assert migrated_jobs["jobs"][0]["name"] == "test_job"
+
+    def test_cache_mechanism(self, tmp_path):
+        """测试配置缓存机制"""
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            cm._invalidate_cache()
+
+            config1 = cm.load_config()
+            config2 = cm.load_config()
+
+            assert config1 == config2
+            assert ConfigManager._cache is not None
+
+    def test_cache_invalidation_on_save(self, tmp_path):
+        """测试保存配置时缓存失效"""
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            cm.load_config()
+            assert ConfigManager._cache is not None
+
+            cm.save_config(
+                {
+                    "version": "0.1.0",
+                    "data_dir": str(tmp_path / "data"),
+                    "new_key": "new_value",
+                }
+            )
+
+            assert ConfigManager._cache is None
+
+    def test_cache_invalidation_manual(self, tmp_path):
+        """测试手动清除缓存"""
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            cm.load_config()
+            assert ConfigManager._cache is not None
+
+            cm._invalidate_cache()
+            assert ConfigManager._cache is None
+
+    def test_reload_config(self, tmp_path):
+        """测试强制重新加载配置"""
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            config1 = cm.load_config()
+
+            with open(cm.config_file, "r", encoding="utf-8") as f:
+                raw_config = json.load(f)
+            raw_config["manual_key"] = "manual_value"
+            with open(cm.config_file, "w", encoding="utf-8") as f:
+                json.dump(raw_config, f)
+
+            config2 = cm.reload_config()
+
+            assert "manual_key" in config2
+            assert config2["manual_key"] == "manual_value"
+
+    def test_load_config_without_cache(self, tmp_path):
+        """测试不使用缓存加载配置"""
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            cm._invalidate_cache()
+
+            config1 = cm.load_config(use_cache=False)
+            assert ConfigManager._cache is not None
+
+            config2 = cm.load_config(use_cache=False)
+            assert config1 == config2
+
+    def test_cache_ttl_expiration(self, tmp_path):
+        """测试缓存 TTL 过期"""
+        import time
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            original_ttl = ConfigManager._cache_ttl
+            ConfigManager._cache_ttl = 0.1
+
+            try:
+                cm._invalidate_cache()
+                cm.load_config()
+
+                time.sleep(0.15)
+
+                assert not cm._is_cache_valid()
+            finally:
+                ConfigManager._cache_ttl = original_ttl
+
+    def test_cache_file_modification_detection(self, tmp_path):
+        """测试文件修改检测"""
+        import time
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager()
+
+            cm._invalidate_cache()
+            cm.load_config()
+
+            time.sleep(0.01)
+
+            with open(cm.config_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "version": "0.1.0",
+                        "data_dir": str(tmp_path / "data"),
+                        "modified": True,
+                    },
+                    f,
+                )
+
+            assert not cm._is_cache_valid()

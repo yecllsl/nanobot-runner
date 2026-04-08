@@ -1381,3 +1381,209 @@ class TestStorageManager:
             lf = manager.read_parquet()
             df = lf.collect()
             assert df.height == 3
+
+
+class TestStorageManagerIncremental:
+    """增量写入方法测试类"""
+
+    def test_save_to_parquet_incremental_new_file(self, tmp_path: Path) -> None:
+        """测试增量写入 - 新文件"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        test_data = pl.DataFrame(
+            {
+                "activity_id": ["test_001", "test_002"],
+                "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1800, 3600],
+            }
+        )
+
+        result = manager.save_to_parquet_incremental(test_data, 2024)
+
+        assert result["success"] is True
+        assert result["records_added"] == 2
+        assert result["records_updated"] == 0
+        assert result["total_records"] == 2
+
+    def test_save_to_parquet_incremental_append(self, tmp_path: Path) -> None:
+        """测试增量写入 - 追加新数据"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        # 第一次写入
+        data1 = pl.DataFrame(
+            {
+                "activity_id": ["test_001"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+            }
+        )
+        manager.save_to_parquet_incremental(data1, 2024)
+
+        # 第二次追加
+        data2 = pl.DataFrame(
+            {
+                "activity_id": ["test_002"],
+                "timestamp": [datetime(2024, 1, 2)],
+                "session_total_distance": [10000.0],
+                "session_total_timer_time": [3600],
+            }
+        )
+        result = manager.save_to_parquet_incremental(data2, 2024)
+
+        assert result["success"] is True
+        assert result["records_added"] == 1
+        assert result["records_updated"] == 0
+        assert result["total_records"] == 2
+
+    def test_save_to_parquet_incremental_update(self, tmp_path: Path) -> None:
+        """测试增量写入 - 更新现有数据"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        # 第一次写入
+        data1 = pl.DataFrame(
+            {
+                "activity_id": ["test_001"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "session_total_distance": [5000.0],
+                "session_total_timer_time": [1800],
+            }
+        )
+        manager.save_to_parquet_incremental(data1, 2024)
+
+        # 第二次更新（相同 activity_id）
+        data2 = pl.DataFrame(
+            {
+                "activity_id": ["test_001"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "session_total_distance": [6000.0],
+                "session_total_timer_time": [2000],
+            }
+        )
+        result = manager.save_to_parquet_incremental(data2, 2024)
+
+        assert result["success"] is True
+        assert result["records_added"] == 0
+        assert result["records_updated"] == 1
+        assert result["total_records"] == 1
+
+    def test_save_to_parquet_incremental_empty_data(self, tmp_path: Path) -> None:
+        """测试增量写入 - 空数据"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        empty_data = pl.DataFrame(
+            {
+                "activity_id": [],
+                "timestamp": [],
+                "session_total_distance": [],
+            }
+        )
+
+        result = manager.save_to_parquet_incremental(empty_data, 2024, allow_empty=True)
+
+        assert result["success"] is True
+        assert result["records_added"] == 0
+
+    def test_save_to_parquet_incremental_no_primary_key(self, tmp_path: Path) -> None:
+        """测试增量写入 - 无主键列"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        test_data = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "session_total_distance": [5000.0],
+            }
+        )
+
+        result = manager.save_to_parquet_incremental(test_data, 2024)
+
+        assert result["success"] is True
+        assert result["records_added"] == 1
+
+    def test_append_activities_single_year(self, tmp_path: Path) -> None:
+        """测试批量追加 - 单年份数据"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        test_data = pl.DataFrame(
+            {
+                "activity_id": ["test_001", "test_002"],
+                "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1800, 3600],
+            }
+        )
+
+        result = manager.append_activities(test_data)
+
+        assert result["success"] is True
+        assert result["total_added"] == 2
+        assert result["years_processed"] == 1
+
+    def test_append_activities_multiple_years(self, tmp_path: Path) -> None:
+        """测试批量追加 - 多年份数据"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        test_data = pl.DataFrame(
+            {
+                "activity_id": ["test_001", "test_002", "test_003"],
+                "timestamp": [
+                    datetime(2023, 1, 1),
+                    datetime(2024, 1, 1),
+                    datetime(2025, 1, 1),
+                ],
+                "session_total_distance": [5000.0, 10000.0, 15000.0],
+                "session_total_timer_time": [1800, 3600, 5400],
+            }
+        )
+
+        result = manager.append_activities(test_data)
+
+        assert result["success"] is True
+        assert result["total_added"] == 3
+        assert result["years_processed"] == 3
+
+    def test_append_activities_empty_data(self, tmp_path: Path) -> None:
+        """测试批量追加 - 空数据"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        empty_data = pl.DataFrame(
+            {
+                "activity_id": [],
+                "timestamp": [],
+            }
+        )
+
+        result = manager.append_activities(empty_data)
+
+        assert result["success"] is True
+        assert result["total_added"] == 0
+        assert result["years_processed"] == 0
+
+    def test_append_activities_missing_timestamp(self, tmp_path: Path) -> None:
+        """测试批量追加 - 缺少 timestamp 列"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        test_data = pl.DataFrame(
+            {
+                "activity_id": ["test_001"],
+                "session_total_distance": [5000.0],
+            }
+        )
+
+        with pytest.raises(ValidationError, match="数据缺少 timestamp 列"):
+            manager.append_activities(test_data)
+
+    def test_save_to_parquet_incremental_invalid_year(self, tmp_path: Path) -> None:
+        """测试增量写入 - 无效年份"""
+        manager = StorageManager(data_dir=tmp_path)
+
+        test_data = pl.DataFrame(
+            {
+                "activity_id": ["test_001"],
+                "timestamp": [datetime(2024, 1, 1)],
+            }
+        )
+
+        with pytest.raises(ValidationError, match="年份必须在2000-2100范围内"):
+            manager.save_to_parquet_incremental(test_data, 1999)

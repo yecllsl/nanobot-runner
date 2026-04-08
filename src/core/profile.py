@@ -10,11 +10,23 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import polars as pl
 
+from src.core.anomaly_data_filter import AnomalyDataFilter
+from src.core.injury_risk_analyzer import InjuryRiskAnalyzer
 from src.core.logger import get_logger
+from src.core.training_history_analyzer import TrainingHistoryAnalyzer
+from src.core.user_profile_manager import (
+    InjuryRiskLevel,
+    RunnerProfile,
+    TrainingPattern,
+    UserProfileManager,
+)
+
+if TYPE_CHECKING:
+    from src.core.storage import StorageManager
 
 logger = get_logger(__name__)
 
@@ -311,15 +323,15 @@ class ProfileStorageManager:
                 total_duration_hours=profile_data.get("total_duration_hours", 0.0),
                 avg_vdot=profile_data.get("avg_vdot", 0.0),
                 max_vdot=profile_data.get("max_vdot", 0.0),
-                fitness_level=fitness_level,
+                fitness_level=fitness_level,  # type: ignore[arg-type]
                 weekly_avg_distance_km=profile_data.get("weekly_avg_distance_km", 0.0),
                 weekly_avg_duration_hours=profile_data.get(
                     "weekly_avg_duration_hours", 0.0
                 ),
                 training_pattern=training_pattern,
-                avg_heart_rate=profile_data.get("avg_heart_rate"),
-                max_heart_rate=profile_data.get("max_heart_rate"),
-                resting_heart_rate=profile_data.get("resting_heart_rate"),
+                avg_heart_rate=profile_data.get("avg_heart_rate"),  # type: ignore[arg-type]
+                max_heart_rate=profile_data.get("max_heart_rate"),  # type: ignore[arg-type]
+                resting_heart_rate=profile_data.get("resting_heart_rate"),  # type: ignore[arg-type]
                 injury_risk_level=injury_risk_level,
                 injury_risk_score=profile_data.get("injury_risk_score", 0.0),
                 atl=profile_data.get("atl", 0.0),
@@ -540,24 +552,6 @@ class FitnessLevel(Enum):
     ELITE = "精英"  # VDOT >= 60
 
 
-class TrainingPattern(Enum):
-    """训练模式类型"""
-
-    REST = "休息型"  # 周跑量 < 10km
-    LIGHT = "轻松型"  # 周跑量 10-30km
-    MODERATE = "适度型"  # 周跑量 30-50km
-    INTENSE = "高强度型"  # 周跑量 50-80km
-    EXTREME = "极限型"  # 周跑量 >= 80km
-
-
-class InjuryRiskLevel(Enum):
-    """伤病风险等级"""
-
-    LOW = "低"  # 风险评分 < 30
-    MEDIUM = "中"  # 风险评分 30-60
-    HIGH = "高"  # 风险评分 > 60
-
-
 class ProfileStaleStatus(Enum):
     """画像保鲜期状态"""
 
@@ -667,7 +661,7 @@ ANOMALY_FILTER_RULES: List[AnomalyFilterRule] = [
 
 
 @dataclass
-class RunnerProfile:
+class RunnerProfile:  # type: ignore[no-redef]
     """跑者画像数据结构"""
 
     # 基本信息
@@ -745,7 +739,7 @@ class RunnerProfile:
 class ProfileEngine:
     """用户画像引擎"""
 
-    def __init__(self, storage_manager) -> None:
+    def __init__(self, storage_manager: "StorageManager") -> None:
         """
         初始化画像引擎
 
@@ -753,6 +747,11 @@ class ProfileEngine:
             storage_manager: StorageManager 实例
         """
         self.storage = storage_manager
+        self.storage_manager = ProfileStorageManager()
+        self.user_profile_manager = UserProfileManager(storage_manager)
+        self.injury_risk_analyzer = InjuryRiskAnalyzer()
+        self.training_history_analyzer = TrainingHistoryAnalyzer(storage_manager)
+        self.anomaly_data_filter = AnomalyDataFilter()
 
     def build_profile(
         self,
@@ -923,90 +922,15 @@ class ProfileEngine:
         Raises:
             ValueError: 当参数无效时
         """
-        # 参数验证
-        if age <= 0 or age > 120:
-            raise ValueError("年龄必须在 1-120 之间")
-        if resting_hr <= 0 or resting_hr > 200:
-            raise ValueError("静息心率必须在合理范围内")
-
-        risk_score = 0.0
-        risk_factors = []
-        recommendations = []
-
-        # 1. 训练负荷突变（ATL/CTL 比率，占比 30%）
-        if profile.ctl > 0:
-            atl_ctl_ratio = profile.atl / profile.ctl
-            if atl_ctl_ratio > 1.5:
-                risk_score += 30
-                risk_factors.append("训练负荷突增（ATL/CTL > 1.5）")
-                recommendations.append("立即降低训练强度，避免过度训练")
-            elif atl_ctl_ratio > 1.2:
-                risk_score += 15
-                risk_factors.append("训练负荷较高（ATL/CTL > 1.2）")
-                recommendations.append("注意监控身体反应，适度调整训练")
-            elif atl_ctl_ratio < 0.8:
-                risk_score += 10
-                risk_factors.append("训练量过低，体能可能下降")
-                recommendations.append("逐步增加训练量，保持体能")
-
-        # 2. 训练一致性（占比 25%）
-        if profile.consistency_score < 30:
-            risk_score += 25
-            risk_factors.append("训练非常不规律")
-            recommendations.append("建立规律的训练习惯，避免三天打鱼两天晒网")
-        elif profile.consistency_score < 60:
-            risk_score += 12
-            risk_factors.append("训练不够规律")
-            recommendations.append("制定固定训练计划，提高训练一致性")
-
-        # 3. 恢复情况（TSB，占比 25%）
-        if profile.tsb < -20:
-            risk_score += 25
-            risk_factors.append("疲劳累积严重（TSB < -20）")
-            recommendations.append("立即安排休息，至少 2-3 天完全恢复")
-        elif profile.tsb < -10:
-            risk_score += 12
-            risk_factors.append("有一定疲劳累积（TSB < -10）")
-            recommendations.append("降低训练强度，增加恢复时间")
-
-        # 4. 年龄因素（占比 10%）
-        if age > 50:
-            risk_score += 10
-            risk_factors.append("年龄较大，恢复能力下降")
-            recommendations.append("增加热身和拉伸时间，注重恢复")
-        elif age > 40:
-            risk_score += 5
-            risk_factors.append("中年跑者，需注意恢复")
-            recommendations.append("保证充足睡眠，适度训练")
-
-        # 5. 训练强度（占比 10%）
-        if profile.training_pattern in [
-            TrainingPattern.INTENSE,
-            TrainingPattern.EXTREME,
-        ]:
-            risk_score += 10
-            risk_factors.append("训练强度过高")
-            recommendations.append("安排轻松周，降低训练量")
-
-        # 确定风险等级
-        if risk_score < 30:
-            risk_level = InjuryRiskLevel.LOW
-            if not recommendations:
-                recommendations.append("保持当前训练节奏，注意监控身体状态")
-        elif risk_score < 60:
-            risk_level = InjuryRiskLevel.MEDIUM
-        else:
-            risk_level = InjuryRiskLevel.HIGH
-
-        # 更新画像
-        profile.injury_risk_score = round(risk_score, 2)
-        profile.injury_risk_level = risk_level
+        result = self.injury_risk_analyzer.calculate_injury_risk(
+            profile, age, resting_hr
+        )
 
         return {
-            "risk_score": round(risk_score, 2),
-            "risk_level": risk_level.value,
-            "risk_factors": risk_factors,
-            "recommendations": recommendations,
+            "risk_score": result.risk_score,
+            "risk_level": result.risk_level.value,
+            "risk_factors": result.risk_factors,
+            "recommendations": result.recommendations,
         }
 
     def _load_activity_data(self, days: int) -> pl.LazyFrame:
@@ -1206,7 +1130,7 @@ class ProfileEngine:
             if vdot_values:
                 profile.avg_vdot = sum(vdot_values) / len(vdot_values)
                 profile.max_vdot = max(vdot_values)
-                profile.fitness_level = self.get_fitness_level(profile.avg_vdot)
+                profile.fitness_level = self.get_fitness_level(profile.avg_vdot)  # type: ignore[assignment]
         except Exception as e:
             logger.warning(f"计算 VDOT 指标失败：{e}")
 
@@ -1268,8 +1192,8 @@ class ProfileEngine:
             if not hr_df.is_empty():
                 avg_hr = hr_df["avg_heart_rate"].mean()
                 max_hr = hr_df["max_heart_rate"].max()
-                profile.avg_heart_rate = float(avg_hr) if avg_hr is not None else None  # type: ignore[arg-type]
-                profile.max_heart_rate = float(max_hr) if max_hr is not None else None  # type: ignore[arg-type]
+                profile.avg_heart_rate = float(avg_hr) if avg_hr is not None else None  # type: ignore[arg-type,assignment]
+                profile.max_heart_rate = float(max_hr) if max_hr is not None else None  # type: ignore[arg-type,assignment]
         except Exception as e:
             logger.warning(f"计算心率指标失败：{e}")
 
@@ -1514,7 +1438,7 @@ class ProfileEngine:
         try:
             # 如果未提供 profile，尝试从 storage 加载
             if profile is None:
-                profile = self.storage.load_profile_json()
+                profile = self.storage_manager.load_profile_json()
 
             # 检查是否存在画像
             if profile is None:

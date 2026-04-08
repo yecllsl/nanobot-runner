@@ -12,22 +12,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
-class IntentType(Enum):
-    """意图类型"""
-
-    GENERATE_PLAN = "generate_plan"
-    ADJUST_PLAN = "adjust_plan"
-    QUERY_PLAN = "query_plan"
-    CANCEL_PLAN = "cancel_plan"
-
-
-class InputType(Enum):
-    """输入类型"""
-
-    NATURAL_LANGUAGE = "natural_language"
-    SLASH_COMMAND = "slash_command"
-
-
 class PlanStatus(Enum):
     """训练计划状态"""
 
@@ -65,25 +49,6 @@ class DimensionStatus(Enum):
     GOOD = "good"
     FAIR = "fair"
     POOR = "poor"
-
-
-@dataclass
-class IntentResult:
-    """意图识别结果"""
-
-    intent: str
-    parameters: Dict[str, Any]
-    confidence: float
-    input_type: str
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
-        return {
-            "intent": self.intent,
-            "parameters": self.parameters,
-            "confidence": self.confidence,
-            "input_type": self.input_type,
-        }
 
 
 @dataclass

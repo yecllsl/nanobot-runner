@@ -146,34 +146,31 @@ class TestProfileEngineCheckFreshness:
 
     def test_fresh_profile(self, profile_engine, mock_storage):
         """测试新鲜的画像（7 天内）"""
-        # 创建 3 天前的画像
         fresh_profile = RunnerProfile(
             user_id="test_user",
             profile_date=datetime.now() - timedelta(days=3),
         )
         mock_storage.load_profile_json.return_value = fresh_profile
 
-        result = profile_engine.check_freshness()
+        result = profile_engine.check_freshness(profile=fresh_profile)
 
         assert result == ProfileStaleStatus.FRESH
-        mock_storage.load_profile_json.assert_called_once()
 
     def test_stale_profile(self, profile_engine, mock_storage):
         """测试过期的画像（超过 7 天）"""
-        # 创建 10 天前的画像
         stale_profile = RunnerProfile(
             user_id="test_user",
             profile_date=datetime.now() - timedelta(days=10),
         )
         mock_storage.load_profile_json.return_value = stale_profile
 
-        result = profile_engine.check_freshness()
+        result = profile_engine.check_freshness(profile=stale_profile)
 
         assert result == ProfileStaleStatus.STALE
 
     def test_missing_profile(self, profile_engine, mock_storage):
         """测试缺失的画像"""
-        mock_storage.load_profile_json.return_value = None
+        profile_engine.storage_manager.load_profile_json = Mock(return_value=None)
 
         result = profile_engine.check_freshness()
 
@@ -181,19 +178,17 @@ class TestProfileEngineCheckFreshness:
 
     def test_fresh_profile_with_custom_days(self, profile_engine, mock_storage):
         """测试自定义保鲜期"""
-        # 创建 5 天前的画像
         profile = RunnerProfile(
             user_id="test_user",
             profile_date=datetime.now() - timedelta(days=5),
         )
-        mock_storage.load_profile_json.return_value = profile
 
         # 使用 3 天保鲜期，应该过期
-        result = profile_engine.check_freshness(freshness_days=3)
+        result = profile_engine.check_freshness(profile=profile, freshness_days=3)
         assert result == ProfileStaleStatus.STALE
 
         # 使用 7 天保鲜期，应该新鲜
-        result = profile_engine.check_freshness(freshness_days=7)
+        result = profile_engine.check_freshness(profile=profile, freshness_days=7)
         assert result == ProfileStaleStatus.FRESH
 
     def test_provided_profile_not_loaded(self, profile_engine, mock_storage):
@@ -206,25 +201,24 @@ class TestProfileEngineCheckFreshness:
         result = profile_engine.check_freshness(profile=profile)
 
         assert result == ProfileStaleStatus.FRESH
-        mock_storage.load_profile_json.assert_not_called()
 
     def test_boundary_case_exactly_7_days(self, profile_engine, mock_storage):
         """测试边界情况：正好 7 天"""
-        # 使用 6 天 23 小时 59 分，确保不超过 7 天
         profile = RunnerProfile(
             user_id="test_user",
             profile_date=datetime.now() - timedelta(days=6, hours=23, minutes=59),
         )
-        mock_storage.load_profile_json.return_value = profile
 
-        result = profile_engine.check_freshness(freshness_days=7)
+        result = profile_engine.check_freshness(profile=profile, freshness_days=7)
 
         # 小于 7 天应该算新鲜
         assert result == ProfileStaleStatus.FRESH
 
     def test_exception_handling(self, profile_engine, mock_storage):
         """测试异常处理"""
-        mock_storage.load_profile_json.side_effect = Exception("加载失败")
+        profile_engine.storage_manager.load_profile_json = Mock(
+            side_effect=Exception("加载失败")
+        )
 
         with pytest.raises(RuntimeError, match="检查画像保鲜期失败"):
             profile_engine.check_freshness()
@@ -496,23 +490,21 @@ class TestIntegration:
 
     def test_freshness_and_filter_integration(self, profile_engine, mock_storage):
         """测试保鲜期检查和异常过滤集成"""
-        # 创建新鲜画像
         fresh_profile = RunnerProfile(
             user_id="test_user",
             profile_date=datetime.now() - timedelta(days=2),
         )
-        mock_storage.load_profile_json.return_value = fresh_profile
 
         # 检查保鲜期
-        freshness = profile_engine.check_freshness()
+        freshness = profile_engine.check_freshness(profile=fresh_profile)
         assert freshness == ProfileStaleStatus.FRESH
 
         # 创建带异常的数据
         data = pl.DataFrame(
             {
                 "activity_id": [1, 2, 3],
-                "avg_heart_rate": [150, 25, 180],  # 25 是异常
-                "total_distance": [5000, 10000, 50],  # 50 是异常
+                "avg_heart_rate": [150, 25, 180],
+                "total_distance": [5000, 10000, 50],
             }
         ).lazy()
 
@@ -521,22 +513,17 @@ class TestIntegration:
         result_df = filtered.collect()
 
         # 验证结果
-        assert result_df.height < 3  # 至少过滤掉一条
+        assert result_df.height < 3
         assert all(result_df["avg_heart_rate"] >= 30)
         assert all(result_df["total_distance"] >= 100)
 
     def test_stale_profile_triggers_update_logic(self, profile_engine, mock_storage):
         """测试过期画像触发更新逻辑"""
-        # 创建过期画像
         stale_profile = RunnerProfile(
             user_id="test_user",
             profile_date=datetime.now() - timedelta(days=10),
         )
-        mock_storage.load_profile_json.return_value = stale_profile
 
         # 检查保鲜期
-        freshness = profile_engine.check_freshness()
+        freshness = profile_engine.check_freshness(profile=stale_profile)
         assert freshness == ProfileStaleStatus.STALE
-
-        # 实际应用中应该在这里触发画像更新逻辑
-        # 本测试仅验证状态判断正确

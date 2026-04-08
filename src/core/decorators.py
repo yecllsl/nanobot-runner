@@ -1,13 +1,50 @@
 # 装饰器模块
 # 提供通用装饰器功能
 
+import json
 import logging
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
-from src.core.exceptions import NanobotRunnerError
+from src.core.exceptions import NanobotRunnerError, ToolResult, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+def tool_wrapper(func: Callable) -> Callable:
+    """
+    工具统一异常处理装饰器
+
+    将所有异常转换为统一的 ToolResult 格式返回
+
+    Args:
+        func: 被装饰的工具函数
+
+    Returns:
+        Callable: 装饰后的函数
+    """
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> str:
+        try:
+            result = func(*args, **kwargs)
+            if isinstance(result, ToolResult):
+                return result.to_json()
+            return ToolResult(success=True, data=result).to_json()
+        except ValidationError as e:
+            logger.error(f"输入验证失败: {e.message}", exc_info=True)
+            return ToolResult(success=False, error=f"输入验证失败: {e.message}").to_json()
+        except FileNotFoundError as e:
+            logger.error(f"文件不存在: {e}", exc_info=True)
+            return ToolResult(success=False, error=f"文件不存在: {e}").to_json()
+        except NanobotRunnerError as e:
+            logger.error(f"业务错误: {e.message}", exc_info=True)
+            return ToolResult(success=False, error=e.message).to_json()
+        except Exception as e:
+            logger.error(f"内部错误: {e}", exc_info=True)
+            return ToolResult(success=False, error=f"内部错误: {e}").to_json()
+
+    return wrapper
 
 
 def handle_tool_errors(
@@ -26,7 +63,7 @@ def handle_tool_errors(
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except NanobotRunnerError as e:
@@ -61,7 +98,7 @@ def handle_errors(default_response: Any = None, log_traceback: bool = True) -> C
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except NanobotRunnerError as e:
@@ -119,7 +156,7 @@ def require_storage(func: Callable) -> Callable:
     """
 
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         if self.storage is None:
             from src.core.storage import StorageManager
 
@@ -163,7 +200,7 @@ def handle_empty_data(default_message: str = "暂无数据") -> Callable:
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             result = func(*args, **kwargs)
             if result is None or (
                 isinstance(result, (list, dict)) and len(result) == 0

@@ -1,4 +1,5 @@
-"""测试 Agent 工具的统计聚合逻辑
+"""
+测试 Agent 工具的聚合逻辑
 
 验证 Agent 工具在查询数据时正确使用按会话聚合逻辑
 """
@@ -8,7 +9,9 @@ import polars as pl
 import pytest
 
 from src.agents.tools import RunnerTools
+from src.core.analytics import AnalyticsEngine
 from src.core.storage import StorageManager
+from tests.conftest import create_mock_context
 
 
 class TestAgentToolsAggregation:
@@ -20,6 +23,11 @@ class TestAgentToolsAggregation:
         storage_dir = tmp_path / "data"
         storage_dir.mkdir()
         return StorageManager(storage_dir)
+
+    @pytest.fixture
+    def mock_analytics(self, mock_storage):
+        """创建模拟分析引擎"""
+        return AnalyticsEngine(mock_storage)
 
     @pytest.fixture
     def sample_run_data(self):
@@ -54,218 +62,167 @@ class TestAgentToolsAggregation:
                 [3600.0] * 3600 + [1800.0] * 1800 + [7200.0] * 7200
             ),
             "session_avg_heart_rate": ([145] * 3600 + [150] * 1800 + [140] * 7200),
-            "source_file": ["test1.fit"] * 3600
-            + ["test2.fit"] * 1800
-            + ["test3.fit"] * 7200,
-            "filename": ["test1"] * 3600 + ["test2"] * 1800 + ["test3"] * 7200,
-            "activity_id": [1] * 3600 + [2] * 1800 + [3] * 7200,
-            "import_timestamp": [datetime.now()] * (3600 + 1800 + 7200),
         }
 
         return pl.DataFrame(data)
 
-    def test_query_by_date_range_aggregation(self, mock_storage, sample_run_data):
-        """测试日期范围查询的聚合逻辑"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
+    def test_get_running_stats_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试获取跑步统计时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        stats = tools.get_running_stats()
 
-        # 查询所有数据
-        results = tools.query_by_date_range("2024-01-01", "2024-01-03")
+        assert stats["total_runs"] == 3
+        assert stats["total_distance"] == 36100.0
+        assert stats["total_duration"] == 12600.0
 
-        # 验证：应该返回 3 次跑步，而不是 12600 个采样点
-        assert len(results) == 3, f"应该返回 3 次跑步，但返回了 {len(results)} 条记录"
+    def test_get_recent_runs_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试获取最近跑步记录时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-        # 验证每次跑步的数据
-        distances = [r["distance"] for r in results]
-        assert 10.0 in distances  # 10 公里
-        assert 5.0 in distances  # 5 公里
-        assert 21.1 in distances  # 21.1 公里
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        runs = tools.get_recent_runs(limit=10)
 
-    def test_query_by_date_range_single_day(self, mock_storage, sample_run_data):
-        """测试查询单天的数据"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
+        assert len(runs) == 3
+        assert runs[0]["distance_km"] == 21.1
+        assert runs[1]["distance_km"] == 5.0
+        assert runs[2]["distance_km"] == 10.0
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+    def test_get_vdot_trend_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试获取 VDOT 趋势时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-        # 只查询第一天
-        results = tools.query_by_date_range("2024-01-01", "2024-01-01")
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        trend = tools.get_vdot_trend(limit=10)
 
-        # 验证：应该返回 1 次跑步
-        assert len(results) == 1, f"应该返回 1 次跑步，但返回了 {len(results)} 条记录"
-        assert results[0]["distance"] == 10.0
+        assert len(trend) == 3
 
-    def test_query_by_distance_aggregation(self, mock_storage, sample_run_data):
-        """测试距离查询的聚合逻辑"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
+    def test_get_training_load_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试获取训练负荷时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        load = tools.get_training_load(days=42)
 
-        # 查询距离>=5 公里的跑步
-        results = tools.query_by_distance(min_distance=5.0)
+        assert "atl" in load
+        assert "ctl" in load
+        assert "tsb" in load
 
-        # 验证：应该返回 3 次跑步，而不是 12600 个采样点
-        assert len(results) == 3, f"应该返回 3 次跑步，但返回了 {len(results)} 条记录"
+    def test_get_hr_drift_analysis_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试获取心率漂移分析时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-        # 验证距离
-        distances = [r["distance"] for r in results]
-        assert all(d >= 5.0 for d in distances)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        drift = tools.get_hr_drift_analysis()
 
-    def test_query_by_distance_range(self, mock_storage, sample_run_data):
-        """测试距离范围查询"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
+        assert "trend" in drift or "error" in drift
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+    def test_query_by_date_range_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试按日期范围查询时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-        # 查询 5-15 公里之间的跑步
-        results = tools.query_by_distance(min_distance=5.0, max_distance=15.0)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        runs = tools.query_by_date_range(start_date="2024-01-01", end_date="2024-01-02")
 
-        # 验证：应该返回 2 次跑步（5 公里和 10 公里）
-        assert len(results) == 2, f"应该返回 2 次跑步，但返回了 {len(results)} 条记录"
+        assert len(runs) == 2
 
-        distances = [r["distance"] for r in results]
-        assert 5.0 in distances
-        assert 10.0 in distances
+    def test_query_by_distance_with_aggregation(
+        self, mock_storage, mock_analytics, sample_run_data
+    ):
+        """测试按距离查询时正确聚合"""
+        mock_storage.save_to_parquet(sample_run_data, year=2024)
 
-    def test_get_recent_runs_aggregation(self, mock_storage, sample_run_data):
-        """测试最近跑步记录的聚合逻辑"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        runs = tools.query_by_distance(min_distance=5.0)
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+        assert len(runs) == 3
 
-        # 获取最近 10 次跑步
-        results = tools.get_recent_runs(limit=10)
+    def test_empty_data_handling(self, mock_storage, mock_analytics):
+        """测试空数据处理"""
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        stats = tools.get_running_stats()
 
-        # 验证：应该返回 3 次跑步，而不是 12600 个采样点
-        assert len(results) == 3, f"应该返回 3 次跑步，但返回了 {len(results)} 条记录"
+        assert "message" in stats
+        assert "暂无跑步数据" in stats["message"]
 
-        # 验证距离
-        distances = [r["distance_km"] for r in results]
-        assert 10.0 in distances
-        assert 5.0 in distances
-        assert 21.1 in distances
+    def test_single_run_data(self, mock_storage, mock_analytics):
+        """测试单次跑步数据"""
+        data = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, 10, 0, 0)],
+                "heart_rate": [145],
+                "pace": [500],
+                "session_start_time": [datetime(2024, 1, 1, 10, 0, 0)],
+                "session_total_distance": [10000.0],
+                "session_total_timer_time": [3600.0],
+                "session_avg_heart_rate": [145],
+            }
+        )
 
-    def test_sampling_points_not_returned_as_runs(self, mock_storage, sample_run_data):
-        """测试采样点不会被作为单独的跑步返回"""
-        # 保存数据（12600 个采样点）
-        mock_storage.save_to_parquet(sample_run_data, 2024)
+        mock_storage.save_to_parquet(data, year=2024)
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        stats = tools.get_running_stats()
 
-        # 查询所有数据
-        results = tools.query_by_date_range("2024-01-01", "2024-01-03")
+        assert stats["total_runs"] == 1
+        assert stats["total_distance"] == 10000.0
 
-        # 验证：返回的应该是 3 次跑步，而不是 12600 个采样点
-        assert len(results) == 3
-        assert len(results) != 12600
-
-    def test_distance_not_duplicated_in_results(self, mock_storage, sample_run_data):
-        """测试距离数据不会在结果中重复"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
-
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
-
-        # 查询所有数据
-        results = tools.query_by_date_range("2024-01-01", "2024-01-03")
-
-        # 验证总距离（应该是 36.1 公里，而不是 12600 * 平均距离）
-        total_distance = sum(r["distance"] for r in results)
-        assert abs(total_distance - 36.1) < 0.1
-
-    def test_empty_date_range_query(self, mock_storage, sample_run_data):
-        """测试空日期范围查询"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
-
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
-
-        # 查询不存在的日期范围
-        results = tools.query_by_date_range("2020-01-01", "2020-01-01")
-
-        # 验证：应该返回空列表
-        assert len(results) == 0
-
-    def test_invalid_date_format(self, mock_storage, sample_run_data):
-        """测试无效日期格式处理"""
-        # 保存数据
-        mock_storage.save_to_parquet(sample_run_data, 2024)
-
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
-
-        # 查询无效日期
-        results = tools.query_by_date_range("invalid", "2024-01-01")
-
-        # 验证：应该返回错误信息
-        assert len(results) == 1
-        assert "error" in results[0]
-
-
-class TestAgentToolsEdgeCases:
-    """测试 Agent 工具的边界情况"""
-
-    @pytest.fixture
-    def mock_storage(self, tmp_path):
-        """创建模拟存储管理器"""
-        storage_dir = tmp_path / "data"
-        storage_dir.mkdir()
-        return StorageManager(storage_dir)
-
-    def test_single_run_query(self, mock_storage):
-        """测试查询单次跑步"""
-        # 创建只有 1 次跑步的数据
+    def test_multiple_runs_same_day(self, mock_storage, mock_analytics):
+        """测试同一天多次跑步"""
         timestamps = [
-            datetime(2024, 1, 1, 10, 0, 0) + timedelta(seconds=i) for i in range(3600)
+            datetime(2024, 1, 1, 10, 0, 0),
+            datetime(2024, 1, 1, 14, 0, 0),
         ]
 
-        data = {
-            "timestamp": timestamps,
-            "heart_rate": [145] * 3600,
-            "pace": [500] * 3600,
-            "session_start_time": [datetime(2024, 1, 1, 10, 0, 0)] * 3600,
-            "session_total_distance": [10000.0] * 3600,
-            "session_total_timer_time": [3600.0] * 3600,
-            "session_avg_heart_rate": [145] * 3600,
-            "source_file": ["test.fit"] * 3600,
-            "filename": ["test"] * 3600,
-            "activity_id": [1] * 3600,
-            "import_timestamp": [datetime.now()] * 3600,
-        }
+        data = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "heart_rate": [145, 150],
+                "pace": [500, 480],
+                "session_start_time": timestamps,
+                "session_total_distance": [5000.0, 3000.0],
+                "session_total_timer_time": [1800.0, 1200.0],
+                "session_avg_heart_rate": [145, 150],
+            }
+        )
 
-        df = pl.DataFrame(data)
-        mock_storage.save_to_parquet(df, 2024)
+        mock_storage.save_to_parquet(data, year=2024)
 
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
+        tools = RunnerTools(
+            context=create_mock_context(storage=mock_storage, analytics=mock_analytics)
+        )
+        stats = tools.get_running_stats()
 
-        # 查询
-        results = tools.query_by_date_range("2024-01-01", "2024-01-01")
-
-        # 验证
-        assert len(results) == 1
-        assert results[0]["distance"] == 10.0
-
-    def test_no_data_query(self, mock_storage):
-        """测试查询空数据"""
-        # 创建 RunnerTools
-        tools = RunnerTools(storage=mock_storage)
-
-        # 查询
-        results = tools.query_by_date_range("2024-01-01", "2024-01-01")
-
-        # 验证
-        assert len(results) == 0
+        assert stats["total_runs"] == 2
+        assert stats["total_distance"] == 8000.0

@@ -10,6 +10,7 @@ import pytest
 from src.agents.tools import RunnerTools
 from src.core.analytics import AnalyticsEngine
 from src.core.storage import StorageManager
+from tests.conftest import create_mock_context
 
 
 class TestAnalyticsIntegration:
@@ -57,7 +58,7 @@ class TestAnalyticsIntegration:
             data_dir.mkdir()
 
             storage = StorageManager(data_dir=data_dir)
-            tools = RunnerTools(storage=storage)
+            tools = RunnerTools(context=create_mock_context(storage=storage))
 
             # 创建测试数据
             test_data = pl.DataFrame(

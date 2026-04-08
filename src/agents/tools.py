@@ -10,9 +10,8 @@ from typing import Any, Dict, List, Optional
 
 import polars as pl
 
-from src.core.analytics import AnalyticsEngine
+from src.core.context import AppContext, AppContextFactory
 from src.core.profile import ProfileStorageManager, RunnerProfile
-from src.core.storage import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -434,10 +433,19 @@ class GenerateTrainingPlanTool(BaseTool):
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
-    def __init__(self, storage: Optional[StorageManager] = None):
-        self.storage = storage or StorageManager()
-        self.analytics = AnalyticsEngine(self.storage)
-        self.profile_storage = ProfileStorageManager()
+    def __init__(self, context: Optional[AppContext] = None):
+        """
+        初始化工具集
+
+        Args:
+            context: 应用上下文（可选），未提供则使用全局上下文
+        """
+        if context is None:
+            context = AppContextFactory.create()
+
+        self.storage = context.storage
+        self.analytics = context.analytics
+        self.profile_storage = context.profile_storage
 
     def get_running_stats(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None
