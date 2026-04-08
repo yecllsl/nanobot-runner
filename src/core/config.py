@@ -137,7 +137,8 @@ class ConfigManager:
             ValueError: 配置验证失败时抛出
         """
         if use_cache and self._is_cache_valid():
-            assert ConfigManager._cache is not None
+            if ConfigManager._cache is None:
+                raise RuntimeError("配置缓存状态异常：缓存有效但值为 None")
             return ConfigManager._cache.copy()
 
         with open(self.config_file, "r", encoding="utf-8") as f:

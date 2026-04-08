@@ -1,7 +1,6 @@
 # 分析引擎
 # 基于Polars实现核心数据分析算法
 
-import math
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -19,6 +18,27 @@ if TYPE_CHECKING:
 # VDOT 计算常量 (Jack Daniels 公式)
 VDOT_COEFFICIENT = 0.000104
 VDOT_DISTANCE_EXPONENT = 1.06
+
+
+def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
+    """按优先级从候选列名中查找DataFrame中存在的列名
+
+    Args:
+        df: 目标DataFrame
+        *candidates: 按优先级排列的候选列名
+
+    Returns:
+        str: 第一个存在的列名
+
+    Raises:
+        RuntimeError: 所有候选列名均不存在
+    """
+    for col in candidates:
+        if col in df.columns:
+            return col
+    raise RuntimeError(f"DataFrame中未找到候选列: {candidates}")
+
+
 VDOT_TIME_EXPONENT = 0.5
 VDOT_MULTIPLIER = 100
 
@@ -115,33 +135,6 @@ class AnalyticsEngine:
             dict: 分析结果
         """
         return self.heart_rate_analyzer.analyze_hr_drift(heart_rate, pace)
-
-    def _calculate_ewma(self, tss_values: List[float], time_constant: float) -> float:
-        """
-        计算指数加权移动平均（EWMA）
-
-        Args:
-            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
-            time_constant: 时间常数（天）
-
-        Returns:
-            float: EWMA值
-        """
-        if not tss_values:
-            return 0.0
-
-        weighted_sum = 0.0
-        weight_sum = 0.0
-
-        for i, tss in enumerate(reversed(tss_values)):
-            weight = math.exp(-i / time_constant)
-            weighted_sum += tss * weight
-            weight_sum += weight
-
-        if weight_sum == 0:
-            return 0.0
-
-        return round(weighted_sum / weight_sum, 2)
 
     def calculate_atl(self, tss_values: List[float]) -> float:
         """
@@ -256,7 +249,6 @@ class AnalyticsEngine:
         try:
             lf = self.storage.read_parquet()
 
-            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
             if len(lf.collect_schema()) == 0:
                 return []
 
@@ -270,23 +262,29 @@ class AnalyticsEngine:
             if df.is_empty():
                 return []
 
+            distance_col = _resolve_col(
+                df, "session_total_distance", "total_distance", "distance"
+            )
+            duration_col = _resolve_col(
+                df, "session_total_timer_time", "total_timer_time", "duration"
+            )
+
+            vdot_series = self.vdot_calculator.calculate_vdot_batch(
+                df, distance_col=distance_col, duration_col=duration_col
+            )
+
+            date_series = df["timestamp"].dt.strftime("%Y-%m-%d")
+            distance_series = df[distance_col]
+            duration_series = df[duration_col]
+
             trend_data = []
-            for row in df.iter_rows(named=True):
-                distance = row.get(
-                    "session_total_distance",
-                    row.get("total_distance", row.get("distance", 0)),
-                )
-                duration = row.get(
-                    "session_total_timer_time",
-                    row.get("total_timer_time", row.get("duration", 0)),
-                )
-                vdot = self.calculate_vdot(distance, duration)
+            for i in range(df.height):
                 trend_data.append(
                     {
-                        "date": row["timestamp"].strftime("%Y-%m-%d"),
-                        "vdot": vdot,
-                        "distance": distance,
-                        "duration": duration,
+                        "date": date_series[i],
+                        "vdot": float(vdot_series[i]),
+                        "distance": float(distance_series[i]),
+                        "duration": float(duration_series[i]),
                     }
                 )
 

@@ -157,7 +157,7 @@ def memory(
                     subprocess.run([ed, "--version"], capture_output=True)
                     editor = ed
                     break
-                except Exception:
+                except (FileNotFoundError, OSError):
                     continue
 
             if editor:
