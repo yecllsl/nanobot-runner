@@ -425,3 +425,468 @@ class TestHeartRateAnalyzerVectorized:
         print(f"性能提升: {(scalar_time / vectorized_time - 1) * 100:.1f}%")
 
         assert vectorized_time <= scalar_time * 2
+
+
+class TestHeartRateAnalyzerEdgeCases:
+    """心率分析器边界情况测试类"""
+
+    @pytest.fixture
+    def mock_storage(self):
+        """创建模拟的 StorageManager"""
+        storage = MagicMock()
+        return storage
+
+    @pytest.fixture
+    def hr_analyzer(self, mock_storage):
+        """创建 HeartRateAnalyzer 实例"""
+        return HeartRateAnalyzer(mock_storage)
+
+    def test_analyze_hr_drift_with_exception(self, hr_analyzer):
+        """测试心率漂移分析异常处理"""
+        # 测试异常情况（例如数据类型不匹配）
+        heart_rate = [150, 152, 155, 158, 160, 162, 165, 168, 170, 172]
+        pace = [300, 298, 295, 293, 290, 288, 285, 283, 280, 278]
+
+        # 正常情况不应该抛出异常
+        result = hr_analyzer.analyze_hr_drift(heart_rate, pace)
+        assert "drift" in result or "error" in result
+
+    def test_analyze_hr_drift_negative_drift_rate(self, hr_analyzer):
+        """测试负向心率漂移（心率下降）"""
+        # 心率逐渐下降的场景
+        heart_rate = [180, 175, 170, 165, 160, 155, 150, 145, 140, 135]
+        pace = [300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
+
+        result = hr_analyzer.analyze_hr_drift(heart_rate, pace)
+
+        assert "drift" in result
+        assert result["drift"] < 0  # 负向漂移
+        assert result["drift_rate"] < 0
+        assert "心率表现优异" in result["assessment"]
+
+    def test_analyze_hr_drift_vectorized_with_exception(self, hr_analyzer):
+        """测试向量化心率漂移分析异常处理"""
+        # 测试异常情况
+        heart_rate = pl.Series([150, 152, 155, 158, 160, 162, 165, 168, 170, 172])
+        pace = pl.Series([300, 298, 295, 293, 290, 288, 285, 283, 280, 278])
+
+        result = hr_analyzer.analyze_hr_drift_vectorized(heart_rate, pace)
+        assert "drift" in result or "error" in result
+
+    def test_analyze_hr_drift_vectorized_negative_drift_rate(self, hr_analyzer):
+        """测试向量化版本负向心率漂移"""
+        heart_rate = pl.Series([180, 175, 170, 165, 160, 155, 150, 145, 140, 135])
+        pace = pl.Series([300, 300, 300, 300, 300, 300, 300, 300, 300, 300])
+
+        result = hr_analyzer.analyze_hr_drift_vectorized(heart_rate, pace)
+
+        assert result["drift"] < 0
+        assert result["drift_rate"] < 0
+        assert "心率表现优异" in result["assessment"]
+
+    def test_analyze_hr_drift_batch_basic(self, hr_analyzer):
+        """测试批量心率漂移分析 - 基本场景"""
+        df = pl.DataFrame(
+            {
+                "heart_rate": [
+                    [150, 152, 155, 158, 160, 162, 165, 168, 170, 172],
+                    [140, 142, 145, 148, 150, 152, 155, 158, 160, 162],
+                ],
+                "pace": [
+                    [300, 298, 295, 293, 290, 288, 285, 283, 280, 278],
+                    [310, 308, 305, 303, 300, 298, 295, 293, 290, 288],
+                ],
+            }
+        )
+
+        results = hr_analyzer.analyze_hr_drift_batch(df, "heart_rate", "pace")
+
+        assert len(results) == 2
+        assert "drift" in results[0] or "error" in results[0]
+        assert "drift" in results[1] or "error" in results[1]
+
+    def test_analyze_hr_drift_batch_missing_columns(self, hr_analyzer):
+        """测试批量心率漂移分析 - 缺少必要列"""
+        df = pl.DataFrame({"other_col": [1, 2, 3]})
+
+        results = hr_analyzer.analyze_hr_drift_batch(df, "heart_rate", "pace")
+
+        assert len(results) == 1
+        assert "error" in results[0]
+        assert "缺少必要列" in results[0]["error"]
+
+    def test_analyze_hr_drift_batch_with_null_data(self, hr_analyzer):
+        """测试批量心率漂移分析 - 包含空数据"""
+        df = pl.DataFrame(
+            {
+                "heart_rate": [
+                    None,
+                    [150, 152, 155, 158, 160, 162, 165, 168, 170, 172],
+                ],
+                "pace": [None, [300, 298, 295, 293, 290, 288, 285, 283, 280, 278]],
+            }
+        )
+
+        results = hr_analyzer.analyze_hr_drift_batch(df, "heart_rate", "pace")
+
+        assert len(results) == 2
+        assert "error" in results[0]
+        assert "数据缺失" in results[0]["error"]
+
+    def test_analyze_hr_drift_batch_with_series_data(self, hr_analyzer):
+        """测试批量心率漂移分析 - Series数据"""
+        df = pl.DataFrame(
+            {
+                "heart_rate": [
+                    pl.Series([150, 152, 155, 158, 160, 162, 165, 168, 170, 172]),
+                ],
+                "pace": [
+                    pl.Series([300, 298, 295, 293, 290, 288, 285, 283, 280, 278]),
+                ],
+            }
+        )
+
+        results = hr_analyzer.analyze_hr_drift_batch(df, "heart_rate", "pace")
+
+        assert len(results) == 1
+        assert "drift" in results[0] or "error" in results[0]
+
+    def test_calculate_zone_time_empty_data(self, hr_analyzer):
+        """测试区间时长计算 - 空数据"""
+        hr_zones = {
+            "zone1": (90, 108),
+            "zone2": (108, 126),
+            "zone3": (126, 144),
+            "zone4": (144, 162),
+            "zone5": (162, 180),
+        }
+        zone_time = hr_analyzer._calculate_zone_time([], hr_zones)
+
+        assert zone_time["zone1"] == 0
+        assert zone_time["zone2"] == 0
+        assert zone_time["zone3"] == 0
+        assert zone_time["zone4"] == 0
+        assert zone_time["zone5"] == 0
+
+    def test_calculate_zone_time_below_zone1(self, hr_analyzer):
+        """测试区间时长计算 - 心率低于区间1"""
+        hr_zones = {
+            "zone1": (90, 108),
+            "zone2": (108, 126),
+            "zone3": (126, 144),
+            "zone4": (144, 162),
+            "zone5": (162, 180),
+        }
+        heart_rate_data = [80, 85, 88, 89]  # 都低于 zone1 的下限
+        zone_time = hr_analyzer._calculate_zone_time(heart_rate_data, hr_zones)
+
+        # 所有心率都低于 zone1，应该不被计入任何区间
+        assert zone_time["zone1"] == 0
+        assert zone_time["zone2"] == 0
+        assert zone_time["zone3"] == 0
+        assert zone_time["zone4"] == 0
+        assert zone_time["zone5"] == 0
+
+    def test_calculate_zone_time_vectorized_empty_data(self, hr_analyzer):
+        """测试向量化区间时长计算 - 空数据"""
+        hr_zones = {
+            "zone1": (90, 108),
+            "zone2": (108, 126),
+            "zone3": (126, 144),
+            "zone4": (144, 162),
+            "zone5": (162, 180),
+        }
+        heart_rate_series = pl.Series([])
+        zone_time = hr_analyzer._calculate_zone_time_vectorized(
+            heart_rate_series, hr_zones
+        )
+
+        assert zone_time["zone1"] == 0
+        assert zone_time["zone2"] == 0
+        assert zone_time["zone3"] == 0
+        assert zone_time["zone4"] == 0
+        assert zone_time["zone5"] == 0
+
+    def test_calculate_zone_time_vectorized_all_null(self, hr_analyzer):
+        """测试向量化区间时长计算 - 全部为空值"""
+        hr_zones = {
+            "zone1": (90, 108),
+            "zone2": (108, 126),
+            "zone3": (126, 144),
+            "zone4": (144, 162),
+            "zone5": (162, 180),
+        }
+        heart_rate_series = pl.Series([None, None, None])
+        zone_time = hr_analyzer._calculate_zone_time_vectorized(
+            heart_rate_series, hr_zones
+        )
+
+        assert zone_time["zone1"] == 0
+        assert zone_time["zone2"] == 0
+        assert zone_time["zone3"] == 0
+        assert zone_time["zone4"] == 0
+        assert zone_time["zone5"] == 0
+
+    def test_calculate_aerobic_effect_zero_duration(self, hr_analyzer):
+        """测试有氧效果计算 - 零时长"""
+        zone_time = {
+            "zone1": 100,
+            "zone2": 200,
+            "zone3": 300,
+            "zone4": 100,
+            "zone5": 50,
+        }
+        effect = hr_analyzer._calculate_aerobic_effect(zone_time, 0)
+
+        assert effect == 1.0
+
+    def test_calculate_anaerobic_effect_zero_duration(self, hr_analyzer):
+        """测试无氧效果计算 - 零时长"""
+        zone_time = {
+            "zone1": 100,
+            "zone2": 200,
+            "zone3": 300,
+            "zone4": 100,
+            "zone5": 50,
+        }
+        effect = hr_analyzer._calculate_anaerobic_effect(zone_time, 0)
+
+        assert effect == 1.0
+
+    def test_get_training_effect_with_avg_heart_rate(self, hr_analyzer):
+        """测试训练效果评估 - 提供平均心率"""
+        heart_rate_data = [140, 145, 150, 155, 160, 158, 152, 148]
+        result = hr_analyzer.get_training_effect(
+            heart_rate_data=heart_rate_data,
+            duration_s=3600,
+            age=30,
+            avg_heart_rate=150.0,
+        )
+
+        assert "aerobic_effect" in result
+        assert "anaerobic_effect" in result
+        assert result["avg_heart_rate"] == 150.0
+
+    def test_get_training_effect_zero_zone_time(self, hr_analyzer):
+        """测试训练效果评估 - 区间时长为零"""
+        # 所有心率都在区间1以下
+        heart_rate_data = [80, 85, 88, 89, 82, 87, 84, 86]
+        result = hr_analyzer.get_training_effect(
+            heart_rate_data=heart_rate_data, duration_s=3600, age=30
+        )
+
+        assert "aerobic_effect" in result
+        assert "anaerobic_effect" in result
+        # 当区间时长为零时，应该使用 duration_s 作为总时长
+
+    def test_get_heart_rate_zones_with_date_filter(self, hr_analyzer, mock_storage):
+        """测试心率区间分析 - 日期过滤"""
+        now = datetime.now()
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    now - timedelta(days=1),
+                    now - timedelta(days=5),
+                    now - timedelta(days=10),
+                ],
+                "heart_rate": [155.0, 160.0, 165.0],
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        # 测试开始日期过滤
+        start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+        result = hr_analyzer.get_heart_rate_zones(age=30, start_date=start_date)
+
+        assert "max_hr" in result
+        assert "zones" in result
+
+    def test_get_heart_rate_zones_with_end_date(self, hr_analyzer, mock_storage):
+        """测试心率区间分析 - 结束日期过滤"""
+        now = datetime.now()
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    now - timedelta(days=1),
+                    now - timedelta(days=5),
+                    now - timedelta(days=10),
+                ],
+                "heart_rate": [155.0, 160.0, 165.0],
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        # 测试结束日期过滤
+        end_date = (now - timedelta(days=3)).strftime("%Y-%m-%d")
+        result = hr_analyzer.get_heart_rate_zones(age=30, end_date=end_date)
+
+        assert "max_hr" in result
+        assert "zones" in result
+
+    def test_get_heart_rate_zones_with_both_dates(self, hr_analyzer, mock_storage):
+        """测试心率区间分析 - 同时过滤开始和结束日期"""
+        now = datetime.now()
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    now - timedelta(days=1),
+                    now - timedelta(days=5),
+                    now - timedelta(days=10),
+                ],
+                "heart_rate": [155.0, 160.0, 165.0],
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+        end_date = (now - timedelta(days=3)).strftime("%Y-%m-%d")
+        result = hr_analyzer.get_heart_rate_zones(
+            age=30, start_date=start_date, end_date=end_date
+        )
+
+        assert "max_hr" in result
+        assert "zones" in result
+
+    def test_get_heart_rate_zones_no_heart_rate_column(self, hr_analyzer, mock_storage):
+        """测试心率区间分析 - 无心率列"""
+        now = datetime.now()
+        df = pl.DataFrame(
+            {
+                "timestamp": [now - timedelta(days=1)],
+                "distance": [10000],
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        result = hr_analyzer.get_heart_rate_zones(age=30)
+
+        assert result["max_hr"] == 190
+        assert result["zones"] == []
+        assert "暂无心率数据" in result["message"]
+
+    def test_get_heart_rate_zones_with_avg_heart_rate_only(
+        self, hr_analyzer, mock_storage
+    ):
+        """测试心率区间分析 - 仅有平均心率"""
+        now = datetime.now()
+        df = pl.DataFrame(
+            {
+                "timestamp": [now - timedelta(days=1)],
+                "session_avg_heart_rate": [155.0],
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        result = hr_analyzer.get_heart_rate_zones(age=30)
+
+        assert "max_hr" in result
+        assert "zones" in result
+        assert result["max_hr"] == 190
+
+    def test_get_heart_rate_zones_empty_heart_rate_data(
+        self, hr_analyzer, mock_storage
+    ):
+        """测试心率区间分析 - 心率数据为空"""
+        now = datetime.now()
+        df = pl.DataFrame(
+            {
+                "timestamp": [now - timedelta(days=1)],
+                "heart_rate": [None],
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        result = hr_analyzer.get_heart_rate_zones(age=30)
+
+        assert "max_hr" in result
+        assert "zones" in result
+
+    def test_get_heart_rate_zones_with_exception(self, hr_analyzer, mock_storage):
+        """测试心率区间分析 - 异常处理"""
+        mock_storage.read_parquet.side_effect = Exception("数据库错误")
+
+        with pytest.raises(RuntimeError, match="心率区间分析失败"):
+            hr_analyzer.get_heart_rate_zones(age=30)
+
+    def test_calculate_zones_from_avg_hr_no_column(self, hr_analyzer):
+        """测试使用平均心率估算区间 - 无平均心率列"""
+        df = pl.DataFrame({"distance": [10000]})
+        zone_boundaries = {
+            "Z1": (0.50, 0.60, "恢复区"),
+            "Z2": (0.60, 0.70, "有氧区"),
+            "Z3": (0.70, 0.80, "节奏区"),
+            "Z4": (0.80, 0.90, "阈值区"),
+            "Z5": (0.90, 1.00, "无氧区"),
+        }
+        result = hr_analyzer._calculate_zones_from_avg_hr(df, 180, zone_boundaries)
+
+        assert result["max_hr"] == 180
+        assert result["zones"] == []
+        assert "暂无心率数据" in result["message"]
+
+    def test_calculate_zones_from_avg_hr_empty_data(self, hr_analyzer):
+        """测试使用平均心率估算区间 - 数据为空"""
+        df = pl.DataFrame({"session_avg_heart_rate": [None, None]})
+        zone_boundaries = {
+            "Z1": (0.50, 0.60, "恢复区"),
+            "Z2": (0.60, 0.70, "有氧区"),
+            "Z3": (0.70, 0.80, "节奏区"),
+            "Z4": (0.80, 0.90, "阈值区"),
+            "Z5": (0.90, 1.00, "无氧区"),
+        }
+        result = hr_analyzer._calculate_zones_from_avg_hr(df, 180, zone_boundaries)
+
+        assert result["max_hr"] == 180
+        assert result["zones"] == []
+        assert "暂无心率数据" in result["message"]
+
+    def test_calculate_zones_from_avg_hr_z5_boundary(self, hr_analyzer):
+        """测试使用平均心率估算区间 - Z5区间边界"""
+        max_hr = 180
+        df = pl.DataFrame(
+            {
+                "session_avg_heart_rate": [
+                    170,  # Z5区间 (162-180)
+                    175,
+                    180,
+                ]
+            }
+        )
+        zone_boundaries = {
+            "Z1": (0.50, 0.60, "恢复区"),
+            "Z2": (0.60, 0.70, "有氧区"),
+            "Z3": (0.70, 0.80, "节奏区"),
+            "Z4": (0.80, 0.90, "阈值区"),
+            "Z5": (0.90, 1.00, "无氧区"),
+        }
+        result = hr_analyzer._calculate_zones_from_avg_hr(df, max_hr, zone_boundaries)
+
+        assert result["max_hr"] == 180
+        assert len(result["zones"]) == 5
+        # 验证Z5区间有数据
+        z5_zone = next((z for z in result["zones"] if z["zone"] == "Z5"), None)
+        assert z5_zone is not None
+        assert z5_zone["time_seconds"] > 0
+
+    def test_get_heart_rate_zones_with_heart_rate_in_z5(
+        self, hr_analyzer, mock_storage
+    ):
+        """测试心率区间分析 - 心率在Z5区间"""
+        now = datetime.now()
+        max_hr = 190
+        df = pl.DataFrame(
+            {
+                "timestamp": [now - timedelta(days=1)],
+                "heart_rate": [175.0],  # Z5区间 (171-190)
+            }
+        )
+        mock_storage.read_parquet.return_value = df.lazy()
+
+        result = hr_analyzer.get_heart_rate_zones(age=30)
+
+        assert result["max_hr"] == max_hr
+        assert len(result["zones"]) == 5
+        # 验证Z5区间有数据
+        z5_zone = next((z for z in result["zones"] if z["zone"] == "Z5"), None)
+        assert z5_zone is not None
+        assert z5_zone["time_seconds"] > 0

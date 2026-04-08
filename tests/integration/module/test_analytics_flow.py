@@ -58,7 +58,6 @@ class TestAnalyticsIntegration:
             data_dir.mkdir()
 
             storage = StorageManager(data_dir=data_dir)
-            tools = RunnerTools(context=create_mock_context(storage=storage))
 
             # 创建测试数据
             test_data = pl.DataFrame(
@@ -76,8 +75,19 @@ class TestAnalyticsIntegration:
 
             storage.save_to_parquet(test_data, 2024)
 
+            # 创建真实的 AnalyticsEngine 而不是 Mock
+            from src.core.analytics import AnalyticsEngine
+
+            analytics = AnalyticsEngine(storage)
+
+            # 创建包含真实 analytics 的 context
+            context = create_mock_context(storage=storage, analytics=analytics)
+            tools = RunnerTools(context=context)
+
             # 获取VDOT趋势
             vdot_trend = tools.get_vdot_trend(limit=10)
 
             assert len(vdot_trend) == 2
+            # 确保 vdot 是数值类型
+            assert isinstance(vdot_trend[0]["vdot"], (int, float))
             assert vdot_trend[0]["vdot"] > 0
