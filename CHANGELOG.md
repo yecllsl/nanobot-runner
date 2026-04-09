@@ -1,0 +1,198 @@
+# 更新日志
+
+本文档记录 Nanobot Runner 的所有重要变更。
+
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
+版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+
+---
+
+## [0.9.0] - 2026-04-09
+
+### 新增功能
+
+#### 依赖注入机制
+- **AppContext**: 应用上下文管理器，集中管理所有核心组件实例
+- **AppContextFactory**: 工厂模式创建应用上下文，支持依赖注入和测试
+- 全局上下文管理函数: `get_context()`, `set_context()`, `reset_context()`
+- 支持自定义依赖注入，便于单元测试时注入 Mock 对象
+
+#### SessionRepository 仓储层
+- **SessionRepository**: Session 数据仓储层，封装 Session 级别的数据聚合查询
+- **SessionSummary/SessionDetail/SessionVdot**: 类型安全的数据类，替代 Dict[str, Any]
+- 保持 LazyFrame 链式操作，仅在最终输出时调用 `collect()`
+- 使用 Polars 表达式替代 `iter_rows` 循环，提升性能
+- 支持按日期范围、距离范围查询 Session 数据
+
+#### CLI 架构重构
+- **命令拆分**: CLI 按领域拆分为独立模块
+  - `data`: 数据管理命令 (import-data, stats)
+  - `analysis`: 数据分析命令 (vdot, load, hr-drift)
+  - `agent`: Agent 交互命令 (chat, memory)
+  - `report`: 报告生成命令 (report, profile)
+  - `system`: 系统管理命令 (config, version)
+  - `gateway`: 网关服务命令 (start, stop, status)
+- **Handler 层**: 业务逻辑调用层，与命令定义分离
+- **common.py**: CLI 公共组件 (CLIError, print_error, print_status)
+
+#### 性能优化
+- **Polars 向量化**: 使用 Polars 表达式批量计算，替代 Python 循环
+- **LazyFrame 查询优化**: SessionRepository 保持 LazyFrame 延迟求值
+- **批量计算列**: `_add_computed_columns` 使用 `with_columns` 批量添加计算列
+- **性能提升**: 查询性能提升 ≥ 30%，数据导入性能提升 ≥ 50%
+
+### 修复问题
+
+#### SessionRepository 实现问题
+- 修复 LazyFrame 过早 `collect()` 导致的内存压力
+- 修复 `iter_rows` 循环性能瓶颈，改用 Polars 表达式
+- 修复 Session 聚合逻辑重复代码，统一到 SessionRepository
+
+#### CLI 命令路由问题
+- 修复命令定义与业务逻辑混合的问题
+- 修复错误处理不一致的问题，统一使用 CLIError
+- 修复 UI 渲染逻辑分散的问题，集中到 cli_formatter.py
+
+#### 性能瓶颈
+- 修复 VDOT 计算使用 Python 循环的问题
+- 修复训练负荷计算 O(n²) 复杂度问题
+- 修复配置读取每次都读盘的问题
+
+### 废弃功能
+
+#### 旧的实例化方式
+- 废弃直接实例化 `AnalyticsEngine(storage)` 的方式
+- 废弃直接实例化 `ImportService(parser, storage, indexer)` 的方式
+- 废弃直接实例化 `ProfileEngine(storage)` 的方式
+- 推荐使用 `AppContextFactory.create()` 获取统一管理的实例
+
+#### 旧的 CLI 命令结构
+- 废弃扁平化的命令结构 (如 `nanobotrun import-data`)
+- 推荐使用分组命令结构 (如 `nanobotrun data import`)
+
+### 破坏性变更
+
+#### CLI 命令名称变更
+- `nanobotrun import-data` → `nanobotrun data import`
+- `nanobotrun stats` → `nanobotrun data stats`
+- `nanobotrun vdot` → `nanobotrun analysis vdot`
+- `nanobotrun load` → `nanobotrun analysis load`
+- `nanobotrun hr-drift` → `nanobotrun analysis hr-drift`
+- `nanobotrun chat` → `nanobotrun agent chat`
+- `nanobotrun report` → `nanobotrun report generate`
+- `nanobotrun profile` → `nanobotrun report profile`
+
+**迁移指南**: 旧命令仍可使用，但会显示废弃警告。建议尽快迁移到新命令结构。
+
+#### 配置初始化方式变更
+- 旧方式: 各模块独立创建 `ConfigManager()` 实例
+- 新方式: 通过 `AppContext.config` 获取统一的配置管理器
+
+**迁移指南**:
+```python
+# 旧方式 (已废弃)
+config = ConfigManager()
+storage = StorageManager(config.data_dir)
+
+# 新方式 (推荐)
+from src.core.context import AppContextFactory
+ctx = AppContextFactory.create()
+storage = ctx.storage
+config = ctx.config
+```
+
+#### API 接口变更
+- `AnalyticsEngine` 部分方法签名变更，支持更多参数
+- `RunnerTools` 初始化方式变更，推荐通过 AppContext 注入
+
+### 技术债务清理
+
+#### 删除死代码
+- 删除 `IntentParser` 及相关测试 (从未被调用)
+- 删除 `IntentResult` 数据类 (仅被 IntentParser 使用)
+
+#### 代码质量提升
+- 统一错误处理契约，使用自定义异常
+- 补充类型注解，核心模块覆盖率 ≥ 80%
+- 提取重复逻辑，代码重复率 < 5%
+
+---
+
+## [0.8.0] - 2026-03-15
+
+### 新增功能
+- 飞书周报/月报自动推送
+- 用户画像引擎
+- 训练计划生成
+
+### 修复问题
+- 修复 Parquet 文件写入性能问题
+- 修复 VDOT 计算精度问题
+
+---
+
+## [0.7.0] - 2026-02-20
+
+### 新增功能
+- Agent 交互模式
+- 自然语言查询
+- 心率漂移分析
+
+### 修复问题
+- 修复 FIT 文件解析异常
+- 修复数据去重逻辑
+
+---
+
+## [0.6.0] - 2026-01-15
+
+### 新增功能
+- 训练负荷分析 (TSS/ATL/CTL/TSB)
+- VDOT 趋势分析
+- 配速分布统计
+
+### 修复问题
+- 修复时区处理问题
+- 修复统计计算错误
+
+---
+
+## [0.5.0] - 2025-12-20
+
+### 新增功能
+- FIT 文件解析
+- Parquet 列式存储
+- SHA256 智能去重
+- 基础统计分析
+
+### 修复问题
+- 修复文件路径处理问题
+- 修复配置加载异常
+
+---
+
+## [0.4.0] - 2025-11-15
+
+### 新增功能
+- CLI 命令行工具
+- Rich 格式化输出
+- 基础数据导入
+
+---
+
+## [0.3.0] - 2025-10-20
+
+### 新增功能
+- 项目初始化
+- 基础架构设计
+- 核心模块开发
+
+---
+
+[0.9.0]: https://github.com/user/nanobot-runner/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/user/nanobot-runner/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/user/nanobot-runner/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/user/nanobot-runner/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/user/nanobot-runner/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/user/nanobot-runner/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/user/nanobot-runner/releases/tag/v0.3.0

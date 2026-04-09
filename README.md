@@ -45,33 +45,46 @@ source .venv/bin/activate
 
 ```bash
 # 导入 FIT 文件
-uv run nanobotrun import-data /path/to/activity.fit
+uv run nanobotrun data import /path/to/activity.fit
 
 # 导入整个目录
-uv run nanobotrun import-data /path/to/activities/
+uv run nanobotrun data import /path/to/activities/
 
 # 强制重新导入（跳过去重）
-uv run nanobotrun import-data /path/to/activity.fit --force
+uv run nanobotrun data import /path/to/activity.fit --force
 ```
 
 ### 查看统计
 
 ```bash
 # 查看当前年份统计
-uv run nanobotrun stats
+uv run nanobotrun data stats
 
 # 查看指定年份
-uv run nanobotrun stats --year 2024
+uv run nanobotrun data stats --year 2024
 
 # 查看日期范围
-uv run nanobotrun stats --start 2024-01-01 --end 2024-12-31
+uv run nanobotrun data stats --start 2024-01-01 --end 2024-12-31
+```
+
+### 数据分析
+
+```bash
+# 查看 VDOT 趋势
+uv run nanobotrun analysis vdot
+
+# 查看训练负荷
+uv run nanobotrun analysis load
+
+# 分析心率漂移
+uv run nanobotrun analysis hr-drift
 ```
 
 ### AI 交互
 
 ```bash
 # 启动 AI 助手
-uv run nanobotrun chat
+uv run nanobotrun agent chat
 ```
 
 示例对话：
@@ -151,19 +164,29 @@ uv run nanobotrun chat
 nanobot-runner/
 ├── src/
 │   ├── core/              # 核心业务逻辑
-│   │   ├── analytics.py   # 数据分析引擎
-│   │   ├── storage.py     # Parquet 存储管理
-│   │   ├── indexer.py     # 去重索引管理
+│   │   ├── analytics/     # 数据分析引擎（v0.9.0 拆分）
+│   │   ├── storage/       # 存储管理（含 SessionRepository）
+│   │   ├── context.py     # 应用上下文（依赖注入）
 │   │   ├── importer.py    # 数据导入服务
 │   │   ├── parser.py      # FIT 解析封装
 │   │   ├── logger.py      # 结构化日志
 │   │   ├── exceptions.py  # 异常处理
 │   │   └── decorators.py  # 装饰器
+│   ├── cli/               # CLI 模块（v0.9.0 拆分）
+│   │   ├── app.py         # CLI 入口
+│   │   ├── commands/      # 命令定义
+│   │   │   ├── data.py    # 数据管理命令
+│   │   │   ├── analysis.py # 数据分析命令
+│   │   │   ├── agent.py   # Agent 交互命令
+│   │   │   ├── report.py  # 报告生成命令
+│   │   │   ├── system.py  # 系统管理命令
+│   │   │   └── gateway.py # 网关服务命令
+│   │   ├── handlers/      # 业务逻辑调用层
+│   │   └── common.py      # CLI 公共组件
 │   ├── agents/            # Agent 定义
 │   │   └── tools.py       # Agent 工具集
 │   ├── notify/            # 通知模块
 │   │   └── feishu.py      # 飞书推送集成
-│   ├── cli.py             # CLI 入口
 │   └── cli_formatter.py   # CLI 格式化
 ├── tests/                 # 测试
 │   ├── unit/              # 单元测试
@@ -174,6 +197,7 @@ nanobot-runner/
 │   └── current/           # 当前版本文档
 ├── data/                  # 本地数据目录
 ├── pyproject.toml         # 项目配置
+├── CHANGELOG.md           # 更新日志
 └── README.md              # 项目说明
 ```
 
@@ -202,6 +226,28 @@ nanobot-runner/
 - [分支管理与发布流程规范](./docs/devops/分支管理与发布流程规范.md) - Git 工作流
 
 ## 开发
+
+### 依赖注入（v0.9.0 新增）
+
+Nanobot Runner v0.9.0 引入了依赖注入机制，便于测试和扩展：
+
+```python
+from src.core.context import AppContextFactory
+
+# 创建应用上下文
+ctx = AppContextFactory.create()
+
+# 获取核心组件
+storage = ctx.storage
+config = ctx.config
+analytics = ctx.analytics
+
+# 自定义依赖注入（用于测试）
+from unittest.mock import Mock
+
+mock_storage = Mock()
+ctx = AppContextFactory.create(storage=mock_storage)
+```
 
 ### 运行测试
 
@@ -297,5 +343,5 @@ uv cache clean && uv sync --reinstall           # Linux/macOS
 
 ---
 
-**版本**: v0.4.1  
-**最后更新**: 2026-03-30
+**版本**: v0.9.0
+**最后更新**: 2026-04-09
