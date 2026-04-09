@@ -23,21 +23,33 @@ docs/archive/v{版本号}/
 │   ├── 测试报告_*.md
 │   ├── Bug清单_*.md
 │   ├── 回归报告_*.md
-│   └── 上线结论_*.md
+│   ├── 上线结论_*.md
+│   ├── E2E测试报告_*.md
+│   ├── E2E测试基线分析报告_*.md
+│   ├── 测试完善报告_*.md
+│   └── strategy_*.md
 ├── devops/          # 运维相关文档
 │   ├── 流水线执行报告_*.md
 │   └── 发布报告_*.md
 ├── development/     # 开发相关文档
 │   ├── 开发交付报告_*.md
 │   ├── Bug修复报告_*.md
-│   └── 代码优化报告_*.md
-└── review/          # 评审相关文档
-    └── 代码评审报告_*.md
+│   ├── 代码优化报告_*.md
+│   └── 文档评估报告_*.md
+├── review/          # 评审相关文档
+│   ├── 代码评审报告_*.md
+│   └── 架构评审报告_*.md
+├── planning/        # 规划相关文档
+│   └── task_list_*.md
+└── architecture/    # 架构相关文档
+    ├── 架构设计_*.md
+    ├── 重构规划方案_*.md
+    └── 功能分析_*.md
 ```
 
 ### 2.2 创建命令
 ```bash
-mkdir -p docs/archive/v{版本号}/{test,devops,development,review}
+mkdir -p docs/archive/v{版本号}/{test,devops,development,review,planning,architecture}
 ```
 
 ## 第三步：移动版本相关文档
@@ -78,13 +90,30 @@ mkdir -p docs/archive/v{版本号}/{test,devops,development,review}
     *   `代码评审报告_{版本号}.md`
     *   `架构评审报告_{版本号}.md`
 
-### 3.5 移动命令示例
+### 3.5 规划文档
+*   **源目录**：`docs/planning/`
+*   **目标目录**：`docs/archive/v{版本号}/planning/`
+*   **移动文件**：
+    *   `task_list_{版本号}.md`
+
+### 3.6 架构文档
+*   **源目录**：`docs/architecture/`
+*   **目标目录**：`docs/archive/v{版本号}/architecture/`
+*   **移动文件**：
+    *   `架构设计_{版本号}.md`
+    *   `重构规划方案_{版本号}.md`
+    *   `功能分析_{版本号}.md`
+    *   其他架构相关文档
+
+### 3.7 移动命令示例
 ```bash
 # 测试文档
 mv docs/test/reports/测试报告_v0.9.0.md docs/archive/v0.9.0/test/
 mv docs/test/reports/Bug清单_v0.9.0.md docs/archive/v0.9.0/test/
 mv docs/test/reports/回归报告_v0.9.0.md docs/archive/v0.9.0/test/
 mv docs/test/reports/上线结论_v0.9.0.md docs/archive/v0.9.0/test/
+mv docs/test/strategy_v0.9.0.md docs/archive/v0.9.0/test/
+mv docs/test/测试完善报告_v0.9.0.md docs/archive/v0.9.0/test/
 
 # 运维文档
 mv docs/devops/流水线执行报告_v0.9.0_*.md docs/archive/v0.9.0/devops/
@@ -98,6 +127,12 @@ mv docs/development/文档评估报告_v0.9.0.md docs/archive/v0.9.0/development
 
 # 评审文档
 mv docs/review/代码评审报告_v0.9.0.md docs/archive/v0.9.0/review/
+
+# 规划文档
+mv docs/planning/task_list_v0.9.0.md docs/archive/v0.9.0/planning/
+
+# 架构文档
+mv docs/architecture/v0.9.0重构规划方案.md docs/archive/v0.9.0/architecture/
 ```
 
 ## 第四步：清理项目目录
@@ -131,6 +166,16 @@ rm docs/development/文档评估报告_v0.9.0.md
 ### 4.4 清理评审目录
 ```bash
 rm docs/review/代码评审报告_v0.9.0.md
+```
+
+### 4.5 清理规划目录
+```bash
+rm docs/planning/task_list_v0.9.0.md
+```
+
+### 4.6 清理架构目录
+```bash
+rm docs/architecture/v0.9.0重构规划方案.md
 ```
 
 ## 第五步：更新归档索引
