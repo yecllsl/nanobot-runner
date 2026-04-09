@@ -188,7 +188,111 @@ def calculate_vdot(distance_m: float, time_s: float) -> float:
 
 ---
 
-## 6. 本地验证命令
+## 6. 依赖注入规范（v0.9.0新增）
+
+> ⚠️ **禁止直接实例化核心组件**，必须通过 `AppContext` 获取依赖。
+
+### 6.1 正确示例
+
+```python
+from src.core.context import get_context
+
+def some_function():
+    # ✅ 正确：通过上下文获取依赖
+    context = get_context()
+    storage = context.storage
+    analytics = context.analytics
+    session_repo = context.session_repo
+    
+    # 使用依赖
+    stats = session_repo.get_session_summary(session_id)
+```
+
+### 6.2 错误示例
+
+```python
+from src.core.storage import StorageManager
+
+def some_function():
+    # ❌ 错误：直接实例化
+    storage = StorageManager()  # 禁止！
+```
+
+### 6.3 测试时注入Mock
+
+```python
+from unittest.mock import Mock
+from src.core.context import set_context, reset_context, AppContext
+
+def test_with_mock():
+    # 创建Mock对象
+    mock_storage = Mock()
+    mock_analytics = Mock()
+    
+    # 注入Mock上下文
+    mock_context = AppContext(
+        storage=mock_storage,
+        analytics=mock_analytics,
+        ...
+    )
+    set_context(mock_context)
+    
+    try:
+        # 测试代码
+        ...
+    finally:
+        # 重置上下文
+        reset_context()
+```
+
+---
+
+## 7. SessionRepository 使用规范（v0.9.0新增）
+
+> ⚠️ **禁止返回 `Dict[str, Any]`**，必须使用类型安全的数据类。
+
+### 7.1 正确示例
+
+```python
+from src.core.context import get_context
+
+context = get_context()
+session_repo = context.session_repo
+
+# ✅ 正确：使用类型安全的返回值
+summary: SessionSummary = session_repo.get_session_summary(session_id)
+detail: SessionDetail = session_repo.get_session_detail(session_id)
+
+# 访问类型安全的属性
+print(f"总距离: {summary.total_distance}米")
+print(f"平均心率: {detail.avg_heart_rate}bpm")
+```
+
+### 7.2 错误示例
+
+```python
+# ❌ 错误：返回 Dict[str, Any]
+result: Dict[str, Any] = session_repo.get_session_summary(session_id)  # 禁止！
+```
+
+### 7.3 LazyFrame 保持规范
+
+```python
+# ✅ 正确：保持 LazyFrame 直到最终输出
+def get_sessions_lazy(self, start_date: date, end_date: date) -> pl.LazyFrame:
+    df = pl.scan_parquet(self.data_path)
+    return df.filter(
+        (pl.col("timestamp").dt.date() >= start_date) &
+        (pl.col("timestamp").dt.date() <= end_date)
+    )
+
+# 仅在最终输出时 collect
+sessions = session_repo.get_sessions_lazy(start, end).collect()
+```
+
+---
+
+## 8. 本地验证命令
 
 ```bash
 # 格式检查
@@ -207,4 +311,4 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 
 ---
 
-*文档版本: v1.0.0 | 更新日期: 2026-04-01*
+*文档版本: v0.9.0 | 更新日期: 2026-04-09*
