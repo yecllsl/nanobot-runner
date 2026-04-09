@@ -27,13 +27,12 @@ import pytest
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.analytics import AnalyticsEngine
-from src.core.importer import ImportService
-from src.core.storage import StorageManager
+from src.core.config import ConfigManager
+from src.core.context import AppContextFactory
 
 
 class TestUserJourney:
-    """用户旅程端到端测试"""
+    """用户旅程端到端测试（v0.9.0更新：使用依赖注入）"""
 
     def setup_method(self):
         """测试前置设置"""
@@ -41,10 +40,13 @@ class TestUserJourney:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_data_dir = Path(self.temp_dir.name)
 
-        # 初始化服务实例
-        self.storage_manager = StorageManager(data_dir=self.test_data_dir / "data")
-        self.import_service = ImportService()
-        self.analytics_engine = AnalyticsEngine(self.storage_manager)
+        # 使用依赖注入容器初始化服务实例（v0.9.0基线）
+        self.config = ConfigManager()
+        self.config.data_dir = self.test_data_dir / "data"
+        self.context = AppContextFactory.create(config=self.config)
+        self.storage_manager = self.context.storage
+        self.import_service = self.context.importer
+        self.analytics_engine = self.context.analytics
 
         # 创建模拟FIT文件
         self.create_mock_fit_files()
@@ -165,6 +167,7 @@ class TestUserJourney:
                     sys.executable,
                     "-m",
                     "src.cli",
+                    "data",
                     "import-data",
                     str(fit_dir),
                     "--help",

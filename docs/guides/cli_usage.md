@@ -4,6 +4,8 @@
 
 Nanobot Runner 提供命令行界面（CLI），用于导入跑步数据、查看统计信息和与 Agent 交互。
 
+**v0.9.0 架构变更**: CLI 已按领域拆分为独立模块，命令采用分组结构（如 `nanobotrun data import`）。
+
 ## 2. 安装与配置
 
 ### 2.1 环境要求
@@ -39,21 +41,27 @@ uv run nanobotrun --help
 # 显示帮助信息
 uv run nanobotrun --help
 
+# 显示子命令帮助
+uv run nanobotrun data --help
+uv run nanobotrun analysis --help
+
 # 显示版本信息
-uv run nanobotrun version
+uv run nanobotrun system version
 ```
 
-### 3.2 数据导入
+### 3.2 数据管理命令 (data)
+
+#### 导入数据
 
 ```bash
 # 导入单个FIT文件
-uv run nanobotrun import-data path/to/activity.fit
+uv run nanobotrun data import path/to/activity.fit
 
 # 导入目录下所有FIT文件
-uv run nanobotrun import-data path/to/fit/files/
+uv run nanobotrun data import path/to/fit/files/
 
 # 强制重新导入（跳过去重检查）
-uv run nanobotrun import-data path/to/activity.fit --force
+uv run nanobotrun data import path/to/activity.fit --force
 ```
 
 **导入流程**：
@@ -62,17 +70,17 @@ uv run nanobotrun import-data path/to/activity.fit --force
 3. 保存到Parquet文件（按年分片）
 4. 更新索引文件
 
-### 3.3 统计查询
+#### 统计查询
 
 ```bash
 # 查看当前年份统计
-uv run nanobotrun stats
+uv run nanobotrun data stats
 
 # 查看指定年份统计
-uv run nanobotrun stats --year 2024
+uv run nanobotrun data stats --year 2024
 
 # 查看日期范围统计
-uv run nanobotrun stats --start 2024-01-01 --end 2024-12-31
+uv run nanobotrun data stats --start 2024-01-01 --end 2024-12-31
 ```
 
 **统计输出示例**：
@@ -86,11 +94,46 @@ uv run nanobotrun stats --start 2024-01-01 --end 2024-12-31
 平均距离: 27.43 km
 ```
 
-### 3.4 Agent 交互
+### 3.3 数据分析命令 (analysis)
+
+#### VDOT 趋势
+
+```bash
+# 查看最近10次VDOT趋势
+uv run nanobotrun analysis vdot
+
+# 查看最近20次VDOT趋势
+uv run nanobotrun analysis vdot --limit 20
+
+# 导出VDOT趋势数据到JSON
+uv run nanobotrun analysis vdot --output vdot_trend.json
+```
+
+#### 训练负荷
+
+```bash
+# 查看训练负荷（ATL/CTL/TSB）
+uv run nanobotrun analysis load
+
+# 查看最近60天训练负荷
+uv run nanobotrun analysis load --days 60
+```
+
+#### 心率漂移
+
+```bash
+# 分析最近一次跑步的心率漂移
+uv run nanobotrun analysis hr-drift
+
+# 分析指定跑步记录
+uv run nanobotrun analysis hr-drift --run-id <activity_id>
+```
+
+### 3.4 Agent 交互命令 (agent)
 
 ```bash
 # 启动交互式对话
-uv run nanobotrun chat
+uv run nanobotrun agent chat
 ```
 
 **交互示例**：
@@ -106,6 +149,45 @@ uv run nanobotrun chat
 - 当前VDOT: 45.2
 - 30天前: 44.8
 - 变化: +0.4 (↑ 改善中)
+```
+
+### 3.5 报告生成命令 (report)
+
+```bash
+# 生成周报
+uv run nanobotrun report generate --type weekly
+
+# 生成月报
+uv run nanobotrun report generate --type monthly
+
+# 查看用户画像
+uv run nanobotrun report profile
+```
+
+### 3.6 系统管理命令 (system)
+
+```bash
+# 查看版本信息
+uv run nanobotrun system version
+
+# 查看配置信息
+uv run nanobotrun system config --show
+
+# 设置配置项
+uv run nanobotrun system config --set key=value
+```
+
+### 3.7 网关服务命令 (gateway)
+
+```bash
+# 启动网关服务
+uv run nanobotrun gateway start
+
+# 停止网关服务
+uv run nanobotrun gateway stop
+
+# 查看网关状态
+uv run nanobotrun gateway status
 ```
 
 ## 4. 输出格式
@@ -182,14 +264,14 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ```bash
 # 导入多个目录
-uv run nanobotrun import-data dir1/ dir2/ dir3/
+uv run nanobotrun data import dir1/ dir2/ dir3/
 ```
 
 ### 7.2 数据验证
 
 ```bash
 # 导入后验证数据完整性
-uv run nanobotrun stats --year 2024
+uv run nanobotrun data stats --year 2024
 ```
 
 ### 7.3 性能优化
@@ -197,6 +279,18 @@ uv run nanobotrun stats --year 2024
 - 大量数据导入时使用 `--force` 跳过去重检查
 - 定期清理旧数据文件
 - 使用SSD存储提升查询性能
+
+### 7.4 命令别名（v0.9.0 新增）
+
+v0.9.0 支持简写命令：
+
+```bash
+# 完整命令
+uv run nanobotrun data import /path/to/file.fit
+
+# 简写命令（等价）
+uv run nanobotrun d i /path/to/file.fit
+```
 
 ## 8. 配置文件
 
@@ -216,6 +310,6 @@ uv run nanobotrun stats --year 2024
 
 ---
 
-**文档版本**: v0.4.1  
-**最后更新**: 2026-03-30  
-**关联文档**: [Agent配置指南](./agent_config_guide.md)
+**文档版本**: v0.9.0
+**最后更新**: 2026-04-09
+**关联文档**: [Agent配置指南](./agent_config_guide.md) | [更新日志](../../CHANGELOG.md)

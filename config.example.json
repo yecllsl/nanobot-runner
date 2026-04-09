@@ -1,0 +1,33 @@
+{
+  "version": "0.9.0",
+  "data_dir": "~/.nanobot-runner/data",
+  "timezone": "Asia/Shanghai",
+  "default_year": 2024,
+  "auto_push_feishu": false,
+  "feishu_app_id": "cli_xxxxxxxxxxxx",
+  "feishu_app_secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "feishu_receive_id": "ou_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "feishu_receive_id_type": "user_id",
+  "report_schedule": {
+    "weekly": {
+      "enabled": false,
+      "day_of_week": "monday",
+      "time": "09:00"
+    },
+    "monthly": {
+      "enabled": false,
+      "day_of_month": 1,
+      "time": "09:00"
+    }
+  },
+  "analytics": {
+    "vdot_min_distance": 1500,
+    "hr_drift_threshold": -0.7,
+    "training_load_days": 42
+  },
+  "performance": {
+    "cache_ttl": 300,
+    "lazy_frame_optimization": true,
+    "batch_size": 100
+  }
+}

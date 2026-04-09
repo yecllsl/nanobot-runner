@@ -259,7 +259,7 @@ def test_cli_commands():
 
     # 测试stats命令
     result = subprocess.run(
-        [sys.executable, "-m", "src.cli", "stats"],
+        [sys.executable, "-m", "src.cli", "data", "stats"],
         capture_output=True,
         text=True,
         timeout=10,
@@ -270,7 +270,7 @@ def test_cli_commands():
 
     # 测试version命令
     result = subprocess.run(
-        [sys.executable, "-m", "src.cli", "version"],
+        [sys.executable, "-m", "src.cli", "system", "version"],
         capture_output=True,
         text=True,
         timeout=10,

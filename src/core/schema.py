@@ -159,7 +159,12 @@ class ParquetSchema:
         for col_name, col_type in schema.items():
             if col_name in df.columns:
                 try:
-                    df = df.with_columns(pl.col(col_name).cast(col_type))
+                    if col_type == pl.Datetime:
+                        df = df.with_columns(
+                            pl.col(col_name).cast(col_type, strict=False)
+                        )
+                    else:
+                        df = df.with_columns(pl.col(col_name).cast(col_type))
                 except (ple.ComputeError, ple.SchemaError):
                     logger.warning(f"列 {col_name} 类型转换失败，保持原类型")
 

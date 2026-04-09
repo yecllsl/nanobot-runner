@@ -346,32 +346,6 @@ class TestReportServiceScheduleReport:
         assert "时间格式" in result.get("error", "")
 
 
-class TestReportServiceCancelSchedule:
-    """测试取消定时报告"""
-
-    @pytest.fixture
-    def mock_service(self):
-        """创建带 Mock 的服务实例"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-        mock_config.get.return_value = None
-
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
-
-        return ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
-
-    def test_cancel_schedule_not_exists(self, mock_service):
-        """测试取消不存在的定时任务"""
-        # ReportService 没有 cancel_schedule 方法，跳过此测试
-        pytest.skip("cancel_schedule 方法未实现")
-
-
 class TestReportServiceGetJobName:
     """测试获取任务名称"""
 

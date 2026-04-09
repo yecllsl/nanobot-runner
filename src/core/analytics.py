@@ -1,11 +1,16 @@
 # 分析引擎
 # 基于Polars实现核心数据分析算法
 
-import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import polars as pl
+
+from src.core.heart_rate_analyzer import HeartRateAnalyzer
+from src.core.race_prediction import RacePredictionEngine
+from src.core.statistics_aggregator import StatisticsAggregator
+from src.core.training_load_analyzer import TrainingLoadAnalyzer
+from src.core.vdot_calculator import VDOTCalculator
 
 if TYPE_CHECKING:
     from src.core.storage import StorageManager
@@ -13,6 +18,27 @@ if TYPE_CHECKING:
 # VDOT 计算常量 (Jack Daniels 公式)
 VDOT_COEFFICIENT = 0.000104
 VDOT_DISTANCE_EXPONENT = 1.06
+
+
+def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
+    """按优先级从候选列名中查找DataFrame中存在的列名
+
+    Args:
+        df: 目标DataFrame
+        *candidates: 按优先级排列的候选列名
+
+    Returns:
+        str: 第一个存在的列名
+
+    Raises:
+        RuntimeError: 所有候选列名均不存在
+    """
+    for col in candidates:
+        if col in df.columns:
+            return col
+    raise RuntimeError(f"DataFrame中未找到候选列: {candidates}")
+
+
 VDOT_TIME_EXPONENT = 0.5
 VDOT_MULTIPLIER = 100
 
@@ -35,6 +61,11 @@ class AnalyticsEngine:
             storage_manager: StorageManager实例
         """
         self.storage = storage_manager
+        self.vdot_calculator = VDOTCalculator()
+        self.training_load_analyzer = TrainingLoadAnalyzer()
+        self.heart_rate_analyzer = HeartRateAnalyzer(storage_manager)
+        self.statistics_aggregator = StatisticsAggregator(storage_manager)
+        self.race_prediction_engine = RacePredictionEngine()
 
     def calculate_vdot(self, distance_m: float, time_s: float) -> float:
         """
@@ -52,18 +83,7 @@ class AnalyticsEngine:
         Raises:
             ValueError: 当距离或时间为负数或零时
         """
-        if distance_m <= 0 or time_s <= 0:
-            raise ValueError("距离和时间必须为正数")
-
-        if distance_m < 1500:
-            return 0.0
-
-        time_min = time_s / 60.0
-        pace_min_per_km = time_min / (distance_m / 1000.0)
-
-        vdot = 85.46 - 7.08 * pace_min_per_km + 0.15 * pace_min_per_km**2
-
-        return round(max(0.0, vdot), 2)
+        return self.vdot_calculator.calculate_vdot(distance_m, time_s)
 
     def calculate_tss(
         self, heart_rate_data: pl.Series, duration_s: float, ftp: int = 200
@@ -82,16 +102,9 @@ class AnalyticsEngine:
         Raises:
             ValueError: 当输入参数无效时
         """
-        if heart_rate_data.is_empty() or duration_s <= 0:
-            raise ValueError("心率数据不能为空且时长必须为正数")
-
-        try:
-            avg_hr: float = float(heart_rate_data.mean())  # type: ignore[arg-type]
-            intensity_factor = avg_hr / DEFAULT_LTHR
-            tss = (intensity_factor**2) * (duration_s / 3600) * 100
-            return round(tss, 2)
-        except Exception as e:
-            raise ValueError(f"TSS计算失败: {e}") from e
+        return self.training_load_analyzer.calculate_tss(
+            heart_rate_data, duration_s, ftp
+        )
 
     def get_running_summary(
         self, start_date: Optional[str] = None, end_date: Optional[str] = None
@@ -99,79 +112,14 @@ class AnalyticsEngine:
         """
         获取跑步摘要统计
 
-        数据模型说明：
-        - 存储的数据包含两类字段：
-          1. 过程数据（record）：timestamp, heart_rate, pace 等，每秒采样一次
-          2. 会话数据（session）：session_total_distance, session_total_timer_time 等，每次跑步一条
-        - 每个采样点都包含会话数据字段，因此需要按 session_start_time 聚合统计
-        - 直接统计行数会将采样点数量误认为跑步次数
-
-        统计逻辑：
-        1. 按 session_start_time 分组，将会话数据聚合为每条跑步一条记录
-        2. 使用 first() 提取会话数据（同一会话内所有采样点的会话数据相同）
-        3. 对聚合后的数据进行统计（总数、平均值、最大值等）
-
         Args:
             start_date: 开始日期（可选）
             end_date: 结束日期（可选）
 
         Returns:
-            pl.DataFrame: 统计结果，包含 total_runs, total_distance, total_timer_time 等字段
+            pl.DataFrame: 统计结果
         """
-        try:
-            lf = self.storage.read_parquet()
-
-            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
-            if len(lf.collect_schema()) == 0:
-                return pl.DataFrame()
-
-            if start_date or end_date:
-                if start_date:
-                    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-                    lf = lf.filter(pl.col("timestamp") >= start_dt)
-                if end_date:
-                    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-                    end_dt = end_dt + timedelta(days=1)
-                    lf = lf.filter(pl.col("timestamp") < end_dt)
-
-            session_df = (
-                lf.group_by("session_start_time")
-                .agg(
-                    [
-                        pl.col("session_total_distance").first().alias("distance"),
-                        pl.col("session_total_timer_time").first().alias("duration"),
-                        pl.col("session_avg_heart_rate").first().alias("avg_hr"),
-                    ]
-                )
-                .collect()
-            )
-
-            if session_df.is_empty():
-                return pl.DataFrame()
-
-            total_runs = session_df.height
-            total_distance = session_df["distance"].sum()
-            total_timer_time = session_df["duration"].sum()
-            avg_distance = session_df["distance"].mean()
-            avg_timer_time = session_df["duration"].mean()
-            max_distance = session_df["distance"].max()
-            avg_heart_rate = session_df["avg_hr"].mean()
-
-            result = pl.DataFrame(
-                {
-                    "total_runs": [total_runs],
-                    "total_distance": [total_distance],
-                    "total_timer_time": [total_timer_time],
-                    "avg_distance": [avg_distance],
-                    "avg_timer_time": [avg_timer_time],
-                    "max_distance": [max_distance],
-                    "avg_heart_rate": [avg_heart_rate],
-                }
-            )
-
-            return result
-        except Exception as e:
-            raise RuntimeError(f"获取跑步摘要失败: {e}") from e
+        return self.statistics_aggregator.get_running_summary(start_date, end_date)
 
     def analyze_hr_drift(
         self, heart_rate: List[float], pace: List[float]
@@ -186,112 +134,31 @@ class AnalyticsEngine:
         Returns:
             dict: 分析结果
         """
-        if not heart_rate or not pace:
-            return {"error": "数据量不足"}
-
-        hr_clean = []
-        pace_clean = []
-
-        for hr, p in zip(heart_rate, pace):
-            if hr is not None and p is not None and p > 0:
-                hr_clean.append(hr)
-                pace_clean.append(p)
-
-        if len(hr_clean) < 10 or len(pace_clean) < 10:
-            return {"error": "数据量不足"}
-
-        try:
-            hr_series = pl.Series("heart_rate", hr_clean)
-            pace_series = pl.Series("pace", pace_clean)
-
-            df = pl.DataFrame([hr_series, pace_series])
-            correlation = df.corr()[0, 1]
-
-            if len(hr_clean) >= 2:
-                first_half_hr = hr_clean[: len(hr_clean) // 2]
-                second_half_hr = hr_clean[len(hr_clean) // 2 :]
-                drift = (sum(second_half_hr) / len(second_half_hr)) - (
-                    sum(first_half_hr) / len(first_half_hr)
-                )
-            else:
-                drift = 0
-
-            drift_rate = (
-                (drift / (sum(hr_clean) / len(hr_clean))) * 100 if hr_clean else 0
-            )
-
-            if drift_rate > 5:
-                assessment = "心率漂移明显，可能有氧基础不扎实"
-            elif drift_rate > 0:
-                assessment = "心率漂移正常，跑步状态稳定"
-            else:
-                assessment = "心率表现优异，状态非常好"
-
-            return {
-                "drift": round(drift, 2),
-                "drift_rate": round(drift_rate, 2),
-                "correlation": round(correlation, 3) if correlation else 0,
-                "assessment": assessment,
-            }
-        except Exception as e:
-            return {"error": f"分析失败: {str(e)}"}
-
-    def _calculate_ewma(self, tss_values: List[float], time_constant: float) -> float:
-        """
-        计算指数加权移动平均（EWMA）
-
-        Args:
-            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
-            time_constant: 时间常数（天）
-
-        Returns:
-            float: EWMA值
-        """
-        if not tss_values:
-            return 0.0
-
-        weighted_sum = 0.0
-        weight_sum = 0.0
-
-        for i, tss in enumerate(reversed(tss_values)):
-            weight = math.exp(-i / time_constant)
-            weighted_sum += tss * weight
-            weight_sum += weight
-
-        if weight_sum == 0:
-            return 0.0
-
-        return round(weighted_sum / weight_sum, 2)
+        return self.heart_rate_analyzer.analyze_hr_drift(heart_rate, pace)
 
     def calculate_atl(self, tss_values: List[float]) -> float:
         """
         计算急性训练负荷（ATL，7天指数移动平均）
 
-        使用 EWMA 公式：ATL = sum(TSS[i] * exp(-i/7)) / sum(exp(-i/7))
-        其中 i 为天数索引（0 表示最近一天）
-
         Args:
-            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
+            tss_values: TSS值列表
 
         Returns:
             float: ATL值
         """
-        return self._calculate_ewma(tss_values, ATL_TIME_CONSTANT)
+        return self.training_load_analyzer.calculate_atl(tss_values)
 
     def calculate_ctl(self, tss_values: List[float]) -> float:
         """
         计算慢性训练负荷（CTL，42天指数移动平均）
 
-        使用 EWMA 公式：CTL = sum(TSS[i] * exp(-i/42)) / sum(exp(-i/42))
-        其中 i 为天数索引（0 表示最近一天）
-
         Args:
-            tss_values: TSS值列表，按时间顺序排列（最早的在前，最近的在后）
+            tss_values: TSS值列表
 
         Returns:
             float: CTL值
         """
-        return self._calculate_ewma(tss_values, CTL_TIME_CONSTANT)
+        return self.training_load_analyzer.calculate_ctl(tss_values)
 
     def calculate_atl_ctl(
         self, tss_values: List[float], atl_days: int = 7, ctl_days: int = 42
@@ -307,13 +174,7 @@ class AnalyticsEngine:
         Returns:
             dict: ATL和CTL值
         """
-        if not tss_values:
-            return {"atl": 0.0, "ctl": 0.0}
-
-        atl = self.calculate_atl(tss_values)
-        ctl = self.calculate_ctl(tss_values)
-
-        return {"atl": atl, "ctl": ctl}
+        return self.training_load_analyzer.calculate_atl_ctl(tss_values)
 
     def get_running_stats(self, year: Optional[int] = None) -> Dict[str, Any]:
         """
@@ -325,51 +186,7 @@ class AnalyticsEngine:
         Returns:
             Dict[str, Any]: 统计信息字典
         """
-        try:
-            years = [year] if year else None
-            lf = self.storage.read_parquet(years)
-
-            if len(lf.collect_schema()) == 0:
-                return {
-                    "total_runs": 0,
-                    "total_distance": 0.0,
-                    "total_duration": 0.0,
-                    "avg_heart_rate": 0.0,
-                }
-
-            session_df = (
-                lf.group_by("session_start_time")
-                .agg(
-                    [
-                        pl.col("session_total_distance").first().alias("distance"),
-                        pl.col("session_total_timer_time").first().alias("duration"),
-                        pl.col("session_avg_heart_rate").first().alias("avg_hr"),
-                    ]
-                )
-                .collect()
-            )
-
-            if session_df.is_empty():
-                return {"total_runs": 0, "total_distance": 0.0, "total_duration": 0.0}
-
-            total_runs = session_df.height
-            total_distance = float(session_df["distance"].sum())
-            total_duration = float(session_df["duration"].sum())
-            avg_heart_rate_result = session_df["avg_hr"].mean()
-            avg_heart_rate = float(avg_heart_rate_result) if avg_heart_rate_result is not None else 0.0  # type: ignore
-
-            stats = {
-                "total_runs": total_runs,
-                "total_distance": round(total_distance / 1000, 2),
-                "total_duration": round(total_duration / 3600, 2),
-                "avg_heart_rate": round(avg_heart_rate, 1),
-                "avg_pace": self._calculate_avg_pace_from_values(
-                    total_distance, total_duration
-                ),
-            }
-            return stats
-        except Exception as e:
-            raise RuntimeError(f"获取统计数据失败: {e}") from e
+        return self.statistics_aggregator.get_running_stats(year)
 
     def _calculate_avg_pace_from_values(
         self, total_distance: float, total_duration: float
@@ -432,7 +249,6 @@ class AnalyticsEngine:
         try:
             lf = self.storage.read_parquet()
 
-            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
             if len(lf.collect_schema()) == 0:
                 return []
 
@@ -446,23 +262,29 @@ class AnalyticsEngine:
             if df.is_empty():
                 return []
 
+            distance_col = _resolve_col(
+                df, "session_total_distance", "total_distance", "distance"
+            )
+            duration_col = _resolve_col(
+                df, "session_total_timer_time", "total_timer_time", "duration"
+            )
+
+            vdot_series = self.vdot_calculator.calculate_vdot_batch(
+                df, distance_col=distance_col, duration_col=duration_col
+            )
+
+            date_series = df["timestamp"].dt.strftime("%Y-%m-%d")
+            distance_series = df[distance_col]
+            duration_series = df[duration_col]
+
             trend_data = []
-            for row in df.iter_rows(named=True):
-                distance = row.get(
-                    "session_total_distance",
-                    row.get("total_distance", row.get("distance", 0)),
-                )
-                duration = row.get(
-                    "session_total_timer_time",
-                    row.get("total_timer_time", row.get("duration", 0)),
-                )
-                vdot = self.calculate_vdot(distance, duration)
+            for i in range(df.height):
                 trend_data.append(
                     {
-                        "date": row["timestamp"].strftime("%Y-%m-%d"),
-                        "vdot": vdot,
-                        "distance": distance,
-                        "duration": duration,
+                        "date": date_series[i],
+                        "vdot": float(vdot_series[i]),
+                        "distance": float(distance_series[i]),
+                        "duration": float(duration_series[i]),
                     }
                 )
 
@@ -567,7 +389,6 @@ class AnalyticsEngine:
 
         lf = self.storage.read_parquet()
 
-        # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
         if len(lf.collect_schema()) == 0:
             return {
                 "message": "暂无跑步数据，请先导入 FIT 文件",
@@ -600,7 +421,7 @@ class AnalyticsEngine:
 
         tss_values = []
         for row in df.iter_rows(named=True):
-            tss = self.calculate_tss_for_run(
+            tss = self.training_load_analyzer.calculate_tss_for_run(
                 distance_m=row.get("session_total_distance", 0),
                 duration_s=row.get("session_total_timer_time", 0),
                 avg_heart_rate=row.get("session_avg_heart_rate"),
@@ -628,18 +449,17 @@ class AnalyticsEngine:
         else:
             message = None
 
-        atl = self.calculate_atl(valid_tss)
-        ctl = self.calculate_ctl(valid_tss)
-        tsb = ctl - atl
+        atl = self.training_load_analyzer.calculate_atl(valid_tss)
+        ctl = self.training_load_analyzer.calculate_ctl(valid_tss)
 
-        fitness_status, training_advice = self._evaluate_fitness_status(tsb, atl, ctl)
+        status_result = self.training_load_analyzer.evaluate_training_status(atl, ctl)
 
         result = {
             "atl": atl,
             "ctl": ctl,
-            "tsb": round(tsb, 2),
-            "fitness_status": fitness_status,
-            "training_advice": training_advice,
+            "tsb": status_result["tsb"],
+            "fitness_status": status_result["fitness_status"],
+            "training_advice": status_result["training_advice"],
             "days_analyzed": days,
             "runs_count": len(valid_tss),
             "total_runs": len(tss_values),
@@ -1284,7 +1104,7 @@ class AnalyticsEngine:
         else:
             return f"{time_greeting}！今天是您的训练日。"
 
-    def _get_yesterday_run(self, yesterday) -> Optional[Dict[str, Any]]:
+    def _get_yesterday_run(self, yesterday: date) -> Optional[Dict[str, Any]]:
         """
         获取昨日训练摘要
 
@@ -1397,8 +1217,8 @@ class AnalyticsEngine:
         return " ".join(advice_parts)
 
     def _generate_weekly_plan(
-        self, today, fitness_status: Dict[str, Any], age: int
-    ) -> List[Dict[str, str]]:
+        self, today: date, fitness_status: Dict[str, Any], age: int
+    ) -> List[Dict[str, Any]]:
         """
         生成本周训练计划预览
 
@@ -1734,129 +1554,6 @@ class AnalyticsEngine:
             year: 年份，不指定则统计所有数据
 
         Returns:
-            Dict[str, Any]: 配速分布数据，包含各区间统计和趋势分析
-
-        Raises:
-            RuntimeError: 当数据处理失败时
+            Dict[str, Any]: 配速分布数据
         """
-        PACE_ZONES = {
-            "Z1": {"min": 360, "max": float("inf"), "label": "恢复跑"},
-            "Z2": {"min": 300, "max": 360, "label": "轻松跑"},
-            "Z3": {"min": 240, "max": 300, "label": "节奏跑"},
-            "Z4": {"min": 210, "max": 240, "label": "间歇跑"},
-            "Z5": {"min": 0, "max": 210, "label": "冲刺跑"},
-        }
-
-        try:
-            years = [year] if year else None
-            lf = self.storage.read_parquet(years)
-
-            # 检查 LazyFrame 是否有列（空 LazyFrame 没有列）
-            if len(lf.collect_schema()) == 0:
-                return {"zones": {}, "trend": [], "message": "无有效配速数据"}
-
-            result = (
-                lf.with_columns(
-                    [
-                        (
-                            pl.col("session_total_timer_time")
-                            / (pl.col("session_total_distance") / 1000)
-                        ).alias("avg_pace_sec_per_km")
-                    ]
-                )
-                .filter(
-                    (pl.col("session_total_distance") > 0)
-                    & (pl.col("session_total_timer_time") > 0)
-                    & (pl.col("avg_pace_sec_per_km").is_not_null())
-                )
-                .with_columns(
-                    [
-                        pl.when(pl.col("avg_pace_sec_per_km") > 360)
-                        .then(pl.lit("Z1"))
-                        .when(pl.col("avg_pace_sec_per_km") > 300)
-                        .then(pl.lit("Z2"))
-                        .when(pl.col("avg_pace_sec_per_km") > 240)
-                        .then(pl.lit("Z3"))
-                        .when(pl.col("avg_pace_sec_per_km") > 210)
-                        .then(pl.lit("Z4"))
-                        .otherwise(pl.lit("Z5"))
-                        .alias("pace_zone")
-                    ]
-                )
-                .select(
-                    [
-                        pl.col("pace_zone"),
-                        pl.col("timestamp"),
-                        pl.col("session_total_distance"),
-                        pl.col("session_total_timer_time"),
-                        pl.col("avg_pace_sec_per_km"),
-                    ]
-                )
-                .collect()
-            )
-
-            if result.is_empty():
-                return {"zones": {}, "trend": [], "message": "无有效配速数据"}
-
-            zone_stats = result.group_by("pace_zone").agg(
-                [
-                    pl.len().alias("count"),
-                    pl.col("session_total_distance").sum().alias("total_distance"),
-                    pl.col("avg_pace_sec_per_km").mean().alias("avg_pace"),
-                    pl.col("session_total_timer_time").sum().alias("total_time"),
-                ]
-            )
-
-            zones_result = {}
-            for row in zone_stats.iter_rows(named=True):
-                zone = row["pace_zone"]
-                if zone in PACE_ZONES:
-                    zones_result[zone] = {
-                        "count": row["count"],
-                        "distance": round(row["total_distance"], 2),
-                        "label": PACE_ZONES[zone]["label"],
-                        "avg_pace": round(row["avg_pace"], 2),
-                        "total_time": row["total_time"],
-                    }
-
-            for zone, info in PACE_ZONES.items():
-                if zone not in zones_result:
-                    zones_result[zone] = {
-                        "count": 0,
-                        "distance": 0.0,
-                        "label": info["label"],
-                        "avg_pace": 0.0,
-                        "total_time": 0,
-                    }
-
-            trend_df = result.sort("timestamp").select(
-                [
-                    "timestamp",
-                    "avg_pace_sec_per_km",
-                    "session_total_distance",
-                    "pace_zone",
-                ]
-            )
-
-            trend_data = []
-            for row in trend_df.iter_rows(named=True):
-                trend_data.append(
-                    {
-                        "date": row["timestamp"].strftime("%Y-%m-%d")
-                        if hasattr(row["timestamp"], "strftime")
-                        else str(row["timestamp"]),
-                        "pace": round(row["avg_pace_sec_per_km"], 2),
-                        "distance": round(row["session_total_distance"], 2),
-                        "zone": row["pace_zone"],
-                    }
-                )
-
-            return {
-                "zones": zones_result,
-                "trend": trend_data,
-                "total_runs": result.height,
-                "total_distance": round(result["session_total_distance"].sum(), 2),
-            }
-
-        except Exception as e:
-            raise RuntimeError(f"获取配速分布失败: {e}") from e
+        return self.statistics_aggregator.get_pace_distribution(year)

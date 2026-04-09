@@ -1,5 +1,6 @@
 # 装饰器模块单元测试
 
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,9 +10,10 @@ from src.core.decorators import (
     handle_errors,
     handle_tool_errors,
     require_storage,
+    tool_wrapper,
     validate_date_format,
 )
-from src.core.exceptions import ParseError, StorageError
+from src.core.exceptions import ParseError, StorageError, ToolResult, ValidationError
 
 
 class TestHandleToolErrors:
@@ -277,3 +279,108 @@ class TestHandleErrors:
         assert "error" in result
         assert result["error"] == "解析失败"
         assert result["error_code"] == "PARSE_ERROR"
+
+
+class TestToolResult:
+    """测试 ToolResult 类"""
+
+    def test_tool_result_success(self):
+        """测试成功结果"""
+        result = ToolResult(success=True, data={"key": "value"}, message="操作成功")
+        result_dict = result.to_dict()
+        assert result_dict["success"] is True
+        assert result_dict["data"] == {"key": "value"}
+        assert result_dict["message"] == "操作成功"
+        assert "error" not in result_dict
+
+    def test_tool_result_error(self):
+        """测试错误结果"""
+        result = ToolResult(success=False, error="操作失败")
+        result_dict = result.to_dict()
+        assert result_dict["success"] is False
+        assert result_dict["error"] == "操作失败"
+        assert "data" not in result_dict
+
+    def test_tool_result_to_json(self):
+        """测试JSON转换"""
+        result = ToolResult(success=True, data={"test": 123})
+        json_str = result.to_json()
+        parsed = json.loads(json_str)
+        assert parsed["success"] is True
+        assert parsed["data"] == {"test": 123}
+
+
+class TestToolWrapper:
+    """测试 tool_wrapper 装饰器"""
+
+    def test_tool_wrapper_success(self):
+        """测试正常执行"""
+
+        @tool_wrapper
+        def successful_function():
+            return {"result": "success"}
+
+        result_json = successful_function()
+        result = json.loads(result_json)
+        assert result["success"] is True
+        assert result["data"] == {"result": "success"}
+
+    def test_tool_wrapper_with_tool_result(self):
+        """测试返回 ToolResult 对象"""
+
+        @tool_wrapper
+        def tool_result_function():
+            return ToolResult(success=True, data={"custom": "data"})
+
+        result_json = tool_result_function()
+        result = json.loads(result_json)
+        assert result["success"] is True
+        assert result["data"] == {"custom": "data"}
+
+    def test_tool_wrapper_validation_error(self):
+        """测试 ValidationError 处理"""
+
+        @tool_wrapper
+        def validation_error_function():
+            raise ValidationError(message="输入验证失败")
+
+        result_json = validation_error_function()
+        result = json.loads(result_json)
+        assert result["success"] is False
+        assert "输入验证失败" in result["error"]
+
+    def test_tool_wrapper_file_not_found(self):
+        """测试 FileNotFoundError 处理"""
+
+        @tool_wrapper
+        def file_not_found_function():
+            raise FileNotFoundError("文件不存在")
+
+        result_json = file_not_found_function()
+        result = json.loads(result_json)
+        assert result["success"] is False
+        assert "文件不存在" in result["error"]
+
+    def test_tool_wrapper_nanobot_runner_error(self):
+        """测试 NanobotRunnerError 处理"""
+
+        @tool_wrapper
+        def error_function():
+            raise StorageError(message="存储失败")
+
+        result_json = error_function()
+        result = json.loads(result_json)
+        assert result["success"] is False
+        assert result["error"] == "存储失败"
+
+    def test_tool_wrapper_generic_exception(self):
+        """测试通用异常处理"""
+
+        @tool_wrapper
+        def generic_error_function():
+            raise RuntimeError("未知错误")
+
+        result_json = generic_error_function()
+        result = json.loads(result_json)
+        assert result["success"] is False
+        assert "内部错误" in result["error"]

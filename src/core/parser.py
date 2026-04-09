@@ -10,13 +10,14 @@ import polars as pl
 
 from src.core.exceptions import ParseError, ValidationError
 from src.core.logger import get_logger
+from src.core.schema import ParquetSchema
 
 logger = get_logger(__name__)
 
 _original_parse_definition_message = fitparse.base.FitFile._parse_definition_message
 
 
-def _patched_parse_definition_message(self, header):
+def _patched_parse_definition_message(self, header) -> None:  # type: ignore[no-untyped-def]
     from fitparse.records import BASE_TYPE_BYTE, BASE_TYPES, FieldDefinition
 
     endian = ">" if self._read_struct("xB") else "<"
@@ -138,6 +139,8 @@ class FitParser:
                 pl.lit(datetime.now()).alias("import_timestamp"),
             )
 
+            df = self._apply_schema_validation(df, filepath)
+
             logger.info(f"解析文件成功: {filepath}, 记录数: {df.height}")
             return df
         except (ValidationError, ParseError):
@@ -165,6 +168,37 @@ class FitParser:
                 message=f"添加会话元数据失败: {e}",
                 recovery_suggestion="请检查FIT文件数据结构",
             ) from e
+
+    def _apply_schema_validation(
+        self, df: pl.DataFrame, filepath: Path
+    ) -> pl.DataFrame:
+        """
+        应用Schema校验和标准化
+
+        Args:
+            df: 原始DataFrame
+            filepath: 文件路径（用于日志）
+
+        Returns:
+            pl.DataFrame: 标准化后的DataFrame
+        """
+        df = df.with_columns(
+            pl.lit(filepath.stem).alias("filename"),
+        )
+
+        if "session_total_distance" not in df.columns:
+            df = df.with_columns(pl.lit(0.0).alias("session_total_distance"))
+        if "session_total_timer_time" not in df.columns:
+            df = df.with_columns(pl.lit(0.0).alias("session_total_timer_time"))
+
+        validation_result = ParquetSchema.validate_dataframe(df)
+
+        if not validation_result["valid"]:
+            logger.warning(f"Schema校验警告: {validation_result['messages']}")
+
+        df = ParquetSchema.normalize_dataframe(df)
+        logger.debug(f"Schema标准化完成: {filepath}")
+        return df
 
     def parse_directory(self, directory: Path) -> pl.DataFrame:
         if not directory.exists():

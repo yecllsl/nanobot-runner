@@ -1,6 +1,6 @@
 [project]
 name = "nanobot-runner"
-version = "0.8.0"
+version = "0.9.0"
 description = "Nanobot Runner - 桌面端私人AI跑步助理"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -92,16 +92,16 @@ known_first_party = ["src"]
 
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = false  # 暂时关闭Any返回警告
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = false  # 暂时允许无类型定义
-check_untyped_defs = false  # 暂时关闭无类型定义检查
-disallow_incomplete_defs = false  # 暂时允许不完整定义
-disallow_untyped_decorators = false  # 暂时允许无类型装饰器
-no_implicit_optional = false  # 暂时关闭隐式Optional检查
-warn_redundant_casts = false  # 暂时关闭冗余转换警告
-warn_unused_ignores = false  # 暂时关闭未使用忽略警告
-warn_no_return = false  # 暂时关闭无返回警告
+disallow_untyped_defs = false
+check_untyped_defs = true
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+warn_no_return = true
 
 [tool.bandit]
 skips = ["B101", "B601"]

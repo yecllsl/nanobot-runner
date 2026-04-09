@@ -163,7 +163,7 @@ class AppConfig:
             "feishu_receive_id_type": self.feishu_receive_id_type,
         }
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """数据类初始化后验证
 
         确保创建的实例符合 Schema 要求

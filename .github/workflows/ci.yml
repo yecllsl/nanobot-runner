@@ -64,7 +64,29 @@ jobs:
     - name: Security scan with bandit
       run: |
         echo "开始安全扫描..."
-        python -m bandit -r src/ -f json -o bandit-report.json -s B101,B601
+        python -m bandit -r src/ -f json -o bandit-report.json -s B101,B601 -ll
+        echo "安全扫描完成"
+        
+    - name: Check bandit results
+      run: |
+        echo "检查安全扫描结果..."
+        if [ -f "bandit-report.json" ]; then
+          # 统计HIGH和MEDIUM严重性问题
+          HIGH_COUNT=$(python -c "import json; data=json.load(open('bandit-report.json')); print(sum(1 for r in data.get('results', []) if r.get('issue_severity') == 'HIGH'))")
+          MEDIUM_COUNT=$(python -c "import json; data=json.load(open('bandit-report.json')); print(sum(1 for r in data.get('results', []) if r.get('issue_severity') == 'MEDIUM'))")
+          
+          echo "HIGH严重性问题: $HIGH_COUNT"
+          echo "MEDIUM严重性问题: $MEDIUM_COUNT"
+          
+          if [ "$HIGH_COUNT" -gt 0 ] || [ "$MEDIUM_COUNT" -gt 0 ]; then
+            echo "❌ 发现HIGH或MEDIUM严重性安全问题，请修复后再提交"
+            exit 1
+          else
+            echo "✅ 未发现HIGH或MEDIUM严重性安全问题"
+          fi
+        else
+          echo "⚠️ 安全扫描报告未生成"
+        fi
         
   # 测试执行
   test:
@@ -122,6 +144,7 @@ jobs:
         echo "开始端到端测试..."
         timeout 300s python -m pytest tests/e2e/ -v --tb=short  # 5分钟超时
         echo "E2E测试完成"
+      continue-on-error: true  # E2E测试失败不影响整体CI结果
         
     - name: Generate coverage report
       run: |

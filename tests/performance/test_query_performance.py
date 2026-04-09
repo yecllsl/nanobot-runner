@@ -13,8 +13,10 @@ import polars as pl
 import pytest
 
 from src.agents.tools import RunnerTools
+from src.core.analytics import AnalyticsEngine
 from src.core.schema import ParquetSchema
 from src.core.storage import StorageManager
+from tests.conftest import create_mock_context
 
 
 class TestQueryPerformance:
@@ -29,7 +31,12 @@ class TestQueryPerformance:
         # 生成测试数据
         self._generate_test_data()
 
-        self.tools = RunnerTools(self.storage)
+        # 创建真实的 AnalyticsEngine
+        analytics = AnalyticsEngine(self.storage)
+
+        # 创建包含真实 analytics 的 context
+        context = create_mock_context(storage=self.storage, analytics=analytics)
+        self.tools = RunnerTools(context=context)
 
     def teardown_method(self):
         """测试后清理"""
@@ -292,7 +299,9 @@ class TestQueryPerformance:
 def test_performance_baseline():
     """性能基准测试 - 验证基础查询性能"""
     storage = StorageManager()
-    tools = RunnerTools(storage)
+    analytics = AnalyticsEngine(storage)
+    context = create_mock_context(storage=storage, analytics=analytics)
+    tools = RunnerTools(context=context)
 
     # 测试空数据查询性能
     start_time = time.time()

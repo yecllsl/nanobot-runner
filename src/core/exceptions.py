@@ -2,7 +2,34 @@
 # 提供统一的异常处理机制
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
+
+
+@dataclass
+class ToolResult:
+    """工具统一返回格式"""
+
+    success: bool
+    data: Optional[Any] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        result: dict[str, Any] = {"success": self.success}
+        if self.data is not None:
+            result["data"] = self.data
+        if self.message is not None:
+            result["message"] = self.message
+        if self.error is not None:
+            result["error"] = self.error
+        return result
+
+    def to_json(self) -> str:
+        """转换为JSON字符串"""
+        import json
+
+        return json.dumps(self.to_dict(), ensure_ascii=False)
 
 
 @dataclass
@@ -13,10 +40,10 @@ class NanobotRunnerError(Exception):
     error_code: str = "UNKNOWN_ERROR"
     recovery_suggestion: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__(self.message)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "error": self.message,

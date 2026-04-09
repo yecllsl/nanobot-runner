@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,7 @@ class IndexManager:
             index_file or Path.home() / ".nanobot-runner" / "data" / "index.json"
         )
         self.index_file.parent.mkdir(parents=True, exist_ok=True)
+        self._fingerprints: set = set()
         self.index = self._load_index()
 
     def _load_index(self) -> Dict[str, Any]:
@@ -28,14 +30,19 @@ class IndexManager:
         if self.index_file.exists():
             try:
                 with open(self.index_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    self._fingerprints = set(data.get("fingerprints", []))
+                    return data
             except Exception:
+                self._fingerprints = set()
                 return {"fingerprints": [], "metadata": {}}
+        self._fingerprints = set()
         return {"fingerprints": [], "metadata": {"created": None, "updated": None}}
 
-    def _save_index(self):
+    def _save_index(self) -> None:
         """保存索引文件"""
-        self.index["metadata"]["updated"] = str(Path.home())
+        self.index["metadata"]["updated"] = datetime.now().isoformat()
+        self.index["fingerprints"] = list(self._fingerprints)
         with open(self.index_file, "w", encoding="utf-8") as f:
             json.dump(self.index, f, indent=2, ensure_ascii=False)
 
@@ -67,9 +74,9 @@ class IndexManager:
         Returns:
             bool: 是否存在
         """
-        return fingerprint in self.index.get("fingerprints", [])
+        return fingerprint in self._fingerprints
 
-    def add(self, fingerprint: str, metadata: Dict[str, Any] = None) -> bool:
+    def add(self, fingerprint: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
         """
         添加指纹到索引
 
@@ -83,7 +90,7 @@ class IndexManager:
         if self.exists(fingerprint):
             return False
 
-        self.index.setdefault("fingerprints", []).append(fingerprint)
+        self._fingerprints.add(fingerprint)
 
         if metadata:
             self.index.setdefault("metadata", {}).setdefault("files", {})[
@@ -110,8 +117,7 @@ class IndexManager:
         if not self.exists(fingerprint):
             return False
 
-        fingerprints = self.index.get("fingerprints", [])
-        fingerprints.remove(fingerprint)
+        self._fingerprints.discard(fingerprint)
 
         if fingerprint in self.index.get("metadata", {}).get("files", {}):
             del self.index["metadata"]["files"][fingerprint]
@@ -126,7 +132,7 @@ class IndexManager:
         Returns:
             list: 指纹列表
         """
-        return self.index.get("fingerprints", [])
+        return list(self._fingerprints)
 
     def get_file_info(self, fingerprint: str) -> Optional[Dict[str, Any]]:
         """
@@ -140,7 +146,7 @@ class IndexManager:
         """
         return self.index.get("metadata", {}).get("files", {}).get(fingerprint)
 
-    def clear(self):
+    def clear(self) -> None:
         """清空索引"""
         self.index = {
             "fingerprints": [],

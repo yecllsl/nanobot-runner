@@ -6,6 +6,9 @@
 
 - [运行环境与初始化](#运行环境与初始化)
 - [Core 模块](#core-模块)
+  - [AppContext](#appcontext) (v0.9.0 新增)
+  - [AppContextFactory](#appcontextfactory) (v0.9.0 新增)
+  - [SessionRepository](#sessionrepository) (v0.9.0 新增)
   - [AnalyticsEngine](#analyticsengine)
   - [StorageManager](#storagemanager)
   - [FitParser](#fitparser)
@@ -52,6 +55,277 @@ Nanobot Runner 使用 `~/.nanobot-runner` 作为 nanobot workspace：
 
 ## Core 模块
 
+### AppContext
+
+应用上下文，集中管理所有核心组件的实例，支持依赖注入和测试。
+
+> **v0.9.0 新增**
+
+#### 初始化
+
+```python
+from src.core.context import AppContext, AppContextFactory
+
+# 通过工厂创建（推荐）
+ctx = AppContextFactory.create()
+
+# 直接初始化（不推荐，用于特殊场景）
+from src.core.config import ConfigManager
+from src.core.storage import StorageManager
+
+config = ConfigManager()
+storage = StorageManager(config.data_dir)
+ctx = AppContext(
+    config=config,
+    storage=storage,
+    # ... 其他组件
+)
+```
+
+#### 属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `config` | ConfigManager | 配置管理器 |
+| `storage` | StorageManager | 存储管理器 |
+| `indexer` | IndexManager | 索引管理器 |
+| `parser` | FitParser | FIT 文件解析器 |
+| `importer` | ImportService | 导入服务 |
+| `analytics` | AnalyticsEngine | 分析引擎 |
+| `profile_engine` | ProfileEngine | 用户画像引擎 |
+| `profile_storage` | ProfileStorageManager | 用户画像存储管理器 |
+
+#### 方法
+
+##### `get_extension(name: str) -> Optional[Any]`
+
+获取扩展组件。
+
+**参数:**
+- `name` (str): 扩展组件名称
+
+**返回:** `Optional[Any]` - 扩展组件实例，不存在则返回 None
+
+---
+
+##### `set_extension(name: str, instance: Any) -> None`
+
+设置扩展组件。
+
+**参数:**
+- `name` (str): 扩展组件名称
+- `instance` (Any): 扩展组件实例
+
+---
+
+### AppContextFactory
+
+应用上下文工厂，负责创建和配置 AppContext 实例，支持自定义依赖注入。
+
+> **v0.9.0 新增**
+
+#### 静态方法
+
+##### `create(...) -> AppContext`
+
+创建应用上下文，支持依赖注入，未提供的组件将自动创建默认实例。
+
+**参数:**
+- `config` (ConfigManager, optional): 配置管理器
+- `storage` (StorageManager, optional): 存储管理器
+- `indexer` (IndexManager, optional): 索引管理器
+- `parser` (FitParser, optional): FIT 文件解析器
+- `importer` (ImportService, optional): 导入服务
+- `analytics` (AnalyticsEngine, optional): 分析引擎
+- `profile_engine` (ProfileEngine, optional): 用户画像引擎
+- `profile_storage` (ProfileStorageManager, optional): 用户画像存储管理器
+
+**返回:** `AppContext` - 配置好的 AppContext 实例
+
+**示例:**
+
+```python
+from src.core.context import AppContextFactory
+
+# 创建默认上下文
+ctx = AppContextFactory.create()
+
+# 自定义依赖注入（用于测试）
+from unittest.mock import Mock
+
+mock_storage = Mock()
+ctx = AppContextFactory.create(storage=mock_storage)
+```
+
+---
+
+##### `create_for_testing(...) -> AppContext`
+
+创建用于测试的应用上下文，与 `create()` 方法相同，但明确表示用于测试场景。
+
+**参数:** 同 `create()`
+
+**返回:** `AppContext` - 配置好的 AppContext 实例
+
+---
+
+### SessionRepository
+
+Session 数据仓储层，封装 Session 级别的数据聚合查询，保持 LazyFrame 链式操作。
+
+> **v0.9.0 新增**
+
+#### 初始化
+
+```python
+from src.core.session_repository import SessionRepository
+from src.core.storage import StorageManager
+
+storage = StorageManager()
+repo = SessionRepository(storage)
+```
+
+#### 数据类
+
+##### `SessionSummary`
+
+Session 摘要数据类，替代 Dict[str, Any] 提升类型安全。
+
+**属性:**
+- `timestamp` (str): 时间戳
+- `distance_km` (float): 距离（公里）
+- `duration_min` (float): 时长（分钟）
+- `avg_pace_sec_km` (Optional[float]): 平均配速（秒/公里）
+- `avg_heart_rate` (Optional[float]): 平均心率
+
+---
+
+##### `SessionDetail`
+
+Session 详情数据类，包含完整字段。
+
+**继承:** SessionSummary
+
+**额外属性:**
+- `distance_m` (float): 距离（米）
+- `duration_s` (float): 时长（秒）
+- `max_heart_rate` (Optional[float]): 最大心率
+- `calories` (Optional[float]): 消耗卡路里
+
+---
+
+##### `SessionVdot`
+
+VDOT 计算所需的 Session 数据。
+
+**属性:**
+- `timestamp` (str): 时间戳
+- `distance_m` (float): 距离（米）
+- `duration_s` (float): 时长（秒）
+- `avg_heart_rate` (Optional[float]): 平均心率
+
+---
+
+#### 方法
+
+##### `get_sessions(...) -> pl.DataFrame`
+
+获取 Session 聚合数据，保持 LazyFrame 链式操作，仅在最终返回前 collect()。
+
+**参数:**
+- `start_date` (datetime, optional): 开始日期
+- `end_date` (datetime, optional): 结束日期
+- `min_distance` (float, optional): 最小距离（米）
+- `max_distance` (float, optional): 最大距离（米）
+- `limit` (int, optional): 返回数量限制
+- `descending` (bool): 是否按时间降序，默认 True
+
+**返回:** `pl.DataFrame` - Session 聚合结果
+
+---
+
+##### `get_recent_sessions(limit: int = 10) -> List[SessionDetail]`
+
+获取最近的 Session 详情。
+
+**参数:**
+- `limit` (int): 返回数量限制，默认 10
+
+**返回:** `List[SessionDetail]` - Session 详情列表
+
+---
+
+##### `get_sessions_for_vdot(limit: Optional[int] = None) -> List[SessionVdot]`
+
+获取 VDOT 计算所需的 Session 数据。
+
+**参数:**
+- `limit` (int, optional): 返回数量限制
+
+**返回:** `List[SessionVdot]` - VDOT 计算所需的 Session 列表
+
+---
+
+##### `get_sessions_by_date_range(start_date: datetime, end_date: datetime) -> List[SessionSummary]`
+
+按日期范围获取 Session 摘要。
+
+**参数:**
+- `start_date` (datetime): 开始日期
+- `end_date` (datetime): 结束日期
+
+**返回:** `List[SessionSummary]` - Session 摘要列表
+
+---
+
+##### `get_sessions_by_distance(min_meters: float, max_meters: Optional[float] = None) -> List[SessionSummary]`
+
+按距离范围获取 Session 摘要。
+
+**参数:**
+- `min_meters` (float): 最小距离（米）
+- `max_meters` (float, optional): 最大距离（米）
+
+**返回:** `List[SessionSummary]` - Session 摘要列表
+
+---
+
+##### `get_session_count(start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> int`
+
+获取 Session 数量。
+
+**参数:**
+- `start_date` (datetime, optional): 开始日期
+- `end_date` (datetime, optional): 结束日期
+
+**返回:** `int` - Session 数量
+
+---
+
+##### `get_total_distance(start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> float`
+
+获取总距离。
+
+**参数:**
+- `start_date` (datetime, optional): 开始日期
+- `end_date` (datetime, optional): 结束日期
+
+**返回:** `float` - 总距离（米）
+
+---
+
+##### `get_total_duration(start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> float`
+
+获取总时长。
+
+**参数:**
+- `start_date` (datetime, optional): 开始日期
+- `end_date` (datetime, optional): 结束日期
+
+**返回:** `float` - 总时长（秒）
+
+---
+
 ### AnalyticsEngine
 
 数据分析引擎，提供跑步数据的统计和分析功能。
@@ -62,8 +336,15 @@ Nanobot Runner 使用 `~/.nanobot-runner` 作为 nanobot workspace：
 from src.core.analytics import AnalyticsEngine
 from src.core.storage import StorageManager
 
+# 旧方式（已废弃）
 storage = StorageManager()
 engine = AnalyticsEngine(storage)
+
+# 新方式（v0.9.0 推荐）
+from src.core.context import AppContextFactory
+
+ctx = AppContextFactory.create()
+engine = ctx.analytics
 ```
 
 #### 方法
@@ -169,7 +450,14 @@ Parquet 存储管理器，负责数据的读写和查询。
 ```python
 from src.core.storage import StorageManager
 
+# 旧方式（已废弃）
 storage = StorageManager(data_dir="~/.nanobot-runner/data")
+
+# 新方式（v0.9.0 推荐）
+from src.core.context import AppContextFactory
+
+ctx = AppContextFactory.create()
+storage = ctx.storage
 ```
 
 #### 方法
@@ -251,9 +539,17 @@ from src.core.importer import ImportService
 from src.core.storage import StorageManager
 from src.core.indexer import IndexManager
 
+# 旧方式（已废弃）
 storage = StorageManager()
 indexer = IndexManager()
-importer = ImportService(storage, indexer)
+parser = FitParser()
+importer = ImportService(parser, storage, indexer)
+
+# 新方式（v0.9.0 推荐）
+from src.core.context import AppContextFactory
+
+ctx = AppContextFactory.create()
+importer = ctx.importer
 ```
 
 #### 方法
@@ -293,7 +589,14 @@ Agent 工具集，封装为 nanobot-ai 可识别的工具格式。
 ```python
 from src.agents.tools import RunnerTools
 
+# 旧方式（已废弃）
 tools = RunnerTools()
+
+# 新方式（v0.9.0 推荐）
+from src.core.context import AppContextFactory
+
+ctx = AppContextFactory.create()
+tools = RunnerTools(ctx)
 ```
 
 #### 工具列表
@@ -379,5 +682,5 @@ bot = FeishuBot(webhook_url="https://open.feishu.cn/...")
 
 ---
 
-*文档版本: v0.4.1*
-*更新时间: 2026-03-30*
+*文档版本: v0.9.0*
+*更新时间: 2026-04-09*
