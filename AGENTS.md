@@ -57,10 +57,43 @@ src/
 
 ## 3. 核心数据流
 
+### 3.1 数据导入流程
+
 ```
 FIT文件 → FitParser → IndexManager(SHA256去重) → StorageManager → Parquet(按年分片)
-                                                    ↓
+```
+
+### 3.2 数据查询流程
+
+```
 用户查询 ← RunnerTools ← AnalyticsEngine ← LazyFrame ← read_parquet
+```
+
+### 3.3 依赖注入流程 (v0.9.0新增)
+
+```
+AppContextFactory.create_context()
+    ↓
+AppContext
+    ├── storage: StorageManager
+    ├── analytics: AnalyticsEngine
+    ├── profile: ProfileEngine
+    └── session_repo: SessionRepository
+    ↓
+CLI Handlers / Agent Tools
+```
+
+**使用示例**:
+```python
+from src.core.context import get_context
+
+# 获取应用上下文
+context = get_context()
+
+# 访问依赖组件
+storage = context.storage
+analytics = context.analytics
+session_repo = context.session_repo
 ```
 
 ---
@@ -70,13 +103,57 @@ FIT文件 → FitParser → IndexManager(SHA256去重) → StorageManager → Pa
 | 规范 | 要求 |
 |------|------|
 | **Polars** | 保持 LazyFrame，仅最终输出时调用 `.collect()`，详见 `docs/guides/development_guide.md` |
+| **依赖注入** | 使用 `get_context()` 获取应用上下文，禁止直接实例化核心组件 (v0.9.0新增) |
+| **SessionRepository** | 使用类型安全的数据类（SessionSummary/SessionDetail），禁止返回 Dict[str, Any] (v0.9.0新增) |
 | **异常处理** | 使用 `from src.core.exceptions import ...` 自定义异常，禁止裸 `Exception` |
 | **类型注解** | 必须添加，核心模块覆盖率 ≥ 80% |
 | **命名约定** | 类名 PascalCase，函数/变量 snake_case，常量 UPPER_SNAKE_CASE |
 
+### 4.1 依赖注入规范 (v0.9.0新增)
+
+**正确做法**:
+```python
+from src.core.context import get_context
+
+def some_function():
+    context = get_context()
+    storage = context.storage  # ✅ 通过上下文获取
+    analytics = context.analytics
+```
+
+**错误做法**:
+```python
+from src.core.storage import StorageManager
+
+def some_function():
+    storage = StorageManager()  # ❌ 禁止直接实例化
+```
+
+### 4.2 SessionRepository 使用规范 (v0.9.0新增)
+
+**正确做法**:
+```python
+from src.core.context import get_context
+
+context = get_context()
+session_repo = context.session_repo
+
+# 使用类型安全的返回值
+summary: SessionSummary = session_repo.get_session_summary(session_id)
+detail: SessionDetail = session_repo.get_session_detail(session_id)
+```
+
+**错误做法**:
+```python
+# 禁止返回 Dict[str, Any]
+result: Dict[str, Any] = session_repo.get_session_summary(session_id)  # ❌
+```
+
 ---
 
 ## 5. 常用命令
+
+**v0.9.0 CLI分层**：命令按领域分组，格式为 `nanobotrun <domain> <command>`。
 
 ```bash
 # 依赖管理
@@ -84,11 +161,26 @@ uv venv                                          # 创建虚拟环境
 uv sync --all-extras                             # 同步依赖
 uv cache clean; if($?) { uv sync --reinstall }   # 清理重装 (Windows)
 
-# 运行
-uv run nanobotrun --help
-uv run nanobotrun import-data <path> [--force]
-uv run nanobotrun stats [--year YYYY]
-uv run nanobotrun chat
+# 数据管理
+uv run nanobotrun data import-data <path> [--force]  # 导入FIT文件
+uv run nanobotrun data stats [--year YYYY]           # 查看统计
+uv run nanobotrun data stats --start 2024-01-01 --end 2024-12-31  # 日期范围
+
+# 数据分析
+uv run nanobotrun analysis vdot      # VDOT趋势分析
+uv run nanobotrun analysis load      # 训练负荷分析
+uv run nanobotrun analysis hr-drift  # 心率漂移分析
+
+# Agent交互
+uv run nanobotrun agent chat         # 启动AI助手
+
+# 报告生成
+uv run nanobotrun report weekly      # 生成周报
+uv run nanobotrun report monthly     # 生成月报
+
+# 系统管理
+uv run nanobotrun system config      # 查看配置
+uv run nanobotrun system version     # 查看版本
 
 # 测试
 uv run pytest tests/unit/                        # 单元测试
@@ -140,4 +232,4 @@ uv run mypy src/ --ignore-missing-imports        # 类型检查
 
 ---
 
-*文档版本: v3.0.0 | 更新日期: 2026-04-01*
+*文档版本: v4.0.0 | 更新日期: 2026-04-09*

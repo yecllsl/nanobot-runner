@@ -1,0 +1,11 @@
+
+archive/
+# 高频忽略规则
+**/node_modules
+**/dist
+**/build
+**/.git
+**/*.log
+**/*.zip
+**/*.exe
+**/*.bin
