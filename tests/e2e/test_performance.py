@@ -25,21 +25,24 @@ import pytest
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.analytics import AnalyticsEngine
-from src.core.storage import StorageManager
+from src.core.config import ConfigManager
+from src.core.context import AppContextFactory
 
 
 class TestPerformanceE2E:
-    """性能端到端测试"""
+    """性能端到端测试（v0.9.0更新：使用依赖注入）"""
 
     def setup_method(self):
         """测试前置设置"""
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_data_dir = Path(self.temp_dir.name)
 
-        # 初始化服务
-        self.storage_manager = StorageManager(data_dir=self.test_data_dir / "data")
-        self.analytics_engine = AnalyticsEngine(self.storage_manager)
+        # 使用依赖注入容器初始化服务（v0.9.0基线）
+        self.config = ConfigManager()
+        self.config.data_dir = self.test_data_dir / "data"
+        self.context = AppContextFactory.create(config=self.config)
+        self.storage_manager = self.context.storage
+        self.analytics_engine = self.context.analytics
 
         # 生成测试数据
         self.generate_test_data()
