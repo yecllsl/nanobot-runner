@@ -18,13 +18,39 @@
 
 ## 2. 项目结构
 
+**v0.9.0 架构重构**：CLI按领域拆分，引入依赖注入机制。
+
 ```
 src/
-├── core/            # 核心模块: parser, storage, indexer, analytics, profile, config, exceptions...
-├── agents/tools.py  # Agent 工具集: BaseTool + RunnerTools
-├── notify/          # 飞书通知: feishu.py, feishu_calendar.py
-├── cli.py           # CLI 入口
-└── cli_formatter.py # Rich 格式化输出
+├── core/                       # 核心模块
+│   ├── context.py              # 应用上下文 (v0.9.0新增)
+│   ├── session_repository.py   # Session仓储层 (v0.9.0新增)
+│   ├── parser.py               # FIT文件解析
+│   ├── storage.py              # Parquet存储管理
+│   ├── indexer.py              # SHA256去重索引
+│   ├── analytics.py            # 数据分析引擎
+│   ├── profile.py              # 用户画像管理
+│   ├── config.py               # 配置管理
+│   └── exceptions.py           # 自定义异常
+├── agents/tools.py             # Agent 工具集: BaseTool + RunnerTools
+├── notify/                     # 飞书通知
+│   ├── feishu.py
+│   └── feishu_calendar.py
+├── cli/                        # CLI 模块 (v0.9.0重构)
+│   ├── commands/               # 命令模块
+│   │   ├── data.py             # 数据管理命令
+│   │   ├── analysis.py         # 数据分析命令
+│   │   ├── agent.py            # Agent交互命令
+│   │   ├── report.py           # 报告生成命令
+│   │   ├── system.py           # 系统管理命令
+│   │   └── gateway.py          # Gateway服务命令
+│   ├── handlers/               # 业务逻辑调用层
+│   │   ├── data_handler.py
+│   │   └── analysis_handler.py
+│   ├── app.py                  # CLI 应用入口
+│   ├── common.py               # CLI公共组件
+│   └── __main__.py             # 模块入口
+└── cli_formatter.py            # Rich 格式化输出
 ```
 
 ---
