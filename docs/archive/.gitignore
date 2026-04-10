@@ -1,0 +1,6 @@
+# 归档目录的Git忽略规则
+# 排除所有.zip文件
+*.zip
+
+# 但保留README.md
+!README.md
