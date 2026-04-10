@@ -1,6 +1,29 @@
 # 版本文档归档
 
-本目录用于归档各版本的项目文档，包括测试报告、发布报告、开发报告、评审报告等。
+本目录用于归档各版本的项目文档索引。**注意：实际的归档文件以.zip格式保存在本地，不提交到Git仓库。**
+
+---
+
+## 📁 归档策略
+
+### Git管理策略
+
+- ✅ **Git历史记录**：所有文档的历史版本已通过Git版本控制记录
+- ✅ **本地备份**：归档文件以.zip格式保存在本地，不提交到Git
+- ✅ **.gitignore**：已配置排除.zip文件，避免仓库体积膨胀
+
+### 查看历史版本
+
+```bash
+# 查看文档历史
+git log --oneline docs/
+
+# 查看特定版本的文档
+git show v0.9.0:docs/
+
+# 恢复特定版本的文档
+git checkout v0.9.0 -- docs/
+```
 
 ---
 
@@ -8,36 +31,12 @@
 
 ```
 docs/archive/
-├── v0.9.0/              # v0.9.0版本归档
-│   ├── test/            # 测试相关文档
-│   ├── devops/          # 运维相关文档
-│   ├── development/     # 开发相关文档
-│   ├── review/          # 评审相关文档
-│   ├── planning/        # 规划相关文档
-│   └── architecture/    # 架构相关文档
-├── v0.8.0/              # v0.8.0版本归档
-│   ├── test/
-│   ├── devops/
-│   ├── development/
-│   ├── review/
-│   ├── planning/
-│   └── architecture/
-├── v0.6.0/              # v0.6.0版本归档
-│   ├── test/
-│   ├── devops/
-│   ├── development/
-│   ├── review/
-│   ├── planning/
-│   └── architecture/
-├── Sprint2/             # Sprint2迭代归档
-│   ├── test/
-│   ├── devops/
-│   ├── development/
-│   └── review/
-├── v0.2.0/              # v0.2.0版本归档
-│   └── test/
-│       └── e2e/         # E2E测试代码归档
-└── README.md            # 本文件
+├── .gitignore           # 排除.zip文件
+├── README.md            # 本文件（归档索引）
+├── v0.9.0-archive.zip   # v0.9.0版本归档（本地备份，不提交）
+├── v0.8.0-archive.zip   # v0.8.0版本归档（本地备份，不提交）
+├── v0.6.0-archive.zip   # v0.6.0版本归档（本地备份，不提交）
+└── Sprint2-archive.zip  # Sprint2迭代归档（本地备份，不提交）
 ```
 
 ---
