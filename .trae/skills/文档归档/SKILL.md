@@ -135,48 +135,44 @@ mv docs/planning/task_list_v0.9.0.md docs/archive/v0.9.0/planning/
 mv docs/architecture/v0.9.0重构规划方案.md docs/archive/v0.9.0/architecture/
 ```
 
-## 第四步：清理项目目录
-删除已归档的文档，确保项目目录整洁。
+## 第四步：压缩归档目录
+将归档目录压缩为.zip文件，减少IDE索引负担。
 
-### 4.1 清理测试目录
+### 4.1 压缩命令
 ```bash
-rm docs/test/reports/测试报告_v0.9.0.md
-rm docs/test/reports/Bug清单_v0.9.0.md
-rm docs/test/reports/回归报告_v0.9.0.md
-rm docs/test/reports/上线结论_v0.9.0.md
-rm docs/test/reports/E2E测试报告_v0.9.0.md
-rm docs/test/reports/E2E测试基线分析报告_v0.9.0.md
-rm docs/test/reports/测试完善报告_v0.9.0.md
+# Windows PowerShell
+Compress-Archive -Path "docs\archive\v{版本号}" -DestinationPath "docs\archive\v{版本号}-archive.zip"
+
+# Linux/macOS
+cd docs/archive && zip -r v{版本号}-archive.zip v{版本号}/
 ```
 
-### 4.2 清理运维目录
+### 4.2 删除原始归档目录
+压缩完成后，删除原始归档目录，减少IDE索引负担。
+
 ```bash
-rm docs/devops/流水线执行报告_v0.9.0_*.md
-rm docs/devops/发布报告_v0.9.0.md
+# Windows PowerShell
+Remove-Item -Path "docs\archive\v{版本号}" -Recurse -Force
+
+# Linux/macOS
+rm -rf docs/archive/v{版本号}/
 ```
 
-### 4.3 清理开发目录
-```bash
-rm docs/development/交付报告_v0.9.0.md
-rm docs/development/Bug修复报告_v0.9.0.md
-rm docs/development/代码优化报告_v0.9.0.md
-rm docs/development/文档评估报告_v0.9.0.md
-```
+### 4.3 为什么删除原始目录？
 
-### 4.4 清理评审目录
-```bash
-rm docs/review/代码评审报告_v0.9.0.md
-```
+**删除的好处**：
+- ✅ **提高IDE效率**：减少IDE索引的文件数量，提升启动和搜索速度
+- ✅ **提高Agent效率**：减少Agent扫描文件的数量，提升查找速度
+- ✅ **保持工作区整洁**：避免归档文件干扰日常开发
+- ✅ **不影响Git历史**：Git已记录所有文件版本，可随时恢复
 
-### 4.5 清理规划目录
-```bash
-rm docs/planning/task_list_v0.9.0.md
-```
+**不删除的问题**：
+- ❌ IDE需要索引大量归档文件，影响性能
+- ❌ 文件搜索变慢，需要搜索更多文件
+- ❌ Agent查找文件速度变慢
+- ❌ 工作区不整洁，影响开发体验
 
-### 4.6 清理架构目录
-```bash
-rm docs/architecture/v0.9.0重构规划方案.md
-```
+---
 
 ## 第五步：更新归档索引
 更新 `docs/archive/README.md`，添加新版本的归档记录。
@@ -185,7 +181,30 @@ rm docs/architecture/v0.9.0重构规划方案.md
 ```markdown
 # 版本文档归档
 
-本目录用于归档各版本的项目文档，包括测试报告、发布报告、开发报告、评审报告等。
+本目录用于归档各版本的项目文档索引。**注意：实际的归档文件以.zip格式保存在本地，不提交到Git仓库。**
+
+---
+
+## 📁 归档策略
+
+### Git管理策略
+
+- ✅ **Git历史记录**：所有文档的历史版本已通过Git版本控制记录
+- ✅ **本地备份**：归档文件以.zip格式保存在本地，不提交到Git
+- ✅ **.gitignore**：已配置排除.zip文件，避免仓库体积膨胀
+
+### 查看历史版本
+
+```bash
+# 查看文档历史
+git log --oneline docs/
+
+# 查看特定版本的文档
+git show v0.9.0:docs/
+
+# 恢复特定版本的文档
+git checkout v0.9.0 -- docs/
+```
 
 ---
 
@@ -193,17 +212,11 @@ rm docs/architecture/v0.9.0重构规划方案.md
 
 ```
 docs/archive/
-├── v0.9.0/              # v0.9.0版本归档
-│   ├── test/            # 测试相关文档
-│   ├── devops/          # 运维相关文档
-│   ├── development/     # 开发相关文档
-│   └── review/          # 评审相关文档
-├── v0.8.0/              # v0.8.0版本归档
-│   ├── test/
-│   ├── devops/
-│   ├── development/
-│   └── review/
-└── README.md            # 本文件
+├── .gitignore           # 排除.zip文件
+├── README.md            # 本文件（归档索引）
+├── v0.9.0-archive.zip   # v0.9.0版本归档（本地备份，不提交）
+├── v0.8.0-archive.zip   # v0.8.0版本归档（本地备份，不提交）
+└── v0.6.0-archive.zip   # v0.6.0版本归档（本地备份，不提交）
 ```
 
 ---
@@ -250,12 +263,46 @@ docs/archive/
 **维护者**: DevOps Team
 ```
 
-## 第六步：标准化汇报
+---
+
+## 第六步：配置.gitignore
+确保.zip文件不会被提交到Git仓库。
+
+### 6.1 创建.gitignore文件
+在`docs/archive/`目录下创建`.gitignore`文件：
+
+```bash
+# 创建.gitignore文件
+cat > docs/archive/.gitignore << 'EOF'
+# 归档目录的Git忽略规则
+# 排除所有.zip文件
+*.zip
+
+# 但保留README.md
+!README.md
+EOF
+```
+
+### 6.2 提交到Git
+```bash
+git add docs/archive/.gitignore
+git add docs/archive/README.md
+git commit -m "docs: 归档v{版本号}版本文档
+
+- 归档测试、运维、开发、评审文档
+- 压缩归档目录为.zip文件
+- 更新归档索引README.md
+- 配置.gitignore排除.zip文件"
+```
+
+---
+
+## 第七步：标准化汇报
 归档完成后，使用以下格式汇报：
 ### 📦 文档归档报告
 *   **版本号**：[版本号]
-*   **归档目录**：`docs/archive/v{版本号}/`
-*   **归档文件列表**：
+*   **归档文件**：`docs/archive/v{版本号}-archive.zip`（本地备份）
+*   **归档内容**：
     *   📄 **测试文档**：[文件数量] 个
         *   测试报告_v{版本号}.md
         *   Bug清单_v{版本号}.md
@@ -272,11 +319,16 @@ docs/archive/
     *   📄 **评审文档**：[文件数量] 个
         *   代码评审报告_v{版本号}.md
 *   **清理结果**：
-    *   ✅ docs/test/reports/ 已清理
-    *   ✅ docs/devops/ 已清理
-    *   ✅ docs/development/ 已清理
-    *   ✅ docs/review/ 已清理
-*   **索引更新**：
-    *   ✅ docs/archive/README.md 已更新
+    *   ✅ 项目目录已清理
+    *   ✅ 归档目录已压缩
+    *   ✅ 原始归档目录已删除
+*   **Git提交**：
+    *   ✅ .gitignore已配置
+    *   ✅ README.md已更新
+    *   ✅ 变更已提交到Git
+*   **性能优化**：
+    *   ✅ IDE索引文件减少，性能提升
+    *   ✅ Agent查找速度提升
+    *   ✅ 工作区整洁
 ---
 **后续建议**：项目目录已整洁，可以开始下一个版本的开发工作。
