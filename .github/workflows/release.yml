@@ -59,12 +59,6 @@ jobs:
         uv sync --all-extras
         echo "依赖安装完成"
         
-    - name: Verify build dependencies
-      run: |
-        echo "验证构建依赖..."
-        uv run python -c "import hatchling; print('hatchling模块已安装')"
-        echo "构建依赖验证完成"
-        
     - name: Build package
       run: |
         echo "开始构建包..."
