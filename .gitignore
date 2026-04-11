@@ -36,7 +36,6 @@ env.bak/
 venv.bak/
 
 # 包管理器锁定文件
-uv.lock
 Pipfile.lock
 poetry.lock
 
