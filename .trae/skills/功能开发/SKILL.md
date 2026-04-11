@@ -25,7 +25,8 @@ description: 完成代码开发与单元测试，输出开发交付报告
     *   测试用例包含正常场景和边界场景
 3. **本地验证**：
     *   执行单元测试：`uv run pytest tests/unit/`
-    *   执行代码格式检查：`uv run black --check src/ tests/`
+    *   执行代码格式检查：`uv run ruff format --check src/ tests/`
+    *   执行代码质量检查：`uv run ruff check src/ tests/`
     *   执行类型检查：`uv run mypy src/ --ignore-missing-imports`
     *   验证核心场景
 
@@ -42,7 +43,7 @@ description: 完成代码开发与单元测试，输出开发交付报告
     *   所有任务清单功能开发完成
     *   单元测试通过率 100%
     *   测试覆盖率 ≥ 80%
-    *   代码符合编码规范（black/isort/mypy）
+    *   代码符合编码规范（ruff format/check/mypy）
     *   若不满足，返回错误信息。
 
 ## 第五步：标准化汇报

@@ -28,7 +28,7 @@ description: 执行单人开发模式的版本发布，确保Tag创建成功、C
     *   使用 `gh run list --limit 1` 确认CI状态
 3. **验证CI检查**：
     *   确认GitHub Actions CI检查全部通过
-    *   检查代码质量门禁：black、isort、mypy、bandit
+    *   检查代码质量门禁：ruff format、ruff check、mypy、bandit
     *   检查测试覆盖率：core≥80%, agents≥70%, cli≥60%
 
 ## 第三步：执行发布

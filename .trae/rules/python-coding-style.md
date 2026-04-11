@@ -33,9 +33,9 @@ class Point(NamedTuple):
 
 ## 格式化
 
-* 使用 **black** 进行代码格式化
-* 使用 **isort** 进行导入排序
-* 使用 **ruff** 进行代码检查
+* 使用 **ruff format** 进行代码格式化
+* 使用 **ruff check** 进行代码质量检查（包含导入排序）
+* 使用 **mypy** 进行类型检查
 
 ## 参考
 
