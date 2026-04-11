@@ -187,7 +187,8 @@ nanobot-runner/
 │   │   └── tools.py       # Agent 工具集
 │   ├── notify/            # 通知模块
 │   │   └── feishu.py      # 飞书推送集成
-│   └── cli_formatter.py   # CLI 格式化
+│   └── cli/               # CLI 模块
+│       └── formatter.py   # CLI 格式化（v0.9.0 迁移）
 ├── tests/                 # 测试
 │   ├── unit/              # 单元测试
 │   ├── integration/       # 集成测试
