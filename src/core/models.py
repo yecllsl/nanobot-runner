@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class PlanStatus(Enum):
@@ -55,16 +55,16 @@ class DimensionStatus(Enum):
 class UserPreferences:
     """用户偏好"""
 
-    preferred_training_days: List[str] = field(default_factory=list)
+    preferred_training_days: list[str] = field(default_factory=list)
     preferred_training_time: str = "morning"
-    max_weekly_distance_km: Optional[float] = None
+    max_weekly_distance_km: float | None = None
     min_recovery_days_per_week: int = 2
     enable_calendar_sync: bool = True
     enable_training_reminder: bool = True
     reminder_time: str = "07:00"
     weather_alert_enabled: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "preferred_training_days": self.preferred_training_days,
@@ -91,7 +91,7 @@ class TrainingLoad:
     longest_run_km: float = 0.0
     training_frequency: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "atl": self.atl,
@@ -110,12 +110,12 @@ class UserContext:
     """用户上下文"""
 
     profile: Any
-    recent_activities: List[Any]
+    recent_activities: list[Any]
     training_load: TrainingLoad
     preferences: UserPreferences
     historical_best_pace_min_per_km: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "profile": self.profile.to_dict()
@@ -143,13 +143,13 @@ class DailyPlan:
     workout_type: str
     distance_km: float
     duration_min: int
-    target_pace_min_per_km: Optional[float] = None
-    target_hr_zone: Optional[int] = None
-    notes: Optional[str] = None
+    target_pace_min_per_km: float | None = None
+    target_hr_zone: int | None = None
+    notes: str | None = None
     completed: bool = False
-    calendar_event_id: Optional[str] = None
+    calendar_event_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "date": self.date,
@@ -171,14 +171,14 @@ class WeeklySchedule:
     week_number: int
     start_date: str
     end_date: str
-    daily_plans: List[DailyPlan]
+    daily_plans: list[DailyPlan]
     weekly_distance_km: float
     weekly_duration_min: int
     phase: str
     focus: str = ""
-    notes: Optional[str] = None
+    notes: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "week_number": self.week_number,
@@ -206,13 +206,13 @@ class TrainingPlan:
     goal_distance_km: float
     goal_date: str
     target_time: str
-    weeks: List[WeeklySchedule]
-    calendar_event_ids: Dict[str, str]
+    weeks: list[WeeklySchedule]
+    calendar_event_ids: dict[str, str]
     created_at: str
     updated_at: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "plan_id": self.plan_id,
@@ -241,9 +241,9 @@ class Violation:
     actual_value: float
     limit_value: float
     message: str
-    location: Optional[str] = None
+    location: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "rule_id": self.rule_id,
@@ -260,11 +260,11 @@ class ValidationResult:
     """校验结果"""
 
     passed: bool
-    violations: List[Violation]
+    violations: list[Violation]
     retry_count: int
-    action: Optional[str] = None
+    action: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "passed": self.passed,
@@ -281,10 +281,10 @@ class DimensionResult:
     dimension: str
     score: float
     status: str
-    details: Dict[str, Any]
-    recommendations: List[str]
+    details: dict[str, Any]
+    recommendations: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "dimension": self.dimension,
@@ -300,12 +300,12 @@ class AnalysisReport:
     """分析报告"""
 
     overall_score: float
-    dimensions: List[DimensionResult]
-    recommendations: List[str]
-    warnings: List[str]
+    dimensions: list[DimensionResult]
+    recommendations: list[str]
+    warnings: list[str]
     disclaimer: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "overall_score": self.overall_score,
@@ -322,11 +322,11 @@ class SyncResult:
 
     success: bool
     message: str
-    event_id: Optional[str] = None
-    error: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    event_id: str | None = None
+    error: str | None = None
+    details: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "success": self.success,
@@ -344,9 +344,9 @@ class BatchSyncResult:
     total: int
     success: int
     failed: int
-    results: List[SyncResult]
+    results: list[SyncResult]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "total": self.total,
@@ -364,9 +364,9 @@ class WeatherInfo:
     temperature: float
     humidity: float
     wind_speed: float
-    alert: Optional[str] = None
+    alert: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "condition": self.condition,
@@ -384,10 +384,10 @@ class NotifyResult:
     sent: bool
     message: str
     skipped: bool
-    skip_reason: Optional[str] = None
-    weather_info: Optional[WeatherInfo] = None
+    skip_reason: str | None = None
+    weather_info: WeatherInfo | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "sent": self.sent,

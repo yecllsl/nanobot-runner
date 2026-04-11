@@ -25,7 +25,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from src.core.config import ConfigManager
 from src.core.context import AppContextFactory
 from src.core.session_repository import SessionRepository
-from src.core.storage import StorageManager
 
 
 class TestSessionRepositoryE2E:
@@ -94,26 +93,26 @@ class TestSessionRepositoryE2E:
 
         lazy_result = self.session_repo._build_session_lazy()
 
-        assert isinstance(
-            lazy_result, pl.LazyFrame
-        ), f"应返回LazyFrame，实际返回: {type(lazy_result)}"
+        assert isinstance(lazy_result, pl.LazyFrame), (
+            f"应返回LazyFrame，实际返回: {type(lazy_result)}"
+        )
 
         filtered = lazy_result.filter(pl.col("distance") > 5000.0)
 
-        assert isinstance(
-            filtered, pl.LazyFrame
-        ), f"过滤后应仍为LazyFrame，实际返回: {type(filtered)}"
+        assert isinstance(filtered, pl.LazyFrame), (
+            f"过滤后应仍为LazyFrame，实际返回: {type(filtered)}"
+        )
 
         result = filtered.collect()
 
-        assert isinstance(
-            result, pl.DataFrame
-        ), f"collect后应为DataFrame，实际返回: {type(result)}"
+        assert isinstance(result, pl.DataFrame), (
+            f"collect后应为DataFrame，实际返回: {type(result)}"
+        )
 
         print("✓ LazyFrame链式构建测试通过")
-        print(f"  - 初始类型: LazyFrame")
-        print(f"  - 过滤后类型: LazyFrame")
-        print(f"  - collect后类型: DataFrame")
+        print("  - 初始类型: LazyFrame")
+        print("  - 过滤后类型: LazyFrame")
+        print("  - collect后类型: DataFrame")
         print(f"  - 结果行数: {len(result)}")
 
     def test_session_aggregation(self):
@@ -130,7 +129,9 @@ class TestSessionRepositoryE2E:
 
         if len(recent) > 0:
             assert hasattr(recent[0], "distance_km"), "SessionData应包含distance_km字段"
-            assert hasattr(recent[0], "duration_min"), "SessionData应包含duration_min字段"
+            assert hasattr(recent[0], "duration_min"), (
+                "SessionData应包含duration_min字段"
+            )
 
         print("✓ Session聚合查询测试通过")
         print(f"  - 最近Session数量: {len(recent)}")
@@ -191,20 +192,24 @@ class TestSessionRepositoryE2E:
         if len(result) > 0:
             result_with_computed = self.session_repo._add_computed_columns(result)
 
-            assert "distance_km" in result_with_computed.columns, "应包含distance_km计算列"
+            assert "distance_km" in result_with_computed.columns, (
+                "应包含distance_km计算列"
+            )
 
-            assert "duration_min" in result_with_computed.columns, "应包含duration_min计算列"
+            assert "duration_min" in result_with_computed.columns, (
+                "应包含duration_min计算列"
+            )
 
-            assert (
-                "avg_pace_sec_km" in result_with_computed.columns
-            ), "应包含avg_pace_sec_km计算列"
+            assert "avg_pace_sec_km" in result_with_computed.columns, (
+                "应包含avg_pace_sec_km计算列"
+            )
 
             distance = result["distance"][0]
             distance_km = result_with_computed["distance_km"][0]
 
-            assert (
-                abs(distance_km - distance / 1000) < 0.01
-            ), f"距离转换错误: {distance}m != {distance_km}km"
+            assert abs(distance_km - distance / 1000) < 0.01, (
+                f"距离转换错误: {distance}m != {distance_km}km"
+            )
 
             print("✓ 计算列正确性测试通过")
             print(f"  - distance_km: {distance_km}")
@@ -240,9 +245,9 @@ class TestSessionRepositoryE2E:
 
         total_distance = self.session_repo.get_total_distance()
 
-        assert isinstance(
-            total_distance, (int, float)
-        ), f"应返回数值，实际返回: {type(total_distance)}"
+        assert isinstance(total_distance, (int, float)), (
+            f"应返回数值，实际返回: {type(total_distance)}"
+        )
 
         assert total_distance >= 0, f"总距离应≥0，实际: {total_distance}"
 
@@ -259,9 +264,9 @@ class TestSessionRepositoryE2E:
 
         total_duration = self.session_repo.get_total_duration()
 
-        assert isinstance(
-            total_duration, (int, float)
-        ), f"应返回数值，实际返回: {type(total_duration)}"
+        assert isinstance(total_duration, (int, float)), (
+            f"应返回数值，实际返回: {type(total_duration)}"
+        )
 
         assert total_duration >= 0, f"总时长应≥0，实际: {total_duration}"
 
@@ -323,9 +328,9 @@ class TestSessionRepositoryE2E:
 
         print("✓ 性能基准测试通过")
         print(f"  - 100次查询总耗时: {elapsed_time:.3f}秒")
-        print(f"  - 平均查询耗时: {avg_time*1000:.2f}毫秒")
+        print(f"  - 平均查询耗时: {avg_time * 1000:.2f}毫秒")
 
-        assert avg_time < 0.1, f"平均查询时间应<100ms，实际: {avg_time*1000:.2f}ms"
+        assert avg_time < 0.1, f"平均查询时间应<100ms，实际: {avg_time * 1000:.2f}ms"
 
 
 class TestSessionRepositoryDataTypes:
@@ -368,7 +373,9 @@ class TestSessionRepositoryDataTypes:
 
                 assert hasattr(session, "timestamp"), "SessionDetail应包含timestamp"
                 assert hasattr(session, "distance_km"), "SessionDetail应包含distance_km"
-                assert hasattr(session, "duration_min"), "SessionDetail应包含duration_min"
+                assert hasattr(session, "duration_min"), (
+                    "SessionDetail应包含duration_min"
+                )
 
                 print("✓ SessionData数据结构测试通过")
                 print(

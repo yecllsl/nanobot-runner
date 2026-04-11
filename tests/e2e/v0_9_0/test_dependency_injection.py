@@ -15,14 +15,14 @@ v0.9.0 依赖注入端到端测试
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from src.core.config import ConfigManager
-from src.core.context import AppContext, AppContextFactory
+from src.core.context import AppContextFactory
 from src.core.storage import StorageManager
 
 
@@ -107,13 +107,13 @@ class TestDependencyInjectionE2E:
         config.data_dir = self.test_data_dir
         context = AppContextFactory.create(config=config)
 
-        assert (
-            context.analytics.storage is context.storage
-        ), "AnalyticsEngine应使用注入的StorageManager"
+        assert context.analytics.storage is context.storage, (
+            "AnalyticsEngine应使用注入的StorageManager"
+        )
 
-        assert (
-            context.profile_engine.storage is context.storage
-        ), "ProfileEngine应使用注入的StorageManager"
+        assert context.profile_engine.storage is context.storage, (
+            "ProfileEngine应使用注入的StorageManager"
+        )
 
         print("✓ 依赖注入集成测试通过")
         print("  - 所有模块共享同一StorageManager实例")
@@ -131,9 +131,9 @@ class TestDependencyInjectionE2E:
         config.data_dir = custom_data_dir
         context = AppContextFactory.create(config=config)
 
-        assert (
-            context.storage.data_dir == custom_data_dir
-        ), f"配置路径未正确传递: {context.storage.data_dir} != {custom_data_dir}"
+        assert context.storage.data_dir == custom_data_dir, (
+            f"配置路径未正确传递: {context.storage.data_dir} != {custom_data_dir}"
+        )
 
         print("✓ 配置路径传递测试通过")
         print(f"  - 配置路径: {custom_data_dir}")

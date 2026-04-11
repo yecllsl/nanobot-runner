@@ -6,11 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
-import typer
 from typer.testing import CliRunner
 
-from src.cli import CLIError, app, console, print_error, print_status
+from src.cli import CLIError, app, print_error, print_status
 
 runner = CliRunner()
 
@@ -759,55 +757,54 @@ class TestCLIProfileShow:
             mock_config_instance.data_dir = Path("/fake/data/dir")
             mock_config.return_value = mock_config_instance
 
-            with patch("src.core.storage.StorageManager"):
-                with patch(
-                    "src.core.profile.ProfileStorageManager"
-                ) as mock_profile_storage:
-                    mock_storage_instance = Mock()
-                    mock_storage_instance.load_profile_json.return_value = None
-                    mock_profile_storage.return_value = mock_storage_instance
+            with patch("src.core.storage.StorageManager"), patch(
+                "src.core.profile.ProfileStorageManager"
+            ) as mock_profile_storage:
+                mock_storage_instance = Mock()
+                mock_storage_instance.load_profile_json.return_value = None
+                mock_profile_storage.return_value = mock_storage_instance
 
-                    with patch("src.core.profile.ProfileEngine") as mock_engine:
-                        mock_engine_instance = Mock()
-                        # 创建完整的 Mock profile 对象，包含所有必要的属性
-                        mock_profile = Mock()
-                        mock_profile.total_activities = 5
-                        mock_profile.user_id = "default_user"
-                        mock_profile.profile_date = datetime.now()
-                        mock_profile.analysis_period_days = 90
-                        # 添加数值类型属性（避免 Mock 对象的格式化问题）
-                        mock_profile.total_distance_km = 50.0
-                        mock_profile.total_duration_hours = 5.0
-                        mock_profile.avg_pace_min_per_km = 6.0
-                        mock_profile.avg_vdot = 40.0
-                        mock_profile.max_vdot = 45.0
-                        # 添加 MagicMock 对象用于 .value 访问
-                        mock_profile.fitness_level = MagicMock()
-                        mock_profile.fitness_level.value = "中级跑者"
-                        mock_profile.weekly_avg_distance_km = 30.0
-                        mock_profile.weekly_avg_duration_hours = 3.0
-                        mock_profile.training_pattern = MagicMock()
-                        mock_profile.training_pattern.value = "周末长跑"
-                        mock_profile.consistency_score = 85.0
-                        mock_profile.atl = 40.0
-                        mock_profile.ctl = 50.0
-                        mock_profile.tsb = 10.0
-                        mock_profile.injury_risk_level = MagicMock()
-                        mock_profile.injury_risk_level.value = "低"
-                        mock_profile.injury_risk_score = 20.0
-                        mock_profile.avg_heart_rate = 150.0
-                        mock_profile.max_heart_rate = 180.0
-                        mock_profile.resting_heart_rate = 55.0
-                        mock_profile.data_quality_score = 90.0
-                        mock_profile.favorite_running_time = "早晨"
+                with patch("src.core.profile.ProfileEngine") as mock_engine:
+                    mock_engine_instance = Mock()
+                    # 创建完整的 Mock profile 对象，包含所有必要的属性
+                    mock_profile = Mock()
+                    mock_profile.total_activities = 5
+                    mock_profile.user_id = "default_user"
+                    mock_profile.profile_date = datetime.now()
+                    mock_profile.analysis_period_days = 90
+                    # 添加数值类型属性（避免 Mock 对象的格式化问题）
+                    mock_profile.total_distance_km = 50.0
+                    mock_profile.total_duration_hours = 5.0
+                    mock_profile.avg_pace_min_per_km = 6.0
+                    mock_profile.avg_vdot = 40.0
+                    mock_profile.max_vdot = 45.0
+                    # 添加 MagicMock 对象用于 .value 访问
+                    mock_profile.fitness_level = MagicMock()
+                    mock_profile.fitness_level.value = "中级跑者"
+                    mock_profile.weekly_avg_distance_km = 30.0
+                    mock_profile.weekly_avg_duration_hours = 3.0
+                    mock_profile.training_pattern = MagicMock()
+                    mock_profile.training_pattern.value = "周末长跑"
+                    mock_profile.consistency_score = 85.0
+                    mock_profile.atl = 40.0
+                    mock_profile.ctl = 50.0
+                    mock_profile.tsb = 10.0
+                    mock_profile.injury_risk_level = MagicMock()
+                    mock_profile.injury_risk_level.value = "低"
+                    mock_profile.injury_risk_score = 20.0
+                    mock_profile.avg_heart_rate = 150.0
+                    mock_profile.max_heart_rate = 180.0
+                    mock_profile.resting_heart_rate = 55.0
+                    mock_profile.data_quality_score = 90.0
+                    mock_profile.favorite_running_time = "早晨"
 
-                        mock_engine_instance.build_profile.return_value = mock_profile
-                        mock_engine.return_value = mock_engine_instance
+                    mock_engine_instance.build_profile.return_value = mock_profile
+                    mock_engine.return_value = mock_engine_instance
 
-                        result = runner.invoke(
-                            app, ["report", "profile", "show", "--rebuild"]
-                        )
-                        assert result.exit_code == 0
+                    result = runner.invoke(
+                        app, ["report", "profile", "show", "--rebuild"]
+                    )
+                    assert result.exit_code == 0
 
     def test_profile_show_with_custom_params(self):
         """测试 profile show 使用自定义参数"""

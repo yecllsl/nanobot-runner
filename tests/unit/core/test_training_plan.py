@@ -2,7 +2,6 @@
 # 测试 TrainingPlanEngine 的所有核心功能
 
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
 
 import pytest
 

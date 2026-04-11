@@ -2,7 +2,7 @@
 # 分析训练一致性、时间偏好等历史数据
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -172,9 +172,9 @@ class TrainingHistoryAnalyzer:
 
     def get_training_summary(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
         """
         获取训练摘要
 
@@ -217,7 +217,7 @@ class TrainingHistoryAnalyzer:
             logger.error(f"获取训练摘要失败：{e}")
             return {"total_runs": 0, "message": f"获取失败: {e}"}
 
-    def analyze_weekly_pattern(self, df: pl.DataFrame) -> Dict[str, int]:
+    def analyze_weekly_pattern(self, df: pl.DataFrame) -> dict[str, int]:
         """
         分析每周训练模式
 
@@ -249,7 +249,7 @@ class TrainingHistoryAnalyzer:
             logger.warning(f"分析每周训练模式失败：{e}")
             return {}
 
-    def get_recent_activities(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_activities(self, limit: int = 10) -> list[dict[str, Any]]:
         """
         获取最近的活动记录
 

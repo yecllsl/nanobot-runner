@@ -1,7 +1,6 @@
 # AnomalyDataFilter 单元测试
 
 from datetime import datetime
-from unittest.mock import MagicMock
 
 import polars as pl
 import pytest

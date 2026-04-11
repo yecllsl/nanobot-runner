@@ -4,7 +4,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import polars as pl
 
@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 class StorageManager:
     """Parquet存储管理器，管理跑步数据的存储"""
 
-    def __init__(self, data_dir: Optional[Path] = None) -> None:
+    def __init__(self, data_dir: Path | None = None) -> None:
         if data_dir:
             self.data_dir = data_dir
         else:
@@ -112,7 +112,7 @@ class StorageManager:
         return df1, df2
 
     def _concat_with_schema_alignment(
-        self, lazy_frames: List[pl.LazyFrame]
+        self, lazy_frames: list[pl.LazyFrame]
     ) -> pl.LazyFrame:
         if not lazy_frames:
             return pl.LazyFrame()
@@ -164,7 +164,7 @@ class StorageManager:
             df = pl.read_parquet(filepath)
             return df.lazy()
 
-    def _read_and_concat_parquet_files(self, parquet_files: List[Path]) -> pl.LazyFrame:
+    def _read_and_concat_parquet_files(self, parquet_files: list[Path]) -> pl.LazyFrame:
         if not parquet_files:
             return pl.LazyFrame()
 
@@ -252,12 +252,14 @@ class StorageManager:
                 string_dfs.append(string_df)
 
             result = pl.concat(string_dfs)
-            logger.warning(f"使用宽松策略合并 {len(dfs)} 个文件，共 {result.height} 条记录")
+            logger.warning(
+                f"使用宽松策略合并 {len(dfs)} 个文件，共 {result.height} 条记录"
+            )
             return result.lazy()
 
     def _read_parquet_file_with_schema_fix(
         self, filepath: Path
-    ) -> Optional[pl.DataFrame]:
+    ) -> pl.DataFrame | None:
         try:
             return pl.read_parquet(filepath)
         except Exception as e:
@@ -271,7 +273,7 @@ class StorageManager:
                     logger.info(f"使用 pyarrow 成功读取文件: {filepath}")
                     return result
                 else:
-                    logger.error(f"pyarrow 返回非 DataFrame 类型")
+                    logger.error("pyarrow 返回非 DataFrame 类型")
                     return None
             except Exception as e2:
                 logger.error(f"pyarrow 读取也失败: {e2}")
@@ -338,7 +340,7 @@ class StorageManager:
         year: int,
         primary_key: str = "activity_id",
         allow_empty: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         增量写入 Parquet 文件
 
@@ -452,7 +454,7 @@ class StorageManager:
 
     def append_activities(
         self, dataframe: pl.DataFrame, primary_key: str = "activity_id"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         批量追加活动数据（按年份分片）
 
@@ -530,7 +532,7 @@ class StorageManager:
             ) from e
 
     def save_activities(
-        self, dataframe: pl.DataFrame, year: Optional[int] = None
+        self, dataframe: pl.DataFrame, year: int | None = None
     ) -> dict:
         try:
             if year is None:
@@ -569,10 +571,10 @@ class StorageManager:
                 "year": year if year else datetime.now().year,
             }
 
-    def load_activities(self, year: Optional[int] = None) -> pl.DataFrame:
+    def load_activities(self, year: int | None = None) -> pl.DataFrame:
         return self.read_activities(year)
 
-    def read_parquet(self, years: Optional[List[int]] = None) -> pl.LazyFrame:
+    def read_parquet(self, years: list[int] | None = None) -> pl.LazyFrame:
         try:
             if years:
                 parquet_files = []
@@ -603,7 +605,7 @@ class StorageManager:
                 recovery_suggestion="请检查数据文件是否损坏，或尝试重新导入数据",
             ) from e
 
-    def read_activities(self, year: Optional[int] = None) -> pl.DataFrame:
+    def read_activities(self, year: int | None = None) -> pl.DataFrame:
         try:
             if year:
                 filename = f"activities_{year}.parquet"
@@ -638,7 +640,7 @@ class StorageManager:
                 recovery_suggestion="请检查数据文件是否损坏，或尝试重新导入数据",
             ) from e
 
-    def get_available_years(self) -> List[int]:
+    def get_available_years(self) -> list[int]:
         try:
             parquet_files = list(self.data_dir.glob("activities_*.parquet"))
             years = []
@@ -658,7 +660,7 @@ class StorageManager:
                 recovery_suggestion="请检查数据目录是否存在",
             ) from e
 
-    def get_data_summary(self) -> Dict[str, Any]:
+    def get_data_summary(self) -> dict[str, Any]:
         try:
             years = self.get_available_years()
             total_records = 0
@@ -714,7 +716,7 @@ class StorageManager:
                 recovery_suggestion="请检查文件权限",
             ) from e
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         获取存储统计信息（使用 LazyFrame 优化性能）
 
@@ -764,10 +766,10 @@ class StorageManager:
 
     def query_activities(
         self,
-        years: Optional[List[int]] = None,
-        days: Optional[int] = None,
-        min_distance: Optional[float] = None,
-        min_heart_rate: Optional[int] = None,
+        years: list[int] | None = None,
+        days: int | None = None,
+        min_distance: float | None = None,
+        min_heart_rate: int | None = None,
     ) -> pl.DataFrame:
         """
         查询跑步活动数据（支持过滤）
@@ -803,9 +805,9 @@ class StorageManager:
 
     def query_by_date_range(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> list[dict[str, Any]]:
         """
         按日期范围查询活动数据
 

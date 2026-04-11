@@ -1,7 +1,6 @@
 # RacePredictionEngine 单元测试
 # 测试比赛预测引擎功能
 
-from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -171,7 +170,7 @@ class TestRacePredictionEngine:
     ) -> None:
         """测试无趋势时的 VDOT 预测"""
         current_vdot = 45.0
-        vdot_trend: List[float] = []
+        vdot_trend: list[float] = []
 
         predicted = prediction_engine.predict_vdot_at_race(current_vdot, vdot_trend, 4)
 

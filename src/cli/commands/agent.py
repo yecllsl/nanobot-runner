@@ -29,7 +29,6 @@ async def _run_chat() -> None:
 
     from src.agents.tools import RunnerTools, create_tools
     from src.cli_formatter import format_agent_response
-    from src.core.storage import StorageManager
 
     console.print("[bold green][Bot] Nanobot Runner Agent[/bold green]")
     console.print("[dim]基于 nanobot 的本地跑步数据助理[/dim]")
@@ -66,7 +65,7 @@ async def _run_chat() -> None:
             system_prompt="你是一个专业的跑步数据助理，帮助用户分析跑步数据、提供训练建议。",
         )
 
-        console.print(f"[bold green][OK] Agent 已初始化[/bold green]")
+        console.print("[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {agent_defaults.model}[/dim]")
         console.print()
 

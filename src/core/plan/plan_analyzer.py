@@ -4,8 +4,7 @@
 负责从多个维度分析训练计划的合理性，生成分析报告
 """
 
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.exceptions import ValidationError
 from src.core.logger import get_logger
@@ -89,7 +88,7 @@ class PlanAnalyzer:
 
         logger.info(f"开始分析训练计划: plan_id={plan.plan_id}")
 
-        dimensions: List[DimensionResult] = []
+        dimensions: list[DimensionResult] = []
 
         dimensions.append(self._analyze_fitness_match(plan, user_context))
         dimensions.append(self._analyze_load_progression(plan, user_context))
@@ -138,7 +137,7 @@ class PlanAnalyzer:
         training_load = user_context.training_load
 
         score = 100.0
-        issues: List[str] = []
+        issues: list[str] = []
 
         avg_weekly_distance = sum(week.weekly_distance_km for week in plan.weeks) / len(
             plan.weeks
@@ -195,7 +194,7 @@ class PlanAnalyzer:
             DimensionResult: 负荷递进分析结果
         """
         score = 100.0
-        issues: List[str] = []
+        issues: list[str] = []
 
         distances = [week.weekly_distance_km for week in plan.weeks]
 
@@ -204,7 +203,9 @@ class PlanAnalyzer:
                 increase_rate = (distances[i] - distances[i - 1]) / distances[i - 1]
                 if increase_rate > 0.10:
                     score -= 10
-                    issues.append(f"第{i + 1}周跑量增长{increase_rate * 100:.1f}%，超过10%安全线")
+                    issues.append(
+                        f"第{i + 1}周跑量增长{increase_rate * 100:.1f}%，超过10%安全线"
+                    )
 
         has_recovery_week = False
         for i in range(2, len(plan.weeks)):
@@ -257,7 +258,7 @@ class PlanAnalyzer:
         training_load = user_context.training_load
 
         score = 100.0
-        issues: List[str] = []
+        issues: list[str] = []
 
         consecutive_days = 0
         max_consecutive = 0
@@ -326,7 +327,7 @@ class PlanAnalyzer:
         training_load = user_context.training_load
 
         score = 100.0
-        issues: List[str] = []
+        issues: list[str] = []
 
         total_weeks = len(plan.weeks)
         if plan.goal_distance_km >= 42 and total_weeks < 12:
@@ -340,10 +341,14 @@ class PlanAnalyzer:
             peak_distance = max(week.weekly_distance_km for week in plan.weeks)
             if plan.goal_distance_km >= 42 and peak_distance < 60:
                 score -= 20
-                issues.append(f"全马目标峰值周跑量{peak_distance:.1f}km不足，建议至少60km")
+                issues.append(
+                    f"全马目标峰值周跑量{peak_distance:.1f}km不足，建议至少60km"
+                )
             elif plan.goal_distance_km >= 21 and peak_distance < 40:
                 score -= 15
-                issues.append(f"半马目标峰值周跑量{peak_distance:.1f}km不足，建议至少40km")
+                issues.append(
+                    f"半马目标峰值周跑量{peak_distance:.1f}km不足，建议至少40km"
+                )
 
         long_runs = [
             day.distance_km
@@ -355,10 +360,14 @@ class PlanAnalyzer:
             max_long_run = max(long_runs)
             if plan.goal_distance_km >= 42 and max_long_run < 32:
                 score -= 15
-                issues.append(f"全马目标最长训练跑{max_long_run:.1f}km不足，建议至少32km")
+                issues.append(
+                    f"全马目标最长训练跑{max_long_run:.1f}km不足，建议至少32km"
+                )
             elif plan.goal_distance_km >= 21 and max_long_run < 16:
                 score -= 10
-                issues.append(f"半马目标最长训练跑{max_long_run:.1f}km不足，建议至少16km")
+                issues.append(
+                    f"半马目标最长训练跑{max_long_run:.1f}km不足，建议至少16km"
+                )
 
         score = max(0, score)
 
@@ -375,10 +384,10 @@ class PlanAnalyzer:
 
     def _generate_recommendations(
         self,
-        dimensions: List[DimensionResult],
+        dimensions: list[DimensionResult],
         plan: TrainingPlan,
         user_context: UserContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         生成改进建议
 
@@ -390,7 +399,7 @@ class PlanAnalyzer:
         Returns:
             List[str]: 改进建议列表
         """
-        suggestions: List[str] = []
+        suggestions: list[str] = []
 
         for dim in dimensions:
             if dim.score < 70:
@@ -403,10 +412,10 @@ class PlanAnalyzer:
 
     def _generate_warnings(
         self,
-        dimensions: List[DimensionResult],
+        dimensions: list[DimensionResult],
         plan: TrainingPlan,
         user_context: UserContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         生成风险警告
 
@@ -418,7 +427,7 @@ class PlanAnalyzer:
         Returns:
             List[str]: 风险警告列表
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         for dim in dimensions:
             if dim.score < 80:
@@ -451,7 +460,7 @@ class PlanAnalyzer:
             "执行本训练计划的风险由用户自行承担，AI系统不承担任何责任。"
         )
 
-    def _generate_fitness_suggestions(self, issues: List[str]) -> List[str]:
+    def _generate_fitness_suggestions(self, issues: list[str]) -> list[str]:
         """生成体能匹配度改进建议"""
         suggestions = []
         for issue in issues:
@@ -463,7 +472,7 @@ class PlanAnalyzer:
                 suggestions.append("初学者建议减少高强度训练，以轻松跑为主")
         return suggestions
 
-    def _generate_load_suggestions(self, issues: List[str]) -> List[str]:
+    def _generate_load_suggestions(self, issues: list[str]) -> list[str]:
         """生成负荷递进改进建议"""
         suggestions = []
         for issue in issues:
@@ -475,7 +484,7 @@ class PlanAnalyzer:
                 suggestions.append("建议赛前一周减少40-60%跑量")
         return suggestions
 
-    def _generate_injury_suggestions(self, issues: List[str]) -> List[str]:
+    def _generate_injury_suggestions(self, issues: list[str]) -> list[str]:
         """生成伤病风险改进建议"""
         suggestions = []
         for issue in issues:
@@ -487,7 +496,7 @@ class PlanAnalyzer:
                 suggestions.append("建议降低高强度训练频率，增加交叉训练")
         return suggestions
 
-    def _generate_goal_suggestions(self, issues: List[str]) -> List[str]:
+    def _generate_goal_suggestions(self, issues: list[str]) -> list[str]:
         """生成目标可达性改进建议"""
         suggestions = []
         for issue in issues:

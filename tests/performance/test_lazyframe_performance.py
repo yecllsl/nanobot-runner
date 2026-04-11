@@ -102,7 +102,7 @@ class TestLazyFramePerformance:
         print(f"📊 性能提升: {improvement:.1f}%")
 
         assert result_eager.equals(result_lazy), "结果应一致"
-        print(f"✅ LazyFrame 聚合性能测试通过")
+        print("✅ LazyFrame 聚合性能测试通过")
 
     @pytest.mark.performance
     def test_lazyframe_filter_pushdown(self):
@@ -131,7 +131,7 @@ class TestLazyFramePerformance:
         print(f"📊 性能提升: {improvement:.1f}%")
 
         assert df_filtered.equals(result_pushdown), "结果应一致"
-        print(f"✅ Filter pushdown 性能测试通过")
+        print("✅ Filter pushdown 性能测试通过")
 
     @pytest.mark.performance
     def test_get_running_stats_lazyframe(self):
@@ -150,7 +150,7 @@ class TestLazyFramePerformance:
         assert isinstance(result, dict), "结果应为字典"
         assert "total_runs" in result, "结果应包含 total_runs"
 
-        print(f"✅ get_running_stats LazyFrame 测试通过")
+        print("✅ get_running_stats LazyFrame 测试通过")
 
     @pytest.mark.performance
     def test_get_vdot_trend_lazyframe(self):
@@ -168,7 +168,7 @@ class TestLazyFramePerformance:
         assert elapsed < 1.0, f"查询耗时 {elapsed:.4f}秒，超过 1 秒限制"
         assert isinstance(result, list), "结果应为列表"
 
-        print(f"✅ get_vdot_trend LazyFrame 测试通过")
+        print("✅ get_vdot_trend LazyFrame 测试通过")
 
     @pytest.mark.performance
     def test_get_training_load_lazyframe(self):
@@ -187,7 +187,7 @@ class TestLazyFramePerformance:
         assert isinstance(result, dict), "结果应为字典"
         assert "atl" in result, "结果应包含 ATL"
 
-        print(f"✅ get_training_load LazyFrame 测试通过")
+        print("✅ get_training_load LazyFrame 测试通过")
 
     @pytest.mark.performance
     def test_get_pace_distribution_lazyframe(self):
@@ -206,7 +206,7 @@ class TestLazyFramePerformance:
         assert isinstance(result, dict), "结果应为字典"
         assert "zones" in result, "结果应包含 zones"
 
-        print(f"✅ get_pace_distribution LazyFrame 测试通过")
+        print("✅ get_pace_distribution LazyFrame 测试通过")
 
     @pytest.mark.performance
     def test_get_training_load_trend_lazyframe(self):
@@ -225,7 +225,7 @@ class TestLazyFramePerformance:
         assert isinstance(result, dict), "结果应为字典"
         assert "trend_data" in result, "结果应包含 trend_data"
 
-        print(f"✅ get_training_load_trend LazyFrame 测试通过")
+        print("✅ get_training_load_trend LazyFrame 测试通过")
 
 
 if __name__ == "__main__":

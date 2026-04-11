@@ -5,7 +5,6 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
-import pytest
 
 from src.agents.tools import RunnerTools
 from src.core.analytics import AnalyticsEngine

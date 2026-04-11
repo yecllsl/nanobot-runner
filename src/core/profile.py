@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 class ProfileStorageManager:
     """画像双存储管理器，管理 profile.json 和 MEMORY.md 的持久化"""
 
-    def __init__(self, workspace_dir: Optional[Path] = None) -> None:
+    def __init__(self, workspace_dir: Path | None = None) -> None:
         """
         初始化画像存储管理器
 
@@ -86,7 +86,7 @@ class ProfileStorageManager:
             logger.error(f"保存 profile.json 失败：{e}")
             raise RuntimeError(f"保存 profile.json 失败：{e}") from e
 
-    def load_profile_json(self) -> Optional[RunnerProfile]:
+    def load_profile_json(self) -> RunnerProfile | None:
         """
         从 profile.json 加载画像
 
@@ -101,7 +101,7 @@ class ProfileStorageManager:
                 logger.debug(f"profile.json 不存在：{self.profile_json_path}")
                 return None
 
-            with open(self.profile_json_path, "r", encoding="utf-8") as f:
+            with open(self.profile_json_path, encoding="utf-8") as f:
                 profile_data = json.load(f)
 
             # 转换回 RunnerProfile 对象
@@ -118,7 +118,7 @@ class ProfileStorageManager:
     def save_memory_md(
         self,
         content: str,
-        profile: Optional[RunnerProfile] = None,
+        profile: RunnerProfile | None = None,
         append: bool = False,
     ) -> bool:
         """
@@ -142,7 +142,7 @@ class ProfileStorageManager:
 
             # 追加模式：读取现有内容
             if append and self.memory_md_path.exists():
-                with open(self.memory_md_path, "r", encoding="utf-8") as f:
+                with open(self.memory_md_path, encoding="utf-8") as f:
                     existing_content = f.read()
                 content = existing_content + "\n\n" + content
 
@@ -155,7 +155,7 @@ class ProfileStorageManager:
             logger.error(f"保存 MEMORY.md 失败：{e}")
             raise RuntimeError(f"保存 MEMORY.md 失败：{e}") from e
 
-    def load_memory_md(self) -> Optional[str]:
+    def load_memory_md(self) -> str | None:
         """
         从 MEMORY.md 加载内容
 
@@ -170,7 +170,7 @@ class ProfileStorageManager:
                 logger.debug(f"MEMORY.md 不存在：{self.memory_md_path}")
                 return None
 
-            with open(self.memory_md_path, "r", encoding="utf-8") as f:
+            with open(self.memory_md_path, encoding="utf-8") as f:
                 content = f.read()
 
             logger.info("MEMORY.md 加载成功")
@@ -182,7 +182,7 @@ class ProfileStorageManager:
     def sync_dual_storage(
         self,
         profile: RunnerProfile,
-        memory_content: Optional[str] = None,
+        memory_content: str | None = None,
         sync_direction: str = "json_to_md",
     ) -> bool:
         """
@@ -246,7 +246,7 @@ class ProfileStorageManager:
             agent_notes = []
 
             if self.memory_md_path.exists():
-                with open(self.memory_md_path, "r", encoding="utf-8") as f:
+                with open(self.memory_md_path, encoding="utf-8") as f:
                     existing_content = f.read()
 
                 # 提取 Agent 笔记（如果 preserve_agent_notes 为 True）
@@ -284,7 +284,7 @@ class ProfileStorageManager:
             logger.error(f"智能合并失败：{e}")
             raise RuntimeError(f"智能合并失败：{e}") from e
 
-    def _dict_to_profile(self, profile_data: Dict[str, Any]) -> RunnerProfile:
+    def _dict_to_profile(self, profile_data: dict[str, Any]) -> RunnerProfile:
         """
         将字典转换为 RunnerProfile 对象
 
@@ -410,7 +410,7 @@ class ProfileStorageManager:
 
         return content
 
-    def _extract_agent_notes(self, content: str) -> List[str]:
+    def _extract_agent_notes(self, content: str) -> list[str]:
         """
         从 MEMORY.md 内容中提取 Agent 笔记
 
@@ -489,7 +489,7 @@ class ProfileStorageManager:
         # 读取 MEMORY.md，提取 Agent 笔记
         agent_notes = []
         if self.memory_md_path.exists():
-            with open(self.memory_md_path, "r", encoding="utf-8") as f:
+            with open(self.memory_md_path, encoding="utf-8") as f:
                 content = f.read()
             agent_notes = self._extract_agent_notes(content)
 
@@ -502,7 +502,7 @@ class ProfileStorageManager:
         return True
 
     def _sync_bidirectional(
-        self, profile: RunnerProfile, memory_content: Optional[str] = None
+        self, profile: RunnerProfile, memory_content: str | None = None
     ) -> bool:
         """
         双向同步（合并）
@@ -520,7 +520,7 @@ class ProfileStorageManager:
         # 2. 从现有 MEMORY.md 提取 Agent 笔记
         agent_notes = []
         if self.memory_md_path.exists():
-            with open(self.memory_md_path, "r", encoding="utf-8") as f:
+            with open(self.memory_md_path, encoding="utf-8") as f:
                 existing_content = f.read()
             agent_notes = self._extract_agent_notes(existing_content)
 
@@ -568,12 +568,12 @@ class AnomalyFilterRule:
     condition: str  # 条件表达式（如 ">", "<", ">=", "<=", "=="）
     threshold: float  # 阈值
     action: str  # 动作："filter" (过滤) 或 "clip" (截断)
-    clip_value: Optional[float] = None  # 截断值（当 action 为 clip 时使用）
-    description: Optional[str] = None  # 规则描述
+    clip_value: float | None = None  # 截断值（当 action 为 clip 时使用）
+    description: str | None = None  # 规则描述
 
 
 # 异常过滤规则配置
-ANOMALY_FILTER_RULES: List[AnomalyFilterRule] = [
+ANOMALY_FILTER_RULES: list[AnomalyFilterRule] = [
     # 心率异常过滤
     AnomalyFilterRule(
         field_name="avg_heart_rate",
@@ -682,9 +682,9 @@ class RunnerProfile:  # type: ignore[no-redef]
     training_pattern: TrainingPattern = TrainingPattern.REST
 
     # 心率指标
-    avg_heart_rate: Optional[float] = None
-    max_heart_rate: Optional[float] = None
-    resting_heart_rate: Optional[float] = None
+    avg_heart_rate: float | None = None
+    max_heart_rate: float | None = None
+    resting_heart_rate: float | None = None
 
     # 伤病风险
     injury_risk_level: InjuryRiskLevel = InjuryRiskLevel.LOW
@@ -703,9 +703,9 @@ class RunnerProfile:  # type: ignore[no-redef]
     # 元数据
     data_quality_score: float = 0.0  # 数据质量评分 (0-100)
     analysis_period_days: int = 0
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "user_id": self.user_id,
@@ -739,7 +739,7 @@ class RunnerProfile:  # type: ignore[no-redef]
 class ProfileEngine:
     """用户画像引擎"""
 
-    def __init__(self, storage_manager: "StorageManager") -> None:
+    def __init__(self, storage_manager: StorageManager) -> None:
         """
         初始化画像引擎
 
@@ -896,7 +896,7 @@ class ProfileEngine:
         profile: RunnerProfile,
         age: int = 30,
         resting_hr: int = 60,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         计算伤病风险评分
 
@@ -1417,7 +1417,7 @@ class ProfileEngine:
 
     def check_freshness(
         self,
-        profile: Optional[RunnerProfile] = None,
+        profile: RunnerProfile | None = None,
         freshness_days: int = 7,
     ) -> ProfileStaleStatus:
         """
@@ -1454,7 +1454,9 @@ class ProfileEngine:
                 logger.debug(f"画像新鲜（{time_diff.days} 天前更新）")
                 return ProfileStaleStatus.FRESH
             else:
-                logger.debug(f"画像过期（{time_diff.days} 天前更新，阈值{freshness_days}天）")
+                logger.debug(
+                    f"画像过期（{time_diff.days} 天前更新，阈值{freshness_days}天）"
+                )
                 return ProfileStaleStatus.STALE
 
         except Exception as e:
@@ -1464,7 +1466,7 @@ class ProfileEngine:
     def filter_anomaly_data(
         self,
         data: pl.LazyFrame,
-        rules: Optional[List[AnomalyFilterRule]] = None,
+        rules: list[AnomalyFilterRule] | None = None,
         strict_mode: bool = False,
     ) -> pl.LazyFrame:
         """
@@ -1574,7 +1576,7 @@ class ProfileEngine:
         self,
         rule: AnomalyFilterRule,
         strict_mode: bool,
-    ) -> Optional[pl.Expr]:
+    ) -> pl.Expr | None:
         """
         构建过滤条件表达式
 

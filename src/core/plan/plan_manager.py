@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.training_plan import TrainingPlan
 
@@ -63,7 +63,7 @@ class PlanManagerError(Exception):
 class PlanManager:
     """训练计划管理器"""
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self, data_dir: Path | None = None):
         """
         初始化计划管理器
 
@@ -78,7 +78,7 @@ class PlanManager:
 
         self.data_dir = data_dir
         self.plans_file = data_dir / "training_plans.json"
-        self._plans: Dict[str, Dict[str, Any]] = {}
+        self._plans: dict[str, dict[str, Any]] = {}
         self._load_plans()
 
     def _load_plans(self) -> None:
@@ -89,7 +89,7 @@ class PlanManager:
             return
 
         try:
-            with open(self.plans_file, "r", encoding="utf-8") as f:
+            with open(self.plans_file, encoding="utf-8") as f:
                 data = json.load(f)
                 self._plans = data.get("plans", {})
             logger.info(f"成功加载 {len(self._plans)} 个训练计划")
@@ -143,7 +143,7 @@ class PlanManager:
         logger.info(f"创建训练计划成功：{plan.plan_id}")
         return plan.plan_id
 
-    def get_plan(self, plan_id: str) -> Optional[TrainingPlan]:
+    def get_plan(self, plan_id: str) -> TrainingPlan | None:
         """
         获取训练计划
 
@@ -163,7 +163,7 @@ class PlanManager:
             logger.error(f"解析训练计划失败：{e}")
             return None
 
-    def get_plan_status(self, plan_id: str) -> Optional[PlanStatus]:
+    def get_plan_status(self, plan_id: str) -> PlanStatus | None:
         """
         获取计划状态
 
@@ -182,7 +182,7 @@ class PlanManager:
             return PlanStatus(status_str)
         return None
 
-    def update_plan(self, plan_id: str, updates: Dict[str, Any]) -> bool:
+    def update_plan(self, plan_id: str, updates: dict[str, Any]) -> bool:
         """
         更新训练计划
 
@@ -352,9 +352,9 @@ class PlanManager:
 
     def list_plans(
         self,
-        status: Optional[PlanStatus] = None,
+        status: PlanStatus | None = None,
         limit: int = 100,
-    ) -> List[TrainingPlan]:
+    ) -> list[TrainingPlan]:
         """
         列出训练计划
 
@@ -408,7 +408,7 @@ class PlanManager:
         logger.info(f"删除训练计划成功：{plan_id}")
         return True
 
-    def get_active_plan(self) -> Optional[TrainingPlan]:
+    def get_active_plan(self) -> TrainingPlan | None:
         """
         获取当前激活的训练计划
 

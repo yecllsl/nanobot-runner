@@ -1,9 +1,8 @@
 # 报告服务单元测试
 # 测试 ReportService 的生成、推送和定时调度功能
 
-from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -284,7 +283,10 @@ class TestReportServicePushReport:
     def test_push_report_generation_error(self, mock_service):
         """测试报告生成失败"""
         # Mock feishu 返回错误
-        mock_service.feishu.send_card.return_value = {"success": False, "error": "推送失败"}
+        mock_service.feishu.send_card.return_value = {
+            "success": False,
+            "error": "推送失败",
+        }
 
         mock_report = {
             "type": "daily",

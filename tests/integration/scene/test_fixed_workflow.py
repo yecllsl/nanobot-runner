@@ -4,7 +4,6 @@ RunFlowAgent 修正版集成测试
 基于实际代码接口，修正测试数据格式
 """
 
-import json
 
 # 添加项目根目录到Python路径
 import sys
@@ -12,7 +11,6 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
@@ -53,7 +51,7 @@ class TestFixedWorkflow:
 
         for i in range(5):
             activity = {
-                "activity_id": f"run_202401{i+1:02d}",
+                "activity_id": f"run_202401{i + 1:02d}",
                 "timestamp": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用标准datetime
                 "session_start_time": datetime(
                     2024, 1, i + 1, 6, 0, 0
@@ -210,7 +208,9 @@ class TestFixedWorkflow:
         for i in range(50):  # 减少数据量避免性能问题
             activity = {
                 "activity_id": f"run_{i:06d}",
-                "timestamp": datetime(2024, 1, (i % 30) + 1, 8, 0, 0),  # 使用标准datetime
+                "timestamp": datetime(
+                    2024, 1, (i % 30) + 1, 8, 0, 0
+                ),  # 使用标准datetime
                 "session_start_time": datetime(
                     2024, 1, (i % 30) + 1, 6, 0, 0
                 ),  # 添加session_start_time

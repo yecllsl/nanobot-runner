@@ -5,7 +5,7 @@ import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -98,7 +98,7 @@ class TestSaveProfileJson:
         assert manager.profile_json_path.exists()
 
         # 验证文件内容
-        with open(manager.profile_json_path, "r", encoding="utf-8") as f:
+        with open(manager.profile_json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["user_id"] == "test_user"
@@ -143,7 +143,7 @@ class TestSaveProfileJson:
         assert result is True
 
         # 验证所有字段
-        with open(manager.profile_json_path, "r", encoding="utf-8") as f:
+        with open(manager.profile_json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["user_id"] == "complete_user"
@@ -171,7 +171,7 @@ class TestSaveProfileJson:
         manager.save_profile_json(profile2)
 
         # 验证只有第二次的数据
-        with open(manager.profile_json_path, "r", encoding="utf-8") as f:
+        with open(manager.profile_json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["user_id"] == "user2"
@@ -281,7 +281,7 @@ class TestSaveMemoryMd:
         assert manager.memory_md_path.exists()
 
         # 验证内容
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             saved_content = f.read()
 
         assert saved_content == content
@@ -302,7 +302,7 @@ class TestSaveMemoryMd:
 
         assert result is True
 
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             saved_content = f.read()
 
         assert "用户画像摘要" in saved_content
@@ -317,7 +317,7 @@ class TestSaveMemoryMd:
         # 第二次追加
         manager.save_memory_md("内容 2", append=True)
 
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             saved_content = f.read()
 
         assert "内容 1" in saved_content
@@ -331,7 +331,7 @@ class TestSaveMemoryMd:
         # 第二次覆盖
         manager.save_memory_md("内容 2", append=False)
 
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             saved_content = f.read()
 
         assert "内容 1" not in saved_content
@@ -393,7 +393,7 @@ class TestSyncDualStorage:
         assert manager.memory_md_path.exists()
 
         # 验证 MD 包含画像信息
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             md_content = f.read()
 
         assert "test_user" in md_content
@@ -474,7 +474,7 @@ class TestMergeProfileToMd:
         assert result is True
 
         # 验证 Agent 笔记被保留
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             content = f.read()
 
         assert "训练量增加" in content
@@ -497,7 +497,7 @@ class TestMergeProfileToMd:
         assert result is True
 
         # 验证 Agent 笔记不被保留（但旧内容会保留）
-        with open(manager.memory_md_path, "r", encoding="utf-8") as f:
+        with open(manager.memory_md_path, encoding="utf-8") as f:
             content = f.read()
 
         assert "训练量增加" not in content

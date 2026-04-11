@@ -5,7 +5,6 @@
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional
 
 from src.core.models import (
     DailyPlan,
@@ -58,8 +57,8 @@ def create_test_user_context() -> UserContext:
 def create_test_training_plan(
     plan_id: str = "test_plan",
     goal_distance_km: float = 21.0975,
-    goal_date: Optional[str] = None,
-    weeks: Optional[List[WeeklySchedule]] = None,
+    goal_date: str | None = None,
+    weeks: list[WeeklySchedule] | None = None,
     weekly_distance_km: float = 32.0,
     daily_workout_type: str = "easy_run",
     daily_distance_km: float = 8.0,

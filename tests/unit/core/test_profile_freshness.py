@@ -246,7 +246,13 @@ class TestProfileEngineFilterAnomalyData:
                 "activity_id": [1, 2, 3, 4, 5],
                 "avg_heart_rate": [150, 25, 180, 230, 160],  # 25 和 230 是异常
                 "max_heart_rate": [170, 40, 190, 240, 180],  # 40 是异常
-                "total_distance": [5000, 50, 10000, 150000, 8000],  # 50 和 150000 是异常
+                "total_distance": [
+                    5000,
+                    50,
+                    10000,
+                    150000,
+                    8000,
+                ],  # 50 和 150000 是异常
                 "total_timer_time": [1800, 30, 3600, 30000, 2400],  # 30 和 30000 是异常
             }
         ).lazy()

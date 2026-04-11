@@ -3,7 +3,6 @@ PlanAnalyzer 单元测试
 """
 
 from datetime import datetime, timedelta
-from typing import List
 
 import pytest
 
@@ -66,7 +65,7 @@ class TestPlanAnalyzer:
     def _create_training_plan(
         self,
         plan_id: str,
-        weeks: List[WeeklySchedule],
+        weeks: list[WeeklySchedule],
         goal_distance_km: float = 21.0975,
         goal_date: str = None,
         target_time: str = "2:00:00",
@@ -205,7 +204,9 @@ class TestPlanAnalyzer:
         )
 
         assert len(report.warnings) > 0
-        assert any("跑量" in warning or "训练" in warning for warning in report.warnings)
+        assert any(
+            "跑量" in warning or "训练" in warning for warning in report.warnings
+        )
 
     def test_analyze_plan_with_unrealistic_goal(self):
         """测试分析目标不切实际的计划"""
@@ -271,7 +272,9 @@ class TestPlanAnalyzer:
         )
 
         assert report.disclaimer is not None
-        assert "免责声明" in report.disclaimer or "disclaimer" in report.disclaimer.lower()
+        assert (
+            "免责声明" in report.disclaimer or "disclaimer" in report.disclaimer.lower()
+        )
 
     def test_dimension_result_structure(self):
         """测试维度结果数据结构"""

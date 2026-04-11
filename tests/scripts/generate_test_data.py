@@ -10,7 +10,6 @@ RunFlowAgent 测试数据生成脚本
 
 import json
 import random
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -24,40 +23,42 @@ def create_mock_fit_file(filepath: Path, activity_data: dict):
         activity_data: 活动数据字典
     """
     # 创建模拟FIT文件内容（简化版）
-    content = f"""# Mock FIT File - {activity_data['filename']}
+    content = f"""# Mock FIT File - {activity_data["filename"]}
 # Generated for testing purposes
 
 [File Header]
 Type: activity
 Manufacturer: Garmin
 Product: Forerunner 945
-Serial Number: {activity_data.get('serial_number', 'TEST12345')}
-Time Created: {activity_data.get('time_created', '2024-01-01T08:00:00Z')}
-Number of Records: {activity_data.get('record_count', 100)}
+Serial Number: {activity_data.get("serial_number", "TEST12345")}
+Time Created: {activity_data.get("time_created", "2024-01-01T08:00:00Z")}
+Number of Records: {activity_data.get("record_count", 100)}
 
 [Activity]
 Sport: running
-Total Timer Time: {activity_data.get('total_timer_time', 1800)}
-Total Distance: {activity_data.get('total_distance', 5000)}
-Total Calories: {activity_data.get('total_calories', 300)}
-Avg Heart Rate: {activity_data.get('avg_heart_rate', 150)}
-Max Heart Rate: {activity_data.get('max_heart_rate', 170)}
-Avg Speed: {activity_data.get('avg_speed', 2.78)}
-Max Speed: {activity_data.get('max_speed', 3.5)}
-Total Ascent: {activity_data.get('total_ascent', 50)}
-Total Descent: {activity_data.get('total_descent', 45)}
+Total Timer Time: {activity_data.get("total_timer_time", 1800)}
+Total Distance: {activity_data.get("total_distance", 5000)}
+Total Calories: {activity_data.get("total_calories", 300)}
+Avg Heart Rate: {activity_data.get("avg_heart_rate", 150)}
+Max Heart Rate: {activity_data.get("max_heart_rate", 170)}
+Avg Speed: {activity_data.get("avg_speed", 2.78)}
+Max Speed: {activity_data.get("max_speed", 3.5)}
+Total Ascent: {activity_data.get("total_ascent", 50)}
+Total Descent: {activity_data.get("total_descent", 45)}
 
 [Records]
 # Sample record data (simplified)
 """
 
     # 添加示例记录数据
-    for i in range(min(10, activity_data.get("record_count", 10))):  # 只添加前10条记录作为示例
+    for i in range(
+        min(10, activity_data.get("record_count", 10))
+    ):  # 只添加前10条记录作为示例
         timestamp = (
             datetime.fromisoformat(activity_data["time_created"].replace("Z", ""))
             + timedelta(seconds=i * 10)
         ).isoformat()
-        content += f"{timestamp}, {150 + i}, {2.7 + i*0.1}, {50 + i}\n"
+        content += f"{timestamp}, {150 + i}, {2.7 + i * 0.1}, {50 + i}\n"
 
     filepath.write_text(content)
     print(f"创建模拟FIT文件: {filepath}")
@@ -158,7 +159,7 @@ def generate_test_dataset():
     metadata_file = test_data_dir / "test_files_metadata.json"
     metadata_file.write_text(json.dumps(test_files, indent=2, ensure_ascii=False))
 
-    print(f"✅ 测试数据集生成完成!")
+    print("✅ 测试数据集生成完成!")
     print(f"📁 数据目录: {test_data_dir}")
     print(f"📊 生成文件数量: {len(test_files)}")
     print(f"📋 元数据文件: {metadata_file}")

@@ -8,7 +8,6 @@ import tempfile
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import polars as pl
 import pytest
@@ -33,7 +32,9 @@ class TestReportPerformance:
 
         # 创建 ReportService 实例
         self.report_service = ReportService(
-            storage=self.storage, analytics=self.analytics, feishu=None  # 不使用飞书推送
+            storage=self.storage,
+            analytics=self.analytics,
+            feishu=None,  # 不使用飞书推送
         )
 
     def teardown_method(self):
@@ -55,7 +56,7 @@ class TestReportPerformance:
             duration = 1800 + (i % 10) * 300  # 时长范围：30-60分钟
 
             activity = {
-                "activity_id": f'run_{activity_date.strftime("%Y%m%d")}_{i:04d}',
+                "activity_id": f"run_{activity_date.strftime('%Y%m%d')}_{i:04d}",
                 "timestamp": activity_date,
                 "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
@@ -112,7 +113,7 @@ class TestReportPerformance:
         # 添加昨日训练数据（确保数据类型与主测试数据一致）
         yesterday = datetime.now() - timedelta(days=1)
         yesterday_activity = {
-            "activity_id": f'run_{yesterday.strftime("%Y%m%d")}_9999',
+            "activity_id": f"run_{yesterday.strftime('%Y%m%d')}_9999",
             "timestamp": yesterday,
             "session_start_time": yesterday,  # 添加session_start_time
             "source_file": "yesterday_run.fit",
@@ -164,7 +165,7 @@ class TestReportPerformance:
             duration = 1800 + (i % 10) * 300
 
             activity = {
-                "activity_id": f'run_large_{activity_date.strftime("%Y%m%d")}_{i:04d}',
+                "activity_id": f"run_large_{activity_date.strftime('%Y%m%d')}_{i:04d}",
                 "timestamp": activity_date,
                 "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_large_{i}.fit",

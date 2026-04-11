@@ -1,8 +1,8 @@
 # 配置 Schema 验证模块
 # 提供配置数据结构定义和验证机制
 
-from dataclasses import dataclass, field
-from typing import ClassVar, Optional, Type, Union
+from dataclasses import dataclass
+from typing import ClassVar
 
 
 @dataclass
@@ -24,9 +24,9 @@ class AppConfig:
     version: str
     data_dir: str
     auto_push_feishu: bool = False
-    feishu_app_id: Optional[str] = None
-    feishu_app_secret: Optional[str] = None
-    feishu_receive_id: Optional[str] = None
+    feishu_app_id: str | None = None
+    feishu_app_secret: str | None = None
+    feishu_receive_id: str | None = None
     feishu_receive_id_type: str = "user_id"
 
     # 必填字段列表（类变量，非实例字段）

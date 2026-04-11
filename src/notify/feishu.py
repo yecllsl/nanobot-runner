@@ -3,11 +3,9 @@
 # 使用 access_token 调用消息发送接口
 
 import logging
-import re
 import time
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import requests
 
@@ -32,7 +30,7 @@ class FeishuAuth:
 
     TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"  # nosec B105
 
-    def __init__(self, app_id: Optional[str] = None, app_secret: Optional[str] = None):
+    def __init__(self, app_id: str | None = None, app_secret: str | None = None):
         """
         初始化认证管理器
 
@@ -44,8 +42,8 @@ class FeishuAuth:
         self.app_id = app_id or self.config.get("feishu_app_id")
         self.app_secret = app_secret or self.config.get("feishu_app_secret")
 
-        self._access_token: Optional[str] = None
-        self._token_expire_time: Optional[float] = None
+        self._access_token: str | None = None
+        self._token_expire_time: float | None = None
 
         if not self.app_id or not self.app_secret:
             logger.warning("未配置飞书应用凭证 (feishu_app_id 或 feishu_app_secret)")
@@ -126,7 +124,7 @@ class FeishuMessageAPI:
 
     BASE_URL = "https://open.feishu.cn/open-apis/im/v1"
 
-    def __init__(self, auth: Optional[FeishuAuth] = None):
+    def __init__(self, auth: FeishuAuth | None = None):
         """
         初始化消息 API
 
@@ -135,7 +133,7 @@ class FeishuMessageAPI:
         """
         self.auth = auth or FeishuAuth()
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """获取请求头"""
         token = self.auth.get_token()
         return {
@@ -147,9 +145,9 @@ class FeishuMessageAPI:
         self,
         method: str,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         通用请求方法
 
@@ -194,7 +192,7 @@ class FeishuMessageAPI:
         content: str,
         receive_id: str,
         receive_id_type: str = "user_id",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         发送文本消息
 
@@ -218,10 +216,10 @@ class FeishuMessageAPI:
 
     def send_card(
         self,
-        card_content: Dict[str, Any],
+        card_content: dict[str, Any],
         receive_id: str,
         receive_id_type: str = "user_id",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         发送卡片消息
 
@@ -266,10 +264,10 @@ class FeishuBot:
 
     def __init__(
         self,
-        app_id: Optional[str] = None,
-        app_secret: Optional[str] = None,
-        receive_id: Optional[str] = None,
-        receive_id_type: Optional[str] = None,
+        app_id: str | None = None,
+        app_secret: str | None = None,
+        receive_id: str | None = None,
+        receive_id_type: str | None = None,
     ):
         """
         初始化飞书机器人
@@ -294,14 +292,14 @@ class FeishuBot:
             "feishu_receive_id_type", "user_id"
         )
 
-        self._nanobot_feishu_enabled: Optional[bool] = None
+        self._nanobot_feishu_enabled: bool | None = None
         self._feishu_channel = None
 
     # ========== 消息发送方法 ==========
 
     def _send_with_retry(
         self, send_func: Callable, retry_count: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         带重试机制的消息发送
 
@@ -322,12 +320,15 @@ class FeishuBot:
                 logger.warning(f"{error_msg}，第 {retry_count + 1} 次重试...")
                 time.sleep(self.RETRY_DELAY)
                 return self._send_with_retry(send_func, retry_count + 1)
-            return {"success": False, "error": f"{error_msg}，已重试{self.MAX_RETRIES}次"}
+            return {
+                "success": False,
+                "error": f"{error_msg}，已重试{self.MAX_RETRIES}次",
+            }
 
         except Exception as e:
             return {"success": False, "error": f"发送失败：{str(e)}"}
 
-    def send_text(self, text: str) -> Dict[str, Any]:
+    def send_text(self, text: str) -> dict[str, Any]:
         """
         发送文本消息
 
@@ -343,7 +344,7 @@ class FeishuBot:
         if not self.receive_id:
             return {"success": False, "error": "未配置接收者 ID"}
 
-        def _send() -> Dict[str, Any]:
+        def _send() -> dict[str, Any]:
             return self.message_api.send_text(
                 content=text,
                 receive_id=self.receive_id,
@@ -352,7 +353,7 @@ class FeishuBot:
 
         return self._send_with_retry(_send)
 
-    def send_card(self, title: str, content: str) -> Dict[str, Any]:
+    def send_card(self, title: str, content: str) -> dict[str, Any]:
         """
         发送卡片消息
 
@@ -389,7 +390,7 @@ class FeishuBot:
             ],
         }
 
-        def _send() -> Dict[str, Any]:
+        def _send() -> dict[str, Any]:
             return self.message_api.send_card(
                 card_content=card_payload,
                 receive_id=self.receive_id,
@@ -398,7 +399,7 @@ class FeishuBot:
 
         return self._send_with_retry(_send)
 
-    def send_import_notification(self, stats: Dict[str, int]) -> Dict[str, Any]:
+    def send_import_notification(self, stats: dict[str, int]) -> dict[str, Any]:
         """
         发送导入通知
 
@@ -411,15 +412,15 @@ class FeishuBot:
         title = "📊 数据导入完成"
         content = f"""
 **导入统计**
-- 扫描文件数：{stats.get('total', 0)}
-- 新增记录：{stats.get('added', 0)}
-- 跳过重复：{stats.get('skipped', 0)}
-- 错误数量：{stats.get('errors', 0)}
+- 扫描文件数：{stats.get("total", 0)}
+- 新增记录：{stats.get("added", 0)}
+- 跳过重复：{stats.get("skipped", 0)}
+- 错误数量：{stats.get("errors", 0)}
         """
 
         return self.send_card(title, content.strip())
 
-    def send_daily_report(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
+    def send_daily_report(self, report_data: dict[str, Any]) -> dict[str, Any]:
         """
         发送每日晨报（飞书卡片消息格式）
 
@@ -487,7 +488,10 @@ class FeishuBot:
             card_elements.append(
                 {
                     "tag": "div",
-                    "text": {"tag": "lark_md", "content": "**🏃 昨日训练**\n无训练记录"},
+                    "text": {
+                        "tag": "lark_md",
+                        "content": "**🏃 昨日训练**\n无训练记录",
+                    },
                 }
             )
 
@@ -530,7 +534,7 @@ class FeishuBot:
         }
 
         # 发送消息
-        def _send() -> Dict[str, Any]:
+        def _send() -> dict[str, Any]:
             return self.message_api.send_card(
                 card_content=card_payload,
                 receive_id=self.receive_id,
@@ -547,10 +551,10 @@ class FeishuBot:
 
 
 def test_connection(
-    app_id: Optional[str] = None,
-    app_secret: Optional[str] = None,
-    receive_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    app_id: str | None = None,
+    app_secret: str | None = None,
+    receive_id: str | None = None,
+) -> dict[str, Any]:
     """
     测试飞书应用机器人连接
 

@@ -5,13 +5,13 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class IndexManager:
     """去重索引管理器"""
 
-    def __init__(self, index_file: Optional[Path] = None):
+    def __init__(self, index_file: Path | None = None):
         """
         初始化索引管理器
 
@@ -25,11 +25,11 @@ class IndexManager:
         self._fingerprints: set = set()
         self.index = self._load_index()
 
-    def _load_index(self) -> Dict[str, Any]:
+    def _load_index(self) -> dict[str, Any]:
         """加载索引文件"""
         if self.index_file.exists():
             try:
-                with open(self.index_file, "r", encoding="utf-8") as f:
+                with open(self.index_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self._fingerprints = set(data.get("fingerprints", []))
                     return data
@@ -46,7 +46,7 @@ class IndexManager:
         with open(self.index_file, "w", encoding="utf-8") as f:
             json.dump(self.index, f, indent=2, ensure_ascii=False)
 
-    def generate_fingerprint(self, metadata: Dict[str, Any]) -> str:
+    def generate_fingerprint(self, metadata: dict[str, Any]) -> str:
         """
         生成文件指纹
 
@@ -76,7 +76,7 @@ class IndexManager:
         """
         return fingerprint in self._fingerprints
 
-    def add(self, fingerprint: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
+    def add(self, fingerprint: str, metadata: dict[str, Any] | None = None) -> bool:
         """
         添加指纹到索引
 
@@ -125,7 +125,7 @@ class IndexManager:
         self._save_index()
         return True
 
-    def get_all_fingerprints(self) -> List[str]:
+    def get_all_fingerprints(self) -> list[str]:
         """
         获取所有指纹
 
@@ -134,7 +134,7 @@ class IndexManager:
         """
         return list(self._fingerprints)
 
-    def get_file_info(self, fingerprint: str) -> Optional[Dict[str, Any]]:
+    def get_file_info(self, fingerprint: str) -> dict[str, Any] | None:
         """
         获取指纹对应的文件信息
 

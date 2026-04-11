@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import fitparse
 import polars as pl
@@ -93,7 +93,7 @@ class FitParser:
     def __init__(self) -> None:
         logger.debug("FitParser 初始化")
 
-    def parse_file(self, filepath: Path) -> Optional[pl.DataFrame]:
+    def parse_file(self, filepath: Path) -> pl.DataFrame | None:
         if not filepath.exists():
             logger.error(f"文件不存在: {filepath}")
             raise ValidationError(
@@ -113,10 +113,10 @@ class FitParser:
             fit_file = fitparse.FitFile(str(filepath))
 
             records = []
-            session_data: Dict[str, Any] = {}
+            session_data: dict[str, Any] = {}
 
             for record in fit_file.get_messages("record"):
-                record_data: Dict[str, Any] = {}
+                record_data: dict[str, Any] = {}
                 for data in record:
                     record_data[data.name] = data.value
                 records.append(record_data)
@@ -153,7 +153,7 @@ class FitParser:
             ) from e
 
     def _add_session_metadata(
-        self, df: pl.DataFrame, session_data: Dict[str, Any]
+        self, df: pl.DataFrame, session_data: dict[str, Any]
     ) -> pl.DataFrame:
         try:
             for key, value in session_data.items():
@@ -247,7 +247,7 @@ class FitParser:
                 recovery_suggestion="请检查目录权限和文件格式",
             ) from e
 
-    def parse_file_metadata(self, filepath: Path) -> Dict[str, Any]:
+    def parse_file_metadata(self, filepath: Path) -> dict[str, Any]:
         try:
             if not filepath.exists():
                 logger.error(f"文件不存在: {filepath}")
@@ -265,7 +265,7 @@ class FitParser:
 
             fit_file = fitparse.FitFile(str(filepath))
 
-            metadata: Dict[str, Any] = {
+            metadata: dict[str, Any] = {
                 "filename": filepath.stem,
                 "filepath": str(filepath),
             }
@@ -286,7 +286,7 @@ class FitParser:
                 recovery_suggestion="请确认文件格式正确",
             ) from e
 
-    def validate_fit_file(self, filepath: Path) -> Dict[str, Any]:
+    def validate_fit_file(self, filepath: Path) -> dict[str, Any]:
         try:
             if not filepath.exists():
                 return {"valid": False, "error": "文件不存在"}
@@ -309,7 +309,7 @@ class FitParser:
             logger.error(f"验证文件异常: {filepath}, 错误: {e}")
             return {"valid": False, "error": str(e)}
 
-    def _validate_data_quality(self, df: pl.DataFrame) -> Dict[str, Any]:
+    def _validate_data_quality(self, df: pl.DataFrame) -> dict[str, Any]:
         """
         验证数据质量
 

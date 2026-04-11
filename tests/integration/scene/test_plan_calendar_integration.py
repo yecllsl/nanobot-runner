@@ -3,17 +3,13 @@
 
 import asyncio
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.core.plan.calendar_tool import (
-    BatchSyncResult,
     CalendarTool,
-    HealthCheckItem,
-    HealthCheckResult,
     SyncMode,
 )
 from src.core.plan.plan_manager import PlanManager, PlanStatus
@@ -25,7 +21,7 @@ from src.core.training_plan import (
     WeeklySchedule,
     WorkoutType,
 )
-from src.notify.feishu_calendar import CalendarSyncConfig, SyncResult
+from src.notify.feishu_calendar import SyncResult
 
 
 def create_test_plan(plan_id: str, with_event_id: bool = False) -> TrainingPlan:

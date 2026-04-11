@@ -4,10 +4,9 @@
 负责校验LLM生成的训练计划是否符合硬性规则，防止反人类计划
 """
 
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any
 
-from src.core.exceptions import ValidationError
 from src.core.logger import get_logger
 from src.core.models import TrainingPlan, ValidationResult, Violation
 
@@ -58,7 +57,7 @@ class HardValidator:
         """
         logger.info(f"开始校验训练计划: plan_id={plan.plan_id}")
 
-        violations: List[Violation] = []
+        violations: list[Violation] = []
 
         for rule_name, rule_func in self.rules.items():
             try:
@@ -104,7 +103,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         规则1: 周跑量增长不超过10%
 
@@ -153,7 +152,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         规则2: 每周至少安排1天完全休息
 
@@ -195,7 +194,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         规则3: 长距离跑不超过周跑量的30%
 
@@ -248,7 +247,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         规则4: 高强度训练（间歇/节奏）不超过周跑量的20%
 
@@ -301,7 +300,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         规则5: 单次最长距离不超过目标距离的120%
 
@@ -346,7 +345,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         规则6: 比赛前一周跑量减少40-60%
 

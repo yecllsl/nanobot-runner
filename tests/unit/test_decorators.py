@@ -3,8 +3,6 @@
 import json
 from unittest.mock import MagicMock
 
-import pytest
-
 from src.core.decorators import (
     handle_empty_data,
     handle_errors,
@@ -103,7 +101,6 @@ class TestRequireStorage:
         """测试没有storage的情况"""
         from unittest.mock import patch
 
-        from src.core.storage import StorageManager
 
         class TestClass:
             def __init__(self):

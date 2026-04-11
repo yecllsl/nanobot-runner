@@ -2,11 +2,8 @@
 # 测试Parquet Schema定义和数据标准化功能
 
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import polars as pl
-import pytest
 
 from src.core.schema import ParquetSchema, create_activity_id, create_schema_dataframe
 

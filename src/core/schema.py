@@ -2,7 +2,7 @@
 # 定义统一的数据结构规范，确保数据一致性
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 import polars as pl
 import polars.exceptions as ple
@@ -79,7 +79,7 @@ class ParquetSchema:
     }
 
     @classmethod
-    def get_schema(cls) -> Dict[str, Any]:
+    def get_schema(cls) -> dict[str, Any]:
         """获取完整 Schema 定义"""
         return {k: v for k, v in cls.UNIFIED_SCHEMA.items()}
 
@@ -89,7 +89,7 @@ class ParquetSchema:
         return cls.REQUIRED_FIELDS.copy()
 
     @classmethod
-    def get_default_values(cls) -> Dict[str, Any]:
+    def get_default_values(cls) -> dict[str, Any]:
         """获取默认值映射"""
         return cls.DEFAULT_VALUES.copy()
 
@@ -187,7 +187,7 @@ def create_activity_id(filename: str, timestamp: datetime) -> str:
 
 
 def create_schema_dataframe(
-    metadata: Dict[str, Any], records: List[Dict[str, Any]]
+    metadata: dict[str, Any], records: list[dict[str, Any]]
 ) -> pl.DataFrame:
     """
     创建符合Schema的DataFrame

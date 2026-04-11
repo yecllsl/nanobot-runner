@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -83,7 +83,6 @@ class TestTemplateEngine:
 
     def test_template_engine_with_custom_template_path(self):
         """测试模板引擎使用自定义模板路径"""
-        import os
         import tempfile
 
         # 创建临时文件

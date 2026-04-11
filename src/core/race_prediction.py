@@ -4,7 +4,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +16,12 @@ class RacePrediction:
     distance_km: float
     predicted_time_seconds: float
     confidence: float
-    best_case_seconds: Optional[float] = None
-    worst_case_seconds: Optional[float] = None
-    predicted_vdot: Optional[float] = None
-    training_weeks: Optional[int] = None
+    best_case_seconds: float | None = None
+    worst_case_seconds: float | None = None
+    predicted_vdot: float | None = None
+    training_weeks: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "distance_km": round(self.distance_km, 2),
@@ -186,7 +186,7 @@ class RacePredictionEngine:
     def predict_vdot_at_race(
         self,
         current_vdot: float,
-        vdot_trend: List[float],
+        vdot_trend: list[float],
         weeks: int = 0,
     ) -> float:
         """
@@ -237,7 +237,7 @@ class RacePredictionEngine:
 
     def calculate_confidence(
         self,
-        vdot_trend: List[float],
+        vdot_trend: list[float],
         training_consistency: float = 1.0,
     ) -> float:
         """
@@ -291,7 +291,7 @@ class RacePredictionEngine:
         self,
         distance_km: float,
         current_vdot: float,
-        vdot_trend: Optional[List[float]] = None,
+        vdot_trend: list[float] | None = None,
         weeks_to_race: int = 0,
         training_consistency: float = 1.0,
     ) -> RacePrediction:
@@ -354,10 +354,10 @@ class RacePredictionEngine:
     def predict_all_distances(
         self,
         current_vdot: float,
-        vdot_trend: Optional[List[float]] = None,
+        vdot_trend: list[float] | None = None,
         weeks_to_race: int = 0,
         training_consistency: float = 1.0,
-    ) -> Dict[str, RacePrediction]:
+    ) -> dict[str, RacePrediction]:
         """
         预测所有标准距离的比赛成绩
 
@@ -387,10 +387,10 @@ class RacePredictionEngine:
     def get_prediction_summary(
         self,
         current_vdot: float,
-        vdot_trend: Optional[List[float]] = None,
+        vdot_trend: list[float] | None = None,
         weeks_to_race: int = 0,
         training_consistency: float = 1.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取预测摘要信息
 
@@ -456,7 +456,7 @@ class RacePredictionEngine:
         self,
         vdot: float,
         distance_km: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         计算比赛配速
 

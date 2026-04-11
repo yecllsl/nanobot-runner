@@ -2,7 +2,7 @@
 # 计算训练压力分数(TSS)、急性训练负荷(ATL)、慢性训练负荷(CTL)
 
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -146,7 +146,7 @@ class TrainingLoadAnalyzer:
 
         return result_df["tss"]
 
-    def _calculate_ewma(self, tss_values: List[float], time_constant: float) -> float:
+    def _calculate_ewma(self, tss_values: list[float], time_constant: float) -> float:
         """
         计算指数加权移动平均（EWMA）
 
@@ -210,7 +210,7 @@ class TrainingLoadAnalyzer:
 
         return round(float(weighted_sum / weight_sum), 2)
 
-    def calculate_atl(self, tss_values: List[float]) -> float:
+    def calculate_atl(self, tss_values: list[float]) -> float:
         """
         计算急性训练负荷（ATL，7天指数移动平均）
 
@@ -225,7 +225,7 @@ class TrainingLoadAnalyzer:
         """
         return self._calculate_ewma(tss_values, ATL_TIME_CONSTANT)
 
-    def calculate_ctl(self, tss_values: List[float]) -> float:
+    def calculate_ctl(self, tss_values: list[float]) -> float:
         """
         计算慢性训练负荷（CTL，42天指数移动平均）
 
@@ -241,8 +241,8 @@ class TrainingLoadAnalyzer:
         return self._calculate_ewma(tss_values, CTL_TIME_CONSTANT)
 
     def calculate_atl_ctl(
-        self, tss_values: List[float], atl_days: int = 7, ctl_days: int = 42
-    ) -> Dict[str, float]:
+        self, tss_values: list[float], atl_days: int = 7, ctl_days: int = 42
+    ) -> dict[str, float]:
         """
         计算ATL和CTL
 
@@ -264,7 +264,7 @@ class TrainingLoadAnalyzer:
 
     def calculate_atl_ctl_vectorized(
         self, tss_series: pl.Series, atl_days: int = 7, ctl_days: int = 42
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         向量化计算ATL和CTL
 
@@ -296,7 +296,7 @@ class TrainingLoadAnalyzer:
         rest_hr: int = 60,
         atl_days: int = 7,
         ctl_days: int = 42,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         从 DataFrame 批量计算训练负荷（完整向量化流程）
 
@@ -409,7 +409,7 @@ class TrainingLoadAnalyzer:
 
         return round(self._ctl_state, 2)
 
-    def update_atl_ctl_incremental(self, new_tss: float) -> Dict[str, float]:
+    def update_atl_ctl_incremental(self, new_tss: float) -> dict[str, float]:
         """
         增量更新 ATL 和 CTL
 
@@ -450,7 +450,7 @@ class TrainingLoadAnalyzer:
         self._atl_initialized = True
         self._ctl_initialized = True
 
-    def get_incremental_state(self) -> Dict[str, Any]:
+    def get_incremental_state(self) -> dict[str, Any]:
         """
         获取当前增量计算状态
 
@@ -466,7 +466,7 @@ class TrainingLoadAnalyzer:
 
     def _evaluate_fitness_status(
         self, tsb: float, atl: float, ctl: float
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """
         根据训练压力平衡评估体能状态并生成训练建议
 
@@ -495,13 +495,11 @@ class TrainingLoadAnalyzer:
             advice = "当前有一定训练累积疲劳，属于正常训练状态。建议适当降低训练强度，增加恢复时间。保证充足睡眠和营养，可安排轻松跑或交叉训练。"
         else:
             status = "过度训练"
-            advice = (
-                "警告：当前疲劳累积过多，存在过度训练风险！建议立即安排休息日或仅进行极轻松的恢复跑。保证充足睡眠和营养，必要时咨询专业教练或运动医学专家。"
-            )
+            advice = "警告：当前疲劳累积过多，存在过度训练风险！建议立即安排休息日或仅进行极轻松的恢复跑。保证充足睡眠和营养，必要时咨询专业教练或运动医学专家。"
 
         return status, advice
 
-    def evaluate_training_status(self, atl: float, ctl: float) -> Dict[str, Any]:
+    def evaluate_training_status(self, atl: float, ctl: float) -> dict[str, Any]:
         """
         评估训练状态
 

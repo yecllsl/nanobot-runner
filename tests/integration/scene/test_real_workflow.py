@@ -10,7 +10,6 @@ RunFlowAgent 真实场景集成测试
 - 发现潜在bug和性能问题
 """
 
-import json
 
 # 添加项目根目录到Python路径
 import sys
@@ -18,7 +17,6 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
@@ -26,9 +24,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from src.core.analytics import AnalyticsEngine
-from src.core.importer import ImportService
 from src.core.indexer import IndexManager
-from src.core.parser import FitParser
 from src.core.schema import ParquetSchema
 from src.core.storage import StorageManager
 
@@ -62,7 +58,7 @@ class TestRealWorkflow:
         # 生成7天的跑步数据
         for i in range(7):
             activity = {
-                "activity_id": f"run_202401{i+1:02d}",
+                "activity_id": f"run_202401{i + 1:02d}",
                 "timestamp": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用datetime类型
                 "session_start_time": datetime(
                     2024, 1, i + 1, 6, 0, 0
@@ -71,7 +67,9 @@ class TestRealWorkflow:
                 "filename": f"test_{i}.fit",
                 "serial_number": f"TEST{i:04d}",
                 "time_created": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用datetime类型
-                "session_total_distance": float(5000 + i * 1000),  # 5km到11km，转换为float
+                "session_total_distance": float(
+                    5000 + i * 1000
+                ),  # 5km到11km，转换为float
                 "session_total_timer_time": float(
                     1800 + i * 300
                 ),  # 30min到48min，转换为float

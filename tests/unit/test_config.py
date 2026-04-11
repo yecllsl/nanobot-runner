@@ -3,9 +3,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from src.core.config import ConfigManager, config
 
@@ -38,7 +36,7 @@ class TestConfigManager:
             cm = ConfigManager()
             assert cm.config_file.exists()
 
-            with open(cm.config_file, "r", encoding="utf-8") as f:
+            with open(cm.config_file, encoding="utf-8") as f:
                 config_data = json.load(f)
 
             assert config_data["version"] == "0.1.0"
@@ -57,7 +55,7 @@ class TestConfigManager:
             }
             cm.save_config(test_config)
 
-            with open(cm.config_file, "r", encoding="utf-8") as f:
+            with open(cm.config_file, encoding="utf-8") as f:
                 saved_config = json.load(f)
 
             assert saved_config["version"] == "0.2.0"
@@ -144,7 +142,7 @@ class TestConfigManager:
             new_cron_store = cm.cron_store
             assert new_cron_store.exists()
 
-            with open(new_cron_store, "r", encoding="utf-8") as f:
+            with open(new_cron_store, encoding="utf-8") as f:
                 migrated_jobs = json.load(f)
 
             assert migrated_jobs["jobs"][0]["id"] == "test1"
@@ -199,7 +197,7 @@ class TestConfigManager:
 
             config1 = cm.load_config()
 
-            with open(cm.config_file, "r", encoding="utf-8") as f:
+            with open(cm.config_file, encoding="utf-8") as f:
                 raw_config = json.load(f)
             raw_config["manual_key"] = "manual_value"
             with open(cm.config_file, "w", encoding="utf-8") as f:

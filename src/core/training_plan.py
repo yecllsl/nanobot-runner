@@ -4,7 +4,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.logger import get_logger
 
@@ -50,18 +50,18 @@ class DailyPlan:
     workout_type: WorkoutType  # 训练类型
     distance_km: float  # 距离 (公里)
     duration_min: int  # 预计时长 (分钟)
-    target_pace_min_per_km: Optional[float] = None  # 目标配速 (分钟/公里)
-    target_hr_zone: Optional[int] = None  # 目标心率区间 (1-5)
+    target_pace_min_per_km: float | None = None  # 目标配速 (分钟/公里)
+    target_hr_zone: int | None = None  # 目标心率区间 (1-5)
     notes: str = ""  # 训练说明
     completed: bool = False  # 是否完成
-    actual_distance_km: Optional[float] = None  # 实际距离
-    actual_duration_min: Optional[int] = None  # 实际时长
-    actual_avg_hr: Optional[int] = None  # 实际平均心率
-    rpe: Optional[int] = None  # 主观疲劳度 (1-10)
-    hr_drift: Optional[float] = None  # 心率漂移 (%)
-    event_id: Optional[str] = None  # 日历事件ID
+    actual_distance_km: float | None = None  # 实际距离
+    actual_duration_min: int | None = None  # 实际时长
+    actual_avg_hr: int | None = None  # 实际平均心率
+    rpe: int | None = None  # 主观疲劳度 (1-10)
+    hr_drift: float | None = None  # 心率漂移 (%)
+    event_id: str | None = None  # 日历事件ID
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "date": self.date,
@@ -96,13 +96,13 @@ class WeeklySchedule:
     week_number: int  # 第几周
     start_date: str  # 周开始日期 (YYYY-MM-DD)
     end_date: str  # 周结束日期 (YYYY-MM-DD)
-    daily_plans: List[DailyPlan] = field(default_factory=list)  # 每日计划
+    daily_plans: list[DailyPlan] = field(default_factory=list)  # 每日计划
     weekly_distance_km: float = 0.0  # 周跑量 (公里)
     weekly_duration_min: int = 0  # 周训练时长 (分钟)
     focus: str = ""  # 本周重点
     notes: str = ""  # 周备注
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "week_number": self.week_number,
@@ -128,12 +128,12 @@ class TrainingPlan:
     end_date: str  # 结束日期 (YYYY-MM-DD)
     goal_distance_km: float  # 目标距离 (公里)
     goal_date: str  # 目标比赛日期 (YYYY-MM-DD)
-    weeks: List[WeeklySchedule] = field(default_factory=list)  # 周计划
+    weeks: list[WeeklySchedule] = field(default_factory=list)  # 周计划
     created_at: datetime = field(default_factory=datetime.now)  # 创建时间
     updated_at: datetime = field(default_factory=datetime.now)  # 更新时间
     notes: str = ""  # 计划备注
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "plan_id": self.plan_id,
@@ -151,7 +151,7 @@ class TrainingPlan:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TrainingPlan":
+    def from_dict(cls, data: dict[str, Any]) -> "TrainingPlan":
         """从字典创建训练计划"""
         weeks = []
         for week_data in data.get("weeks", []):
@@ -275,7 +275,7 @@ class TrainingPlanEngine:
 
     def get_phase_config_by_fitness_level(
         self, plan_type: PlanType, fitness_level: FitnessLevel
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         根据体能水平获取动态阶段配置
 
@@ -477,7 +477,7 @@ class TrainingPlanEngine:
 
     def _allocate_phases(
         self, total_weeks: int, goal_distance_km: float
-    ) -> List[tuple[PlanType, int]]:
+    ) -> list[tuple[PlanType, int]]:
         """
         分配训练阶段
 
@@ -571,7 +571,7 @@ class TrainingPlanEngine:
         start_date: str,
         end_date: str,
         weekly_distance_km: float,
-        phase_config: Dict[str, Any],
+        phase_config: dict[str, Any],
         fitness_level: FitnessLevel,
         current_vdot: float,
     ) -> WeeklySchedule:
@@ -674,11 +674,13 @@ class TrainingPlanEngine:
 
         # 设置本周重点
         phase_type = self._get_phase_type_from_config(phase_config)
-        weekly_schedule.focus = f"{phase_type.value} - 周跑量{round(total_distance, 1)}km"
+        weekly_schedule.focus = (
+            f"{phase_type.value} - 周跑量{round(total_distance, 1)}km"
+        )
 
         return weekly_schedule
 
-    def _get_phase_type_from_config(self, phase_config: Dict[str, Any]) -> PlanType:
+    def _get_phase_type_from_config(self, phase_config: dict[str, Any]) -> PlanType:
         """根据配置反推阶段类型"""
         for plan_type, config in PHASE_CONFIG.items():
             if (
@@ -724,9 +726,9 @@ class TrainingPlanEngine:
         self,
         plan: TrainingPlan,
         week_number: int,
-        hr_drift: Optional[float] = None,
-        rpe: Optional[int] = None,
-        completed_runs: Optional[List[Dict[str, Any]]] = None,
+        hr_drift: float | None = None,
+        rpe: int | None = None,
+        completed_runs: list[dict[str, Any]] | None = None,
     ) -> TrainingPlan:
         """
         调整训练计划（基于心率漂移和主观疲劳度）
@@ -857,8 +859,8 @@ class TrainingPlanEngine:
     def get_daily_workout(
         self,
         plan: TrainingPlan,
-        target_date: Optional[str] = None,
-    ) -> Optional[DailyPlan]:
+        target_date: str | None = None,
+    ) -> DailyPlan | None:
         """
         获取指定日期的训练内容
 
@@ -892,7 +894,7 @@ class TrainingPlanEngine:
         # 未找到计划
         return None
 
-    def get_plan_summary(self, plan: TrainingPlan) -> Dict[str, Any]:
+    def get_plan_summary(self, plan: TrainingPlan) -> dict[str, Any]:
         """
         获取训练计划摘要
 
@@ -906,7 +908,7 @@ class TrainingPlanEngine:
         total_duration = sum(week.weekly_duration_min for week in plan.weeks)
 
         # 统计各类型训练次数
-        workout_counts: Dict[str, int] = {}
+        workout_counts: dict[str, int] = {}
         for week in plan.weeks:
             for daily_plan in week.daily_plans:
                 workout_type = daily_plan.workout_type.value

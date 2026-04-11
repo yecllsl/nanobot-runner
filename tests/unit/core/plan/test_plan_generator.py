@@ -4,19 +4,17 @@ PlanGenerator 单元测试
 
 import json
 from datetime import datetime
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
 from src.core.exceptions import LLMError, ValidationError
 from src.core.models import (
-    DailyPlan,
     TrainingLoad,
     TrainingPlan,
     UserContext,
     UserPreferences,
-    WeeklySchedule,
 )
 from src.core.plan.plan_generator import PlanGenerator
 from src.core.profile import RunnerProfile
@@ -221,7 +219,7 @@ class TestPlanGenerator:
         generator.set_llm_provider(mock_llm)
         assert generator.llm_provider == mock_llm
 
-    def _create_mock_llm_response(self) -> Dict[str, Any]:
+    def _create_mock_llm_response(self) -> dict[str, Any]:
         """创建模拟的LLM响应"""
         return {
             "plan_id": "plan_test_user_20260420",

@@ -1,10 +1,8 @@
 # 飞书报告推送单元测试
 # 测试周报和月报的推送功能
 
-import json
-from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

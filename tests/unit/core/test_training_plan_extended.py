@@ -3,8 +3,6 @@
 
 from datetime import datetime
 
-import pytest
-
 from src.core.training_plan import (
     DailyPlan,
     FitnessLevel,
@@ -101,7 +99,7 @@ class TestWeeklyScheduleExtended:
         """测试周计划创建"""
         daily_plans = [
             DailyPlan(
-                date=f"2026-04-{10+i:02d}",
+                date=f"2026-04-{10 + i:02d}",
                 workout_type=WorkoutType.EASY,
                 distance_km=5.0,
                 duration_min=30,

@@ -2,8 +2,7 @@
 # 测试统计聚合器功能
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import polars as pl
 import pytest

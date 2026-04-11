@@ -3,9 +3,6 @@ HardValidator 单元测试
 """
 
 from datetime import datetime, timedelta
-from typing import List
-
-import pytest
 
 from src.core.models import (
     DailyPlan,
@@ -27,7 +24,7 @@ class TestHardValidator:
     def _create_training_plan(
         self,
         plan_id: str,
-        weeks: List[WeeklySchedule],
+        weeks: list[WeeklySchedule],
         goal_distance_km: float = 21.0975,
         goal_date: str = None,
     ) -> TrainingPlan:

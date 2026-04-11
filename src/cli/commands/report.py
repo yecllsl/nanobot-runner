@@ -1,7 +1,6 @@
 # 报告和画像相关命令
 # 包含 report 和 profile 命令
 
-from typing import Optional
 
 import typer
 from rich.panel import Panel
@@ -18,10 +17,12 @@ app.add_typer(profile_app, name="profile")
 @app.command()
 def report(
     push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
-    schedule: Optional[str] = typer.Option(
+    schedule: str | None = typer.Option(
         None, "--schedule", "-s", help="配置定时推送时间 (HH:MM)"
     ),
-    enable: Optional[bool] = typer.Option(None, "--enable/--disable", help="启用/禁用定时推送"),
+    enable: bool | None = typer.Option(
+        None, "--enable/--disable", help="启用/禁用定时推送"
+    ),
     status: bool = typer.Option(False, "--status", help="查看定时推送状态"),
     age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
 ) -> None:
@@ -185,7 +186,11 @@ def _display_report(report_data: dict) -> None:
 
     status_text = fitness.get("status", "数据不足")
     status_color = (
-        "green" if "良好" in status_text else "yellow" if "注意" in status_text else "red"
+        "green"
+        if "良好" in status_text
+        else "yellow"
+        if "注意" in status_text
+        else "red"
     )
     fitness_table.add_row("评估", f"[{status_color}]{status_text}[/{status_color}]")
     console.print(fitness_table)
@@ -326,8 +331,12 @@ def profile_show(
         training_table.add_column("指标", style="cyan")
         training_table.add_column("数值", style="green")
         training_table.add_row("周平均跑量", f"{profile.weekly_avg_distance_km:.2f} km")
-        training_table.add_row("周平均时长", f"{profile.weekly_avg_duration_hours:.2f} 小时")
-        training_table.add_row("训练模式", f"[bold]{profile.training_pattern.value}[/bold]")
+        training_table.add_row(
+            "周平均时长", f"{profile.weekly_avg_duration_hours:.2f} 小时"
+        )
+        training_table.add_row(
+            "训练模式", f"[bold]{profile.training_pattern.value}[/bold]"
+        )
         training_table.add_row("训练一致性", f"{profile.consistency_score:.1f}/100")
         console.print(training_table)
 
@@ -345,9 +354,15 @@ def profile_show(
             "green" if profile.tsb > 0 else "yellow" if profile.tsb > -20 else "red"
         )
 
-        load_table.add_row("ATL (疲劳)", f"[{atl_color}]{profile.atl:.2f}[/{atl_color}]")
-        load_table.add_row("CTL (体能)", f"[{ctl_color}]{profile.ctl:.2f}[/{ctl_color}]")
-        load_table.add_row("TSB (状态)", f"[{tsb_color}]{profile.tsb:.2f}[/{tsb_color}]")
+        load_table.add_row(
+            "ATL (疲劳)", f"[{atl_color}]{profile.atl:.2f}[/{atl_color}]"
+        )
+        load_table.add_row(
+            "CTL (体能)", f"[{ctl_color}]{profile.ctl:.2f}[/{ctl_color}]"
+        )
+        load_table.add_row(
+            "TSB (状态)", f"[{tsb_color}]{profile.tsb:.2f}[/{tsb_color}]"
+        )
         console.print(load_table)
 
         risk_color = (

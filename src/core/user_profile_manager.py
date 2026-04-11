@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from src.core.logger import get_logger
 
@@ -82,9 +82,9 @@ class RunnerProfile:
 
     data_quality_score: float = 0.0
     analysis_period_days: int = 0
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "user_id": self.user_id,
@@ -118,7 +118,7 @@ class RunnerProfile:
 class ProfileStorageManager:
     """画像双存储管理器"""
 
-    def __init__(self, workspace_dir: Optional[Path] = None) -> None:
+    def __init__(self, workspace_dir: Path | None = None) -> None:
         self.workspace_dir = workspace_dir or Path.home() / ".nanobot-runner"
         self.profile_json_path = self.workspace_dir / "data" / "profile.json"
         self.memory_md_path = self.workspace_dir / "memory" / "MEMORY.md"
@@ -148,14 +148,14 @@ class ProfileStorageManager:
             logger.error(f"保存 profile.json 失败：{e}")
             raise RuntimeError(f"保存 profile.json 失败：{e}") from e
 
-    def load_profile_json(self) -> Optional[RunnerProfile]:
+    def load_profile_json(self) -> RunnerProfile | None:
         """从 profile.json 加载画像"""
         try:
             if not self.profile_json_path.exists():
                 logger.debug(f"profile.json 不存在：{self.profile_json_path}")
                 return None
 
-            with open(self.profile_json_path, "r", encoding="utf-8") as f:
+            with open(self.profile_json_path, encoding="utf-8") as f:
                 profile_data = json.load(f)
 
             profile = self._dict_to_profile(profile_data)
@@ -168,7 +168,7 @@ class ProfileStorageManager:
             logger.error(f"加载 profile.json 失败：{e}")
             raise RuntimeError(f"加载 profile.json 失败：{e}") from e
 
-    def _dict_to_profile(self, data: Dict[str, Any]) -> RunnerProfile:
+    def _dict_to_profile(self, data: dict[str, Any]) -> RunnerProfile:
         """将字典转换为 RunnerProfile 对象"""
         profile = RunnerProfile(
             user_id=data.get("user_id", "default_user"),
@@ -303,8 +303,8 @@ class UserProfileManager:
 
     def __init__(
         self,
-        storage_manager: "StorageManager",
-        workspace_dir: Optional[Path] = None,
+        storage_manager: StorageManager,
+        workspace_dir: Path | None = None,
     ) -> None:
         """
         初始化用户画像管理器
@@ -330,7 +330,7 @@ class UserProfileManager:
         md_success = self.storage_manager.save_memory_md(profile)
         return json_success and md_success
 
-    def load_profile(self) -> Optional[RunnerProfile]:
+    def load_profile(self) -> RunnerProfile | None:
         """
         加载画像
 

@@ -1,10 +1,10 @@
 # 装饰器模块
 # 提供通用装饰器功能
 
-import json
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 from src.core.exceptions import NanobotRunnerError, ToolResult, ValidationError
 
@@ -33,7 +33,9 @@ def tool_wrapper(func: Callable) -> Callable:
             return ToolResult(success=True, data=result).to_json()
         except ValidationError as e:
             logger.error(f"输入验证失败: {e.message}", exc_info=True)
-            return ToolResult(success=False, error=f"输入验证失败: {e.message}").to_json()
+            return ToolResult(
+                success=False, error=f"输入验证失败: {e.message}"
+            ).to_json()
         except FileNotFoundError as e:
             logger.error(f"文件不存在: {e}", exc_info=True)
             return ToolResult(success=False, error=f"文件不存在: {e}").to_json()
@@ -67,7 +69,9 @@ def handle_tool_errors(
             try:
                 return func(*args, **kwargs)
             except NanobotRunnerError as e:
-                logger.error(f"工具调用失败：{func.__name__} - {e.message}", exc_info=True)
+                logger.error(
+                    f"工具调用失败：{func.__name__} - {e.message}", exc_info=True
+                )
                 return e.to_dict()
             except FileNotFoundError:
                 return {"error": "暂无数据，请先导入跑步数据"}

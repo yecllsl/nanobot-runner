@@ -2,7 +2,7 @@
 # 编排解析、索引、存储等模块，实现数据导入功能
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 from rich.console import Console
@@ -25,9 +25,9 @@ class ImportService:
 
     def __init__(
         self,
-        parser: Optional[FitParser] = None,
-        storage: Optional[StorageManager] = None,
-        indexer: Optional[IndexManager] = None,
+        parser: FitParser | None = None,
+        storage: StorageManager | None = None,
+        indexer: IndexManager | None = None,
     ) -> None:
         """初始化导入服务"""
         self.console = Console()
@@ -35,7 +35,7 @@ class ImportService:
         self.indexer = indexer or IndexManager()
         self.storage = storage or StorageManager()
 
-    def scan_directory(self, directory: Path) -> List[Path]:
+    def scan_directory(self, directory: Path) -> list[Path]:
         """
         扫描目录下的所有FIT文件
 
@@ -49,7 +49,7 @@ class ImportService:
 
     def process_file(
         self, filepath: Path, progress: Progress, task_id: TaskID
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         result = {
             "filepath": str(filepath),
             "filename": filepath.stem,
@@ -105,14 +105,14 @@ class ImportService:
         progress.update(task_id, advance=1)
         return result
 
-    def import_file(self, filepath: Path, force: bool = False) -> Dict[str, Any]:
+    def import_file(self, filepath: Path, force: bool = False) -> dict[str, Any]:
         self.console.print(f"[bold]正在处理: {filepath.name}[/bold]")
         logger.debug(f"开始导入文件: {filepath}")
 
         try:
             metadata = self.parser.parse_file_metadata(filepath)
         except ParseError as e:
-            self.console.print(f"[red]错误: 解析元数据失败[/red]")
+            self.console.print("[red]错误: 解析元数据失败[/red]")
             logger.warning(f"解析元数据失败: {filepath}, 原因: {e.message}")
             return {"status": "error", "message": f"解析元数据失败: {e.message}"}
 
@@ -143,13 +143,17 @@ class ImportService:
             self.indexer.add(fingerprint, metadata)
             self.console.print(f"[green]新增: 导入成功 ({filepath.name})[/green]")
             logger.info(f"文件导入成功: {filepath}, 年份: {year}, 记录数: {df.height}")
-            return {"status": "added", "message": "导入成功", "fingerprint": fingerprint}
+            return {
+                "status": "added",
+                "message": "导入成功",
+                "fingerprint": fingerprint,
+            }
         else:
             self.console.print("[red]错误: 保存失败[/red]")
             logger.error(f"保存文件失败: {filepath}")
             return {"status": "error", "message": "保存失败"}
 
-    def import_directory(self, directory: Path, force: bool = False) -> Dict[str, Any]:
+    def import_directory(self, directory: Path, force: bool = False) -> dict[str, Any]:
         fit_files = self.scan_directory(directory)
 
         if not fit_files:
@@ -178,7 +182,7 @@ class ImportService:
                     errors += 1
 
         self.console.print("\n" + "=" * 50)
-        self.console.print(f"[bold]导入完成:[/bold]")
+        self.console.print("[bold]导入完成:[/bold]")
         self.console.print(f"  新增: [green]{added}[/green] 条记录")
         self.console.print(f"  跳过: [yellow]{skipped}[/yellow] 条重复")
         self.console.print(f"  错误: [red]{errors}[/red] 个")

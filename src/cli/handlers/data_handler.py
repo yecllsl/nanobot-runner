@@ -2,7 +2,6 @@
 # 负责数据导入和统计的业务逻辑调用
 
 from pathlib import Path
-from typing import List, Optional
 
 import polars as pl
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -13,7 +12,7 @@ from src.core.context import AppContext, AppContextFactory
 class DataHandler:
     """数据处理业务逻辑"""
 
-    def __init__(self, context: Optional[AppContext] = None) -> None:
+    def __init__(self, context: AppContext | None = None) -> None:
         """
         初始化数据处理器
 
@@ -44,7 +43,7 @@ class DataHandler:
 
     def import_directory(
         self, directory: Path, force: bool = False
-    ) -> tuple[int, int, List[str]]:
+    ) -> tuple[int, int, list[str]]:
         """
         导入目录中的所有 FIT 文件
 
@@ -77,15 +76,17 @@ class DataHandler:
                 elif result.get("status") == "skipped":
                     skip_count += 1
                 else:
-                    errors.append(f"{fit_file.name}: {result.get('message', '未知错误')}")
+                    errors.append(
+                        f"{fit_file.name}: {result.get('message', '未知错误')}"
+                    )
 
         return success_count, skip_count, errors
 
     def get_stats(
         self,
-        year: Optional[int] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        year: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> pl.DataFrame:
         """
         获取统计数据
@@ -111,7 +112,7 @@ class DataHandler:
         return df
 
     def _filter_by_date_range(
-        self, df: pl.DataFrame, start_date: Optional[str], end_date: Optional[str]
+        self, df: pl.DataFrame, start_date: str | None, end_date: str | None
     ) -> pl.DataFrame:
         """
         按日期范围过滤数据

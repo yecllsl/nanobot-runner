@@ -2,9 +2,9 @@
 # 通过飞书机器人按时提醒用户执行训练，支持智能免打扰
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.models import DailyPlan, NotifyResult, UserContext, WeatherInfo
 from src.notify.feishu import FeishuBot
@@ -50,7 +50,7 @@ class WeatherService:
     HEAVY_RAIN_THRESHOLD = 25.0  # 大雨阈值（mm/h）
     STRONG_WIND_SPEED = 15.0  # 强风阈值（m/s）
 
-    def __init__(self, api_key: Optional[str] = None, city: str = "北京"):
+    def __init__(self, api_key: str | None = None, city: str = "北京"):
         """
         初始化天气服务
 
@@ -61,7 +61,7 @@ class WeatherService:
         self.api_key = api_key
         self.city = city
 
-    def get_weather(self, date: Optional[str] = None) -> WeatherInfo:
+    def get_weather(self, date: str | None = None) -> WeatherInfo:
         """
         获取天气信息
 
@@ -132,8 +132,8 @@ class NotifyTool:
 
     def __init__(
         self,
-        feishu_bot: Optional[FeishuBot] = None,
-        weather_service: Optional[WeatherService] = None,
+        feishu_bot: FeishuBot | None = None,
+        weather_service: WeatherService | None = None,
     ):
         """
         初始化通知工具
@@ -162,7 +162,9 @@ class NotifyTool:
         Returns:
             NotifyResult: 通知结果
         """
-        logger.info(f"准备发送训练提醒：日期={daily_plan.date}, 类型={daily_plan.workout_type}")
+        logger.info(
+            f"准备发送训练提醒：日期={daily_plan.date}, 类型={daily_plan.workout_type}"
+        )
 
         # 检查免打扰规则
         if check_do_not_disturb:
@@ -217,7 +219,7 @@ class NotifyTool:
 
     def _check_do_not_disturb(
         self, daily_plan: DailyPlan, user_context: UserContext
-    ) -> Optional[SkipReason]:
+    ) -> SkipReason | None:
         """
         检查免打扰规则
 
@@ -392,9 +394,9 @@ class NotifyTool:
 
     def send_batch_reminders(
         self,
-        daily_plans: List[DailyPlan],
+        daily_plans: list[DailyPlan],
         user_context: UserContext,
-    ) -> List[NotifyResult]:
+    ) -> list[NotifyResult]:
         """
         批量发送训练提醒
 
@@ -414,8 +416,8 @@ class NotifyTool:
         return results
 
     def get_today_plan(
-        self, user_context: UserContext, plans: List[Any]
-    ) -> Optional[DailyPlan]:
+        self, user_context: UserContext, plans: list[Any]
+    ) -> DailyPlan | None:
         """
         获取今日训练计划
 

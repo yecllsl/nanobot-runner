@@ -1,18 +1,14 @@
 # CalendarTool 补充单元测试
 # 提高覆盖率至80%以上
 
-import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.core.plan.calendar_tool import (
-    BatchSyncResult,
     CalendarTool,
     HealthCheckItem,
-    HealthCheckResult,
-    OptimisticUpdateContext,
     SyncMode,
 )
 from src.core.training_plan import (
@@ -261,11 +257,12 @@ class TestSyncPlanExtended:
         """TC-M5-015: 同步计划-UPDATE模式"""
         plan = create_test_plan("test_plan", with_event_id=True)
 
-        with patch.object(
-            calendar_tool._sync_service, "_api"
-        ) as mock_api, patch.object(
-            calendar_tool._sync_service, "update_event", new_callable=AsyncMock
-        ) as mock_update:
+        with (
+            patch.object(calendar_tool._sync_service, "_api") as mock_api,
+            patch.object(
+                calendar_tool._sync_service, "update_event", new_callable=AsyncMock
+            ) as mock_update,
+        ):
             mock_api.return_value = MagicMock()
             mock_update.return_value = SyncResult(success=True, message="更新成功")
 
@@ -278,11 +275,12 @@ class TestSyncPlanExtended:
         """TC-M5-016: 同步计划-DELETE模式"""
         plan = create_test_plan("test_plan", with_event_id=True)
 
-        with patch.object(
-            calendar_tool._sync_service, "_api"
-        ) as mock_api, patch.object(
-            calendar_tool._sync_service, "_get_default_calendar_id"
-        ) as mock_calendar_id:
+        with (
+            patch.object(calendar_tool._sync_service, "_api") as mock_api,
+            patch.object(
+                calendar_tool._sync_service, "_get_default_calendar_id"
+            ) as mock_calendar_id,
+        ):
             mock_api.delete_event = AsyncMock()
             mock_calendar_id.return_value = "calendar_123"
 
@@ -306,11 +304,12 @@ class TestSyncPlanExtended:
         """同步计划删除-无日历ID"""
         plan = create_test_plan("test_plan", with_event_id=True)
 
-        with patch.object(
-            calendar_tool._sync_service, "_api"
-        ) as mock_api, patch.object(
-            calendar_tool._sync_service, "_get_default_calendar_id"
-        ) as mock_calendar_id:
+        with (
+            patch.object(calendar_tool._sync_service, "_api") as mock_api,
+            patch.object(
+                calendar_tool._sync_service, "_get_default_calendar_id"
+            ) as mock_calendar_id,
+        ):
             mock_api.return_value = MagicMock()
             mock_calendar_id.return_value = None
 
@@ -366,11 +365,12 @@ class TestSyncDailyWorkoutExtended:
         )
         date = datetime.strptime("2026-04-10", "%Y-%m-%d")
 
-        with patch.object(
-            calendar_tool._sync_service, "_api"
-        ) as mock_api, patch.object(
-            calendar_tool._sync_service, "_get_default_calendar_id"
-        ) as mock_calendar_id:
+        with (
+            patch.object(calendar_tool._sync_service, "_api") as mock_api,
+            patch.object(
+                calendar_tool._sync_service, "_get_default_calendar_id"
+            ) as mock_calendar_id,
+        ):
             mock_api.delete_event = AsyncMock()
             mock_calendar_id.return_value = "calendar_123"
 

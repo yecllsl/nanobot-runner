@@ -1,8 +1,6 @@
 # 分析引擎单元测试
 # 测试数据分析功能
 
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import polars as pl
@@ -648,7 +646,6 @@ class TestTrainingLoad:
     def test_get_training_load_with_data(self):
         """测试有数据的训练负荷"""
         from datetime import datetime
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -843,7 +840,6 @@ class TestTrainingLoad:
     def test_get_training_load_no_heart_rate_data(self):
         """测试无心率数据时的训练负荷"""
         from datetime import datetime
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -901,7 +897,6 @@ class TestTrainingLoad:
     def test_get_training_load_insufficient_data_warning(self):
         """测试数据量不足时的警告提示"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -943,7 +938,6 @@ class TestTrainingLoad:
     def test_get_training_load_short_period_warning(self):
         """测试分析周期过短时的警告提示"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -985,7 +979,6 @@ class TestTrainingLoad:
     def test_get_training_load_tsb_calculation(self):
         """测试 TSB 计算正确性"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -1033,7 +1026,6 @@ class TestTrainingLoad:
         """测试训练负荷计算性能（1000 条记录 < 2 秒）"""
         import time
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -1080,7 +1072,6 @@ class TestTrainingLoad:
 
     def test_ewma_industry_standard_comparison(self):
         """测试 EWMA 计算与行业标准对比（误差 < 10%）"""
-        import math
 
         engine = AnalyticsEngine(Mock())
 
@@ -1097,7 +1088,6 @@ class TestTrainingLoad:
     def test_get_training_load_sorted_by_timestamp(self):
         """测试数据按时间戳排序"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2355,7 +2345,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_no_heart_rate(self):
         """测试无心率数据的训练负荷趋势"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2386,7 +2375,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_with_data(self):
         """测试有数据的训练负荷趋势"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2435,8 +2423,7 @@ class TestTrainingLoadTrend:
 
     def test_get_training_load_trend_with_date_range(self):
         """测试使用日期范围的训练负荷趋势"""
-        from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
+        from datetime import datetime
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2489,7 +2476,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_days_parameter(self):
         """测试 days 参数优先级"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2519,8 +2505,7 @@ class TestTrainingLoadTrend:
 
     def test_get_training_load_trend_tss_aggregation(self):
         """测试 TSS 按日期聚合"""
-        from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
+        from datetime import datetime
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2555,8 +2540,7 @@ class TestTrainingLoadTrend:
 
     def test_get_training_load_trend_fill_missing_dates(self):
         """测试填充缺失日期"""
-        from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
+        from datetime import datetime
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2594,7 +2578,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_ewma_calculation(self):
         """测试 EWMA 计算正确性"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2631,7 +2614,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_status_evaluation(self):
         """测试体能状态评估"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2671,7 +2653,6 @@ class TestTrainingLoadTrend:
         """测试性能要求（90 天数据 < 3 秒）"""
         import time
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2707,7 +2688,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_default_90_days(self):
         """测试默认 90 天范围"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2737,7 +2717,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_summary_correctness(self):
         """测试汇总数据正确性"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2771,7 +2750,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_with_history_data(self):
         """测试包含历史数据的 EWMA 计算"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2806,7 +2784,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_zero_tss_filtering(self):
         """测试 TSS 为 0 的记录被过滤"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2840,7 +2817,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_chronological_order(self):
         """测试数据按时间顺序排列"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2871,7 +2847,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_tsb_progression(self):
         """测试 TSB 变化趋势"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2904,7 +2879,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_days_analyzed(self):
         """测试 days_analyzed 字段"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2932,7 +2906,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_recommendation_content(self):
         """测试训练建议内容"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2963,7 +2936,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_single_day(self):
         """测试单日查询"""
         from datetime import datetime
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -2994,7 +2966,6 @@ class TestTrainingLoadTrend:
     def test_get_training_load_trend_empty_trend_data_edge_case(self):
         """测试 trend_data 为空但 tss_records 不为空的边界情况"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3065,7 +3036,10 @@ class TestCalculateTssForRun:
         engine = AnalyticsEngine(Mock())
 
         tss = engine.calculate_tss_for_run(
-            distance_m=5000, duration_s=1800, avg_heart_rate=60, age=30  # 等于默认静息心率
+            distance_m=5000,
+            duration_s=1800,
+            avg_heart_rate=60,
+            age=30,  # 等于默认静息心率
         )
 
         assert tss == 0.0
@@ -3264,8 +3238,6 @@ class TestDailyReport:
 
     def test_generate_daily_report_success(self):
         """测试成功生成晨报"""
-        from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3301,7 +3273,6 @@ class TestDailyReport:
     def test_generate_daily_report_with_yesterday_run(self):
         """测试有昨日训练数据的晨报"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3334,7 +3305,6 @@ class TestDailyReport:
 
     def test_generate_daily_report_no_yesterday_run(self):
         """测试无昨日训练数据的晨报"""
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3660,7 +3630,6 @@ class TestDailyReport:
     def test_get_yesterday_run_success(self):
         """测试成功获取昨日训练"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3689,7 +3658,6 @@ class TestDailyReport:
     def test_get_yesterday_run_no_data(self):
         """测试无昨日训练数据"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3707,7 +3675,6 @@ class TestDailyReport:
     def test_get_yesterday_run_exception(self):
         """测试获取昨日训练异常处理"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_storage.read_parquet.side_effect = Exception("数据库错误")
@@ -3722,7 +3689,6 @@ class TestDailyReport:
     def test_generate_daily_report_performance(self):
         """测试晨报生成性能（< 1秒）"""
         import time
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3743,7 +3709,6 @@ class TestDailyReport:
 
     def test_generate_daily_report_different_ages(self):
         """测试不同年龄的晨报生成"""
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3816,7 +3781,6 @@ class TestDailyReport:
 
     def test_generate_daily_report_complete_structure(self):
         """测试晨报完整结构"""
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()
@@ -3883,7 +3847,6 @@ class TestDailyReport:
     def test_get_yesterday_run_multiple_runs(self):
         """测试昨日多次训练"""
         from datetime import datetime, timedelta
-        from unittest.mock import MagicMock
 
         mock_storage = MagicMock()
         mock_lf = MagicMock()

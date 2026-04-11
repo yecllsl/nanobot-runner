@@ -2,7 +2,7 @@
 # 基于 Typer 和 Rich 的本地跑步数据助理
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import polars as pl
 import typer
@@ -18,7 +18,6 @@ from rich.progress import (
 )
 from rich.prompt import Prompt
 from rich.table import Table
-from rich.text import Text
 
 from src.core.config import ConfigManager
 from src.core.importer import ImportService
@@ -185,7 +184,8 @@ def import_data(
 
             console.print()
             print_status(
-                f"[OK] 导入完成: 新增 {stats['added']} 个，跳过 {stats['skipped']} 个", "success"
+                f"[OK] 导入完成: 新增 {stats['added']} 个，跳过 {stats['skipped']} 个",
+                "success",
             )
             if stats["failed"] > 0:
                 print_status(f"  失败 {stats['failed']} 个文件", "warning")
@@ -200,11 +200,11 @@ def import_data(
 
 @app.command()
 def stats(
-    year: Optional[int] = typer.Option(None, "--year", "-y", help="指定年份"),
-    start_date: Optional[str] = typer.Option(
+    year: int | None = typer.Option(None, "--year", "-y", help="指定年份"),
+    start_date: str | None = typer.Option(
         None, "--start", "-s", help="开始日期 (YYYY-MM-DD)"
     ),
-    end_date: Optional[str] = typer.Option(
+    end_date: str | None = typer.Option(
         None, "--end", "-e", help="结束日期 (YYYY-MM-DD)"
     ),
 ) -> None:
@@ -243,7 +243,9 @@ def stats(
 
         if df.is_empty():
             print_status("暂无跑步数据", "warning")
-            console.print("[dim]提示: 使用 'nanobotrun import-data <路径>' 导入FIT文件[/dim]")
+            console.print(
+                "[dim]提示: 使用 'nanobotrun import-data <路径>' 导入FIT文件[/dim]"
+            )
             return
 
         from datetime import datetime
@@ -374,7 +376,7 @@ async def _run_chat() -> None:
 
         agent.tools = registry
 
-        console.print(f"[bold green][OK] Agent 已初始化[/bold green]")
+        console.print("[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {agent_defaults.model}[/dim]")
         console.print()
 
@@ -419,7 +421,9 @@ def version() -> None:
 @app.command()
 def vdot(
     limit: int = typer.Option(10, "--limit", "-n", help="显示最近 N 条记录"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="输出文件路径（JSON）"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="输出文件路径（JSON）"
+    ),
 ) -> None:
     """
     查看 VDOT 趋势
@@ -569,7 +573,9 @@ def recent(
 
         if not runs:
             console.print("[yellow]暂无训练记录[/yellow]")
-            console.print("[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]")
+            console.print(
+                "[dim]提示: 使用 'nanobotrun import <路径>' 导入FIT文件[/dim]"
+            )
             return
 
         table = Table(show_header=True, header_style="bold cyan")
@@ -745,7 +751,7 @@ def init() -> None:
 
     if not workspace.exists():
         workspace.mkdir(parents=True, exist_ok=True)
-        console.print(f"[green]✓[/green] 创建工作区目录")
+        console.print("[green]✓[/green] 创建工作区目录")
 
     data_dir = config.data_dir
     if not data_dir.exists():
@@ -760,7 +766,7 @@ def init() -> None:
     else:
         console.print("[dim]模板文件已是最新[/dim]")
 
-    console.print(f"\n[bold green]工作区初始化完成！[/bold green]")
+    console.print("\n[bold green]工作区初始化完成！[/bold green]")
     console.print(f"工作区路径: [cyan]{workspace}[/cyan]")
     console.print(f"数据路径: [cyan]{data_dir}[/cyan]")
     console.print("\n下一步:")
@@ -799,7 +805,7 @@ def gateway(
     from nanobot.bus import MessageBus
     from nanobot.channels.manager import ChannelManager
     from nanobot.cli.commands import _make_provider
-    from nanobot.config.loader import get_data_dir, load_config
+    from nanobot.config.loader import load_config
     from nanobot.cron.service import CronService
     from nanobot.cron.types import CronJob
     from nanobot.heartbeat.service import HeartbeatService
@@ -937,7 +943,9 @@ def gateway(
     )
 
     if channels.enabled_channels:
-        console.print(f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}")
+        console.print(
+            f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}"
+        )
     else:
         console.print("[yellow]警告: 未启用任何通道[/yellow]")
 
@@ -979,10 +987,12 @@ def gateway(
 @app.command()
 def report(
     push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
-    schedule: Optional[str] = typer.Option(
+    schedule: str | None = typer.Option(
         None, "--schedule", "-s", help="配置定时推送时间 (HH:MM)"
     ),
-    enable: Optional[bool] = typer.Option(None, "--enable/--disable", help="启用/禁用定时推送"),
+    enable: bool | None = typer.Option(
+        None, "--enable/--disable", help="启用/禁用定时推送"
+    ),
     status: bool = typer.Option(False, "--status", help="查看定时推送状态"),
     age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
 ):
@@ -1149,7 +1159,11 @@ def _display_report(report_data: dict):
 
     status_text = fitness.get("status", "数据不足")
     status_color = (
-        "green" if "良好" in status_text else "yellow" if "注意" in status_text else "red"
+        "green"
+        if "良好" in status_text
+        else "yellow"
+        if "注意" in status_text
+        else "red"
     )
     fitness_table.add_row("评估", f"[{status_color}]{status_text}[/{status_color}]")
     console.print(fitness_table)
@@ -1295,8 +1309,12 @@ def profile_show(
         training_table.add_column("指标", style="cyan")
         training_table.add_column("数值", style="green")
         training_table.add_row("周平均跑量", f"{profile.weekly_avg_distance_km:.2f} km")
-        training_table.add_row("周平均时长", f"{profile.weekly_avg_duration_hours:.2f} 小时")
-        training_table.add_row("训练模式", f"[bold]{profile.training_pattern.value}[/bold]")
+        training_table.add_row(
+            "周平均时长", f"{profile.weekly_avg_duration_hours:.2f} 小时"
+        )
+        training_table.add_row(
+            "训练模式", f"[bold]{profile.training_pattern.value}[/bold]"
+        )
         training_table.add_row("训练一致性", f"{profile.consistency_score:.1f}/100")
         console.print(training_table)
 
@@ -1314,9 +1332,15 @@ def profile_show(
             "green" if profile.tsb > 0 else "yellow" if profile.tsb > -20 else "red"
         )
 
-        load_table.add_row("ATL (疲劳)", f"[{atl_color}]{profile.atl:.2f}[/{atl_color}]")
-        load_table.add_row("CTL (体能)", f"[{ctl_color}]{profile.ctl:.2f}[/{ctl_color}]")
-        load_table.add_row("TSB (状态)", f"[{tsb_color}]{profile.tsb:.2f}[/{tsb_color}]")
+        load_table.add_row(
+            "ATL (疲劳)", f"[{atl_color}]{profile.atl:.2f}[/{atl_color}]"
+        )
+        load_table.add_row(
+            "CTL (体能)", f"[{ctl_color}]{profile.ctl:.2f}[/{ctl_color}]"
+        )
+        load_table.add_row(
+            "TSB (状态)", f"[{tsb_color}]{profile.tsb:.2f}[/{tsb_color}]"
+        )
         console.print(load_table)
 
         risk_color = (

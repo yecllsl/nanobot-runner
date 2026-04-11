@@ -2,7 +2,6 @@
 # 包含 import-data 和 stats 命令
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -49,7 +48,7 @@ def import_data(
                 path_obj, force=force
             )
 
-            console.print(f"\n[bold]导入完成:[/bold]")
+            console.print("\n[bold]导入完成:[/bold]")
             console.print(f"  [green]成功:[/green] {success_count} 个文件")
             console.print(f"  [yellow]跳过:[/yellow] {skip_count} 个文件")
 
@@ -71,11 +70,11 @@ def import_data(
 
 @app.command()
 def stats(
-    year: Optional[int] = typer.Option(None, "--year", "-y", help="指定年份"),
-    start_date: Optional[str] = typer.Option(
+    year: int | None = typer.Option(None, "--year", "-y", help="指定年份"),
+    start_date: str | None = typer.Option(
         None, "--start", "-s", help="开始日期 (YYYY-MM-DD)"
     ),
-    end_date: Optional[str] = typer.Option(
+    end_date: str | None = typer.Option(
         None, "--end", "-e", help="结束日期 (YYYY-MM-DD)"
     ),
 ) -> None:

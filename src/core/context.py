@@ -2,7 +2,7 @@
 # 提供依赖注入和统一的对象管理
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from src.core.analytics import AnalyticsEngine
 from src.core.config import ConfigManager
@@ -43,7 +43,7 @@ class AppContext:
     # 可选的扩展组件
     _extensions: dict = field(default_factory=dict)
 
-    def get_extension(self, name: str) -> Optional[Any]:
+    def get_extension(self, name: str) -> Any | None:
         """
         获取扩展组件
 
@@ -75,14 +75,14 @@ class AppContextFactory:
 
     @staticmethod
     def create(
-        config: Optional[ConfigManager] = None,
-        storage: Optional[StorageManager] = None,
-        indexer: Optional[IndexManager] = None,
-        parser: Optional[FitParser] = None,
-        importer: Optional[ImportService] = None,
-        analytics: Optional[AnalyticsEngine] = None,
-        profile_engine: Optional[ProfileEngine] = None,
-        profile_storage: Optional[ProfileStorageManager] = None,
+        config: ConfigManager | None = None,
+        storage: StorageManager | None = None,
+        indexer: IndexManager | None = None,
+        parser: FitParser | None = None,
+        importer: ImportService | None = None,
+        analytics: AnalyticsEngine | None = None,
+        profile_engine: ProfileEngine | None = None,
+        profile_storage: ProfileStorageManager | None = None,
     ) -> AppContext:
         """
         创建应用上下文
@@ -147,14 +147,14 @@ class AppContextFactory:
 
     @staticmethod
     def create_for_testing(
-        config: Optional[ConfigManager] = None,
-        storage: Optional[StorageManager] = None,
-        indexer: Optional[IndexManager] = None,
-        parser: Optional[FitParser] = None,
-        importer: Optional[ImportService] = None,
-        analytics: Optional[AnalyticsEngine] = None,
-        profile_engine: Optional[ProfileEngine] = None,
-        profile_storage: Optional[ProfileStorageManager] = None,
+        config: ConfigManager | None = None,
+        storage: StorageManager | None = None,
+        indexer: IndexManager | None = None,
+        parser: FitParser | None = None,
+        importer: ImportService | None = None,
+        analytics: AnalyticsEngine | None = None,
+        profile_engine: ProfileEngine | None = None,
+        profile_storage: ProfileStorageManager | None = None,
     ) -> AppContext:
         """
         创建用于测试的应用上下文
@@ -188,7 +188,7 @@ class AppContextFactory:
 
 
 # 全局上下文实例（延迟初始化）
-_global_context: Optional[AppContext] = None
+_global_context: AppContext | None = None
 
 
 def get_context() -> AppContext:

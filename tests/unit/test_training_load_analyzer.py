@@ -1,14 +1,11 @@
 # TrainingLoadAnalyzer 单元测试
 
-import math
-from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
 
 from src.core.training_load_analyzer import (
     ATL_TIME_CONSTANT,
-    CTL_TIME_CONSTANT,
     TrainingLoadAnalyzer,
 )
 

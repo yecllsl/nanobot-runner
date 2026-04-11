@@ -4,7 +4,7 @@
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -25,7 +25,7 @@ def create_e2e_plan(plan_id: str, with_event_id: bool = False) -> TrainingPlan:
     """创建E2E测试训练计划"""
     daily_plans = [
         DailyPlan(
-            date=f"2026-04-{10+i:02d}",
+            date=f"2026-04-{10 + i:02d}",
             workout_type=WorkoutType.EASY if i % 2 == 0 else WorkoutType.LONG,
             distance_km=5.0 + i,
             duration_min=30 + i * 5,

@@ -4,7 +4,7 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import polars as pl
 import pytest
@@ -581,7 +581,6 @@ class TestFitParserAdvanced:
 
     def test_parse_directory_success(self):
         """测试成功解析目录"""
-        import os
         import tempfile
 
         parser = FitParser()

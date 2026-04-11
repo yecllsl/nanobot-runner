@@ -2,9 +2,8 @@
 # 分析心率漂移、心率区间、训练效果等
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
 import polars as pl
 
 if TYPE_CHECKING:
@@ -24,8 +23,8 @@ class HeartRateAnalyzer:
         self.storage = storage_manager
 
     def analyze_hr_drift(
-        self, heart_rate: List[float], pace: List[float]
-    ) -> Dict[str, Any]:
+        self, heart_rate: list[float], pace: list[float]
+    ) -> dict[str, Any]:
         """
         分析心率漂移情况
 
@@ -88,7 +87,7 @@ class HeartRateAnalyzer:
 
     def analyze_hr_drift_vectorized(
         self, heart_rate: pl.Series, pace: pl.Series
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         向量化分析心率漂移情况
 
@@ -153,7 +152,7 @@ class HeartRateAnalyzer:
 
     def analyze_hr_drift_batch(
         self, df: pl.DataFrame, hr_col: str = "heart_rate", pace_col: str = "pace"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         批量分析心率漂移情况
 
@@ -193,7 +192,7 @@ class HeartRateAnalyzer:
 
         return results
 
-    def _calculate_hr_zones(self, max_hr: int) -> Dict[str, tuple]:
+    def _calculate_hr_zones(self, max_hr: int) -> dict[str, tuple]:
         """
         计算心率区间边界
 
@@ -212,8 +211,8 @@ class HeartRateAnalyzer:
         }
 
     def _calculate_zone_time(
-        self, heart_rate_data: List[int], hr_zones: Dict[str, tuple]
-    ) -> Dict[str, int]:
+        self, heart_rate_data: list[int], hr_zones: dict[str, tuple]
+    ) -> dict[str, int]:
         """
         计算各心率区间的时长（秒）
 
@@ -246,8 +245,8 @@ class HeartRateAnalyzer:
         return zone_time
 
     def _calculate_zone_time_vectorized(
-        self, heart_rate_series: pl.Series, hr_zones: Dict[str, tuple]
-    ) -> Dict[str, int]:
+        self, heart_rate_series: pl.Series, hr_zones: dict[str, tuple]
+    ) -> dict[str, int]:
         """
         向量化计算各心率区间的时长（秒）
 
@@ -299,7 +298,7 @@ class HeartRateAnalyzer:
         return zone_time
 
     def _calculate_aerobic_effect(
-        self, zone_time: Dict[str, int], total_duration: int
+        self, zone_time: dict[str, int], total_duration: int
     ) -> float:
         """
         计算有氧训练效果（1.0-5.0）
@@ -330,7 +329,7 @@ class HeartRateAnalyzer:
         return round(min(max(effect, 1.0), 5.0), 1)
 
     def _calculate_anaerobic_effect(
-        self, zone_time: Dict[str, int], total_duration: int
+        self, zone_time: dict[str, int], total_duration: int
     ) -> float:
         """
         计算无氧训练效果（1.0-5.0）
@@ -396,11 +395,11 @@ class HeartRateAnalyzer:
 
     def get_training_effect(
         self,
-        heart_rate_data: List[int],
+        heart_rate_data: list[int],
         duration_s: float,
         age: int = 30,
-        avg_heart_rate: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        avg_heart_rate: float | None = None,
+    ) -> dict[str, Any]:
         """
         获取训练效果评估
 
@@ -464,8 +463,8 @@ class HeartRateAnalyzer:
         self,
         df: pl.DataFrame,
         max_hr: int,
-        zone_boundaries: Dict[str, tuple],
-    ) -> Dict[str, Any]:
+        zone_boundaries: dict[str, tuple],
+    ) -> dict[str, Any]:
         """
         使用平均心率估算心率区间分布
 
@@ -550,9 +549,9 @@ class HeartRateAnalyzer:
     def get_heart_rate_zones(
         self,
         age: int = 30,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
         """
         计算心率区间分布
 

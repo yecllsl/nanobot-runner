@@ -5,7 +5,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
 
@@ -21,12 +21,12 @@ class CalendarSyncConfig:
     """日历同步配置"""
 
     enabled: bool = True
-    calendar_id: Optional[str] = None  # 指定日历 ID
+    calendar_id: str | None = None  # 指定日历 ID
     reminder_minutes: int = 60  # 提前提醒时间（分钟）
     sync_completed: bool = False  # 是否同步已完成训练
     include_description: bool = True  # 是否包含详细描述
-    app_id: Optional[str] = None  # 飞书应用 App ID
-    app_secret: Optional[str] = None  # 飞书应用 App Secret
+    app_id: str | None = None  # 飞书应用 App ID
+    app_secret: str | None = None  # 飞书应用 App Secret
 
 
 @dataclass
@@ -35,9 +35,9 @@ class SyncResult:
 
     success: bool
     message: str
-    event_id: Optional[str] = None
-    error: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    event_id: str | None = None
+    error: str | None = None
+    details: dict[str, Any] | None = None
 
 
 @dataclass
@@ -47,8 +47,8 @@ class CalendarEventCreateRequest:
     summary: str
     start_time: datetime
     end_time: datetime
-    description: Optional[str] = None
-    reminders: List[Dict[str, Any]] = field(default_factory=list)
+    description: str | None = None
+    reminders: list[dict[str, Any]] = field(default_factory=list)
 
 
 class FeishuCalendarAPI:
@@ -67,8 +67,8 @@ class FeishuCalendarAPI:
         """
         self.app_id = app_id
         self.app_secret = app_secret
-        self._access_token: Optional[str] = None
-        self._token_expire_time: Optional[float] = None
+        self._access_token: str | None = None
+        self._token_expire_time: float | None = None
 
     def _get_access_token(self) -> str:
         """
@@ -113,7 +113,7 @@ class FeishuCalendarAPI:
             logger.error(f"获取飞书访问令牌请求异常：{e}")
             raise RuntimeError(f"获取飞书访问令牌请求异常：{e}")
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """获取请求头"""
         token = self._get_access_token()
         return {
@@ -125,9 +125,9 @@ class FeishuCalendarAPI:
         self,
         method: str,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         通用请求方法
 
@@ -169,7 +169,7 @@ class FeishuCalendarAPI:
 
     async def create_event(
         self, calendar_id: str, event: CalendarEventCreateRequest
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         创建日历事件
 
@@ -207,8 +207,8 @@ class FeishuCalendarAPI:
         return result.get("data", {})
 
     async def update_event(
-        self, calendar_id: str, event_id: str, event: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, calendar_id: str, event_id: str, event: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         更新日历事件
 
@@ -227,7 +227,7 @@ class FeishuCalendarAPI:
         result = self._request("PATCH", endpoint, json=event)
         return result.get("data", {})
 
-    async def delete_event(self, calendar_id: str, event_id: str) -> Dict[str, Any]:
+    async def delete_event(self, calendar_id: str, event_id: str) -> dict[str, Any]:
         """
         删除日历事件
 
@@ -245,7 +245,7 @@ class FeishuCalendarAPI:
         result = self._request("DELETE", endpoint)
         return result.get("data", {})
 
-    async def get_event(self, calendar_id: str, event_id: str) -> Dict[str, Any]:
+    async def get_event(self, calendar_id: str, event_id: str) -> dict[str, Any]:
         """
         获取日历事件
 
@@ -263,7 +263,7 @@ class FeishuCalendarAPI:
         result = self._request("GET", endpoint)
         return result.get("data", {})
 
-    async def get_calendar_list(self) -> List[Dict[str, Any]]:
+    async def get_calendar_list(self) -> list[dict[str, Any]]:
         """
         获取日历列表
 
@@ -285,7 +285,7 @@ class FeishuCalendarSync:
     MAX_RETRIES = 3
     RETRY_DELAY = 1.0  # 秒
 
-    def __init__(self, config: Optional[CalendarSyncConfig] = None):
+    def __init__(self, config: CalendarSyncConfig | None = None):
         """
         初始化飞书日历同步服务
 
@@ -293,7 +293,7 @@ class FeishuCalendarSync:
             config: 同步配置，不指定则从配置文件读取
         """
         self.config = config or self._load_config()
-        self._api: Optional[FeishuCalendarAPI] = None
+        self._api: FeishuCalendarAPI | None = None
 
         # 初始化 API 客户端
         if self.config.app_id and self.config.app_secret:
@@ -317,7 +317,7 @@ class FeishuCalendarSync:
             app_secret=config_dict.get("feishu_app_secret"),
         )
 
-    def _get_default_calendar_id(self) -> Optional[str]:
+    def _get_default_calendar_id(self) -> str | None:
         """获取默认日历 ID"""
         if self.config.calendar_id:
             return self.config.calendar_id
@@ -420,10 +420,14 @@ class FeishuCalendarSync:
             SyncResult: 同步结果
         """
         if not self.config.enabled:
-            return SyncResult(success=False, message="日历同步功能未启用", error="功能未启用")
+            return SyncResult(
+                success=False, message="日历同步功能未启用", error="功能未启用"
+            )
 
         if not self._api:
-            return SyncResult(success=False, message="飞书 API 未初始化", error="API 凭证缺失")
+            return SyncResult(
+                success=False, message="飞书 API 未初始化", error="API 凭证缺失"
+            )
 
         calendar_id = self._get_default_calendar_id()
         if not calendar_id:
@@ -469,7 +473,9 @@ class FeishuCalendarSync:
                         )
                     else:
                         failed_count += 1
-                        logger.warning(f"同步训练计划事件失败：{daily_plan.date} - 未返回 event_id")
+                        logger.warning(
+                            f"同步训练计划事件失败：{daily_plan.date} - 未返回 event_id"
+                        )
 
                 except Exception as e:
                     failed_count += 1
@@ -507,10 +513,14 @@ class FeishuCalendarSync:
             SyncResult: 同步结果
         """
         if not self.config.enabled:
-            return SyncResult(success=False, message="日历同步功能未启用", error="功能未启用")
+            return SyncResult(
+                success=False, message="日历同步功能未启用", error="功能未启用"
+            )
 
         if not self._api:
-            return SyncResult(success=False, message="飞书 API 未初始化", error="API 凭证缺失")
+            return SyncResult(
+                success=False, message="飞书 API 未初始化", error="API 凭证缺失"
+            )
 
         calendar_id = self._get_default_calendar_id()
         if not calendar_id:
@@ -539,7 +549,7 @@ class FeishuCalendarSync:
                     details={"event_id": event_id, "date": date.strftime("%Y-%m-%d")},
                 )
             else:
-                logger.error(f"同步单日训练失败：未返回 event_id")
+                logger.error("同步单日训练失败：未返回 event_id")
                 return SyncResult(
                     success=False,
                     message="同步失败",
@@ -569,10 +579,14 @@ class FeishuCalendarSync:
             SyncResult: 同步结果
         """
         if not self.config.enabled:
-            return SyncResult(success=False, message="日历同步功能未启用", error="功能未启用")
+            return SyncResult(
+                success=False, message="日历同步功能未启用", error="功能未启用"
+            )
 
         if not self._api:
-            return SyncResult(success=False, message="飞书 API 未初始化", error="API 凭证缺失")
+            return SyncResult(
+                success=False, message="飞书 API 未初始化", error="API 凭证缺失"
+            )
 
         calendar_id = self._get_default_calendar_id()
         if not calendar_id:
@@ -630,10 +644,14 @@ class FeishuCalendarSync:
             SyncResult: 同步结果
         """
         if not self.config.enabled:
-            return SyncResult(success=False, message="日历同步功能未启用", error="功能未启用")
+            return SyncResult(
+                success=False, message="日历同步功能未启用", error="功能未启用"
+            )
 
         if not self._api:
-            return SyncResult(success=False, message="飞书 API 未初始化", error="API 凭证缺失")
+            return SyncResult(
+                success=False, message="飞书 API 未初始化", error="API 凭证缺失"
+            )
 
         calendar_id = self._get_default_calendar_id()
         if not calendar_id:
@@ -661,8 +679,8 @@ class FeishuCalendarSync:
             )
 
     async def check_conflicts(
-        self, date: datetime, time_range: Tuple[int, int]
-    ) -> List[Dict[str, Any]]:
+        self, date: datetime, time_range: tuple[int, int]
+    ) -> list[dict[str, Any]]:
         """
         检测日程冲突
 
@@ -690,7 +708,7 @@ class FeishuCalendarSync:
 
             # 查询日历事件（需要 API 支持时间范围查询）
             # 注意：飞书日历 API 可能需要使用特定的查询参数
-            events: List[Dict[str, Any]] = []
+            events: list[dict[str, Any]] = []
 
             # 检查是否有事件在指定时间范围内
             conflicts = []

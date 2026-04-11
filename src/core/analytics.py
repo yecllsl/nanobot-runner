@@ -2,7 +2,7 @@
 # 基于Polars实现核心数据分析算法
 
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -107,7 +107,7 @@ class AnalyticsEngine:
         )
 
     def get_running_summary(
-        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+        self, start_date: str | None = None, end_date: str | None = None
     ) -> pl.DataFrame:
         """
         获取跑步摘要统计
@@ -122,8 +122,8 @@ class AnalyticsEngine:
         return self.statistics_aggregator.get_running_summary(start_date, end_date)
 
     def analyze_hr_drift(
-        self, heart_rate: List[float], pace: List[float]
-    ) -> Dict[str, Any]:
+        self, heart_rate: list[float], pace: list[float]
+    ) -> dict[str, Any]:
         """
         分析心率漂移情况
 
@@ -136,7 +136,7 @@ class AnalyticsEngine:
         """
         return self.heart_rate_analyzer.analyze_hr_drift(heart_rate, pace)
 
-    def calculate_atl(self, tss_values: List[float]) -> float:
+    def calculate_atl(self, tss_values: list[float]) -> float:
         """
         计算急性训练负荷（ATL，7天指数移动平均）
 
@@ -148,7 +148,7 @@ class AnalyticsEngine:
         """
         return self.training_load_analyzer.calculate_atl(tss_values)
 
-    def calculate_ctl(self, tss_values: List[float]) -> float:
+    def calculate_ctl(self, tss_values: list[float]) -> float:
         """
         计算慢性训练负荷（CTL，42天指数移动平均）
 
@@ -161,8 +161,8 @@ class AnalyticsEngine:
         return self.training_load_analyzer.calculate_ctl(tss_values)
 
     def calculate_atl_ctl(
-        self, tss_values: List[float], atl_days: int = 7, ctl_days: int = 42
-    ) -> Dict[str, float]:
+        self, tss_values: list[float], atl_days: int = 7, ctl_days: int = 42
+    ) -> dict[str, float]:
         """
         计算ATL和CTL
 
@@ -176,7 +176,7 @@ class AnalyticsEngine:
         """
         return self.training_load_analyzer.calculate_atl_ctl(tss_values)
 
-    def get_running_stats(self, year: Optional[int] = None) -> Dict[str, Any]:
+    def get_running_stats(self, year: int | None = None) -> dict[str, Any]:
         """
         获取跑步统计数据
 
@@ -236,7 +236,7 @@ class AnalyticsEngine:
         except Exception as e:
             raise ValueError(f"配速计算失败: {e}") from e
 
-    def get_vdot_trend(self, days: int = 30) -> List[Dict[str, Any]]:
+    def get_vdot_trend(self, days: int = 30) -> list[dict[str, Any]]:
         """
         获取VDOT趋势数据
 
@@ -296,7 +296,7 @@ class AnalyticsEngine:
         self,
         distance_m: float,
         duration_s: float,
-        avg_heart_rate: Optional[float],
+        avg_heart_rate: float | None,
         age: int = 30,
         rest_hr: int = 60,
     ) -> float:
@@ -361,7 +361,7 @@ class AnalyticsEngine:
 
         return round(tss, 2)
 
-    def get_training_load(self, days: int = 42) -> Dict[str, Any]:
+    def get_training_load(self, days: int = 42) -> dict[str, Any]:
         """
         获取训练负荷（ATL/CTL/TSB）及体能状态评估
 
@@ -445,7 +445,9 @@ class AnalyticsEngine:
         if len(valid_tss) < 7:
             message = f"数据量较少（{len(valid_tss)} 次训练），建议积累更多数据以获得更准确的分析"
         elif days < 42:
-            message = f"分析周期较短（{days} 天），建议使用 42 天以上数据以获得准确的 CTL"
+            message = (
+                f"分析周期较短（{days} 天），建议使用 42 天以上数据以获得准确的 CTL"
+            )
         else:
             message = None
 
@@ -492,16 +494,24 @@ class AnalyticsEngine:
         """
         if tsb > 10:
             status = "恢复良好"
-            advice = "当前体能充沛，适合进行高强度训练或比赛。" "建议安排质量课（间歇跑、节奏跑）或长距离跑。" "注意把握巅峰期，可考虑参加比赛。"
+            advice = (
+                "当前体能充沛，适合进行高强度训练或比赛。"
+                "建议安排质量课（间歇跑、节奏跑）或长距离跑。"
+                "注意把握巅峰期，可考虑参加比赛。"
+            )
         elif tsb > 0:
             status = "状态正常"
             advice = (
-                "当前状态良好，可以保持正常训练节奏。" "建议继续按训练计划执行，注意训练与恢复的平衡。" "可适度增加训练强度，但需监控身体反应。"
+                "当前状态良好，可以保持正常训练节奏。"
+                "建议继续按训练计划执行，注意训练与恢复的平衡。"
+                "可适度增加训练强度，但需监控身体反应。"
             )
         elif tsb > -10:
             status = "轻度疲劳"
             advice = (
-                "当前有一定训练累积疲劳，属于正常训练状态。" "建议适当降低训练强度，增加恢复时间。" "保证充足睡眠和营养，可安排轻松跑或交叉训练。"
+                "当前有一定训练累积疲劳，属于正常训练状态。"
+                "建议适当降低训练强度，增加恢复时间。"
+                "保证充足睡眠和营养，可安排轻松跑或交叉训练。"
             )
         else:
             status = "过度训练"
@@ -519,7 +529,7 @@ class AnalyticsEngine:
 
         return status, advice
 
-    def _calculate_hr_zones(self, max_hr: int) -> Dict[str, tuple]:
+    def _calculate_hr_zones(self, max_hr: int) -> dict[str, tuple]:
         """
         计算心率区间边界
 
@@ -538,8 +548,8 @@ class AnalyticsEngine:
         }
 
     def _calculate_zone_time(
-        self, heart_rate_data: List[int], hr_zones: Dict[str, tuple]
-    ) -> Dict[str, int]:
+        self, heart_rate_data: list[int], hr_zones: dict[str, tuple]
+    ) -> dict[str, int]:
         """
         计算各心率区间的时长（秒）
 
@@ -572,7 +582,7 @@ class AnalyticsEngine:
         return zone_time
 
     def _calculate_aerobic_effect(
-        self, zone_time: Dict[str, int], total_duration: int
+        self, zone_time: dict[str, int], total_duration: int
     ) -> float:
         """
         计算有氧训练效果（1.0-5.0）
@@ -608,7 +618,7 @@ class AnalyticsEngine:
         return round(min(max(effect, 1.0), 5.0), 1)
 
     def _calculate_anaerobic_effect(
-        self, zone_time: Dict[str, int], total_duration: int
+        self, zone_time: dict[str, int], total_duration: int
     ) -> float:
         """
         计算无氧训练效果（1.0-5.0）
@@ -684,11 +694,11 @@ class AnalyticsEngine:
 
     def get_training_effect(
         self,
-        heart_rate_data: List[int],
+        heart_rate_data: list[int],
         duration_s: float,
         age: int = 30,
-        avg_heart_rate: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        avg_heart_rate: float | None = None,
+    ) -> dict[str, Any]:
         """
         获取训练效果评估
 
@@ -760,9 +770,9 @@ class AnalyticsEngine:
     def get_heart_rate_zones(
         self,
         age: int = 30,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
         """
         计算心率区间分布
 
@@ -917,8 +927,8 @@ class AnalyticsEngine:
             raise RuntimeError(f"心率区间分析失败: {e}") from e
 
     def _calculate_zones_from_avg_hr(
-        self, df: pl.DataFrame, max_hr: int, zone_boundaries: Dict[str, tuple]
-    ) -> Dict[str, Any]:
+        self, df: pl.DataFrame, max_hr: int, zone_boundaries: dict[str, tuple]
+    ) -> dict[str, Any]:
         """
         基于平均心率估算心率区间分布
 
@@ -952,7 +962,7 @@ class AnalyticsEngine:
                 "message": "暂无有效心率数据",
             }
 
-        zone_times = {zone: 0 for zone in zone_boundaries.keys()}
+        zone_times = dict.fromkeys(zone_boundaries.keys(), 0)
         total_time = 0
 
         for row in hr_df.iter_rows(named=True):
@@ -1004,7 +1014,7 @@ class AnalyticsEngine:
             "data_type": "avg_heart_rate",
         }
 
-    def generate_daily_report(self, age: int = 30) -> Dict[str, Any]:
+    def generate_daily_report(self, age: int = 30) -> dict[str, Any]:
         """
         生成每日晨报内容
 
@@ -1039,9 +1049,7 @@ class AnalyticsEngine:
         weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
         # 1. 生成日期和问候语
-        date_str = (
-            f"{today.year}年{today.month}月{today.day}日 {weekday_names[today.weekday()]}"
-        )
+        date_str = f"{today.year}年{today.month}月{today.day}日 {weekday_names[today.weekday()]}"
         greeting = self._generate_greeting(now.hour, today.weekday())
 
         # 2. 获取昨日训练摘要
@@ -1104,7 +1112,7 @@ class AnalyticsEngine:
         else:
             return f"{time_greeting}！今天是您的训练日。"
 
-    def _get_yesterday_run(self, yesterday: date) -> Optional[Dict[str, Any]]:
+    def _get_yesterday_run(self, yesterday: date) -> dict[str, Any] | None:
         """
         获取昨日训练摘要
 
@@ -1114,7 +1122,7 @@ class AnalyticsEngine:
         Returns:
             Optional[Dict]: 昨日训练数据，无训练返回None
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         try:
             lf = self.storage.read_parquet()
@@ -1156,8 +1164,8 @@ class AnalyticsEngine:
 
     def _generate_training_advice(
         self,
-        fitness_status: Dict[str, Any],
-        yesterday_run: Optional[Dict[str, Any]],
+        fitness_status: dict[str, Any],
+        yesterday_run: dict[str, Any] | None,
         weekday: int,
         age: int,
     ) -> str:
@@ -1204,7 +1212,9 @@ class AnalyticsEngine:
         # 考虑昨日训练情况
         if yesterday_run:
             if yesterday_run["tss"] > 100:
-                advice_parts.append(f"昨日训练强度较高（TSS: {yesterday_run['tss']}），注意恢复。")
+                advice_parts.append(
+                    f"昨日训练强度较高（TSS: {yesterday_run['tss']}），注意恢复。"
+                )
             elif yesterday_run["tss"] > 50:
                 advice_parts.append("昨日进行了中等强度训练，今日可适度活动。")
 
@@ -1217,8 +1227,8 @@ class AnalyticsEngine:
         return " ".join(advice_parts)
 
     def _generate_weekly_plan(
-        self, today: date, fitness_status: Dict[str, Any], age: int
-    ) -> List[Dict[str, Any]]:
+        self, today: date, fitness_status: dict[str, Any], age: int
+    ) -> list[dict[str, Any]]:
         """
         生成本周训练计划预览
 
@@ -1318,10 +1328,10 @@ class AnalyticsEngine:
 
     def get_training_load_trend(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        days: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days: int | None = None,
+    ) -> dict[str, Any]:
         """
         获取训练负荷趋势数据（每日 TSS、ATL、CTL、TSB）
 
@@ -1370,7 +1380,9 @@ class AnalyticsEngine:
                         hour=23, minute=59, second=59
                     )
                 except ValueError as e:
-                    raise ValueError(f"结束日期格式无效: {end_date}，应为 YYYY-MM-DD") from e
+                    raise ValueError(
+                        f"结束日期格式无效: {end_date}，应为 YYYY-MM-DD"
+                    ) from e
             else:
                 end_dt = datetime.now().replace(hour=23, minute=59, second=59)
 
@@ -1380,7 +1392,9 @@ class AnalyticsEngine:
                         hour=0, minute=0, second=0
                     )
                 except ValueError as e:
-                    raise ValueError(f"开始日期格式无效: {start_date}，应为 YYYY-MM-DD") from e
+                    raise ValueError(
+                        f"开始日期格式无效: {start_date}，应为 YYYY-MM-DD"
+                    ) from e
             else:
                 # 默认最近 90 天
                 start_dt = (end_dt - timedelta(days=89)).replace(
@@ -1546,7 +1560,7 @@ class AnalyticsEngine:
             "total_runs": len(tss_records),
         }
 
-    def get_pace_distribution(self, year: Optional[int] = None) -> Dict[str, Any]:
+    def get_pace_distribution(self, year: int | None = None) -> dict[str, Any]:
         """
         获取配速分布统计
 

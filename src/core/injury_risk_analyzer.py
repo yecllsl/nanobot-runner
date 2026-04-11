@@ -2,7 +2,7 @@
 # 评估跑者的伤病风险，提供预防建议
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 from src.core.logger import get_logger
 from src.core.user_profile_manager import (
@@ -20,10 +20,10 @@ class InjuryRiskResult:
 
     risk_score: float
     risk_level: InjuryRiskLevel
-    risk_factors: List[str]
-    recommendations: List[str]
+    risk_factors: list[str]
+    recommendations: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "risk_score": self.risk_score,
@@ -69,8 +69,8 @@ class InjuryRiskAnalyzer:
             raise ValueError("静息心率必须在合理范围内")
 
         risk_score = 0.0
-        risk_factors: List[str] = []
-        recommendations: List[str] = []
+        risk_factors: list[str] = []
+        recommendations: list[str] = []
 
         risk_score, risk_factors, recommendations = self._evaluate_training_load(
             profile, risk_score, risk_factors, recommendations
@@ -110,8 +110,8 @@ class InjuryRiskAnalyzer:
         self,
         profile: RunnerProfile,
         risk_score: float,
-        risk_factors: List[str],
-        recommendations: List[str],
+        risk_factors: list[str],
+        recommendations: list[str],
     ) -> tuple:
         """评估训练负荷突变"""
         if profile.ctl > 0:
@@ -135,8 +135,8 @@ class InjuryRiskAnalyzer:
         self,
         profile: RunnerProfile,
         risk_score: float,
-        risk_factors: List[str],
-        recommendations: List[str],
+        risk_factors: list[str],
+        recommendations: list[str],
     ) -> tuple:
         """评估训练一致性"""
         if profile.consistency_score < 30:
@@ -154,8 +154,8 @@ class InjuryRiskAnalyzer:
         self,
         profile: RunnerProfile,
         risk_score: float,
-        risk_factors: List[str],
-        recommendations: List[str],
+        risk_factors: list[str],
+        recommendations: list[str],
     ) -> tuple:
         """评估恢复情况"""
         if profile.tsb < -20:
@@ -173,8 +173,8 @@ class InjuryRiskAnalyzer:
         self,
         age: int,
         risk_score: float,
-        risk_factors: List[str],
-        recommendations: List[str],
+        risk_factors: list[str],
+        recommendations: list[str],
     ) -> tuple:
         """评估年龄因素"""
         if age > 50:
@@ -192,8 +192,8 @@ class InjuryRiskAnalyzer:
         self,
         profile: RunnerProfile,
         risk_score: float,
-        risk_factors: List[str],
-        recommendations: List[str],
+        risk_factors: list[str],
+        recommendations: list[str],
     ) -> tuple:
         """评估训练强度"""
         if profile.training_pattern in [
@@ -207,7 +207,7 @@ class InjuryRiskAnalyzer:
         return risk_score, risk_factors, recommendations
 
     def _determine_risk_level(
-        self, risk_score: float, recommendations: List[str]
+        self, risk_score: float, recommendations: list[str]
     ) -> InjuryRiskLevel:
         """确定风险等级"""
         if risk_score < 30:
@@ -219,7 +219,7 @@ class InjuryRiskAnalyzer:
         else:
             return InjuryRiskLevel.HIGH
 
-    def get_risk_summary(self, profile: RunnerProfile) -> Dict[str, Any]:
+    def get_risk_summary(self, profile: RunnerProfile) -> dict[str, Any]:
         """
         获取风险摘要
 

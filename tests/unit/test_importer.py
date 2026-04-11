@@ -4,7 +4,7 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -79,16 +79,14 @@ class TestImportService:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2024]
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet", return_value=True
-            ), patch.object(
-                service.indexer, "add", return_value=None
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet", return_value=True),
+                patch.object(service.indexer, "add", return_value=None),
             ):
                 result = service.import_file(temp_path)
 
@@ -105,9 +103,10 @@ class TestImportService:
             temp_path = Path(f.name)
 
         try:
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value={}
-            ), patch.object(service.parser, "parse_file") as mock_parse:
+            with (
+                patch.object(service.parser, "parse_file_metadata", return_value={}),
+                patch.object(service.parser, "parse_file") as mock_parse,
+            ):
                 result = service.import_file(temp_path)
 
                 assert result["status"] == "error"
@@ -132,13 +131,14 @@ class TestImportService:
                 "filepath": str(temp_path),
             }
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(service.indexer, "exists", return_value=True), patch.object(
-                service.parser, "parse_file"
-            ) as mock_parse, patch.object(
-                service.storage, "save_to_parquet"
-            ) as mock_save:
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=True),
+                patch.object(service.parser, "parse_file") as mock_parse,
+                patch.object(service.storage, "save_to_parquet") as mock_save,
+            ):
                 result = service.import_file(temp_path)
 
                 assert result["status"] == "skipped"
@@ -164,12 +164,12 @@ class TestImportService:
                 "filepath": str(temp_path),
             }
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=None
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=None),
             ):
                 result = service.import_file(temp_path)
 
@@ -197,17 +197,15 @@ class TestImportService:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2024]
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet", return_value=False
-            ), patch.object(
-                service.indexer, "add"
-            ) as mock_add:
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet", return_value=False),
+                patch.object(service.indexer, "add") as mock_add,
+            ):
                 result = service.import_file(temp_path)
 
                 assert result["status"] == "error"
@@ -249,18 +247,15 @@ class TestImportService:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2024]
 
-            with patch.object(
-                service, "scan_directory", return_value=[fit_file]
-            ), patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet", return_value=True
-            ), patch.object(
-                service.indexer, "add", return_value=None
+            with (
+                patch.object(service, "scan_directory", return_value=[fit_file]),
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet", return_value=True),
+                patch.object(service.indexer, "add", return_value=None),
             ):
                 result = service.import_directory(Path(tmpdir))
 
@@ -299,20 +294,19 @@ class TestImportService:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2024]
 
-            with patch.object(
-                service, "scan_directory", return_value=[fit_file1, fit_file2]
-            ), patch.object(
-                service.parser,
-                "parse_file_metadata",
-                side_effect=[mock_metadata1, mock_metadata2],
-            ), patch.object(
-                service.indexer, "exists", side_effect=[False, True]
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet", return_value=True
-            ), patch.object(
-                service.indexer, "add", return_value=None
+            with (
+                patch.object(
+                    service, "scan_directory", return_value=[fit_file1, fit_file2]
+                ),
+                patch.object(
+                    service.parser,
+                    "parse_file_metadata",
+                    side_effect=[mock_metadata1, mock_metadata2],
+                ),
+                patch.object(service.indexer, "exists", side_effect=[False, True]),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet", return_value=True),
+                patch.object(service.indexer, "add", return_value=None),
             ):
                 result = service.import_directory(Path(tmpdir))
 
@@ -344,16 +338,14 @@ class TestImportServiceAdvanced:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2024]
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet", return_value=True
-            ), patch.object(
-                service.indexer, "add", return_value=None
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet", return_value=True),
+                patch.object(service.indexer, "add", return_value=None),
             ):
                 from rich.progress import Progress
 
@@ -388,16 +380,14 @@ class TestImportServiceAdvanced:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2023]
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet"
-            ) as mock_save, patch.object(
-                service.indexer, "add", return_value=None
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet") as mock_save,
+                patch.object(service.indexer, "add", return_value=None),
             ):
                 service.import_file(temp_path)
 
@@ -426,16 +416,14 @@ class TestImportServiceAdvanced:
             mock_df = Mock()
             mock_df.select.return_value.row.return_value = [2024]
 
-            with patch.object(
-                service.parser, "parse_file_metadata", return_value=mock_metadata
-            ), patch.object(
-                service.indexer, "exists", return_value=False
-            ), patch.object(
-                service.parser, "parse_file", return_value=mock_df
-            ), patch.object(
-                service.storage, "save_to_parquet", return_value=True
-            ), patch.object(
-                service.indexer, "add", return_value=None
+            with (
+                patch.object(
+                    service.parser, "parse_file_metadata", return_value=mock_metadata
+                ),
+                patch.object(service.indexer, "exists", return_value=False),
+                patch.object(service.parser, "parse_file", return_value=mock_df),
+                patch.object(service.storage, "save_to_parquet", return_value=True),
+                patch.object(service.indexer, "add", return_value=None),
             ):
                 result = service.import_file(temp_path)
 
@@ -454,9 +442,8 @@ class TestImportServiceAdvanced:
         try:
             with patch.object(
                 service.parser, "parse_file_metadata", side_effect=Exception("解析错误")
-            ):
-                with pytest.raises(Exception):
-                    service.import_file(temp_path)
+            ), pytest.raises(Exception):
+                service.import_file(temp_path)
         finally:
             os.unlink(temp_path)
 

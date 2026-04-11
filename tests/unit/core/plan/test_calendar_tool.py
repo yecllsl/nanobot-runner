@@ -1,7 +1,6 @@
 # CalendarTool单元测试
 
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -85,15 +84,20 @@ class TestPreSyncCheck:
     @pytest.mark.asyncio
     async def test_pre_sync_check_all(self, calendar_tool):
         """测试完整健康检查"""
-        with patch.object(
-            calendar_tool, "_check_network", new_callable=AsyncMock
-        ) as mock_network, patch.object(
-            calendar_tool, "_check_token", new_callable=AsyncMock
-        ) as mock_token, patch.object(
-            calendar_tool, "_check_calendar_permission", new_callable=AsyncMock
-        ) as mock_permission, patch.object(
-            calendar_tool, "_check_calendar_id", new_callable=AsyncMock
-        ) as mock_id:
+        with (
+            patch.object(
+                calendar_tool, "_check_network", new_callable=AsyncMock
+            ) as mock_network,
+            patch.object(
+                calendar_tool, "_check_token", new_callable=AsyncMock
+            ) as mock_token,
+            patch.object(
+                calendar_tool, "_check_calendar_permission", new_callable=AsyncMock
+            ) as mock_permission,
+            patch.object(
+                calendar_tool, "_check_calendar_id", new_callable=AsyncMock
+            ) as mock_id,
+        ):
             mock_network.return_value = HealthCheckResult(
                 healthy=True, item=HealthCheckItem.NETWORK, message="网络正常"
             )
@@ -101,7 +105,9 @@ class TestPreSyncCheck:
                 healthy=True, item=HealthCheckItem.TOKEN, message="令牌有效"
             )
             mock_permission.return_value = HealthCheckResult(
-                healthy=True, item=HealthCheckItem.CALENDAR_PERMISSION, message="权限正常"
+                healthy=True,
+                item=HealthCheckItem.CALENDAR_PERMISSION,
+                message="权限正常",
             )
             mock_id.return_value = HealthCheckResult(
                 healthy=True, item=HealthCheckItem.CALENDAR_ID, message="日历ID已配置"

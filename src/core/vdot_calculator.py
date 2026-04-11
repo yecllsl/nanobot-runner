@@ -1,9 +1,7 @@
 # VDOT 计算器
 # 基于 Jack Daniels 公式计算跑力值
 
-from typing import Any, Dict, List
 
-import numpy as np
 import polars as pl
 
 
@@ -151,7 +149,7 @@ class VDOTCalculator:
 
         return time_min * 60.0
 
-    def get_race_predictions(self, vdot: float) -> Dict[str, float]:
+    def get_race_predictions(self, vdot: float) -> dict[str, float]:
         """
         根据VDOT值预测各距离比赛成绩
 
@@ -176,7 +174,7 @@ class VDOTCalculator:
 
     def get_race_predictions_batch(
         self, vdot_series: pl.Series
-    ) -> Dict[str, pl.Series]:
+    ) -> dict[str, pl.Series]:
         """
         批量预测各距离比赛成绩（向量化版本）
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -25,10 +25,10 @@ class SessionSummary:
     timestamp: str
     distance_km: float
     duration_min: float
-    avg_pace_sec_km: Optional[float]
-    avg_heart_rate: Optional[float]
+    avg_pace_sec_km: float | None
+    avg_heart_rate: float | None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "distance_km": self.distance_km,
@@ -44,10 +44,10 @@ class SessionDetail(SessionSummary):
 
     distance_m: float = 0.0
     duration_s: float = 0.0
-    max_heart_rate: Optional[float] = None
-    calories: Optional[float] = None
+    max_heart_rate: float | None = None
+    calories: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
         d.update(
             {
@@ -67,9 +67,9 @@ class SessionVdot:
     timestamp: str
     distance_m: float
     duration_s: float
-    avg_heart_rate: Optional[float]
+    avg_heart_rate: float | None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "distance_m": self.distance_m,
@@ -99,10 +99,10 @@ class SessionRepository:
 
     def _build_session_lazy(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        min_distance: Optional[float] = None,
-        max_distance: Optional[float] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        min_distance: float | None = None,
+        max_distance: float | None = None,
         descending: bool = True,
     ) -> pl.LazyFrame:
         """构建Session聚合查询的LazyFrame链
@@ -174,7 +174,7 @@ class SessionRepository:
             ]
         )
 
-    def _df_to_session_details(self, df: pl.DataFrame) -> List[SessionDetail]:
+    def _df_to_session_details(self, df: pl.DataFrame) -> list[SessionDetail]:
         """将DataFrame转换为SessionDetail列表
 
         Args:
@@ -188,7 +188,7 @@ class SessionRepository:
 
         df = self._add_computed_columns(df)
 
-        results: List[SessionDetail] = []
+        results: list[SessionDetail] = []
         for row in df.iter_rows(named=True):
             results.append(
                 SessionDetail(
@@ -206,7 +206,7 @@ class SessionRepository:
 
         return results
 
-    def _df_to_session_summaries(self, df: pl.DataFrame) -> List[SessionSummary]:
+    def _df_to_session_summaries(self, df: pl.DataFrame) -> list[SessionSummary]:
         """将DataFrame转换为SessionSummary列表
 
         Args:
@@ -220,7 +220,7 @@ class SessionRepository:
 
         df = self._add_computed_columns(df)
 
-        results: List[SessionSummary] = []
+        results: list[SessionSummary] = []
         for row in df.iter_rows(named=True):
             results.append(
                 SessionSummary(
@@ -236,11 +236,11 @@ class SessionRepository:
 
     def get_sessions(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        min_distance: Optional[float] = None,
-        max_distance: Optional[float] = None,
-        limit: Optional[int] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        min_distance: float | None = None,
+        max_distance: float | None = None,
+        limit: int | None = None,
         descending: bool = True,
     ) -> pl.DataFrame:
         """获取Session聚合数据
@@ -271,7 +271,7 @@ class SessionRepository:
 
         return session_lf.collect()
 
-    def get_recent_sessions(self, limit: int = 10) -> List[SessionDetail]:
+    def get_recent_sessions(self, limit: int = 10) -> list[SessionDetail]:
         """获取最近的Session详情
 
         Args:
@@ -286,7 +286,7 @@ class SessionRepository:
 
         return self._df_to_session_details(df)
 
-    def get_sessions_for_vdot(self, limit: Optional[int] = None) -> List[SessionVdot]:
+    def get_sessions_for_vdot(self, limit: int | None = None) -> list[SessionVdot]:
         """获取VDOT计算所需的Session数据
 
         Args:
@@ -303,7 +303,7 @@ class SessionRepository:
         if df.is_empty():
             return []
 
-        results: List[SessionVdot] = []
+        results: list[SessionVdot] = []
         for row in df.iter_rows(named=True):
             results.append(
                 SessionVdot(
@@ -318,7 +318,7 @@ class SessionRepository:
 
     def get_sessions_by_date_range(
         self, start_date: datetime, end_date: datetime
-    ) -> List[SessionSummary]:
+    ) -> list[SessionSummary]:
         """按日期范围获取Session摘要
 
         Args:
@@ -336,8 +336,8 @@ class SessionRepository:
         return self._df_to_session_summaries(df)
 
     def get_sessions_by_distance(
-        self, min_meters: float, max_meters: Optional[float] = None
-    ) -> List[SessionSummary]:
+        self, min_meters: float, max_meters: float | None = None
+    ) -> list[SessionSummary]:
         """按距离范围获取Session摘要
 
         Args:
@@ -356,8 +356,8 @@ class SessionRepository:
 
     def get_session_count(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> int:
         """获取Session数量
 
@@ -373,8 +373,8 @@ class SessionRepository:
 
     def get_total_distance(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> float:
         """获取总距离
 
@@ -395,8 +395,8 @@ class SessionRepository:
 
     def get_total_duration(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> float:
         """获取总时长
 

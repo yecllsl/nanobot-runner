@@ -3,8 +3,7 @@
 
 from datetime import datetime, timedelta
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
@@ -35,10 +34,10 @@ class ReportService:
 
     def __init__(
         self,
-        config: Optional[ConfigManager] = None,
-        storage: Optional[StorageManager] = None,
-        analytics: Optional[AnalyticsEngine] = None,
-        feishu: Optional[FeishuBot] = None,
+        config: ConfigManager | None = None,
+        storage: StorageManager | None = None,
+        analytics: AnalyticsEngine | None = None,
+        feishu: FeishuBot | None = None,
     ):
         self.config = config or ConfigManager()
         self.storage = storage or StorageManager(self.config.data_dir)
@@ -63,7 +62,7 @@ class ReportService:
 
     def generate_report(
         self, report_type: ReportType = ReportType.DAILY, age: int = 30
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         生成报告
 
@@ -85,7 +84,7 @@ class ReportService:
         else:
             raise ValueError(f"不支持的报告类型：{report_type}")
 
-    def _generate_weekly_report(self, age: int = 30) -> Dict[str, Any]:
+    def _generate_weekly_report(self, age: int = 30) -> dict[str, Any]:
         """
         生成周报
 
@@ -144,7 +143,7 @@ class ReportService:
                 "error": f"生成失败：{str(e)}",
             }
 
-    def _generate_monthly_report(self, age: int = 30) -> Dict[str, Any]:
+    def _generate_monthly_report(self, age: int = 30) -> dict[str, Any]:
         """
         生成月报
 
@@ -209,9 +208,9 @@ class ReportService:
                 "error": f"生成失败：{str(e)}",
             }
 
-    def _identify_weekly_highlights(self, runs: List[Dict]) -> List[str]:
+    def _identify_weekly_highlights(self, runs: list[dict]) -> list[str]:
         """识别本周亮点"""
-        highlights: List[str] = []
+        highlights: list[str] = []
         if not runs:
             return highlights
 
@@ -233,7 +232,7 @@ class ReportService:
 
         return highlights
 
-    def _identify_weekly_concerns(self, runs: List[Dict]) -> List[str]:
+    def _identify_weekly_concerns(self, runs: list[dict]) -> list[str]:
         """识别本周需关注点"""
         concerns = []
         if not runs:
@@ -252,8 +251,8 @@ class ReportService:
         return concerns
 
     def _generate_weekly_recommendations(
-        self, runs: List[Dict], training_load: Dict
-    ) -> List[str]:
+        self, runs: list[dict], training_load: dict
+    ) -> list[str]:
         """生成本周建议"""
         recommendations = []
 
@@ -276,9 +275,9 @@ class ReportService:
 
         return recommendations
 
-    def _identify_monthly_highlights(self, runs: List[Dict]) -> List[str]:
+    def _identify_monthly_highlights(self, runs: list[dict]) -> list[str]:
         """识别本月亮点"""
-        highlights: List[str] = []
+        highlights: list[str] = []
         if not runs:
             return highlights
 
@@ -299,7 +298,7 @@ class ReportService:
 
         return highlights
 
-    def _identify_monthly_concerns(self, runs: List[Dict]) -> List[str]:
+    def _identify_monthly_concerns(self, runs: list[dict]) -> list[str]:
         """识别本月需关注点"""
         concerns = []
         if not runs:
@@ -318,8 +317,8 @@ class ReportService:
         return concerns
 
     def _generate_monthly_recommendations(
-        self, runs: List[Dict], training_load: Dict
-    ) -> List[str]:
+        self, runs: list[dict], training_load: dict
+    ) -> list[str]:
         """生成月度建议"""
         recommendations = []
 
@@ -343,8 +342,8 @@ class ReportService:
         return recommendations
 
     def push_report(
-        self, report_data: Dict[str, Any], report_type: ReportType = ReportType.DAILY
-    ) -> Dict[str, Any]:
+        self, report_data: dict[str, Any], report_type: ReportType = ReportType.DAILY
+    ) -> dict[str, Any]:
         """
         推送报告
 
@@ -390,7 +389,7 @@ class ReportService:
         logger.info(f"{report_type.value}报告推送成功")
         return {"success": True, "message": f"{report_type.value}报告推送成功"}
 
-    def _format_report_content(self, report_data: Dict[str, Any]) -> str:
+    def _format_report_content(self, report_data: dict[str, Any]) -> str:
         """格式化报告内容 (晨报)"""
         lines = []
 
@@ -422,7 +421,7 @@ class ReportService:
 
         return "\n".join(lines)
 
-    def _format_weekly_report_content(self, report_data: Dict[str, Any]) -> str:
+    def _format_weekly_report_content(self, report_data: dict[str, Any]) -> str:
         """格式化周报内容"""
         lines = []
 
@@ -462,7 +461,7 @@ class ReportService:
 
         return "\n".join(lines)
 
-    def _format_monthly_report_content(self, report_data: Dict[str, Any]) -> str:
+    def _format_monthly_report_content(self, report_data: dict[str, Any]) -> str:
         """格式化月报内容"""
         lines = []
 
@@ -475,8 +474,12 @@ class ReportService:
         lines.append(f"- 总时长：{report_data.get('total_duration_min', 0):.1f} 分钟")
         lines.append(f"- 总 TSS: {report_data.get('total_tss', 0):.1f}")
         lines.append(f"- 平均 VDOT: {report_data.get('avg_vdot', 0):.1f}")
-        lines.append(f"- 周均距离：{report_data.get('avg_weekly_distance_km', 0):.2f} km")
-        lines.append(f"- 周均时长：{report_data.get('avg_weekly_duration_min', 0):.1f} 分钟")
+        lines.append(
+            f"- 周均距离：{report_data.get('avg_weekly_distance_km', 0):.2f} km"
+        )
+        lines.append(
+            f"- 周均时长：{report_data.get('avg_weekly_duration_min', 0):.1f} 分钟"
+        )
         lines.append("")
 
         # 训练亮点
@@ -521,7 +524,7 @@ class ReportService:
         push: bool = True,
         age: int = 30,
         report_type: ReportType = ReportType.DAILY,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         配置定时推送
 
@@ -575,7 +578,9 @@ class ReportService:
             self.config.set(f"report_push_{report_type.value}", push)
             self.config.set(f"report_age_{report_type.value}", age)
 
-            logger.info(f"配置定时{report_type.value}推送成功，下次推送时间：{target_time}")
+            logger.info(
+                f"配置定时{report_type.value}推送成功，下次推送时间：{target_time}"
+            )
             return {
                 "success": True,
                 "message": f"已配置定时{report_type.value}推送，下次推送时间：{target_time.strftime('%Y-%m-%d %H:%M')}",
@@ -591,7 +596,7 @@ class ReportService:
 
     def enable_schedule(
         self, enabled: bool = True, report_type: ReportType = ReportType.DAILY
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         启用/禁用定时推送
 
@@ -632,7 +637,7 @@ class ReportService:
 
     def get_schedule_status(
         self, report_type: ReportType = ReportType.DAILY
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取定时推送状态
 
@@ -728,7 +733,7 @@ class ReportService:
         push: bool = False,
         age: int = 30,
         report_type: ReportType = ReportType.DAILY,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         立即生成报告
 

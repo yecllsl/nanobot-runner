@@ -635,7 +635,7 @@ class TestStorageManager:
 
     def test_query_by_date_range(self):
         """测试按日期范围查询"""
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))
@@ -770,9 +770,8 @@ class TestStorageManager:
                 manager,
                 "get_available_years",
                 side_effect=Exception("Get years error"),
-            ):
-                with pytest.raises(StorageError, match="获取数据摘要失败"):
-                    manager.get_data_summary()
+            ), pytest.raises(StorageError, match="获取数据摘要失败"):
+                manager.get_data_summary()
 
     def test_delete_year_data_with_exception(self):
         """测试删除年份数据时的异常"""
@@ -836,9 +835,8 @@ class TestStorageManager:
                 manager,
                 "_read_and_concat_parquet_files",
                 side_effect=Exception("Read error"),
-            ):
-                with pytest.raises(StorageError, match="读取Parquet数据失败"):
-                    manager.read_parquet(years=[2024])
+            ), pytest.raises(StorageError, match="读取Parquet数据失败"):
+                manager.read_parquet(years=[2024])
 
     def test_save_to_parquet_with_storage_error(self):
         """测试保存时的存储错误"""
@@ -861,9 +859,8 @@ class TestStorageManager:
                 pl.DataFrame,
                 "write_parquet",
                 side_effect=Exception("Write error"),
-            ):
-                with pytest.raises(StorageError, match="保存Parquet文件失败"):
-                    manager.save_to_parquet(test_data, 2024)
+            ), pytest.raises(StorageError, match="保存Parquet文件失败"):
+                manager.save_to_parquet(test_data, 2024)
 
     def test_save_activities_with_timestamp_no_year_attr(self):
         """测试timestamp没有year属性的情况"""
@@ -1056,7 +1053,7 @@ class TestStorageManager:
 
     def test_read_parquet_file_with_schema_fix_pyarrow(self):
         """测试使用pyarrow读取Parquet文件"""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))
@@ -1239,9 +1236,8 @@ class TestStorageManager:
                 Path,
                 "glob",
                 side_effect=Exception("Glob error"),
-            ):
-                with pytest.raises(StorageError, match="获取可用年份失败"):
-                    manager.get_available_years()
+            ), pytest.raises(StorageError, match="获取可用年份失败"):
+                manager.get_available_years()
 
     def test_read_parquet_file_with_schema_fix_pyarrow_non_dataframe(self):
         """测试pyarrow返回非DataFrame类型的情况"""

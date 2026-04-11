@@ -2,14 +2,13 @@
 
 测试 stats 命令在不同场景下的统计逻辑正确性
 """
+
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import polars as pl
 import pytest
 
 from src.core.analytics import AnalyticsEngine
-from src.core.parser import FitParser
 from src.core.storage import StorageManager
 
 

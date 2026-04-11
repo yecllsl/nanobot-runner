@@ -40,7 +40,6 @@ def gateway(
     from nanobot.cli.commands import _make_provider
     from nanobot.config.loader import get_data_dir, load_config
     from nanobot.cron.service import CronService
-    from nanobot.cron.types import CronJob
     from nanobot.heartbeat.service import HeartbeatService
     from nanobot.session.manager import SessionManager
     from nanobot.utils.helpers import sync_workspace_templates
@@ -123,7 +122,9 @@ def gateway(
     )
 
     if channels.enabled_channels:
-        console.print(f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}")
+        console.print(
+            f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}"
+        )
     else:
         console.print("[yellow]警告: 未启用任何通道[/yellow]")
 

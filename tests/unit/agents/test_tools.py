@@ -8,7 +8,6 @@ import pytest
 
 from src.agents.tools import (
     TOOL_DESCRIPTIONS,
-    BaseTool,
     CalculateVdotForRunTool,
     GetHrDriftAnalysisTool,
     GetRecentRunsTool,
@@ -196,9 +195,7 @@ class TestGetRecentRunsTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = (
-                []
-            )
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
 
             runner_tools = RunnerTools(
                 context=create_mock_context(storage=mock_storage)
@@ -259,9 +256,7 @@ class TestGetVdotTrendTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = (
-                []
-            )
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
 
             runner_tools = RunnerTools(
                 context=create_mock_context(storage=mock_storage)
@@ -358,9 +353,7 @@ class TestQueryByDateRangeTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
-                []
-            )
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
 
             runner_tools = RunnerTools(
                 context=create_mock_context(storage=mock_storage)
@@ -398,9 +391,7 @@ class TestQueryByDistanceTool:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = (
-                []
-            )
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
 
             runner_tools = RunnerTools(
                 context=create_mock_context(storage=mock_storage)
@@ -716,9 +707,7 @@ class TestRunnerTools:
 
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
-            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = (
-                []
-            )
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
 
             tools = RunnerTools(context=create_mock_context(storage=mock_storage))
 
@@ -948,18 +937,17 @@ class TestRunnerTools:
         categories = ["training", "preference", "injury", "other"]
 
         for category in categories:
-            with patch("src.core.storage.StorageManager"):
-                with patch(
-                    "src.agents.tools.ProfileStorageManager"
-                ) as MockProfileStorage:
-                    mock_profile_storage = MagicMock()
-                    MockProfileStorage.return_value = mock_profile_storage
-                    mock_profile_storage.save_memory_md.return_value = True
+            with patch("src.core.storage.StorageManager"), patch(
+                "src.agents.tools.ProfileStorageManager"
+            ) as MockProfileStorage:
+                mock_profile_storage = MagicMock()
+                MockProfileStorage.return_value = mock_profile_storage
+                mock_profile_storage.save_memory_md.return_value = True
 
-                    runner_tools = RunnerTools()
-                    result = runner_tools.update_memory("测试笔记", category)
+                runner_tools = RunnerTools()
+                result = runner_tools.update_memory("测试笔记", category)
 
-                    assert result["success"] is True
+                assert result["success"] is True
 
     def test_update_memory_exception_handling(self):
         """测试异常处理"""

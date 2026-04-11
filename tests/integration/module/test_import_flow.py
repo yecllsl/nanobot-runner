@@ -3,8 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.storage import StorageManager

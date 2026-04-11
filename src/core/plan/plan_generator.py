@@ -5,17 +5,15 @@
 """
 
 import json
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
 from src.core.exceptions import LLMError, ValidationError
 from src.core.logger import get_logger
 from src.core.models import (
     DailyPlan,
-    TrainingLoad,
     TrainingPlan,
     UserContext,
-    UserPreferences,
     WeeklySchedule,
 )
 
@@ -32,7 +30,7 @@ class PlanGenerator:
     MAX_RETRIES = 3
     LLM_TIMEOUT = 60
 
-    def __init__(self, llm_provider: Optional[Any] = None) -> None:
+    def __init__(self, llm_provider: Any | None = None) -> None:
         """
         初始化训练计划生成器
 
@@ -55,7 +53,7 @@ class PlanGenerator:
         user_context: UserContext,
         goal_distance_km: float,
         goal_date: str,
-        target_time: Optional[str] = None,
+        target_time: str | None = None,
         plan_type: str = "race_preparation",
     ) -> TrainingPlan:
         """
@@ -128,7 +126,7 @@ class PlanGenerator:
         user_context: UserContext,
         goal_distance_km: float,
         goal_date: str,
-        target_time: Optional[str],
+        target_time: str | None,
         plan_type: str,
     ) -> str:
         """
@@ -257,7 +255,7 @@ class PlanGenerator:
         user_context: UserContext,
         goal_distance_km: float,
         goal_date: str,
-        target_time: Optional[str],
+        target_time: str | None,
     ) -> TrainingPlan:
         """
         解析LLM响应，构建TrainingPlan对象

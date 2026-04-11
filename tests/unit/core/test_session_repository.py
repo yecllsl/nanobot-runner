@@ -2,7 +2,7 @@
 # 测试 Session 数据仓储层的聚合查询逻辑
 
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import polars as pl
 import pytest

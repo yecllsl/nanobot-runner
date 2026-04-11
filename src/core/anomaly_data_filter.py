@@ -2,7 +2,6 @@
 # 过滤跑步数据中的异常记录
 
 from dataclasses import dataclass
-from typing import List, Optional
 
 import polars as pl
 
@@ -22,7 +21,7 @@ class AnomalyFilterRule:
     description: str
 
 
-ANOMALY_FILTER_RULES: List[AnomalyFilterRule] = [
+ANOMALY_FILTER_RULES: list[AnomalyFilterRule] = [
     AnomalyFilterRule(
         field_name="avg_heart_rate",
         condition="<",
@@ -85,7 +84,7 @@ ANOMALY_FILTER_RULES: List[AnomalyFilterRule] = [
 class AnomalyDataFilter:
     """异常数据过滤器"""
 
-    def __init__(self, rules: Optional[List[AnomalyFilterRule]] = None) -> None:
+    def __init__(self, rules: list[AnomalyFilterRule] | None = None) -> None:
         """
         初始化异常数据过滤器
 

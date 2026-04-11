@@ -10,7 +10,6 @@ RunFlowAgent 全量测试执行脚本
 
 import argparse
 import subprocess
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +17,7 @@ from pathlib import Path
 
 def run_command(cmd, description, timeout=300):
     """执行命令并处理结果"""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"🚀 开始执行: {description}")
     print(f"💻 命令: {cmd}")
     print(f"⏰ 超时: {timeout}秒")
@@ -38,7 +37,7 @@ def run_command(cmd, description, timeout=300):
 
         elapsed_time = time.time() - start_time
 
-        print(f"✅ 执行完成!")
+        print("✅ 执行完成!")
         print(f"⏱️  耗时: {elapsed_time:.2f}秒")
         print(f"📊 退出码: {result.returncode}")
 
@@ -113,18 +112,18 @@ def run_specific_module(module_name):
 
 def generate_test_report(results, total_time):
     """生成测试报告"""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 测试执行报告")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     passed = sum(1 for result in results.values() if result[0])
     total = len(results)
 
     print(f"📅 报告时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"⏱️  总耗时: {total_time:.2f}秒")
-    print(f"📈 通过率: {passed}/{total} ({passed/total*100:.1f}%)")
+    print(f"📈 通过率: {passed}/{total} ({passed / total * 100:.1f}%)")
 
-    print(f"\n📋 详细结果:")
+    print("\n📋 详细结果:")
     for test_name, (success, output) in results.items():
         status = "✅ 通过" if success else "❌ 失败"
         print(f"   {status} {test_name}")
@@ -138,7 +137,7 @@ def generate_test_report(results, total_time):
         f.write("=" * 50 + "\n")
         f.write(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"总耗时: {total_time:.2f}秒\n")
-        f.write(f"通过率: {passed}/{total} ({passed/total*100:.1f}%)\n\n")
+        f.write(f"通过率: {passed}/{total} ({passed / total * 100:.1f}%)\n\n")
 
         f.write("详细结果:\n")
         for test_name, (success, output) in results.items():
@@ -158,7 +157,9 @@ def main():
     parser.add_argument("--integration", action="store_true", help="仅执行集成测试")
     parser.add_argument("--e2e", action="store_true", help="仅执行E2E测试")
     parser.add_argument("--coverage", action="store_true", help="执行覆盖率测试")
-    parser.add_argument("--module", type=str, help="执行特定模块测试 (cli|analytics|import)")
+    parser.add_argument(
+        "--module", type=str, help="执行特定模块测试 (cli|analytics|import)"
+    )
     parser.add_argument("--generate-data", action="store_true", help="生成测试数据")
 
     args = parser.parse_args()
@@ -175,7 +176,9 @@ def main():
         if args.generate_data:
             print("\n📊 生成测试数据...")
             success, output = run_command(
-                "python tests/scripts/generate_test_data.py", "测试数据生成", timeout=120
+                "python tests/scripts/generate_test_data.py",
+                "测试数据生成",
+                timeout=120,
             )
             if not success:
                 print("❌ 测试数据生成失败，继续执行测试...")
@@ -232,14 +235,14 @@ def main():
         all_passed = generate_test_report(results, total_time)
 
         # 最终结果
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         if all_passed:
             print("🎉 所有测试通过! 代码质量优秀!")
             print("✅ 可以安全进入发布环节")
         else:
             print("⚠️  部分测试失败，请检查代码质量")
             print("❌ 不建议直接发布，请先修复问题")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         return 0 if all_passed else 1
 

@@ -13,13 +13,12 @@ RunFlowAgent 端到端用户旅程测试
 - 单独执行: python tests/e2e/test_user_journey.py
 """
 
-import json
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import polars as pl
 import pytest

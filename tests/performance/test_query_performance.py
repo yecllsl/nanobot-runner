@@ -14,7 +14,6 @@ import pytest
 
 from src.agents.tools import RunnerTools
 from src.core.analytics import AnalyticsEngine
-from src.core.schema import ParquetSchema
 from src.core.storage import StorageManager
 from tests.conftest import create_mock_context
 
@@ -57,7 +56,7 @@ class TestQueryPerformance:
             duration = 1800 + (i % 10) * 300  # 时长范围：30-60分钟
 
             activity = {
-                "activity_id": f'run_{activity_date.strftime("%Y%m%d")}_{i:04d}',
+                "activity_id": f"run_{activity_date.strftime('%Y%m%d')}_{i:04d}",
                 "timestamp": activity_date,
                 "session_start_time": activity_date,  # 添加session_start_time
                 "source_file": f"test_{i}.fit",
@@ -280,20 +279,20 @@ class TestQueryPerformance:
             ((df_memory - lazy_memory) / df_memory * 100) if df_memory > 0 else 0
         )
 
-        print(f"📊 LazyFrame vs DataFrame 性能对比:")
+        print("📊 LazyFrame vs DataFrame 性能对比:")
         print(f"   LazyFrame: {lazy_time:.3f}秒, 内存: {lazy_memory:.2f}MB")
         print(f"   DataFrame: {df_time:.3f}秒, 内存: {df_memory:.2f}MB")
         print(f"   时间提升: {time_improvement:.1f}%")
         print(f"   内存优化: {memory_improvement:.1f}%")
 
         # 验证结果一致性
-        assert (
-            lazy_result["count"][0] == df_result["count"][0]
-        ), "LazyFrame 和 DataFrame 结果不一致"
+        assert lazy_result["count"][0] == df_result["count"][0], (
+            "LazyFrame 和 DataFrame 结果不一致"
+        )
 
         # 验证性能提升（目标：≥20%）
         # 注意：小数据集可能看不出明显差异，主要验证功能正确性
-        print(f"✅ LazyFrame vs DataFrame 对比测试通过")
+        print("✅ LazyFrame vs DataFrame 对比测试通过")
 
 
 def test_performance_baseline():

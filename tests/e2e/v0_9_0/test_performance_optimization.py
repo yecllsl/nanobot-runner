@@ -96,9 +96,9 @@ class TestPerformanceOptimizationE2E:
         avg_time = loop_time / 1000
 
         print(f"  - 循环方式耗时: {loop_time:.3f}秒")
-        print(f"  - 平均计算时间: {avg_time*1000:.3f}毫秒")
+        print(f"  - 平均计算时间: {avg_time * 1000:.3f}毫秒")
 
-        assert avg_time < 0.001, f"平均计算时间应<1ms，实际: {avg_time*1000:.3f}ms"
+        assert avg_time < 0.001, f"平均计算时间应<1ms，实际: {avg_time * 1000:.3f}ms"
 
         print("✓ Polars向量化性能测试通过")
 
@@ -120,9 +120,9 @@ class TestPerformanceOptimizationE2E:
         avg_time = elapsed_time / 100
 
         print(f"  - 100次查询总耗时: {elapsed_time:.3f}秒")
-        print(f"  - 平均查询耗时: {avg_time*1000:.2f}毫秒")
+        print(f"  - 平均查询耗时: {avg_time * 1000:.2f}毫秒")
 
-        assert avg_time < 0.1, f"平均查询时间应<100ms，实际: {avg_time*1000:.2f}ms"
+        assert avg_time < 0.1, f"平均查询时间应<100ms，实际: {avg_time * 1000:.2f}ms"
 
         print("✓ LazyFrame查询性能测试通过")
 
@@ -150,9 +150,11 @@ class TestPerformanceOptimizationE2E:
         avg_time = elapsed_time / 50
 
         print(f"  - 50次聚合查询总耗时: {elapsed_time:.3f}秒")
-        print(f"  - 平均聚合查询耗时: {avg_time*1000:.2f}毫秒")
+        print(f"  - 平均聚合查询耗时: {avg_time * 1000:.2f}毫秒")
 
-        assert avg_time < 0.2, f"平均聚合查询时间应<200ms，实际: {avg_time*1000:.2f}ms"
+        assert avg_time < 0.2, (
+            f"平均聚合查询时间应<200ms，实际: {avg_time * 1000:.2f}ms"
+        )
 
         print("✓ Session聚合查询性能测试通过")
 
@@ -188,7 +190,7 @@ class TestPerformanceOptimizationE2E:
 
         print(f"  - 写入时间: {write_time:.3f}秒")
         print(f"  - 文件大小: {file_size:.2f}MB")
-        print(f"  - 写入速度: {len(test_data)/write_time:.0f}条/秒")
+        print(f"  - 写入速度: {len(test_data) / write_time:.0f}条/秒")
 
         assert write_time < 5.0, f"写入时间应<5秒，实际: {write_time:.3f}秒"
 
@@ -226,7 +228,7 @@ class TestPerformanceOptimizationE2E:
         avg_time = elapsed_time / 10
 
         print(f"  - 10次读取总耗时: {elapsed_time:.3f}秒")
-        print(f"  - 平均读取耗时: {avg_time*1000:.2f}毫秒")
+        print(f"  - 平均读取耗时: {avg_time * 1000:.2f}毫秒")
         print(f"  - 数据量: {len(loaded_df)} 条")
 
         assert avg_time < 1.0, f"平均读取时间应<1秒，实际: {avg_time:.3f}秒"
@@ -259,7 +261,9 @@ class TestPerformanceOptimizationE2E:
             print(f"  - 操作后内存: {memory_after:.1f}MB")
             print(f"  - 内存增长: {memory_increase:.1f}MB")
 
-            assert memory_increase < 50, f"内存增长应<50MB，实际: {memory_increase:.1f}MB"
+            assert memory_increase < 50, (
+                f"内存增长应<50MB，实际: {memory_increase:.1f}MB"
+            )
 
             print("✓ 内存使用效率测试通过")
 
@@ -302,7 +306,7 @@ class TestPerformanceOptimizationE2E:
 
         elapsed_time = time.time() - start_time
 
-        print(f"  - 并发线程数: 5")
+        print("  - 并发线程数: 5")
         print(f"  - 成功操作: {len(results)}")
         print(f"  - 错误操作: {len(errors)}")
         print(f"  - 总耗时: {elapsed_time:.3f}秒")
@@ -336,9 +340,11 @@ class TestPerformanceBenchmark:
             avg_time = elapsed_time / 10000
 
             print(f"  - 计算10000次VDOT耗时: {elapsed_time:.3f}秒")
-            print(f"  - 平均计算时间: {avg_time*1000:.3f}毫秒")
+            print(f"  - 平均计算时间: {avg_time * 1000:.3f}毫秒")
 
-            assert avg_time < 0.001, f"平均计算时间应<1ms，实际: {avg_time*1000:.3f}ms"
+            assert avg_time < 0.001, (
+                f"平均计算时间应<1ms，实际: {avg_time * 1000:.3f}ms"
+            )
 
             print("✓ VDOT计算基准测试通过")
 

@@ -5,13 +5,11 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import polars as pl
 
 from src.core.context import AppContext, AppContextFactory
-from src.core.profile import ProfileStorageManager, RunnerProfile
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +108,9 @@ class BaseTool(ABC):
             logger.info(f"工具返回 JSON 长度: {len(json_result)}")
             return json_result
         except Exception as e:
-            logger.error(f"工具调用异常: {func.__name__}, 错误: {str(e)}", exc_info=True)
+            logger.error(
+                f"工具调用异常: {func.__name__}, 错误: {str(e)}", exc_info=True
+            )
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
@@ -134,7 +134,10 @@ class GetRunningStatsTool(BaseTool):
                     "type": "string",
                     "description": "开始日期（可选，格式：YYYY-MM-DD）",
                 },
-                "end_date": {"type": "string", "description": "结束日期（可选，格式：YYYY-MM-DD）"},
+                "end_date": {
+                    "type": "string",
+                    "description": "结束日期（可选，格式：YYYY-MM-DD）",
+                },
             },
         }
 
@@ -201,7 +204,10 @@ class CalculateVdotForRunTool(BaseTool):
 
         if distance_m is None or time_s is None:
             return json.dumps(
-                {"success": False, "error": "缺少必要参数：distance_m（距离，米）和 time_s（用时，秒）"},
+                {
+                    "success": False,
+                    "error": "缺少必要参数：distance_m（距离，米）和 time_s（用时，秒）",
+                },
                 ensure_ascii=False,
             )
 
@@ -210,13 +216,17 @@ class CalculateVdotForRunTool(BaseTool):
             time_s = float(time_s)
         except (TypeError, ValueError):
             return json.dumps(
-                {"success": False, "error": "参数类型错误：distance_m 和 time_s 必须为数字"},
+                {
+                    "success": False,
+                    "error": "参数类型错误：distance_m 和 time_s 必须为数字",
+                },
                 ensure_ascii=False,
             )
 
         if distance_m <= 0 or time_s <= 0:
             return json.dumps(
-                {"success": False, "error": "参数值错误：距离和时间必须为正数"}, ensure_ascii=False
+                {"success": False, "error": "参数值错误：距离和时间必须为正数"},
+                ensure_ascii=False,
             )
 
         return self._run_sync(
@@ -268,7 +278,9 @@ class GetHrDriftAnalysisTool(BaseTool):
     def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
-            "properties": {"run_id": {"type": "string", "description": "活动ID（可选）"}},
+            "properties": {
+                "run_id": {"type": "string", "description": "活动ID（可选）"}
+            },
         }
 
     async def execute(self, **kwargs: Any) -> str:
@@ -292,7 +304,11 @@ class GetTrainingLoadTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "days": {"type": "integer", "description": "分析天数（默认42天）", "default": 42}
+                "days": {
+                    "type": "integer",
+                    "description": "分析天数（默认42天）",
+                    "default": 42,
+                }
             },
         }
 
@@ -317,8 +333,14 @@ class QueryByDateRangeTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "start_date": {"type": "string", "description": "开始日期（格式：YYYY-MM-DD）"},
-                "end_date": {"type": "string", "description": "结束日期（格式：YYYY-MM-DD）"},
+                "start_date": {
+                    "type": "string",
+                    "description": "开始日期（格式：YYYY-MM-DD）",
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "结束日期（格式：YYYY-MM-DD）",
+                },
             },
             "required": ["start_date", "end_date"],
         }
@@ -348,7 +370,10 @@ class QueryByDistanceTool(BaseTool):
             "type": "object",
             "properties": {
                 "min_distance": {"type": "number", "description": "最小距离（公里）"},
-                "max_distance": {"type": "number", "description": "最大距离（公里，可选）"},
+                "max_distance": {
+                    "type": "number",
+                    "description": "最大距离（公里，可选）",
+                },
             },
             "required": ["min_distance"],
         }
@@ -417,7 +442,10 @@ class GenerateTrainingPlanTool(BaseTool):
                     "type": "number",
                     "description": "目标比赛距离（公里），例如：5, 10, 21.0975, 42.195",
                 },
-                "goal_date": {"type": "string", "description": "目标比赛日期（YYYY-MM-DD）"},
+                "goal_date": {
+                    "type": "string",
+                    "description": "目标比赛日期（YYYY-MM-DD）",
+                },
             },
             "required": ["goal_distance_km", "goal_date"],
         }
@@ -433,7 +461,7 @@ class GenerateTrainingPlanTool(BaseTool):
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
-    def __init__(self, context: Optional[AppContext] = None):
+    def __init__(self, context: AppContext | None = None):
         """
         初始化工具集
 
@@ -448,8 +476,8 @@ class RunnerTools:
         self.profile_storage = context.profile_storage
 
     def get_running_stats(
-        self, start_date: Optional[str] = None, end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> dict[str, Any]:
         summary = self.analytics.get_running_summary(start_date, end_date)
 
         if summary.height == 0:
@@ -467,7 +495,7 @@ class RunnerTools:
             "avg_heart_rate": row[6],
         }
 
-    def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_runs(self, limit: int = 10) -> list[dict[str, Any]]:
         lf = self.storage.read_parquet()
 
         session_df = (
@@ -514,7 +542,7 @@ class RunnerTools:
     def calculate_vdot_for_run(self, distance_m: float, time_s: float) -> float:
         return self.analytics.calculate_vdot(distance_m, time_s)
 
-    def get_vdot_trend(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_vdot_trend(self, limit: int = 20) -> list[dict[str, Any]]:
         lf = self.storage.read_parquet()
 
         session_df = (
@@ -548,7 +576,7 @@ class RunnerTools:
 
         return vdot_trend
 
-    def get_hr_drift_analysis(self, run_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_hr_drift_analysis(self, run_id: str | None = None) -> dict[str, Any]:
         lf = self.storage.read_parquet()
         df = lf.collect()
 
@@ -560,7 +588,7 @@ class RunnerTools:
 
         heart_rate = df.select(pl.col("heart_rate")).to_series().to_list()
 
-        pace_list: List[float] = []
+        pace_list: list[float] = []
         if "speed" in df.columns:
             speed_values = df.select(pl.col("speed")).to_series().to_list()
             pace_list = [1000 / s for s in speed_values if s and s > 0]
@@ -570,12 +598,12 @@ class RunnerTools:
 
         return self.analytics.analyze_hr_drift(heart_rate, pace_list)
 
-    def get_training_load(self, days: int = 42) -> Dict[str, Any]:
+    def get_training_load(self, days: int = 42) -> dict[str, Any]:
         return self.analytics.get_training_load(days)
 
     def query_by_date_range(
         self, start_date: str, end_date: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         按日期范围查询跑步记录（按会话聚合）
 
@@ -639,8 +667,8 @@ class RunnerTools:
         return results
 
     def query_by_distance(
-        self, min_distance: float, max_distance: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        self, min_distance: float, max_distance: float | None = None
+    ) -> list[dict[str, Any]]:
         """
         按距离范围查询跑步记录（按会话聚合）
 
@@ -698,7 +726,7 @@ class RunnerTools:
 
         return results
 
-    def update_memory(self, note: str, category: str = "other") -> Dict[str, Any]:
+    def update_memory(self, note: str, category: str = "other") -> dict[str, Any]:
         """
         更新 Agent 观察笔记到 MEMORY.md
 
@@ -716,7 +744,9 @@ class RunnerTools:
             # 验证分类
             valid_categories = ["training", "preference", "injury", "other"]
             if category not in valid_categories:
-                return {"error": f"无效的分类，必须是 {', '.join(valid_categories)} 之一"}
+                return {
+                    "error": f"无效的分类，必须是 {', '.join(valid_categories)} 之一"
+                }
 
             # 格式化笔记内容（添加分类标签）
             category_map = {
@@ -747,7 +777,7 @@ class RunnerTools:
 
     def generate_training_plan(
         self, goal_distance_km: float, goal_date: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         生成训练计划
 
@@ -797,7 +827,7 @@ class RunnerTools:
             return {"error": str(e)}
 
 
-def create_tools(runner_tools: RunnerTools) -> List[BaseTool]:
+def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
     return [
         GetRunningStatsTool(runner_tools),

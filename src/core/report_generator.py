@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import polars as pl
 
@@ -46,7 +46,7 @@ class TemplateEngine:
     模板变量使用 {variable_name} 语法
     """
 
-    def __init__(self, template_path: Optional[Path] = None) -> None:
+    def __init__(self, template_path: Path | None = None) -> None:
         """
         初始化模板引擎
 
@@ -54,15 +54,13 @@ class TemplateEngine:
             template_path: 自定义模板文件路径（可选）
         """
         self.template_path = template_path
-        self._templates: Dict[str, str] = {}
+        self._templates: dict[str, str] = {}
         self._load_default_templates()
 
     def _load_default_templates(self) -> None:
         """加载默认模板"""
         # 周报模板
-        self._templates[
-            "weekly"
-        ] = """# 跑步训练周报
+        self._templates["weekly"] = """# 跑步训练周报
 
 **报告周期**: {start_date} 至 {end_date}
 **生成时间**: {generated_at}
@@ -96,9 +94,7 @@ class TemplateEngine:
 """
 
         # 月报模板
-        self._templates[
-            "monthly"
-        ] = """# 跑步训练月报
+        self._templates["monthly"] = """# 跑步训练月报
 
 **报告周期**: {start_date} 至 {end_date}
 **生成时间**: {generated_at}
@@ -139,9 +135,7 @@ class TemplateEngine:
 """
 
         # 训练周期报告模板
-        self._templates[
-            "training_cycle"
-        ] = """# 训练周期报告
+        self._templates["training_cycle"] = """# 训练周期报告
 
 **报告周期**: {start_date} 至 {end_date}
 **周期类型**: {cycle_type}
@@ -207,9 +201,11 @@ class TemplateEngine:
 
         # 使用内置模板
         template_key = report_type.value
-        return self._templates.get(template_key, self._templates["weekly"])  # 默认返回周报模板
+        return self._templates.get(
+            template_key, self._templates["weekly"]
+        )  # 默认返回周报模板
 
-    def render(self, template: str, variables: Dict[str, Any]) -> str:
+    def render(self, template: str, variables: dict[str, Any]) -> str:
         """
         渲染模板
 
@@ -253,10 +249,10 @@ class ReportGenerator:
 
     def __init__(
         self,
-        config: Optional[ConfigManager] = None,
-        storage: Optional[StorageManager] = None,
-        analytics: Optional[AnalyticsEngine] = None,
-        template_engine: Optional[TemplateEngine] = None,
+        config: ConfigManager | None = None,
+        storage: StorageManager | None = None,
+        analytics: AnalyticsEngine | None = None,
+        template_engine: TemplateEngine | None = None,
     ) -> None:
         """
         初始化报告生成器
@@ -275,12 +271,12 @@ class ReportGenerator:
     def generate_report(
         self,
         report_type: ReportType,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         age: int = 30,
         rest_hr: int = 60,
-        template_path: Optional[Path] = None,
-    ) -> Dict[str, Any]:
+        template_path: Path | None = None,
+    ) -> dict[str, Any]:
         """
         生成训练回顾报告
 
@@ -362,7 +358,7 @@ class ReportGenerator:
         self,
         report_type: ReportType,
         end_date: datetime,
-        start_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
     ) -> datetime:
         """
         计算报告开始日期
@@ -391,7 +387,7 @@ class ReportGenerator:
             # 默认 7 天
             return end_date - timedelta(days=6)
 
-    def _collect_report_data(self, config: ReportConfig) -> Dict[str, Any]:
+    def _collect_report_data(self, config: ReportConfig) -> dict[str, Any]:
         """
         收集报告数据
 
@@ -487,7 +483,7 @@ class ReportGenerator:
 
         return report_data
 
-    def _create_empty_report_data(self, config: ReportConfig) -> Dict[str, Any]:
+    def _create_empty_report_data(self, config: ReportConfig) -> dict[str, Any]:
         """
         创建空数据报告
 
@@ -550,7 +546,6 @@ class ReportGenerator:
             float: 总 TSS
         """
         try:
-            from datetime import datetime, timedelta
 
             start_dt = config.start_date
             end_dt = config.end_date
@@ -588,8 +583,8 @@ class ReportGenerator:
     def _generate_report_content(
         self,
         report_type: ReportType,
-        report_data: Dict[str, Any],
-        template_path: Optional[Path] = None,
+        report_data: dict[str, Any],
+        template_path: Path | None = None,
     ) -> str:
         """
         生成报告内容
@@ -619,8 +614,8 @@ class ReportGenerator:
         return content
 
     def _prepare_template_variables(
-        self, report_type: ReportType, report_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, report_type: ReportType, report_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         准备模板变量
 
@@ -697,7 +692,7 @@ class ReportGenerator:
 
         return variables
 
-    def _format_hr_zones(self, hr_zones_data: Dict[str, Any]) -> str:
+    def _format_hr_zones(self, hr_zones_data: dict[str, Any]) -> str:
         """
         格式化心率区间数据
 
@@ -730,7 +725,7 @@ class ReportGenerator:
 
         return "\n".join(lines) if lines else "暂无有效心率数据"
 
-    def _format_vdot_trend(self, vdot_trend: List[Dict[str, Any]]) -> str:
+    def _format_vdot_trend(self, vdot_trend: list[dict[str, Any]]) -> str:
         """
         格式化 VDOT 趋势数据
 
@@ -753,7 +748,7 @@ class ReportGenerator:
 
         return "\n".join(lines) if lines else "暂无有效 VDOT 数据"
 
-    def _format_pace_distribution(self, pace_data: Dict[str, Any]) -> str:
+    def _format_pace_distribution(self, pace_data: dict[str, Any]) -> str:
         """
         格式化配速分布数据
 
@@ -817,7 +812,7 @@ class ReportGenerator:
         else:
             return "长周期"
 
-    def _generate_cycle_evaluation(self, report_data: Dict[str, Any]) -> str:
+    def _generate_cycle_evaluation(self, report_data: dict[str, Any]) -> str:
         """
         生成周期评估
 
@@ -863,7 +858,7 @@ class ReportGenerator:
         return " ".join(evaluations)
 
     def _generate_next_cycle_advice(
-        self, report_data: Dict[str, Any], cycle_type: str
+        self, report_data: dict[str, Any], cycle_type: str
     ) -> str:
         """
         生成下一周期建议
@@ -911,9 +906,9 @@ class ReportGenerator:
         self,
         report_content: str,
         report_type: ReportType,
-        output_dir: Optional[Path] = None,
-        filename: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        output_dir: Path | None = None,
+        filename: str | None = None,
+    ) -> dict[str, Any]:
         """
         保存报告到文件
 
@@ -955,10 +950,10 @@ class ReportGenerator:
 
 # 便捷的报告生成函数
 def generate_weekly_report(
-    end_date: Optional[datetime] = None,
+    end_date: datetime | None = None,
     age: int = 30,
-    template_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+    template_path: Path | None = None,
+) -> dict[str, Any]:
     """
     生成周报
 
@@ -980,10 +975,10 @@ def generate_weekly_report(
 
 
 def generate_monthly_report(
-    end_date: Optional[datetime] = None,
+    end_date: datetime | None = None,
     age: int = 30,
-    template_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+    template_path: Path | None = None,
+) -> dict[str, Any]:
     """
     生成月报
 
@@ -1005,10 +1000,10 @@ def generate_monthly_report(
 
 
 def generate_training_cycle_report(
-    end_date: Optional[datetime] = None,
+    end_date: datetime | None = None,
     age: int = 30,
-    template_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+    template_path: Path | None = None,
+) -> dict[str, Any]:
     """
     生成训练周期报告
 

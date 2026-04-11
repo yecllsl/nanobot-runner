@@ -6,7 +6,7 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from src.core.config_schema import AppConfig
 
@@ -17,7 +17,7 @@ class ConfigManager:
     使用缓存机制提升配置读取性能，避免频繁的文件 I/O 操作。
     """
 
-    _cache: Optional[Dict[str, Any]] = None
+    _cache: dict[str, Any] | None = None
     _cache_time: float = 0
     _cache_ttl: float = 300.0
 
@@ -67,7 +67,9 @@ class ConfigManager:
         if old_cron_store.exists() and not new_cron_store.exists():
             try:
                 shutil.copy2(old_cron_store, new_cron_store)
-                loguru.logger.info(f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}")
+                loguru.logger.info(
+                    f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}"
+                )
             except Exception as e:
                 loguru.logger.warning(f"迁移定时任务配置失败：{e}")
 
@@ -116,7 +118,9 @@ class ConfigManager:
         """
         is_valid, errors = AppConfig.validate(config)
         if not is_valid:
-            error_msg = "配置验证失败，无法保存:\n" + "\n".join(f"  - {e}" for e in errors)
+            error_msg = "配置验证失败，无法保存:\n" + "\n".join(
+                f"  - {e}" for e in errors
+            )
             raise ValueError(error_msg)
 
         with open(self.config_file, "w", encoding="utf-8") as f:
@@ -141,7 +145,7 @@ class ConfigManager:
                 raise RuntimeError("配置缓存状态异常：缓存有效但值为 None")
             return ConfigManager._cache.copy()
 
-        with open(self.config_file, "r", encoding="utf-8") as f:
+        with open(self.config_file, encoding="utf-8") as f:
             config = json.load(f)
 
         is_valid, errors = AppConfig.validate(config)

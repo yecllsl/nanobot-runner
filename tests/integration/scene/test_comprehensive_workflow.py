@@ -4,7 +4,6 @@ RunFlowAgent 全面集成测试
 基于实际代码接口，测试模块间交互和数据流转
 """
 
-import json
 
 # 添加项目根目录到Python路径
 import sys
@@ -12,7 +11,6 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
@@ -53,7 +51,7 @@ class TestComprehensiveWorkflow:
 
         for i in range(5):
             activity = {
-                "activity_id": f"run_202401{i+1:02d}",
+                "activity_id": f"run_202401{i + 1:02d}",
                 "timestamp": datetime(2024, 1, i + 1, 8, 0, 0),  # 使用datetime类型
                 "session_start_time": datetime(
                     2024, 1, i + 1, 6, 0, 0

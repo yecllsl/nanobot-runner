@@ -6,14 +6,14 @@ import logging
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class JsonFormatter(logging.Formatter):
     """JSON格式日志格式化器"""
 
     def format(self, record: logging.LogRecord) -> str:
-        log_data: Dict[str, Any] = {
+        log_data: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "level": record.levelname,
             "logger": record.name,
@@ -52,7 +52,7 @@ class LogConfig:
         self,
         log_level: str = "INFO",
         log_format: str = "text",
-        log_file: Optional[Path] = None,
+        log_file: Path | None = None,
         max_bytes: int = 10 * 1024 * 1024,
         backup_count: int = 5,
         console_output: bool = True,
@@ -65,7 +65,7 @@ class LogConfig:
         self.console_output = console_output
 
     @classmethod
-    def from_dict(cls, config: Dict[str, Any]) -> "LogConfig":
+    def from_dict(cls, config: dict[str, Any]) -> "LogConfig":
         """从字典创建配置"""
         log_file = config.get("log_file")
         return cls(
@@ -77,7 +77,7 @@ class LogConfig:
             console_output=config.get("console_output", True),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "log_level": logging.getLevelName(self.log_level),
@@ -89,17 +89,17 @@ class LogConfig:
         }
 
 
-_loggers: Dict[str, logging.Logger] = {}
-_default_config: Optional[LogConfig] = None
+_loggers: dict[str, logging.Logger] = {}
+_default_config: LogConfig | None = None
 
 
-def setup_logging(config: Optional[LogConfig] = None) -> None:
+def setup_logging(config: LogConfig | None = None) -> None:
     """配置全局日志系统"""
     global _default_config
     _default_config = config or LogConfig()
 
 
-def get_logger(name: str, config: Optional[LogConfig] = None) -> logging.Logger:
+def get_logger(name: str, config: LogConfig | None = None) -> logging.Logger:
     """获取或创建日志记录器"""
     if name in _loggers:
         return _loggers[name]
@@ -143,7 +143,7 @@ def log_with_data(
     logger: logging.Logger,
     level: int,
     message: str,
-    data: Optional[Dict[str, Any]] = None,
+    data: dict[str, Any] | None = None,
 ) -> None:
     """记录带额外数据的日志"""
     record = logger.makeRecord(logger.name, level, "", 0, message, (), None)
@@ -151,7 +151,7 @@ def log_with_data(
     logger.handle(record)
 
 
-_default_logger: Optional[logging.Logger] = None
+_default_logger: logging.Logger | None = None
 
 
 def get_default_logger() -> logging.Logger:

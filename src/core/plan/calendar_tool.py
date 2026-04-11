@@ -1,12 +1,11 @@
 # 日历同步工具
 # 扩展FeishuCalendarSync，支持完整的增删改生命周期管理
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.core.training_plan import DailyPlan, TrainingPlan
 from src.notify.feishu_calendar import (
@@ -42,7 +41,7 @@ class HealthCheckResult:
     healthy: bool
     item: HealthCheckItem
     message: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 @dataclass
@@ -54,8 +53,8 @@ class BatchSyncResult:
     total_count: int
     synced_count: int
     failed_count: int
-    event_ids: List[str] = field(default_factory=list)
-    errors: List[Dict[str, Any]] = field(default_factory=list)
+    event_ids: list[str] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -66,13 +65,13 @@ class OptimisticUpdateContext:
     event_id: str
     daily_plan: DailyPlan
     date: datetime
-    rollback_data: Optional[Dict[str, Any]] = None
+    rollback_data: dict[str, Any] | None = None
 
 
 class CalendarTool:
     """日历同步工具"""
 
-    def __init__(self, config: Optional[CalendarSyncConfig] = None):
+    def __init__(self, config: CalendarSyncConfig | None = None):
         """
         初始化日历同步工具
 
@@ -80,11 +79,11 @@ class CalendarTool:
             config: 同步配置，不指定则从配置文件读取
         """
         self._sync_service = FeishuCalendarSync(config)
-        self._optimistic_contexts: Dict[str, OptimisticUpdateContext] = {}
+        self._optimistic_contexts: dict[str, OptimisticUpdateContext] = {}
 
     async def pre_sync_check(
-        self, check_items: Optional[List[HealthCheckItem]] = None
-    ) -> List[HealthCheckResult]:
+        self, check_items: list[HealthCheckItem] | None = None
+    ) -> list[HealthCheckResult]:
         """
         预同步检查（健康检测）
 
@@ -343,7 +342,9 @@ class CalendarTool:
                         calendar_id, daily_plan.event_id
                     )
                     deleted_count += 1
-                    logger.info(f"删除训练计划事件成功：{daily_plan.date} - {daily_plan.event_id}")
+                    logger.info(
+                        f"删除训练计划事件成功：{daily_plan.date} - {daily_plan.event_id}"
+                    )
                 except Exception as e:
                     failed_count += 1
                     logger.error(
@@ -432,7 +433,7 @@ class CalendarTool:
 
     async def batch_sync(
         self,
-        plans: List[TrainingPlan],
+        plans: list[TrainingPlan],
         mode: SyncMode = SyncMode.CREATE,
         batch_size: int = 10,
     ) -> BatchSyncResult:
@@ -450,8 +451,8 @@ class CalendarTool:
         total_count = len(plans)
         synced_count = 0
         failed_count = 0
-        all_event_ids: List[str] = []
-        all_errors: List[Dict[str, Any]] = []
+        all_event_ids: list[str] = []
+        all_errors: list[dict[str, Any]] = []
 
         for i in range(0, total_count, batch_size):
             batch = plans[i : i + batch_size]

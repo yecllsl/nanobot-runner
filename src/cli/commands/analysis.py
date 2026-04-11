@@ -2,7 +2,6 @@
 # 包含 vdot、load 和 hr-drift 命令
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.panel import Panel
@@ -17,7 +16,9 @@ app = typer.Typer(help="数据分析命令")
 @app.command()
 def vdot(
     limit: int = typer.Option(10, "--limit", "-n", help="显示最近 N 条记录"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="输出文件路径（JSON）"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="输出文件路径（JSON）"
+    ),
 ) -> None:
     """
     查看 VDOT 趋势

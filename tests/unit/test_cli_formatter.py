@@ -1,6 +1,5 @@
 # CLI格式化输出单元测试
 
-import pytest
 
 from src.cli_formatter import (
     format_agent_response,

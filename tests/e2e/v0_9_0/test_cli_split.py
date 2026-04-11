@@ -59,13 +59,13 @@ class TestCLISplitE2E:
 
         assert result.returncode == 0, f"帮助命令应成功，返回码: {result.returncode}"
 
-        assert (
-            "Nanobot Runner" in result.stdout or "nanobotrun" in result.stdout
-        ), f"帮助输出应包含应用名称"
+        assert "Nanobot Runner" in result.stdout or "nanobotrun" in result.stdout, (
+            "帮助输出应包含应用名称"
+        )
 
         print("✓ 帮助命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
-        print(f"  - 输出包含应用名称")
+        print("  - 输出包含应用名称")
 
     def test_command_routing_import_data(self):
         """
@@ -82,7 +82,9 @@ class TestCLISplitE2E:
             timeout=10,
         )
 
-        assert result.returncode == 0, f"data帮助命令应成功，返回码: {result.returncode}"
+        assert result.returncode == 0, (
+            f"data帮助命令应成功，返回码: {result.returncode}"
+        )
 
         print("✓ data命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
@@ -102,7 +104,9 @@ class TestCLISplitE2E:
             timeout=10,
         )
 
-        assert result.returncode == 0, f"analysis帮助命令应成功，返回码: {result.returncode}"
+        assert result.returncode == 0, (
+            f"analysis帮助命令应成功，返回码: {result.returncode}"
+        )
 
         print("✓ analysis命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
@@ -122,7 +126,9 @@ class TestCLISplitE2E:
             timeout=10,
         )
 
-        assert result.returncode == 0, f"agent帮助命令应成功，返回码: {result.returncode}"
+        assert result.returncode == 0, (
+            f"agent帮助命令应成功，返回码: {result.returncode}"
+        )
 
         print("✓ agent命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
@@ -142,7 +148,9 @@ class TestCLISplitE2E:
             timeout=10,
         )
 
-        assert result.returncode == 0, f"gateway帮助命令应成功，返回码: {result.returncode}"
+        assert result.returncode == 0, (
+            f"gateway帮助命令应成功，返回码: {result.returncode}"
+        )
 
         print("✓ gateway命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
@@ -162,7 +170,9 @@ class TestCLISplitE2E:
             timeout=10,
         )
 
-        assert result.returncode == 0, f"report帮助命令应成功，返回码: {result.returncode}"
+        assert result.returncode == 0, (
+            f"report帮助命令应成功，返回码: {result.returncode}"
+        )
 
         print("✓ report命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
@@ -182,7 +192,9 @@ class TestCLISplitE2E:
             timeout=10,
         )
 
-        assert result.returncode == 0, f"system帮助命令应成功，返回码: {result.returncode}"
+        assert result.returncode == 0, (
+            f"system帮助命令应成功，返回码: {result.returncode}"
+        )
 
         print("✓ system命令路由测试通过")
         print(f"  - 返回码: {result.returncode}")
@@ -204,11 +216,13 @@ class TestCLISplitE2E:
 
         assert result.returncode != 0, "无效命令应返回非零退出码"
 
-        assert "No such command" in result.stderr or "Error" in result.stderr, "应显示错误信息"
+        assert "No such command" in result.stderr or "Error" in result.stderr, (
+            "应显示错误信息"
+        )
 
         print("✓ 无效命令处理测试通过")
         print(f"  - 返回码: {result.returncode}")
-        print(f"  - 错误信息已显示")
+        print("  - 错误信息已显示")
 
     def test_cli_startup_performance(self):
         """
@@ -276,7 +290,9 @@ class TestCLICommandIntegration:
                 cwd=temp_dir,
             )
 
-            assert result.returncode == 0, f"analysis命令应成功，返回码: {result.returncode}"
+            assert result.returncode == 0, (
+                f"analysis命令应成功，返回码: {result.returncode}"
+            )
 
             print("✓ analysis命令执行测试通过")
 

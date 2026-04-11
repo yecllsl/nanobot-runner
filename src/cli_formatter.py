@@ -1,18 +1,16 @@
 # Rich格式化输出模块
 # 为CLI和Agent交互提供统一的格式化输出
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 console = Console()
 
 
-def format_duration(seconds: Union[int, float]) -> str:
+def format_duration(seconds: int | float) -> str:
     """
     格式化时长为人类可读格式
 
@@ -70,7 +68,7 @@ def format_distance(meters: float) -> str:
         return f"{meters / 1000:.2f}公里"
 
 
-def format_stats_panel(data: Dict[str, Any]) -> Panel:
+def format_stats_panel(data: dict[str, Any]) -> Panel:
     """
     将统计数据格式化为Rich面板
 
@@ -146,7 +144,7 @@ def format_warning(message: str) -> Panel:
     )
 
 
-def format_runs_table(runs: List[Dict[str, Any]]) -> Table:
+def format_runs_table(runs: list[dict[str, Any]]) -> Table:
     """
     将跑步记录格式化为Rich表格
 
@@ -192,7 +190,7 @@ def format_runs_table(runs: List[Dict[str, Any]]) -> Table:
     return table
 
 
-def _format_duration(seconds: Union[int, float]) -> str:
+def _format_duration(seconds: int | float) -> str:
     """内部函数：格式化时长"""
     if seconds is None:
         return "-"
@@ -203,7 +201,7 @@ def _format_duration(seconds: Union[int, float]) -> str:
         return "-"
 
 
-def _format_pace(pace: Union[int, float, str]) -> str:
+def _format_pace(pace: int | float | str) -> str:
     """内部函数：格式化配速"""
     if pace is None or pace == "N/A":
         return "-"
@@ -213,7 +211,7 @@ def _format_pace(pace: Union[int, float, str]) -> str:
         return "-"
 
 
-def format_vdot_trend(vdot_data: List[Dict[str, Any]]) -> Table:
+def format_vdot_trend(vdot_data: list[dict[str, Any]]) -> Table:
     """
     将VDOT趋势数据格式化为Rich表格
 
@@ -223,7 +221,9 @@ def format_vdot_trend(vdot_data: List[Dict[str, Any]]) -> Table:
     Returns:
         Table: Rich表格对象
     """
-    table = Table(title="[Trend] VDOT趋势", show_header=True, header_style="bold magenta")
+    table = Table(
+        title="[Trend] VDOT趋势", show_header=True, header_style="bold magenta"
+    )
 
     table.add_column("日期", style="cyan", width=12)
     table.add_column("VDOT", style="green", width=10, justify="right")

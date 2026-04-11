@@ -37,7 +37,7 @@ def init() -> None:
 
     if not workspace.exists():
         workspace.mkdir(parents=True, exist_ok=True)
-        console.print(f"[green]✓[/green] 创建工作区目录")
+        console.print("[green]✓[/green] 创建工作区目录")
 
     data_dir = context.config.data_dir
     if not data_dir.exists():
@@ -52,7 +52,7 @@ def init() -> None:
     else:
         console.print("[dim]模板文件已是最新[/dim]")
 
-    console.print(f"\n[bold green]工作区初始化完成！[/bold green]")
+    console.print("\n[bold green]工作区初始化完成！[/bold green]")
     console.print(f"工作区路径: [cyan]{workspace}[/cyan]")
     console.print(f"数据路径: [cyan]{data_dir}[/cyan]")
     console.print("\n下一步:")

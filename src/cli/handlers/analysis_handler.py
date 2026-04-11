@@ -1,7 +1,7 @@
 # 分析处理 Handler
 # 负责VDOT、训练负荷、心率漂移等分析的业务逻辑调用
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from src.agents.tools import RunnerTools
 from src.core.context import AppContext, AppContextFactory
@@ -10,7 +10,7 @@ from src.core.context import AppContext, AppContextFactory
 class AnalysisHandler:
     """分析业务逻辑"""
 
-    def __init__(self, context: Optional[AppContext] = None) -> None:
+    def __init__(self, context: AppContext | None = None) -> None:
         """
         初始化分析处理器
 
@@ -37,7 +37,7 @@ class AnalysisHandler:
         tools = RunnerTools(context=self.context)
         return tools.get_vdot_trend(limit=limit)
 
-    def get_training_load(self, days: int = 42) -> Dict[str, Any]:
+    def get_training_load(self, days: int = 42) -> dict[str, Any]:
         """
         获取训练负荷数据
 
@@ -49,7 +49,7 @@ class AnalysisHandler:
         """
         return self.engine.get_training_load(days=days)
 
-    def get_hr_drift_analysis(self) -> Dict[str, Any]:
+    def get_hr_drift_analysis(self) -> dict[str, Any]:
         """
         获取心率漂移分析
 

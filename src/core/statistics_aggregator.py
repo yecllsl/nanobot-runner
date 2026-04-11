@@ -2,7 +2,7 @@
 # 提供跑步数据的统计汇总功能
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -23,7 +23,7 @@ class StatisticsAggregator:
         self.storage = storage_manager
 
     def get_running_summary(
-        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+        self, start_date: str | None = None, end_date: str | None = None
     ) -> pl.DataFrame:
         """
         获取跑步摘要统计
@@ -126,7 +126,7 @@ class StatisticsAggregator:
         except Exception:
             return "0'00\""
 
-    def get_running_stats(self, year: Optional[int] = None) -> Dict[str, Any]:
+    def get_running_stats(self, year: int | None = None) -> dict[str, Any]:
         """
         获取跑步统计数据
 
@@ -167,7 +167,11 @@ class StatisticsAggregator:
             total_distance = float(session_df["distance"].sum())
             total_duration = float(session_df["duration"].sum())
             avg_heart_rate_result = session_df["avg_hr"].mean()
-            avg_heart_rate = float(avg_heart_rate_result) if avg_heart_rate_result is not None else 0.0  # type: ignore
+            avg_heart_rate = (
+                float(avg_heart_rate_result)
+                if avg_heart_rate_result is not None
+                else 0.0
+            )  # type: ignore
 
             stats = {
                 "total_runs": total_runs,
@@ -230,7 +234,7 @@ class StatisticsAggregator:
         except Exception:
             return "0:00"
 
-    def get_pace_distribution(self, year: Optional[int] = None) -> Dict[str, Any]:
+    def get_pace_distribution(self, year: int | None = None) -> dict[str, Any]:
         """
         获取配速分布统计
 

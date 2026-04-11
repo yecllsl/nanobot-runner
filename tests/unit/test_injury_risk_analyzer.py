@@ -1,11 +1,10 @@
 # InjuryRiskAnalyzer 单元测试
 
 from datetime import datetime
-from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.injury_risk_analyzer import InjuryRiskAnalyzer, InjuryRiskResult
+from src.core.injury_risk_analyzer import InjuryRiskAnalyzer
 from src.core.user_profile_manager import (
     FitnessLevel,
     InjuryRiskLevel,
