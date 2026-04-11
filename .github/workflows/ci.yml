@@ -47,22 +47,21 @@ jobs:
     - name: Verify tool installations
       run: |
         echo "验证工具安装..."
-        uv run black --version
-        uv run isort --version
+        uv run ruff --version
         uv run mypy --version
         uv run bandit --version
         uv run pytest --version
         echo "工具验证完成"
         
-    - name: Check code formatting with black
+    - name: Check code formatting with ruff
       run: |
         echo "开始代码格式化检查..."
-        uv run black --check src/ tests/
+        uv run ruff format --check src/ tests/
         
-    - name: Check import sorting with isort
+    - name: Check code quality with ruff
       run: |
-        echo "开始导入排序检查..."
-        uv run isort --check-only src/ tests/
+        echo "开始代码质量检查..."
+        uv run ruff check src/ tests/
         
     - name: Type checking with mypy
       run: |
