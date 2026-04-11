@@ -4,8 +4,8 @@
 
 ### 1.1 代码质量检查
 
-- [ ] 执行 `uv run black src tests --check`
-- [ ] 执行 `uv run isort src tests --check-only`
+- [ ] 执行 `uv run ruff format --check src tests`
+- [ ] 执行 `uv run ruff check src tests`
 - [ ] 执行 `uv run mypy src --ignore-missing-imports`
 - [ ] 执行 `uv run bandit -r src -s B101,B601`
 - [ ] 确认无高危安全漏洞
@@ -157,8 +157,8 @@
 
 ```bash
 # 完整预检查
-uv run black --check src/ tests/
-uv run isort --check-only src/ tests/
+uv run ruff format --check src/ tests/
+uv run ruff check src/ tests/
 uv run mypy src/ --ignore-missing-imports
 uv run bandit -r src/ -s B101,B601
 uv run pytest tests/unit/ --cov=src --cov-fail-under=80
@@ -166,7 +166,7 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 
 ---
 
-**文档版本**: v0.6.0  
-**最后更新**: 2026-04-02  
+**文档版本**: v0.7.0  
+**最后更新**: 2026-04-11  
 **关联文档**: [分支管理与发布流程规范](./分支管理与发布流程规范.md)  
-**更新说明**: 优化单人开发模式发布流程，强调版本号更新后必须先推送main分支验证CI
+**更新说明**: 更新为使用ruff进行代码质量检查

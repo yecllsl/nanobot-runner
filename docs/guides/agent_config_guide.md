@@ -49,7 +49,7 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 - 依赖管理: uv venv, uv sync --all-extras
 - 运行: uv run nanobotrun --help
 - 测试: uv run pytest
-- 代码质量: black, isort, mypy, bandit
+- 代码质量: ruff format, ruff check, mypy, bandit
 
 ## 代码风格
 - 导入顺序: 标准库 → 第三方库 → 本地模块

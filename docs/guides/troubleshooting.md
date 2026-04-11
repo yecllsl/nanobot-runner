@@ -37,7 +37,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 **解决方案**：
 ```powershell
 # 使用 ; if($?) { } 替代 &&
-uv run black src/; if($?) { uv run pytest }
+uv run ruff format src/; if($?) { uv run pytest }
 ```
 
 ---
@@ -183,8 +183,8 @@ FIXTURE_DIR = Path(__file__).parent.parent / "data" / "fixtures"
 
 | 检查项 | 工具 | 门禁要求 |
 |--------|------|----------|
-| 代码格式化 | black | 零警告 |
-| 导入排序 | isort | 零警告 |
+| 代码格式化 | ruff format | 零警告 |
+| 代码质量 | ruff check | 零警告 |
 | 类型检查 | mypy | 警告可接受 |
 | 安全扫描 | bandit | 高危漏洞=0 |
 | 单元测试 | pytest | 通过率100% |
@@ -192,4 +192,4 @@ FIXTURE_DIR = Path(__file__).parent.parent / "data" / "fixtures"
 
 ---
 
-*文档版本: v1.0.0 | 更新日期: 2026-04-01*
+*文档版本: v1.1.0 | 更新日期: 2026-04-11*
