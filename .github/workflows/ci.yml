@@ -30,18 +30,10 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         
-    - name: Cache uv dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/uv
-        key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-uv-
-        
     - name: Install dependencies
       run: |
         echo "正在使用uv安装依赖..."
-        uv sync --all-extras
+        uv sync --all-extras --no-cache
         echo "依赖安装完成"
         
     - name: Verify tool installations
