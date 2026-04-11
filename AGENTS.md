@@ -187,8 +187,10 @@ uv run pytest tests/unit/                        # 单元测试
 uv run pytest -k "test_calculate_vdot"           # 按关键字
 
 # 代码质量
-uv run black --check src/ tests/                 # 格式检查
-uv run mypy src/ --ignore-missing-imports        # 类型检查
+uv run ruff format src/ tests/           # 代码格式化
+uv run ruff check src/ tests/            # 代码质量检查
+uv run ruff check --fix src/ tests/      # 自动修复问题
+uv run mypy src/ --ignore-missing-imports  # 类型检查
 ```
 
 > **Windows PowerShell 注意**：多命令链用 `; if($?) { cmd }` 替代 `&&`
@@ -224,8 +226,8 @@ uv run mypy src/ --ignore-missing-imports        # 类型检查
 
 ## 8. 提交前 Checklist
 
-- [ ] `uv run black --check src/ tests/` 零警告
-- [ ] `uv run isort --check-only src/ tests/` 零警告
+- [ ] `uv run ruff format --check src/ tests/` 零警告
+- [ ] `uv run ruff check src/ tests/` 零警告
 - [ ] `uv run mypy src/` 无新增错误
 - [ ] `uv run pytest tests/unit/` 通过率 100%
 - [ ] 新增字段/工具 → 更新 Schema/TOOL_DESCRIPTIONS

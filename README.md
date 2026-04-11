@@ -268,11 +268,14 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 ### 代码质量
 
 ```bash
-# 格式化代码
-uv run black src/ tests/
+# 代码格式化
+uv run ruff format src/ tests/
 
-# 导入排序
-uv run isort src/ tests/
+# 代码质量检查
+uv run ruff check src/ tests/
+
+# 自动修复问题
+uv run ruff check --fix src/ tests/
 
 # 类型检查
 uv run mypy src/ --ignore-missing-imports
@@ -285,8 +288,8 @@ uv run bandit -r src/ -s B101,B601
 
 | 检查项 | 工具 | 门禁要求 |
 |--------|------|----------|
-| 代码格式化 | black | 零警告 |
-| 导入排序 | isort | 零警告 |
+| 代码格式化 | ruff format | 零警告 |
+| 代码质量 | ruff check | 零警告 |
 | 类型检查 | mypy | 警告可接受 |
 | 安全扫描 | bandit | 高危漏洞=0 |
 | 单元测试 | pytest | 通过率100% |

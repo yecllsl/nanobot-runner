@@ -124,7 +124,9 @@ class AnalyticsEngine:
 
 ## 4. 代码风格
 
-### 4.1 导入顺序 (isort profile=black)
+### 4.1 导入顺序
+
+使用ruff的isort规则自动排序导入：
 
 ```python
 # 1. 标准库
@@ -179,8 +181,8 @@ def calculate_vdot(distance_m: float, time_s: float) -> float:
 
 | 检查项 | 工具 | 门禁要求 |
 |--------|------|----------|
-| 代码格式化 | black | 零警告 |
-| 导入排序 | isort | 零警告 |
+| 代码格式化 | ruff format | 零警告 |
+| 代码质量 | ruff check | 零警告 |
 | 类型检查 | mypy | 警告可接受 |
 | 安全扫描 | bandit | 高危漏洞=0 |
 | 单元测试 | pytest | 通过率100% |
@@ -295,9 +297,14 @@ sessions = session_repo.get_sessions_lazy(start, end).collect()
 ## 8. 本地验证命令
 
 ```bash
-# 格式检查
-uv run black --check src/ tests/
-uv run isort --check-only src/ tests/
+# 代码格式化
+uv run ruff format src/ tests/
+
+# 代码质量检查
+uv run ruff check src/ tests/
+
+# 自动修复问题
+uv run ruff check --fix src/ tests/
 
 # 类型检查
 uv run mypy src/ --ignore-missing-imports
@@ -311,4 +318,4 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 
 ---
 
-*文档版本: v0.9.0 | 更新日期: 2026-04-09*
+*文档版本: v0.9.1 | 更新日期: 2026-04-11*
