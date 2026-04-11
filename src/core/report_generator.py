@@ -546,7 +546,6 @@ class ReportGenerator:
             float: 总 TSS
         """
         try:
-
             start_dt = config.start_date
             end_dt = config.end_date
 
@@ -823,7 +822,7 @@ class ReportGenerator:
             str: 周期评估文本
         """
         ctl = report_data.get("ctl", 0.0)
-        tsb = report_data.get("tsb", 0.0)
+        report_data.get("tsb", 0.0)
         total_tss = report_data.get("total_tss", 0.0)
         total_runs = report_data.get("total_runs", 0)
 
@@ -872,7 +871,7 @@ class ReportGenerator:
         """
         tsb = report_data.get("tsb", 0.0)
         ctl = report_data.get("ctl", 0.0)
-        fitness_status = report_data.get("fitness_status", "数据不足")
+        report_data.get("fitness_status", "数据不足")
 
         advices = []
 

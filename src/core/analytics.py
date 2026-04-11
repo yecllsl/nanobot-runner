@@ -161,7 +161,7 @@ class AnalyticsEngine:
         return self.training_load_analyzer.calculate_ctl(tss_values)
 
     def calculate_atl_ctl(
-        self, tss_values: list[float], atl_days: int = 7, ctl_days: int = 42
+        self, tss_values: list[float], _atl_days: int = 7, _ctl_days: int = 42
     ) -> dict[str, float]:
         """
         计算ATL和CTL
@@ -473,7 +473,7 @@ class AnalyticsEngine:
         return result
 
     def _evaluate_fitness_status(
-        self, tsb: float, atl: float, ctl: float
+        self, tsb: float, _atl: float, _ctl: float
     ) -> tuple[str, str]:
         """
         根据训练压力平衡评估体能状态并生成训练建议
@@ -522,9 +522,9 @@ class AnalyticsEngine:
             )
 
         # 根据 CTL 补充建议
-        if ctl < 30:
+        if _ctl < 30:
             advice += " 体能基础较弱，建议循序渐进增加训练量。"
-        elif ctl > 80:
+        elif _ctl > 80:
             advice += " 体能基础扎实，可保持当前训练水平。"
 
         return status, advice
@@ -1167,7 +1167,7 @@ class AnalyticsEngine:
         fitness_status: dict[str, Any],
         yesterday_run: dict[str, Any] | None,
         weekday: int,
-        age: int,
+        _age: int,
     ) -> str:
         """
         基于训练负荷数据生成训练建议
@@ -1227,7 +1227,7 @@ class AnalyticsEngine:
         return " ".join(advice_parts)
 
     def _generate_weekly_plan(
-        self, today: date, fitness_status: dict[str, Any], age: int
+        self, today: date, fitness_status: dict[str, Any], _age: int
     ) -> list[dict[str, Any]]:
         """
         生成本周训练计划预览
@@ -1272,7 +1272,7 @@ class AnalyticsEngine:
         return weekly_plan
 
     def _get_daily_plan(
-        self, weekday: int, tsb: float, ctl: float, is_past: bool
+        self, weekday: int, tsb: float, _ctl: float, is_past: bool
     ) -> str:
         """
         获取单日训练计划

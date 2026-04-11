@@ -73,9 +73,7 @@ class ConfigError(NanobotRunnerError):
     """配置相关错误"""
 
     error_code: str = "CONFIG_ERROR"
-    recovery_suggestion: str | None = (
-        "请检查配置文件格式，或删除配置文件后重新初始化"
-    )
+    recovery_suggestion: str | None = "请检查配置文件格式，或删除配置文件后重新初始化"
 
 
 @dataclass

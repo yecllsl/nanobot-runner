@@ -225,7 +225,7 @@ class StorageManager:
                 )
 
             cast_exprs = []
-            for col in df_schema.keys():
+            for col in df_schema:
                 if col in all_schemas and df_schema[col] != all_schemas[col]:
                     cast_exprs.append(pl.col(col).cast(all_schemas[col]))
 
@@ -257,9 +257,7 @@ class StorageManager:
             )
             return result.lazy()
 
-    def _read_parquet_file_with_schema_fix(
-        self, filepath: Path
-    ) -> pl.DataFrame | None:
+    def _read_parquet_file_with_schema_fix(self, filepath: Path) -> pl.DataFrame | None:
         try:
             return pl.read_parquet(filepath)
         except Exception as e:
@@ -531,9 +529,7 @@ class StorageManager:
                 recovery_suggestion="请检查数据格式和磁盘空间",
             ) from e
 
-    def save_activities(
-        self, dataframe: pl.DataFrame, year: int | None = None
-    ) -> dict:
+    def save_activities(self, dataframe: pl.DataFrame, year: int | None = None) -> dict:
         try:
             if year is None:
                 if not dataframe.is_empty() and "timestamp" in dataframe.columns:

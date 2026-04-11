@@ -122,9 +122,8 @@ class AnomalyDataFilter:
                 if rule.field_name not in filtered_data.collect_schema().names():
                     continue
 
-                if not strict_mode:
-                    if not self._is_severe_rule(rule):
-                        continue
+                if not strict_mode and not self._is_severe_rule(rule):
+                    continue
 
                 filtered_data = self._apply_filter_rule(filtered_data, rule)
 

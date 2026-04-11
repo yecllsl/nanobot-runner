@@ -101,7 +101,6 @@ class TestRequireStorage:
         """测试没有storage的情况"""
         from unittest.mock import patch
 
-
         class TestClass:
             def __init__(self):
                 self.storage = None
@@ -126,18 +125,18 @@ class TestValidateDateFormat:
 
     def test_validate_date_format_valid(self):
         """测试有效日期格式"""
-        assert validate_date_format("2024-01-01") == True
-        assert validate_date_format("2024-12-31") == True
+        assert validate_date_format("2024-01-01")
+        assert validate_date_format("2024-12-31")
 
     def test_validate_date_format_invalid(self):
         """测试无效日期格式"""
-        assert validate_date_format("invalid") == False
-        assert validate_date_format("2024/01/01") == False
-        assert validate_date_format("") == False
+        assert not validate_date_format("invalid")
+        assert not validate_date_format("2024/01/01")
+        assert not validate_date_format("")
 
     def test_validate_date_format_none(self):
         """测试None输入"""
-        assert validate_date_format(None) == False
+        assert not validate_date_format(None)
 
 
 class TestHandleEmptyData:

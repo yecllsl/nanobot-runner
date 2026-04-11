@@ -90,7 +90,7 @@ class FeishuAuth:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"获取飞书访问令牌请求异常：{e}")
-            raise RuntimeError(f"获取飞书访问令牌请求异常：{e}")
+            raise RuntimeError(f"获取飞书访问令牌请求异常：{e}") from e
 
     def get_token(self) -> str:
         """
@@ -182,10 +182,10 @@ class FeishuMessageAPI:
 
         except requests.exceptions.Timeout:
             logger.error("飞书 API 请求超时")
-            raise RuntimeError("飞书 API 请求超时")
+            raise RuntimeError("飞书 API 请求超时") from None
         except requests.exceptions.RequestException as e:
             logger.error(f"飞书 API 请求异常：{e}")
-            raise RuntimeError(f"飞书 API 请求异常：{e}")
+            raise RuntimeError(f"飞书 API 请求异常：{e}") from e
 
     def send_text(
         self,

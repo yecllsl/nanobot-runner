@@ -576,7 +576,7 @@ class RunnerTools:
 
         return vdot_trend
 
-    def get_hr_drift_analysis(self, run_id: str | None = None) -> dict[str, Any]:
+    def get_hr_drift_analysis(self, _run_id: str | None = None) -> dict[str, Any]:
         lf = self.storage.read_parquet()
         df = lf.collect()
 

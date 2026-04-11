@@ -514,7 +514,7 @@ class TestAnalyticsEngineAdvanced:
         engine = AnalyticsEngine(Mock())
 
         tss_values = [50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
-        result = engine.calculate_atl_ctl(tss_values, atl_days=3, ctl_days=14)
+        result = engine.calculate_atl_ctl(tss_values, _atl_days=3, _ctl_days=14)
 
         assert "atl" in result
         assert "ctl" in result
@@ -789,7 +789,7 @@ class TestTrainingLoad:
         """测试 TSB > 10 时的体能状态评估"""
         engine = AnalyticsEngine(Mock())
 
-        status, advice = engine._evaluate_fitness_status(tsb=15.0, atl=50.0, ctl=65.0)
+        status, advice = engine._evaluate_fitness_status(tsb=15.0, _atl=50.0, _ctl=65.0)
 
         assert status == "恢复良好"
         assert "高强度训练" in advice or "比赛" in advice
@@ -798,7 +798,7 @@ class TestTrainingLoad:
         """测试 TSB 0-10 时的体能状态评估"""
         engine = AnalyticsEngine(Mock())
 
-        status, advice = engine._evaluate_fitness_status(tsb=5.0, atl=60.0, ctl=65.0)
+        status, advice = engine._evaluate_fitness_status(tsb=5.0, _atl=60.0, _ctl=65.0)
 
         assert status == "状态正常"
         assert "保持" in advice or "正常" in advice
@@ -807,7 +807,7 @@ class TestTrainingLoad:
         """测试 TSB -10-0 时的体能状态评估"""
         engine = AnalyticsEngine(Mock())
 
-        status, advice = engine._evaluate_fitness_status(tsb=-5.0, atl=70.0, ctl=65.0)
+        status, advice = engine._evaluate_fitness_status(tsb=-5.0, _atl=70.0, _ctl=65.0)
 
         assert status == "轻度疲劳"
         assert "恢复" in advice or "降低" in advice
@@ -816,7 +816,9 @@ class TestTrainingLoad:
         """测试 TSB < -10 时的体能状态评估"""
         engine = AnalyticsEngine(Mock())
 
-        status, advice = engine._evaluate_fitness_status(tsb=-15.0, atl=80.0, ctl=65.0)
+        status, advice = engine._evaluate_fitness_status(
+            tsb=-15.0, _atl=80.0, _ctl=65.0
+        )
 
         assert status == "过度训练"
         assert "警告" in advice or "休息" in advice
@@ -825,7 +827,7 @@ class TestTrainingLoad:
         """测试低 CTL 时的补充建议"""
         engine = AnalyticsEngine(Mock())
 
-        status, advice = engine._evaluate_fitness_status(tsb=5.0, atl=20.0, ctl=25.0)
+        status, advice = engine._evaluate_fitness_status(tsb=5.0, _atl=20.0, _ctl=25.0)
 
         assert "体能基础较弱" in advice
 
@@ -833,7 +835,7 @@ class TestTrainingLoad:
         """测试高 CTL 时的补充建议"""
         engine = AnalyticsEngine(Mock())
 
-        status, advice = engine._evaluate_fitness_status(tsb=5.0, atl=80.0, ctl=85.0)
+        status, advice = engine._evaluate_fitness_status(tsb=5.0, _atl=80.0, _ctl=85.0)
 
         assert "体能基础扎实" in advice
 
@@ -3378,7 +3380,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "状态良好" in advice
@@ -3397,7 +3399,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "状态正常" in advice
@@ -3416,7 +3418,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "疲劳" in advice
@@ -3435,7 +3437,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "警告" in advice or "休息" in advice
@@ -3454,7 +3456,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "数据" in advice
@@ -3480,7 +3482,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=yesterday_run,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "TSS" in advice or "恢复" in advice
@@ -3499,7 +3501,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "体能基础较弱" in advice
@@ -3518,7 +3520,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "体能基础扎实" in advice
@@ -3537,7 +3539,7 @@ class TestDailyReport:
         weekly_plan = engine._generate_weekly_plan(
             today=date(2024, 1, 10),  # 周三
             fitness_status=fitness_status,
-            age=30,
+            _age=30,
         )
 
         assert len(weekly_plan) == 7
@@ -3559,7 +3561,7 @@ class TestDailyReport:
         weekly_plan = engine._generate_weekly_plan(
             today=date(2024, 1, 10),  # 周三
             fitness_status=fitness_status,
-            age=30,
+            _age=30,
         )
 
         # 验证今日标记
@@ -3578,7 +3580,7 @@ class TestDailyReport:
         weekly_plan = engine._generate_weekly_plan(
             today=date(2024, 1, 10),  # 周三
             fitness_status=fitness_status,
-            age=30,
+            _age=30,
         )
 
         # 周一和周二应该是过去的
@@ -3593,7 +3595,7 @@ class TestDailyReport:
         engine = AnalyticsEngine(Mock())
 
         # TSB < -10
-        plan = engine._get_daily_plan(weekday=1, tsb=-15.0, ctl=60.0, is_past=False)
+        plan = engine._get_daily_plan(weekday=1, tsb=-15.0, _ctl=60.0, is_past=False)
         assert "轻松跑" in plan or "休息" in plan
 
     def test_get_daily_plan_fatigued(self):
@@ -3601,7 +3603,7 @@ class TestDailyReport:
         engine = AnalyticsEngine(Mock())
 
         # TSB -10 ~ 0
-        plan = engine._get_daily_plan(weekday=2, tsb=-5.0, ctl=60.0, is_past=False)
+        plan = engine._get_daily_plan(weekday=2, tsb=-5.0, _ctl=60.0, is_past=False)
         assert "跑" in plan
 
     def test_get_daily_plan_good_status(self):
@@ -3609,14 +3611,14 @@ class TestDailyReport:
         engine = AnalyticsEngine(Mock())
 
         # TSB > 0
-        plan = engine._get_daily_plan(weekday=6, tsb=10.0, ctl=60.0, is_past=False)
+        plan = engine._get_daily_plan(weekday=6, tsb=10.0, _ctl=60.0, is_past=False)
         assert "长距离" in plan
 
     def test_get_daily_plan_past_day(self):
         """测试过去日期的日计划"""
         engine = AnalyticsEngine(Mock())
 
-        plan = engine._get_daily_plan(weekday=1, tsb=5.0, ctl=60.0, is_past=True)
+        plan = engine._get_daily_plan(weekday=1, tsb=5.0, _ctl=60.0, is_past=True)
         assert plan == "已完成"
 
     def test_get_daily_plan_rest_day(self):
@@ -3624,7 +3626,7 @@ class TestDailyReport:
         engine = AnalyticsEngine(Mock())
 
         # 周一通常是休息日
-        plan = engine._get_daily_plan(weekday=0, tsb=5.0, ctl=60.0, is_past=False)
+        plan = engine._get_daily_plan(weekday=0, tsb=5.0, _ctl=60.0, is_past=False)
         assert plan == "休息"
 
     def test_get_yesterday_run_success(self):
@@ -3741,7 +3743,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=1,
-            age=30,
+            _age=30,
         )
         assert "节奏跑" in advice_tuesday
 
@@ -3750,7 +3752,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=None,
             weekday=2,
-            age=30,
+            _age=30,
         )
         assert "轻松跑" in advice_wednesday
 
@@ -3765,7 +3767,7 @@ class TestDailyReport:
         plan_high = engine._generate_weekly_plan(
             today=date(2024, 1, 10),
             fitness_status=fitness_status_high,
-            age=30,
+            _age=30,
         )
 
         # 低TSB状态
@@ -3773,7 +3775,7 @@ class TestDailyReport:
         plan_low = engine._generate_weekly_plan(
             today=date(2024, 1, 10),
             fitness_status=fitness_status_low,
-            age=30,
+            _age=30,
         )
 
         # 验证两种状态下的计划不同
@@ -3839,7 +3841,7 @@ class TestDailyReport:
             fitness_status=fitness_status,
             yesterday_run=yesterday_run,
             weekday=2,
-            age=30,
+            _age=30,
         )
 
         assert "中等强度" in advice or "适度" in advice

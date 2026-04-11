@@ -4,7 +4,7 @@
 import json
 import logging
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,7 @@ from src.core.training_plan import TrainingPlan
 logger = logging.getLogger(__name__)
 
 
-class PlanStatus(str, Enum):
+class PlanStatus(StrEnum):
     """训练计划状态"""
 
     DRAFT = "draft"  # 草稿
@@ -111,7 +111,7 @@ class PlanManager:
             logger.info(f"成功保存 {len(self._plans)} 个训练计划")
         except Exception as e:
             logger.error(f"保存训练计划失败：{e}")
-            raise PlanManagerError(f"保存训练计划失败：{e}")
+            raise PlanManagerError(f"保存训练计划失败：{e}") from e
 
     def create_plan(self, plan: TrainingPlan) -> str:
         """

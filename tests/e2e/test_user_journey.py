@@ -26,6 +26,8 @@ import pytest
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+import contextlib
+
 from src.core.config import ConfigManager
 from src.core.context import AppContextFactory
 
@@ -57,10 +59,8 @@ class TestUserJourney:
 
         gc.collect()
         time.sleep(0.1)
-        try:
+        with contextlib.suppress(PermissionError):
             self.temp_dir.cleanup()
-        except PermissionError:
-            pass
 
     def create_mock_fit_files(self):
         """创建模拟FIT文件用于测试"""

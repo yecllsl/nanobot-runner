@@ -169,7 +169,7 @@ class ImportService:
         errors = 0
 
         with Progress() as progress:
-            task = progress.add_task("正在导入...", total=len(fit_files))
+            progress.add_task("正在导入...", total=len(fit_files))
 
             for filepath in fit_files:
                 result = self.import_file(filepath, force=force)

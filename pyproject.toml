@@ -33,7 +33,7 @@ dev = [
 ]
 
 [project.scripts]
-nanobotrun = "src.cli:app"
+nanobotrun = "src.cli.app:app"
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
@@ -84,7 +84,15 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "B905",  # zip without explicit strict parameter
+    "F811",  # redefinition of unused variable
+    "ARG001",  # unused function argument
+    "ARG002",  # unused method argument
+    "B904",  # raise from err
+    "B007",  # loop control variable not used
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["SIM117", "ARG001", "ARG002", "ARG005", "F841", "E402", "E721", "B017"]  # 测试文件忽略嵌套with、未使用参数、类型比较、盲目异常等
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

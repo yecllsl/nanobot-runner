@@ -1,7 +1,7 @@
 # CLI格式化输出单元测试
 
 
-from src.cli_formatter import (
+from src.cli.formatter import (
     format_agent_response,
     format_distance,
     format_duration,

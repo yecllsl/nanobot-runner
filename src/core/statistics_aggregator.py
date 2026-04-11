@@ -168,10 +168,10 @@ class StatisticsAggregator:
             total_duration = float(session_df["duration"].sum())
             avg_heart_rate_result = session_df["avg_hr"].mean()
             avg_heart_rate = (
-                float(avg_heart_rate_result)
+                float(avg_heart_rate_result)  # type: ignore[arg-type]
                 if avg_heart_rate_result is not None
                 else 0.0
-            )  # type: ignore
+            )
 
             stats = {
                 "total_runs": total_runs,

@@ -2,6 +2,7 @@
 # 负责数据导入和统计的业务逻辑调用
 
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -67,7 +68,7 @@ class DataHandler:
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            task = progress.add_task(f"正在导入 {len(fit_files)} 个文件", total=None)
+            progress.add_task(f"正在导入 {len(fit_files)} 个文件", total=None)
 
             for fit_file in fit_files:
                 result = self.importer.import_file(fit_file, force=force)
@@ -135,3 +136,59 @@ class DataHandler:
             df = df.filter(pl.col("timestamp") <= end_date)
 
         return df
+
+    def get_recent_runs(self, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        获取最近的训练记录
+
+        Args:
+            limit: 返回记录数量
+
+        Returns:
+            list[dict]: 训练记录列表
+        """
+        from src.core.analytics import AnalyticsEngine
+
+        lf = self.storage.read_parquet()
+
+        session_df = (
+            lf.group_by("session_start_time")
+            .agg(
+                [
+                    pl.col("session_start_time").first().alias("timestamp"),
+                    pl.col("session_total_distance").first().alias("distance"),
+                    pl.col("session_total_timer_time").first().alias("duration"),
+                    pl.col("session_avg_heart_rate").first().alias("avg_hr"),
+                ]
+            )
+            .sort("timestamp", descending=True)
+            .limit(limit)
+            .collect()
+        )
+
+        analytics = AnalyticsEngine(self.storage)
+        runs = []
+
+        for row in session_df.iter_rows(named=True):
+            distance = row.get("distance") or 0
+            duration = row.get("duration") or 0
+            distance_km = distance / 1000
+            duration_min = duration / 60
+            pace = duration_min / distance_km if distance_km > 0 else 0
+
+            vdot = None
+            if distance > 0 and duration > 0:
+                vdot = analytics.calculate_vdot(distance, duration)
+
+            runs.append(
+                {
+                    "timestamp": str(row.get("timestamp", "N/A")),
+                    "distance_km": round(distance_km, 2),
+                    "duration_min": round(duration_min, 1),
+                    "avg_pace_sec_km": round(pace, 1) if pace > 0 else None,
+                    "avg_heart_rate": row.get("avg_hr"),
+                    "vdot": round(vdot, 2) if vdot else None,
+                }
+            )
+
+        return runs

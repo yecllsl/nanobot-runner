@@ -440,9 +440,14 @@ class TestImportServiceAdvanced:
             temp_path = Path(f.name)
 
         try:
-            with patch.object(
-                service.parser, "parse_file_metadata", side_effect=Exception("解析错误")
-            ), pytest.raises(Exception):
+            with (
+                patch.object(
+                    service.parser,
+                    "parse_file_metadata",
+                    side_effect=Exception("解析错误"),
+                ),
+                pytest.raises(Exception),
+            ):
                 service.import_file(temp_path)
         finally:
             os.unlink(temp_path)

@@ -81,7 +81,7 @@ class ParquetSchema:
     @classmethod
     def get_schema(cls) -> dict[str, Any]:
         """获取完整 Schema 定义"""
-        return {k: v for k, v in cls.UNIFIED_SCHEMA.items()}
+        return dict(cls.UNIFIED_SCHEMA.items())
 
     @classmethod
     def get_required_fields(cls) -> set:
@@ -199,7 +199,7 @@ def create_schema_dataframe(
     Returns:
         pl.DataFrame: 符合Schema的DataFrame
     """
-    schema = ParquetSchema.get_schema()
+    ParquetSchema.get_schema()
     default_values = ParquetSchema.get_default_values()
 
     # 生成活动ID
@@ -254,10 +254,7 @@ def create_schema_dataframe(
         normalized_records.append(normalized_record)
 
     # 创建DataFrame
-    if not normalized_records:
-        df = pl.DataFrame()
-    else:
-        df = pl.DataFrame(normalized_records)
+    df = pl.DataFrame() if not normalized_records else pl.DataFrame(normalized_records)
 
     # 应用Schema转换
     df = ParquetSchema.normalize_dataframe(df)

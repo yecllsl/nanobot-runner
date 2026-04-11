@@ -25,7 +25,7 @@ def _patched_parse_definition_message(self, header) -> None:  # type: ignore[no-
     mesg_type = fitparse.profile.MESSAGE_TYPES.get(global_mesg_num)
     field_defs = []
 
-    for n in range(num_fields):
+    for _n in range(num_fields):
         field_def_num, field_size, base_type_num = self._read_struct(
             "3B", endian=endian
         )
@@ -58,7 +58,7 @@ def _patched_parse_definition_message(self, header) -> None:  # type: ignore[no-
     dev_field_defs = []
     if header.is_developer_data:
         num_dev_fields = self._read_struct("B", endian=endian)
-        for n in range(num_dev_fields):
+        for _n in range(num_dev_fields):
             field_def_num, field_size, dev_data_index = self._read_struct(
                 "3B", endian=endian
             )

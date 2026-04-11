@@ -28,7 +28,7 @@ async def _run_chat() -> None:
     from rich.prompt import Prompt
 
     from src.agents.tools import RunnerTools, create_tools
-    from src.cli_formatter import format_agent_response
+    from src.cli.formatter import format_agent_response
 
     console.print("[bold green][Bot] Nanobot Runner Agent[/bold green]")
     console.print("[dim]基于 nanobot 的本地跑步数据助理[/dim]")

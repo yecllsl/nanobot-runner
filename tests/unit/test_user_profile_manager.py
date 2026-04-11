@@ -98,7 +98,7 @@ class TestProfileStorageManager:
 
     def test_init_creates_directories(self, temp_workspace: Path) -> None:
         """测试初始化时创建目录"""
-        manager = ProfileStorageManager(temp_workspace)
+        _ = ProfileStorageManager(temp_workspace)
 
         assert (temp_workspace / "data").exists()
         assert (temp_workspace / "memory").exists()

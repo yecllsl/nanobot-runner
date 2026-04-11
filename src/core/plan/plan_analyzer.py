@@ -255,7 +255,6 @@ class PlanAnalyzer:
             DimensionResult: 伤病风险分析结果
         """
         profile = user_context.profile
-        training_load = user_context.training_load
 
         score = 100.0
         issues: list[str] = []
@@ -323,8 +322,6 @@ class PlanAnalyzer:
         Returns:
             DimensionResult: 目标可达性分析结果
         """
-        profile = user_context.profile
-        training_load = user_context.training_load
 
         score = 100.0
         issues: list[str] = []

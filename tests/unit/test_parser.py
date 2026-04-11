@@ -4,7 +4,7 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import polars as pl
 import pytest
@@ -1164,7 +1164,3 @@ class TestFitParserQualityScore:
 
         # 异常时应返回0分
         assert score == 0.0
-
-
-# 需要导入PropertyMock
-from unittest.mock import PropertyMock

@@ -4,7 +4,7 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from src.core.training_plan import DailyPlan, TrainingPlan
@@ -17,7 +17,7 @@ from src.notify.feishu_calendar import (
 logger = logging.getLogger(__name__)
 
 
-class SyncMode(str, Enum):
+class SyncMode(StrEnum):
     """同步模式"""
 
     CREATE = "create"
@@ -25,7 +25,7 @@ class SyncMode(str, Enum):
     DELETE = "delete"
 
 
-class HealthCheckItem(str, Enum):
+class HealthCheckItem(StrEnum):
     """健康检查项"""
 
     NETWORK = "network"

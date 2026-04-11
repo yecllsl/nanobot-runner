@@ -766,11 +766,14 @@ class TestStorageManager:
             manager = StorageManager(data_dir=Path(tmpdir))
 
             # Mock get_available_years 抛出异常
-            with patch.object(
-                manager,
-                "get_available_years",
-                side_effect=Exception("Get years error"),
-            ), pytest.raises(StorageError, match="获取数据摘要失败"):
+            with (
+                patch.object(
+                    manager,
+                    "get_available_years",
+                    side_effect=Exception("Get years error"),
+                ),
+                pytest.raises(StorageError, match="获取数据摘要失败"),
+            ):
                 manager.get_data_summary()
 
     def test_delete_year_data_with_exception(self):
@@ -831,11 +834,14 @@ class TestStorageManager:
             manager.save_to_parquet(test_data, 2024)
 
             # Mock _read_and_concat_parquet_files 抛出异常
-            with patch.object(
-                manager,
-                "_read_and_concat_parquet_files",
-                side_effect=Exception("Read error"),
-            ), pytest.raises(StorageError, match="读取Parquet数据失败"):
+            with (
+                patch.object(
+                    manager,
+                    "_read_and_concat_parquet_files",
+                    side_effect=Exception("Read error"),
+                ),
+                pytest.raises(StorageError, match="读取Parquet数据失败"),
+            ):
                 manager.read_parquet(years=[2024])
 
     def test_save_to_parquet_with_storage_error(self):
@@ -855,11 +861,14 @@ class TestStorageManager:
             )
 
             # Mock write_parquet 抛出异常
-            with patch.object(
-                pl.DataFrame,
-                "write_parquet",
-                side_effect=Exception("Write error"),
-            ), pytest.raises(StorageError, match="保存Parquet文件失败"):
+            with (
+                patch.object(
+                    pl.DataFrame,
+                    "write_parquet",
+                    side_effect=Exception("Write error"),
+                ),
+                pytest.raises(StorageError, match="保存Parquet文件失败"),
+            ):
                 manager.save_to_parquet(test_data, 2024)
 
     def test_save_activities_with_timestamp_no_year_attr(self):
@@ -1232,11 +1241,14 @@ class TestStorageManager:
             manager = StorageManager(data_dir=Path(tmpdir))
 
             # Mock glob 抛出异常
-            with patch.object(
-                Path,
-                "glob",
-                side_effect=Exception("Glob error"),
-            ), pytest.raises(StorageError, match="获取可用年份失败"):
+            with (
+                patch.object(
+                    Path,
+                    "glob",
+                    side_effect=Exception("Glob error"),
+                ),
+                pytest.raises(StorageError, match="获取可用年份失败"),
+            ):
                 manager.get_available_years()
 
     def test_read_parquet_file_with_schema_fix_pyarrow_non_dataframe(self):
@@ -1337,7 +1349,7 @@ class TestStorageManager:
             assert "start" in stats["time_range"]
             assert "end" in stats["time_range"]
 
-    def test_get_stats_empty(self):
+    def test_get_stats_empty_no_data(self):
         """测试获取统计信息（无数据）"""
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))

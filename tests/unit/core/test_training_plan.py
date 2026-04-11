@@ -275,7 +275,7 @@ class TestPhaseConfig:
 
     def test_phase_config_structure(self):
         """测试阶段配置结构"""
-        for plan_type, config in PHASE_CONFIG.items():
+        for _plan_type, config in PHASE_CONFIG.items():
             assert "duration_weeks" in config
             assert "easy_ratio" in config
             assert "intensity_multiplier" in config
@@ -446,7 +446,7 @@ class TestTrainingPlanEngine:
             end_date="2024-01-21",
             weekly_distance_km=40.0,
             phase_config=PHASE_CONFIG[PlanType.BASE],
-            fitness_level=FitnessLevel.INTERMEDIATE,
+            _fitness_level=FitnessLevel.INTERMEDIATE,
             current_vdot=40,
         )
 

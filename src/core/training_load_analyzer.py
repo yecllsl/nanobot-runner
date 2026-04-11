@@ -241,7 +241,7 @@ class TrainingLoadAnalyzer:
         return self._calculate_ewma(tss_values, CTL_TIME_CONSTANT)
 
     def calculate_atl_ctl(
-        self, tss_values: list[float], atl_days: int = 7, ctl_days: int = 42
+        self, tss_values: list[float], _atl_days: int = 7, _ctl_days: int = 42
     ) -> dict[str, float]:
         """
         计算ATL和CTL
@@ -465,7 +465,7 @@ class TrainingLoadAnalyzer:
         }
 
     def _evaluate_fitness_status(
-        self, tsb: float, atl: float, ctl: float
+        self, tsb: float, atl: float, _ctl: float
     ) -> tuple[str, str]:
         """
         根据训练压力平衡评估体能状态并生成训练建议

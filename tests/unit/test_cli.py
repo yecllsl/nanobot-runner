@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 from typer.testing import CliRunner
 
-from src.cli import CLIError, app, print_error, print_status
+from src.cli.app import app
+from src.cli.common import CLIError, print_error, print_status
 
 runner = CliRunner()
 
@@ -757,9 +758,10 @@ class TestCLIProfileShow:
             mock_config_instance.data_dir = Path("/fake/data/dir")
             mock_config.return_value = mock_config_instance
 
-            with patch("src.core.storage.StorageManager"), patch(
-                "src.core.profile.ProfileStorageManager"
-            ) as mock_profile_storage:
+            with (
+                patch("src.core.storage.StorageManager"),
+                patch("src.core.profile.ProfileStorageManager") as mock_profile_storage,
+            ):
                 mock_storage_instance = Mock()
                 mock_storage_instance.load_profile_json.return_value = None
                 mock_profile_storage.return_value = mock_storage_instance

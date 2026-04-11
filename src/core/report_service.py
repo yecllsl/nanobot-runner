@@ -2,7 +2,7 @@
 # 封装晨报、周报、月报生成、推送和定时调度逻辑
 
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from nanobot.cron.service import CronService
@@ -17,7 +17,7 @@ from src.notify.feishu import FeishuBot
 logger = get_logger(__name__)
 
 
-class ReportType(str, Enum):
+class ReportType(StrEnum):
     """报告类型枚举"""
 
     DAILY = "daily"
@@ -258,7 +258,7 @@ class ReportService:
 
         # 基于训练负荷给出建议
         ctl = training_load.get("ctl", 0)
-        atl = training_load.get("atl", 0)
+        training_load.get("atl", 0)
         tsb = training_load.get("tsb", 0)
 
         if tsb < -20:

@@ -888,7 +888,7 @@ class ProfileEngine:
             age: 年龄
             resting_hr: 静息心率
         """
-        result = self.calculate_injury_risk(profile, age, resting_hr)
+        self.calculate_injury_risk(profile, age, resting_hr)
         # 结果已经通过 calculate_injury_risk 更新到 profile
 
     def calculate_injury_risk(

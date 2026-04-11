@@ -1,5 +1,6 @@
 # 报告生成器单元测试
 
+import contextlib
 import os
 import tempfile
 from datetime import datetime
@@ -96,10 +97,8 @@ class TestTemplateEngine:
             assert "Custom template" in template
         finally:
             # 关闭文件并删除
-            try:
+            with contextlib.suppress(BaseException):
                 os.unlink(temp_path)
-            except:
-                pass
 
     def test_template_engine_get_template_default(self):
         """测试获取默认模板"""

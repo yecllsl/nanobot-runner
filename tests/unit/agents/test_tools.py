@@ -450,7 +450,7 @@ class TestUpdateMemoryTool:
     async def test_execute_success(self):
         """测试执行成功"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True
@@ -490,7 +490,7 @@ class TestUpdateMemoryTool:
     async def test_execute_default_category(self):
         """测试默认分类"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True
@@ -506,7 +506,7 @@ class TestUpdateMemoryTool:
     async def test_execute_save_failure(self):
         """测试保存失败"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = False
@@ -881,7 +881,7 @@ class TestRunnerTools:
     def test_update_memory_success(self):
         """测试更新记忆成功"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True
@@ -922,7 +922,7 @@ class TestRunnerTools:
     def test_update_memory_default_category(self):
         """测试默认分类"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True
@@ -937,9 +937,10 @@ class TestRunnerTools:
         categories = ["training", "preference", "injury", "other"]
 
         for category in categories:
-            with patch("src.core.storage.StorageManager"), patch(
-                "src.agents.tools.ProfileStorageManager"
-            ) as MockProfileStorage:
+            with (
+                patch("src.core.storage.StorageManager"),
+                patch("src.core.profile.ProfileStorageManager") as MockProfileStorage,
+            ):
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True
@@ -952,7 +953,7 @@ class TestRunnerTools:
     def test_update_memory_exception_handling(self):
         """测试异常处理"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.side_effect = Exception("测试异常")
@@ -965,7 +966,7 @@ class TestRunnerTools:
     def test_update_memory_formats_note(self):
         """测试笔记格式化"""
         with patch("src.core.storage.StorageManager"):
-            with patch("src.agents.tools.ProfileStorageManager") as MockProfileStorage:
+            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True
@@ -999,12 +1000,12 @@ class TestToolDescriptions:
 
     def test_tool_has_description_field(self):
         """测试工具描述包含description字段"""
-        for tool_name, tool_info in TOOL_DESCRIPTIONS.items():
+        for _tool_name, tool_info in TOOL_DESCRIPTIONS.items():
             assert "description" in tool_info
 
     def test_tool_has_parameters(self):
         """测试工具描述包含parameters字段"""
-        for tool_name, tool_info in TOOL_DESCRIPTIONS.items():
+        for _tool_name, tool_info in TOOL_DESCRIPTIONS.items():
             assert "parameters" in tool_info
 
     def test_update_memory_in_descriptions(self):

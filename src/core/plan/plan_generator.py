@@ -119,7 +119,7 @@ class PlanGenerator:
             if parsed_date <= datetime.now():
                 raise ValidationError("目标日期必须晚于今天")
         except ValueError as e:
-            raise ValidationError(f"目标日期格式错误: {e}")
+            raise ValidationError(f"目标日期格式错误: {e}") from e
 
     def _build_prompt(
         self,
@@ -334,10 +334,10 @@ class PlanGenerator:
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON解析失败: {e}")
-            raise ValidationError(f"LLM响应格式错误: {e}")
+            raise ValidationError(f"LLM响应格式错误: {e}") from e
         except KeyError as e:
             logger.error(f"缺少必需字段: {e}")
-            raise ValidationError(f"LLM响应缺少必需字段: {e}")
+            raise ValidationError(f"LLM响应缺少必需字段: {e}") from e
         except Exception as e:
             logger.error(f"解析LLM响应失败: {e}")
-            raise ValidationError(f"解析LLM响应失败: {e}")
+            raise ValidationError(f"解析LLM响应失败: {e}") from e

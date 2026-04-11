@@ -9,7 +9,7 @@ from typing import Any
 
 import requests
 
-from src.cli_formatter import format_distance
+from src.cli.formatter import format_distance
 from src.core.config import ConfigManager
 from src.core.training_plan import DailyPlan, TrainingPlan
 
@@ -111,7 +111,7 @@ class FeishuCalendarAPI:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"获取飞书访问令牌请求异常：{e}")
-            raise RuntimeError(f"获取飞书访问令牌请求异常：{e}")
+            raise RuntimeError(f"获取飞书访问令牌请求异常：{e}") from e
 
     def _get_headers(self) -> dict[str, str]:
         """获取请求头"""
@@ -162,10 +162,10 @@ class FeishuCalendarAPI:
 
         except requests.exceptions.Timeout:
             logger.error("飞书 API 请求超时")
-            raise RuntimeError("飞书 API 请求超时")
+            raise RuntimeError("飞书 API 请求超时") from None
         except requests.exceptions.RequestException as e:
             logger.error(f"飞书 API 请求异常：{e}")
-            raise RuntimeError(f"飞书 API 请求异常：{e}")
+            raise RuntimeError(f"飞书 API 请求异常：{e}") from e
 
     async def create_event(
         self, calendar_id: str, event: CalendarEventCreateRequest
@@ -704,7 +704,7 @@ class FeishuCalendarSync:
             start_time = datetime.combine(
                 date.date(), datetime.min.time().replace(hour=0)
             )
-            end_time = start_time + timedelta(days=1)
+            _end_time = start_time + timedelta(days=1)
 
             # 查询日历事件（需要 API 支持时间范围查询）
             # 注意：飞书日历 API 可能需要使用特定的查询参数

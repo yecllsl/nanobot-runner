@@ -3,7 +3,7 @@
 
 import logging
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from src.core.models import DailyPlan, NotifyResult, UserContext, WeatherInfo
@@ -12,7 +12,7 @@ from src.notify.feishu import FeishuBot
 logger = logging.getLogger(__name__)
 
 
-class SkipReason(str, Enum):
+class SkipReason(StrEnum):
     """免打扰原因"""
 
     TRAINING_COMPLETED = "已完成训练"
@@ -24,7 +24,7 @@ class SkipReason(str, Enum):
     DISABLED = "提醒功能已禁用"
 
 
-class WeatherCondition(str, Enum):
+class WeatherCondition(StrEnum):
     """天气状况"""
 
     CLEAR = "晴"
@@ -115,10 +115,7 @@ class WeatherService:
             return True
 
         # 检查预警
-        if weather.alert:
-            return True
-
-        return False
+        return bool(weather.alert)
 
 
 class NotifyTool:
@@ -330,7 +327,6 @@ class NotifyTool:
 
         # 从用户偏好中获取免打扰时段
         # 这里简化实现，实际应支持配置多个时段
-        preferences = user_context.preferences
 
         # 默认免打扰时段：22:00 - 07:00
         do_not_disturb_start = "22:00"

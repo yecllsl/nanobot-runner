@@ -116,7 +116,7 @@ class HeartRateAnalyzer:
 
         try:
             hr_series = df_clean["heart_rate"]
-            pace_series = df_clean["pace"]
+            df_clean["pace"]
 
             correlation = float(df_clean.select(pl.corr("heart_rate", "pace")).item())
 
@@ -177,10 +177,7 @@ class HeartRateAnalyzer:
                 results.append({"error": "数据缺失"})
                 continue
 
-            if isinstance(hr_data, list):
-                hr_series = pl.Series(hr_data)
-            else:
-                hr_series = hr_data
+            hr_series = pl.Series(hr_data) if isinstance(hr_data, list) else hr_data
 
             if isinstance(pace_data, list):
                 pace_series = pl.Series(pace_data)

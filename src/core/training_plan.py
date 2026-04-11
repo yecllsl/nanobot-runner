@@ -417,7 +417,7 @@ class TrainingPlanEngine:
                 phase_type, fitness_level
             )
 
-            for week_in_phase in range(phase_weeks):
+            for _week_in_phase in range(phase_weeks):
                 week_start = current_date
                 week_end = current_date + timedelta(days=6)
 
@@ -439,7 +439,7 @@ class TrainingPlanEngine:
                     end_date=week_end.strftime("%Y-%m-%d"),
                     weekly_distance_km=weekly_distance,
                     phase_config=phase_config,
-                    fitness_level=fitness_level,
+                    _fitness_level=fitness_level,
                     current_vdot=current_vdot,
                 )
 
@@ -572,7 +572,7 @@ class TrainingPlanEngine:
         end_date: str,
         weekly_distance_km: float,
         phase_config: dict[str, Any],
-        fitness_level: FitnessLevel,
+        _fitness_level: FitnessLevel,
         current_vdot: float,
     ) -> WeeklySchedule:
         """

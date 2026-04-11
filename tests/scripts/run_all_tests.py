@@ -124,7 +124,7 @@ def generate_test_report(results, total_time):
     print(f"📈 通过率: {passed}/{total} ({passed / total * 100:.1f}%)")
 
     print("\n📋 详细结果:")
-    for test_name, (success, output) in results.items():
+    for test_name, (success, _output) in results.items():
         status = "✅ 通过" if success else "❌ 失败"
         print(f"   {status} {test_name}")
 
@@ -140,7 +140,7 @@ def generate_test_report(results, total_time):
         f.write(f"通过率: {passed}/{total} ({passed / total * 100:.1f}%)\n\n")
 
         f.write("详细结果:\n")
-        for test_name, (success, output) in results.items():
+        for test_name, (success, _output) in results.items():
             status = "通过" if success else "失败"
             f.write(f"- {test_name}: {status}\n")
 

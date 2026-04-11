@@ -22,6 +22,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
+import contextlib
+
 from src.core.config import ConfigManager
 from src.core.context import AppContextFactory
 from src.core.session_repository import SessionRepository
@@ -54,10 +56,8 @@ class TestSessionRepositoryE2E:
 
         gc.collect()
         time.sleep(0.1)
-        try:
+        with contextlib.suppress(PermissionError):
             self.temp_dir.cleanup()
-        except PermissionError:
-            pass
 
     def generate_test_data(self):
         """生成测试数据"""

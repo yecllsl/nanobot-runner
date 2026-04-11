@@ -113,7 +113,7 @@ def stats(
 
         import polars as pl
 
-        from src.cli_formatter import format_stats_panel
+        from src.cli.formatter import format_stats_panel
 
         session_df = df.group_by("session_start_time").agg(
             [
@@ -148,4 +148,74 @@ def stats(
                 "suggestion": "请检查数据文件是否损坏，或重新导入数据",
             }
         )
+        raise typer.Exit(1)
+
+
+@app.command()
+def recent(
+    limit: int = typer.Option(10, "--limit", "-n", help="显示最近 N 次训练"),
+) -> None:
+    """
+    查看最近训练记录
+
+    示例:
+        nanobotrun data recent
+        nanobotrun data recent -n 5
+
+    Args:
+        limit: 显示最近 N 次训练
+    """
+    from rich.table import Table
+
+    try:
+        handler = DataHandler()
+
+        console.print(f"[bold]最近 {limit} 次训练记录[/bold]")
+
+        runs = handler.get_recent_runs(limit=limit)
+
+        if not runs:
+            console.print("[yellow]暂无训练记录[/yellow]")
+            console.print(
+                "[dim]提示: 使用 'nanobotrun data import-data <路径>' 导入FIT文件[/dim]"
+            )
+            return
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("日期", width=12)
+        table.add_column("距离(km)", justify="right")
+        table.add_column("时长", justify="right")
+        table.add_column("配速", justify="right")
+        table.add_column("平均心率", justify="right")
+
+        for run in runs:
+            timestamp = run.get("timestamp", "N/A")
+            if len(timestamp) > 10:
+                timestamp = timestamp[:10]
+
+            duration_min = run.get("duration_min", 0)
+            hours = int(duration_min // 60)
+            minutes = int(duration_min % 60)
+            duration_str = f"{hours}:{minutes:02d}" if hours > 0 else f"{minutes}分"
+
+            pace_sec = run.get("avg_pace_sec_km")
+            if pace_sec:
+                pace_min = int(pace_sec // 60)
+                pace_sec_remainder = int(pace_sec % 60)
+                pace_str = f"{pace_min}'{pace_sec_remainder:02d}\""
+            else:
+                pace_str = "-"
+
+            table.add_row(
+                timestamp,
+                f"{run.get('distance_km', 0):.2f}",
+                duration_str,
+                pace_str,
+                str(run.get("avg_heart_rate", "-") or "-"),
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

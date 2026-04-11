@@ -23,6 +23,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
+import contextlib
+
 from src.core.config import ConfigManager
 from src.core.context import AppContextFactory
 
@@ -48,10 +50,8 @@ class TestPerformanceOptimizationE2E:
         import gc
 
         gc.collect()
-        try:
+        with contextlib.suppress(PermissionError):
             self.temp_dir.cleanup()
-        except PermissionError:
-            pass
 
     def generate_large_dataset(self):
         """生成大规模测试数据集"""

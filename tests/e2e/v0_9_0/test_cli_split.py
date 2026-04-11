@@ -12,6 +12,7 @@ v0.9.0 CLI拆分端到端测试
 - pytest tests/e2e/v0_9_0/test_cli_split.py -v
 """
 
+import contextlib
 import subprocess
 import sys
 import tempfile
@@ -37,10 +38,8 @@ class TestCLISplitE2E:
 
         gc.collect()
         time.sleep(0.1)
-        try:
+        with contextlib.suppress(PermissionError):
             self.temp_dir.cleanup()
-        except PermissionError:
-            pass
 
     def test_command_routing_help(self):
         """
