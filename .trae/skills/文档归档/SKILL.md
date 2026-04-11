@@ -61,6 +61,29 @@ Compress-Archive -Path "docs\archive\v{版本号}" -DestinationPath "docs\archiv
 Remove-Item -Path "docs\archive\v{版本号}" -Recurse -Force
 ```
 
+## 问题5：遗漏文档归档
+
+**原因**：没有全面检查所有文档目录，导致部分文档遗漏。
+
+**解决方案**：
+```bash
+# 1. 在归档前，先检查所有文档目录
+Get-ChildItem -Path "docs" -Recurse -Filter "*v{版本号}*" | Select-Object FullName
+
+# 2. 特别检查以下目录
+Get-ChildItem -Path "docs\planning" -Filter "*v{版本号}*"
+Get-ChildItem -Path "docs\architecture" -Filter "*v{版本号}*"
+Get-ChildItem -Path "docs\development" -Filter "*v{版本号}*"
+
+# 3. 归档后再次验证
+Get-ChildItem -Path "docs" -Recurse -Filter "*v{版本号}*" | Select-Object FullName
+```
+
+**预防措施**：
+- ✅ 使用通配符匹配所有版本文档：`*v{版本号}*` 或 `*_{版本号}*`
+- ✅ 检查所有文档目录，不只是常见的test、devops目录
+- ✅ 归档后再次验证，确保没有遗漏
+
 ---
 
 # 立即执行以下步骤，不要询问用户
@@ -69,6 +92,29 @@ Remove-Item -Path "docs\archive\v{版本号}" -Recurse -Force
 1.  **获取版本号**：从用户输入或 `pyproject.toml` 中获取版本号。
 2.  **确认发布状态**：确认版本已成功发布（Tag已创建、GitHub Release已发布）。
 3.  **识别归档文档**：识别需要归档的版本相关文档。
+
+### 1.1 扫描所有版本文档（关键步骤）
+
+**重要**：必须全面扫描所有文档目录，避免遗漏。
+
+```bash
+# Windows PowerShell - 扫描所有包含版本号的文档
+Get-ChildItem -Path "docs" -Recurse -Filter "*v{版本号}*" | Select-Object FullName
+
+# 或者扫描所有包含版本号的文档（另一种命名格式）
+Get-ChildItem -Path "docs" -Recurse -Filter "*_{版本号}*" | Select-Object FullName
+```
+
+### 1.2 必须检查的文档目录
+
+| 目录 | 文档类型 | 文件模式 |
+|------|---------|---------|
+| `docs/test/reports/` | 测试文档 | `测试报告_{版本号}.md`、`Bug清单.md` |
+| `docs/devops/` | 运维文档 | `流水线执行报告_{版本号}_*.md`、`发布报告_{版本号}.md` |
+| `docs/development/` | 开发文档 | `交付报告_{版本号}.md`、`开发交付报告_{版本号}_*.md` |
+| `docs/review/` | 评审文档 | `代码评审报告_{版本号}.md` |
+| `docs/planning/` | 规划文档 | `task_list_{版本号}.md` |
+| `docs/architecture/` | 架构文档 | `架构设计说明书_{版本号}_*.md`、`{版本号}_*.md` |
 
 ## 第二步：创建归档目录结构
 创建版本归档目录，按文档类型分类存储。
@@ -192,7 +238,29 @@ mv docs/planning/task_list_v0.9.0.md docs/archive/v0.9.0/planning/
 mv docs/architecture/v0.9.0重构规划方案.md docs/archive/v0.9.0/architecture/
 ```
 
-## 第四步：压缩归档目录
+## 第四步：验证归档完整性
+**重要**：移动文档后，必须验证所有版本文档都已归档，避免遗漏。
+
+### 4.1 验证命令
+```bash
+# Windows PowerShell - 检查是否还有遗漏的版本文档
+Get-ChildItem -Path "docs" -Recurse -Filter "*v{版本号}*" | Select-Object FullName
+
+# 如果有输出，说明还有遗漏的文档
+```
+
+### 4.2 验证标准
+- ✅ 输出为空：所有版本文档已归档
+- ❌ 输出不为空：还有遗漏的文档，需要补充归档
+
+### 4.3 常见遗漏文档
+根据经验，以下文档容易遗漏：
+- `docs/planning/task_list_{版本号}.md` - 任务清单
+- `docs/architecture/{版本号}_*.md` - 架构设计文档
+- `docs/architecture/架构设计说明书_{版本号}_*.md` - 架构设计说明书
+- `docs/development/开发交付报告_{版本号}_*.md` - 开发交付报告
+
+## 第五步：压缩归档目录
 将归档目录压缩为.zip文件，减少IDE索引负担。
 
 ### 4.1 压缩命令
