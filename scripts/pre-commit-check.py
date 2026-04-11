@@ -4,8 +4,8 @@
 基于 AGENTS.md 中的提交前 Checklist 实现
 
 功能：
-- 执行 black 代码格式化检查
-- 执行 isort 导入排序检查
+- 执行 ruff format 代码格式化检查
+- 执行 ruff check 代码质量检查
 - 执行 mypy 类型检查
 - 执行 pytest 单元测试
 - 检查 Schema/TOOL_DESCRIPTIONS 更新
@@ -128,15 +128,15 @@ class PreCommitChecker:
                 output=str(e)
             )
     
-    def check_black_formatting(self) -> CheckResult:
+    def check_ruff_format(self) -> CheckResult:
         """检查代码格式化"""
-        command = "uv run black --check src/ tests/"
-        return self.run_command(command, "black 代码格式化检查")
+        command = "uv run ruff format --check src/ tests/"
+        return self.run_command(command, "ruff format 代码格式化检查")
     
-    def check_isort_imports(self) -> CheckResult:
-        """检查导入排序"""
-        command = "uv run isort --check-only src/ tests/"
-        return self.run_command(command, "isort 导入排序检查")
+    def check_ruff_lint(self) -> CheckResult:
+        """检查代码质量"""
+        command = "uv run ruff check src/ tests/"
+        return self.run_command(command, "ruff check 代码质量检查")
     
     def check_mypy_types(self) -> CheckResult:
         """检查类型注解"""
@@ -205,8 +205,8 @@ class PreCommitChecker:
         
         # 执行所有检查
         checks = [
-            self.check_black_formatting,
-            self.check_isort_imports,
+            self.check_ruff_format,
+            self.check_ruff_lint,
             self.check_mypy_types,
             self.check_pytest_tests,
             self.check_schema_updates
@@ -254,10 +254,10 @@ class PreCommitChecker:
             print("\n💡 修复建议:")
             for result in self.results:
                 if result.status == CheckStatus.FAILED:
-                    if "black" in result.name.lower():
-                        print("  - 执行: uv run black src/ tests/")
-                    elif "isort" in result.name.lower():
-                        print("  - 执行: uv run isort src/ tests/")
+                    if "ruff format" in result.name.lower():
+                        print("  - 执行: uv run ruff format src/ tests/")
+                    elif "ruff check" in result.name.lower():
+                        print("  - 执行: uv run ruff check --fix src/ tests/")
                     elif "mypy" in result.name.lower():
                         print("  - 执行: uv run mypy src/ --ignore-missing-imports")
                     elif "pytest" in result.name.lower():
@@ -277,10 +277,10 @@ class PreCommitChecker:
         
         for result in self.results:
             if result.status == CheckStatus.FAILED:
-                if "black" in result.name.lower():
-                    fix_commands.append("uv run black src/ tests/")
-                elif "isort" in result.name.lower():
-                    fix_commands.append("uv run isort src/ tests/")
+                if "ruff format" in result.name.lower():
+                    fix_commands.append("uv run ruff format src/ tests/")
+                elif "ruff check" in result.name.lower():
+                    fix_commands.append("uv run ruff check --fix src/ tests/")
                 elif "mypy" in result.name.lower():
                     fix_commands.append("uv run mypy src/ --ignore-missing-imports")
                 elif "pytest" in result.name.lower():
