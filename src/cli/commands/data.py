@@ -108,7 +108,7 @@ def stats(
 
         if df.is_empty():
             console.print("[yellow]暂无数据[/yellow]")
-            console.print("[dim]提示: 请先使用 'nanobotrun import-data' 导入数据[/dim]")
+            console.print("[dim]提示: 请先使用 'nanobotrun data import <路径>' 导入数据[/dim]")
             return
 
         import polars as pl
@@ -177,7 +177,7 @@ def recent(
         if not runs:
             console.print("[yellow]暂无训练记录[/yellow]")
             console.print(
-                "[dim]提示: 使用 'nanobotrun data import-data <路径>' 导入FIT文件[/dim]"
+                "[dim]提示: 使用 'nanobotrun data import <路径>' 导入FIT文件[/dim]"
             )
             return
 

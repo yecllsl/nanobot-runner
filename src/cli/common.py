@@ -36,7 +36,7 @@ class CLIError:
     def storage_error(error: str) -> dict:
         return {
             "message": f"存储错误: {error}",
-            "suggestion": "请检查数据目录权限，或运行 'nanobotrun import-data' 导入数据",
+            "suggestion": "请检查数据目录权限，或运行 'nanobotrun data import <路径>' 导入数据",
         }
 
     @staticmethod

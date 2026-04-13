@@ -34,11 +34,10 @@ def gateway(
         我的VDOT是多少？
     """
     from nanobot.agent import AgentLoop
-    from nanobot.agent.tools import ToolRegistry
     from nanobot.bus import MessageBus
     from nanobot.channels.manager import ChannelManager
     from nanobot.cli.commands import _make_provider
-    from nanobot.config.loader import get_data_dir, load_config
+    from nanobot.config.loader import load_config
     from nanobot.cron.service import CronService
     from nanobot.heartbeat.service import HeartbeatService
     from nanobot.session.manager import SessionManager
@@ -59,36 +58,38 @@ def gateway(
         logger.disable("src")
 
     config = load_config()
-    workspace = get_data_dir()
-    sync_workspace_templates(workspace)
-
     provider = _make_provider(config)
 
     context = None
     runner_tools = None
+    workspace = None
 
     try:
         from src.core.context import AppContextFactory
 
         context = AppContextFactory.create()
+        workspace = context.config.base_dir
         runner_tools = RunnerTools(context)
     except Exception:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
+        from pathlib import Path
 
-    registry = ToolRegistry()
-    if runner_tools:
-        for tool in create_tools(runner_tools):
-            registry.register(tool)
+        workspace = Path.home() / ".nanobot-runner"
+
+    sync_workspace_templates(workspace)
 
     bus = MessageBus()
     session = SessionManager(bus=bus)
 
     agent = AgentLoop(
-        provider=provider,
-        tools=registry,
         bus=bus,
-        system_prompt="你是一个专业的跑步数据助理，帮助用户分析跑步数据、提供训练建议。",
+        provider=provider,
+        workspace=workspace,
     )
+
+    if runner_tools:
+        for tool in create_tools(runner_tools):
+            agent.tools.register(tool)
 
     channels = ChannelManager(
         workspace=workspace,

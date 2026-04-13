@@ -108,7 +108,7 @@ def report(
             print_error(
                 {
                     "message": f"生成晨报失败: {result.get('error', '未知错误')}",
-                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun import-data' 导入数据",
+                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun data import <路径>' 导入数据",
                 }
             )
             raise typer.Exit(1)
@@ -282,7 +282,7 @@ def profile_show(
             console.print(
                 Panel(
                     "[yellow]暂无跑步数据[/yellow]\n\n"
-                    "使用 'nanobotrun import-data <路径>' 导入FIT文件",
+                    "使用 'nanobotrun data import <路径>' 导入FIT文件",
                     title="用户画像",
                     border_style="yellow",
                 )

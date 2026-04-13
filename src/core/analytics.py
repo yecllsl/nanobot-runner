@@ -323,6 +323,10 @@ class AnalyticsEngine:
             - 强度因子上限为 1.5
             - 最大心率估算公式：220 - 年龄
         """
+        # 边界条件：参数为 None
+        if distance_m is None or duration_s is None:
+            return 0.0
+
         # 边界条件：时长为 0 或距离为 0
         if duration_s <= 0 or distance_m <= 0:
             return 0.0

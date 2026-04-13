@@ -70,6 +70,10 @@ class TrainingLoadAnalyzer:
         Returns:
             float: TSS值
         """
+        # 边界条件：参数为 None
+        if distance_m is None or duration_s is None:
+            return 0.0
+
         if distance_m <= 0 or duration_s <= 0:
             return 0.0
 

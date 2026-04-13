@@ -107,7 +107,7 @@ class StatisticsAggregator:
         except Exception:
             return "00:00:00"
 
-    def _format_pace(self, pace_sec_per_km: float) -> str:
+    def _format_pace(self, pace_sec_per_km: float | None) -> str:
         """
         格式化配速（M'SS"/km）
 
@@ -118,7 +118,7 @@ class StatisticsAggregator:
             str: 格式化后的配速
         """
         try:
-            if pace_sec_per_km <= 0:
+            if pace_sec_per_km is None or pace_sec_per_km <= 0:
                 return "0'00\""
             minutes = int(pace_sec_per_km // 60)
             seconds = int(pace_sec_per_km % 60)

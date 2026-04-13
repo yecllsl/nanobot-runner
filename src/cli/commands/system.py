@@ -28,6 +28,7 @@ def init() -> None:
     """
     from nanobot.utils.helpers import sync_workspace_templates
 
+    from src.cli.utils import sync_custom_templates
     from src.core.context import AppContextFactory
 
     context = AppContextFactory.create()
@@ -44,18 +45,27 @@ def init() -> None:
         data_dir.mkdir(parents=True, exist_ok=True)
         console.print(f"[green]✓[/green] 创建数据目录: {data_dir}")
 
+    # 同步 nanobot-ai 框架默认模板
     added = sync_workspace_templates(workspace)
     if added:
-        console.print("[green]✓[/green] 同步模板文件:")
+        console.print("[green]✓[/green] 同步框架模板文件:")
         for name in added:
             console.print(f"  [dim]{name}[/dim]")
+
+    # 同步自定义模板（覆盖框架默认模板）
+    custom_synced = sync_custom_templates(workspace)
+    if custom_synced:
+        console.print("[green]✓[/green] 同步自定义模板文件:")
+        for name in custom_synced:
+            console.print(f"  [dim]{name}[/dim]")
     else:
-        console.print("[dim]模板文件已是最新[/dim]")
+        console.print("[dim]自定义模板文件已是最新[/dim]")
 
     console.print("\n[bold green]工作区初始化完成！[/bold green]")
     console.print(f"工作区路径: [cyan]{workspace}[/cyan]")
     console.print(f"数据路径: [cyan]{data_dir}[/cyan]")
     console.print("\n下一步:")
-    console.print("  1. 导入数据: [cyan]nanobotrun import-data <FIT文件路径>[/cyan]")
-    console.print("  2. 查看统计: [cyan]nanobotrun stats[/cyan]")
-    console.print("  3. 查看画像: [cyan]nanobotrun profile show[/cyan]")
+    console.print("  1. 导入数据: [cyan]nanobotrun data import <FIT文件路径>[/cyan]")
+    console.print("  2. 查看统计: [cyan]nanobotrun data stats[/cyan]")
+    console.print("  3. 查看画像: [cyan]nanobotrun report profile show[/cyan]")
+    console.print("  4. Agent聊天: [cyan]nanobotrun agent chat[/cyan]")

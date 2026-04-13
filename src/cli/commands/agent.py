@@ -21,7 +21,6 @@ def chat() -> None:
 async def _run_chat() -> None:
     """异步聊天循环函数"""
     from nanobot.agent import AgentLoop
-    from nanobot.agent.tools import ToolRegistry
     from nanobot.bus import MessageBus
     from nanobot.cli.commands import _make_provider
     from nanobot.config.loader import load_config
@@ -48,22 +47,19 @@ async def _run_chat() -> None:
         config = load_config()
         agent_defaults = config.agents.defaults
 
-        provider = _make_provider(config)
-
         context = AppContextFactory.create()
+        workspace = context.config.base_dir
         runner_tools = RunnerTools(context)
-
-        registry = ToolRegistry()
-        for tool in create_tools(runner_tools):
-            registry.register(tool)
 
         bus = MessageBus()
         agent = AgentLoop(
-            provider=provider,
-            tools=registry,
             bus=bus,
-            system_prompt="你是一个专业的跑步数据助理，帮助用户分析跑步数据、提供训练建议。",
+            provider=_make_provider(config),
+            workspace=workspace,
         )
+
+        for tool in create_tools(runner_tools):
+            agent.tools.register(tool)
 
         console.print("[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {agent_defaults.model}[/dim]")
