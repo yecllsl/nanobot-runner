@@ -1117,8 +1117,10 @@ class ProfileEngine:
 
             vdot_values = []
             for row in activity_rows:
-                distance = row.get("total_distance") or 0
-                duration = row.get("total_timer_time") or 0
+                distance_raw = row.get("total_distance")
+                duration_raw = row.get("total_timer_time")
+                distance = float(distance_raw) if distance_raw is not None else 0.0
+                duration = float(duration_raw) if duration_raw is not None else 0.0
 
                 if distance > 0 and duration > 0:
                     try:

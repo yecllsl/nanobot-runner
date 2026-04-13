@@ -29,32 +29,36 @@ class TestAnalyticsEngine:
         assert isinstance(vdot, float)
 
     def test_calculate_vdot_zero_distance(self):
-        """测试零距离VDOT计算"""
+        """测试零距离VDOT计算返回 0"""
         engine = AnalyticsEngine(Mock())
 
-        with pytest.raises(ValueError):
-            engine.calculate_vdot(0, 1800)
+        vdot = engine.calculate_vdot(0, 1800)
+
+        assert vdot == 0.0
 
     def test_calculate_vdot_zero_time(self):
-        """测试零时间VDOT计算"""
+        """测试零时间VDOT计算返回 0"""
         engine = AnalyticsEngine(Mock())
 
-        with pytest.raises(ValueError):
-            engine.calculate_vdot(5000, 0)
+        vdot = engine.calculate_vdot(5000, 0)
+
+        assert vdot == 0.0
 
     def test_calculate_vdot_negative_distance(self):
-        """测试负距离VDOT计算"""
+        """测试负距离VDOT计算返回 0"""
         engine = AnalyticsEngine(Mock())
 
-        with pytest.raises(ValueError):
-            engine.calculate_vdot(-5000, 1800)
+        vdot = engine.calculate_vdot(-5000, 1800)
+
+        assert vdot == 0.0
 
     def test_calculate_vdot_negative_time(self):
-        """测试负时间VDOT计算"""
+        """测试负时间VDOT计算返回 0"""
         engine = AnalyticsEngine(Mock())
 
-        with pytest.raises(ValueError):
-            engine.calculate_vdot(5000, -1800)
+        vdot = engine.calculate_vdot(5000, -1800)
+
+        assert vdot == 0.0
 
     def test_calculate_tss_success(self):
         """测试成功计算TSS"""

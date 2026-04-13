@@ -45,14 +45,22 @@ class TestVDOTCalculator:
     def test_calculate_vdot_invalid_distance(
         self, vdot_calculator: VDOTCalculator
     ) -> None:
-        """测试无效距离"""
-        with pytest.raises(ValueError, match="距离和时间必须为正数"):
-            vdot_calculator.calculate_vdot(-1000, 1200)
+        """测试无效距离返回 0"""
+        distance_m = -1000
+        time_s = 1200
+
+        vdot = vdot_calculator.calculate_vdot(distance_m, time_s)
+
+        assert vdot == 0.0
 
     def test_calculate_vdot_invalid_time(self, vdot_calculator: VDOTCalculator) -> None:
-        """测试无效时间"""
-        with pytest.raises(ValueError, match="距离和时间必须为正数"):
-            vdot_calculator.calculate_vdot(5000, -1200)
+        """测试无效时间返回 0"""
+        distance_m = 5000
+        time_s = -1200
+
+        vdot = vdot_calculator.calculate_vdot(distance_m, time_s)
+
+        assert vdot == 0.0
 
     def test_calculate_vdot_short_distance(
         self, vdot_calculator: VDOTCalculator

@@ -172,8 +172,10 @@ class DataHandler:
         runs = []
 
         for row in session_df.iter_rows(named=True):
-            distance = row.get("distance") or 0
-            duration = row.get("duration") or 0
+            distance_raw = row.get("distance")
+            duration_raw = row.get("duration")
+            distance = float(distance_raw) if distance_raw is not None else 0.0
+            duration = float(duration_raw) if duration_raw is not None else 0.0
             distance_km = distance / 1000
             duration_min = duration / 60
             pace = duration_min / distance_km if distance_km > 0 else 0

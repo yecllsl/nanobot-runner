@@ -56,6 +56,11 @@ async def _run_chat() -> None:
             bus=bus,
             provider=_make_provider(config),
             workspace=workspace,
+            model=agent_defaults.model,
+            max_iterations=agent_defaults.max_tool_iterations,
+            context_window_tokens=agent_defaults.context_window_tokens,
+            context_block_limit=agent_defaults.context_block_limit,
+            max_tool_result_chars=agent_defaults.max_tool_result_chars,
         )
 
         for tool in create_tools(runner_tools):

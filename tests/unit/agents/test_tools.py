@@ -686,18 +686,20 @@ class TestRunnerTools:
         assert vdot < 100
 
     def test_calculate_vdot_zero_distance(self):
-        """测试VDOT计算零距离应抛出异常"""
+        """测试VDOT计算零距离返回 0"""
         tools = RunnerTools()
 
-        with pytest.raises(ValueError):
-            tools.calculate_vdot_for_run(0, 1800)
+        vdot = tools.calculate_vdot_for_run(0, 1800)
+
+        assert vdot == 0.0
 
     def test_calculate_vdot_zero_time(self):
-        """测试VDOT计算零时间应抛出异常"""
+        """测试VDOT计算零时间返回 0"""
         tools = RunnerTools()
 
-        with pytest.raises(ValueError):
-            tools.calculate_vdot_for_run(5000, 0)
+        vdot = tools.calculate_vdot_for_run(5000, 0)
+
+        assert vdot == 0.0
 
     def test_get_vdot_trend_empty(self):
         """测试获取VDOT趋势空数据"""

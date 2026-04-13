@@ -19,13 +19,13 @@ class VDOTCalculator:
             time_s: 用时（秒）
 
         Returns:
-            float: VDOT值
-
-        Raises:
-            ValueError: 当距离或时间为负数或零时
+            float: VDOT值，无效输入时返回 0.0
         """
+        if distance_m is None or time_s is None:
+            return 0.0
+
         if distance_m <= 0 or time_s <= 0:
-            raise ValueError("距离和时间必须为正数")
+            return 0.0
 
         if distance_m < 1500:
             return 0.0

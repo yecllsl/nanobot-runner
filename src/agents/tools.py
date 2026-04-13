@@ -125,7 +125,7 @@ class GetRunningStatsTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "获取跑步统计数据，包括总次数、总距离、平均距离等。返回JSON格式：{success: true, data: {total_runs: 总次数, total_distance: 总距离(米), total_duration: 总时长(秒), avg_distance: 平均距离(米), avg_duration: 平均时长(秒), max_distance: 最大距离(米), avg_heart_rate: 平均心率}} 或 {success: false, error: 错误信息}"
+        return "获取跑步统计数据。返回JSON格式数据，包含 total_runs（总次数）、total_distance（总距离，单位米）、total_duration（总时长，单位秒）等字段。当用户询问'跑了多少次'、'总距离'、'跑步统计'时使用此工具。"
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -158,7 +158,7 @@ class GetRecentRunsTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "获取最近的跑步记录列表"
+        return "获取最近的跑步记录列表。返回JSON数组，每条记录包含 timestamp（时间）、distance_km（距离，单位公里）、duration_min（时长，单位分钟）、vdot（跑力值）等字段。当用户询问'最近跑步'、'跑步记录'时使用此工具。"
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -488,13 +488,13 @@ class RunnerTools:
         row = summary.row(0)
 
         return {
-            "total_runs": row[0],
-            "total_distance": row[1],
-            "total_duration": row[2],
-            "avg_distance": row[3],
-            "avg_duration": row[4],
-            "max_distance": row[5],
-            "avg_heart_rate": row[6],
+            "total_runs": row[0] if row[0] is not None else 0,
+            "total_distance": row[1] if row[1] is not None else 0.0,
+            "total_duration": row[2] if row[2] is not None else 0.0,
+            "avg_distance": row[3] if row[3] is not None else 0.0,
+            "avg_duration": row[4] if row[4] is not None else 0.0,
+            "max_distance": row[5] if row[5] is not None else 0.0,
+            "avg_heart_rate": row[6] if row[6] is not None else 0.0,
         }
 
     def get_recent_runs(self, limit: int = 10) -> list[dict[str, Any]]:
@@ -517,13 +517,14 @@ class RunnerTools:
 
         runs = []
         for row in session_df.iter_rows(named=True):
-            distance = row.get("distance") or 0
-            duration = row.get("duration") or 0
+            distance_raw = row.get("distance")
+            duration_raw = row.get("duration")
+            distance = float(distance_raw) if distance_raw is not None else 0.0
+            duration = float(duration_raw) if duration_raw is not None else 0.0
             distance_km = distance / 1000
             duration_min = duration / 60
             pace = duration_min / distance_km if distance_km > 0 else 0
 
-            # 计算VDOT值
             vdot = None
             if distance > 0 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
@@ -563,9 +564,11 @@ class RunnerTools:
 
         vdot_trend = []
         for row in session_df.iter_rows(named=True):
-            distance = row.get("distance") or 0
-            duration = row.get("duration") or 0
+            distance_raw = row.get("distance")
+            duration_raw = row.get("duration")
             timestamp = row.get("timestamp")
+            distance = float(distance_raw) if distance_raw is not None else 0.0
+            duration = float(duration_raw) if duration_raw is not None else 0.0
 
             if distance > 0 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
@@ -661,9 +664,11 @@ class RunnerTools:
 
         results = []
         for row in session_df.iter_rows(named=True):
-            distance = row.get("distance") or 0
-            duration = row.get("duration") or 0
+            distance_raw = row.get("distance")
+            duration_raw = row.get("duration")
             avg_hr = row.get("avg_hr")
+            distance = float(distance_raw) if distance_raw is not None else 0.0
+            duration = float(duration_raw) if duration_raw is not None else 0.0
 
             distance_km = distance / 1000
             duration_minutes = duration / 60
@@ -721,9 +726,11 @@ class RunnerTools:
 
         results = []
         for row in session_df.iter_rows(named=True):
-            distance = row.get("distance") or 0
-            duration = row.get("duration") or 0
+            distance_raw = row.get("distance")
+            duration_raw = row.get("duration")
             avg_hr = row.get("avg_hr")
+            distance = float(distance_raw) if distance_raw is not None else 0.0
+            duration = float(duration_raw) if duration_raw is not None else 0.0
 
             distance_km = distance / 1000
             duration_minutes = duration / 60
