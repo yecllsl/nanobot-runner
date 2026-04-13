@@ -194,6 +194,8 @@ class TestCLICommandIntegration:
             ["analysis", "hr-drift"],
             ["agent", "chat"],
             ["report", "report"],
+            ["report", "weekly"],
+            ["report", "monthly"],
             ["system", "version"],
         ]
 

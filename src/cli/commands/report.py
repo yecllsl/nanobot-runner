@@ -137,6 +137,112 @@ def report(
         raise typer.Exit(1)
 
 
+@app.command()
+def weekly(
+    push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
+    age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+) -> None:
+    """
+    生成周报
+
+    示例:
+        nanobotrun report weekly              # 生成周报
+        nanobotrun report weekly --push       # 生成并推送到飞书
+    """
+    from src.core.report_service import ReportService, ReportType
+
+    try:
+        service = ReportService()
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task("正在生成周报", total=None)
+            result = service.generate_report(report_type=ReportType.WEEKLY, age=age)
+
+        if not result:
+            print_error(
+                {
+                    "message": "生成周报失败",
+                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun data import <路径>' 导入数据",
+                }
+            )
+            raise typer.Exit(1)
+
+        _display_weekly_report(result)
+
+        if push:
+            push_result = service.push_report(result, report_type=ReportType.WEEKLY)
+            if push_result.get("success"):
+                print_status("周报已推送到飞书", "success")
+            else:
+                print_error(CLIError.push_failed(push_result.get("error", "未知错误")))
+
+    except Exception as e:
+        print_error(
+            {
+                "message": f"操作失败: {str(e)}",
+                "suggestion": "请检查配置和数据文件是否正常",
+            }
+        )
+        raise typer.Exit(1)
+
+
+@app.command()
+def monthly(
+    push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
+    age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+) -> None:
+    """
+    生成月报
+
+    示例:
+        nanobotrun report monthly              # 生成月报
+        nanobotrun report monthly --push       # 生成并推送到飞书
+    """
+    from src.core.report_service import ReportService, ReportType
+
+    try:
+        service = ReportService()
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task("正在生成月报", total=None)
+            result = service.generate_report(report_type=ReportType.MONTHLY, age=age)
+
+        if not result:
+            print_error(
+                {
+                    "message": "生成月报失败",
+                    "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun data import <路径>' 导入数据",
+                }
+            )
+            raise typer.Exit(1)
+
+        _display_monthly_report(result)
+
+        if push:
+            push_result = service.push_report(result, report_type=ReportType.MONTHLY)
+            if push_result.get("success"):
+                print_status("月报已推送到飞书", "success")
+            else:
+                print_error(CLIError.push_failed(push_result.get("error", "未知错误")))
+
+    except Exception as e:
+        print_error(
+            {
+                "message": f"操作失败: {str(e)}",
+                "suggestion": "请检查配置和数据文件是否正常",
+            }
+        )
+        raise typer.Exit(1)
+
+
 def _display_report(report_data: dict) -> None:
     """
     在终端显示晨报内容
@@ -226,6 +332,176 @@ def _display_report(report_data: dict) -> None:
             else:
                 plan_table.add_row(f"{day_str} {date_str}", plan_str)
         console.print(plan_table)
+
+
+def _display_weekly_report(report_data: dict) -> None:
+    """
+    在终端显示周报内容
+
+    Args:
+        report_data: 周报数据
+    """
+    if "error" in report_data:
+        print_error(
+            {
+                "message": report_data["error"],
+                "suggestion": "请检查是否有跑步数据",
+            }
+        )
+        return
+
+    console.print()
+    console.print(
+        Panel(
+            f"[bold]{report_data.get('date_range', '')}[/bold]\n{report_data.get('greeting', '')}",
+            title="[Weekly] 周报",
+            border_style="blue",
+        )
+    )
+
+    summary_table = Table(title="本周训练统计", show_header=False)
+    summary_table.add_column("指标", style="cyan")
+    summary_table.add_column("数值", style="green")
+    summary_table.add_row("总次数", str(report_data.get("total_runs", 0)))
+    summary_table.add_row("总距离", f"{report_data.get('total_distance_km', 0)} km")
+    summary_table.add_row("总时长", f"{report_data.get('total_duration_min', 0)} 分钟")
+    summary_table.add_row("总TSS", f"{report_data.get('total_tss', 0)}")
+    summary_table.add_row("平均VDOT", f"{report_data.get('avg_vdot', 0)}")
+    console.print(summary_table)
+
+    training_load = report_data.get("training_load", {})
+    if training_load:
+        load_table = Table(title="训练负荷", show_header=False)
+        load_table.add_column("指标", style="cyan")
+        load_table.add_column("数值", style="green")
+
+        atl = training_load.get("atl", 0)
+        ctl = training_load.get("ctl", 0)
+        tsb = training_load.get("tsb", 0)
+
+        atl_color = "green" if atl < 50 else "yellow" if atl < 100 else "red"
+        ctl_color = "green" if ctl < 50 else "yellow" if ctl < 100 else "red"
+        tsb_color = "green" if tsb > 0 else "yellow" if tsb > -20 else "red"
+
+        load_table.add_row("ATL (疲劳)", f"[{atl_color}]{atl}[/{atl_color}]")
+        load_table.add_row("CTL (体能)", f"[{ctl_color}]{ctl}[/{ctl_color}]")
+        load_table.add_row("TSB (状态)", f"[{tsb_color}]{tsb}[/{tsb_color}]")
+        console.print(load_table)
+
+    highlights = report_data.get("highlights", [])
+    if highlights:
+        console.print(
+            Panel(
+                "\n".join(f"• {h}" for h in highlights),
+                title="本周亮点",
+                border_style="green",
+            )
+        )
+
+    concerns = report_data.get("concerns", [])
+    if concerns:
+        console.print(
+            Panel(
+                "\n".join(f"• {c}" for c in concerns),
+                title="需要关注",
+                border_style="yellow",
+            )
+        )
+
+    recommendations = report_data.get("recommendations", [])
+    if recommendations:
+        console.print(
+            Panel(
+                "\n".join(f"• {r}" for r in recommendations),
+                title="下周建议",
+                border_style="blue",
+            )
+        )
+
+
+def _display_monthly_report(report_data: dict) -> None:
+    """
+    在终端显示月报内容
+
+    Args:
+        report_data: 月报数据
+    """
+    if "error" in report_data:
+        print_error(
+            {
+                "message": report_data["error"],
+                "suggestion": "请检查是否有跑步数据",
+            }
+        )
+        return
+
+    console.print()
+    console.print(
+        Panel(
+            f"[bold]{report_data.get('date_range', '')}[/bold]\n{report_data.get('greeting', '')}",
+            title="[Monthly] 月报",
+            border_style="blue",
+        )
+    )
+
+    summary_table = Table(title="本月训练统计", show_header=False)
+    summary_table.add_column("指标", style="cyan")
+    summary_table.add_column("数值", style="green")
+    summary_table.add_row("总次数", str(report_data.get("total_runs", 0)))
+    summary_table.add_row("总距离", f"{report_data.get('total_distance_km', 0)} km")
+    summary_table.add_row("总时长", f"{report_data.get('total_duration_min', 0)} 分钟")
+    summary_table.add_row("总TSS", f"{report_data.get('total_tss', 0)}")
+    summary_table.add_row("平均VDOT", f"{report_data.get('avg_vdot', 0)}")
+    console.print(summary_table)
+
+    training_load = report_data.get("training_load", {})
+    if training_load:
+        load_table = Table(title="训练负荷", show_header=False)
+        load_table.add_column("指标", style="cyan")
+        load_table.add_column("数值", style="green")
+
+        atl = training_load.get("atl", 0)
+        ctl = training_load.get("ctl", 0)
+        tsb = training_load.get("tsb", 0)
+
+        atl_color = "green" if atl < 50 else "yellow" if atl < 100 else "red"
+        ctl_color = "green" if ctl < 50 else "yellow" if ctl < 100 else "red"
+        tsb_color = "green" if tsb > 0 else "yellow" if tsb > -20 else "red"
+
+        load_table.add_row("ATL (疲劳)", f"[{atl_color}]{atl}[/{atl_color}]")
+        load_table.add_row("CTL (体能)", f"[{ctl_color}]{ctl}[/{ctl_color}]")
+        load_table.add_row("TSB (状态)", f"[{tsb_color}]{tsb}[/{tsb_color}]")
+        console.print(load_table)
+
+    highlights = report_data.get("highlights", [])
+    if highlights:
+        console.print(
+            Panel(
+                "\n".join(f"• {h}" for h in highlights),
+                title="本月亮点",
+                border_style="green",
+            )
+        )
+
+    concerns = report_data.get("concerns", [])
+    if concerns:
+        console.print(
+            Panel(
+                "\n".join(f"• {c}" for c in concerns),
+                title="需要关注",
+                border_style="yellow",
+            )
+        )
+
+    recommendations = report_data.get("recommendations", [])
+    if recommendations:
+        console.print(
+            Panel(
+                "\n".join(f"• {r}" for r in recommendations),
+                title="下月建议",
+                border_style="blue",
+            )
+        )
 
 
 @profile_app.command("show")
