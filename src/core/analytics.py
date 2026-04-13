@@ -269,13 +269,20 @@ class AnalyticsEngine:
                 df, "session_total_timer_time", "total_timer_time", "duration"
             )
 
+            df = df.with_columns(
+                [
+                    pl.col(distance_col).fill_null(0).alias("distance_filled"),
+                    pl.col(duration_col).fill_null(0).alias("duration_filled"),
+                ]
+            )
+
             vdot_series = self.vdot_calculator.calculate_vdot_batch(
-                df, distance_col=distance_col, duration_col=duration_col
+                df, distance_col="distance_filled", duration_col="duration_filled"
             )
 
             date_series = df["timestamp"].dt.strftime("%Y-%m-%d")
-            distance_series = df[distance_col]
-            duration_series = df[duration_col]
+            distance_series = df["distance_filled"]
+            duration_series = df["duration_filled"]
 
             trend_data = []
             for i in range(df.height):
@@ -426,8 +433,8 @@ class AnalyticsEngine:
         tss_values = []
         for row in df.iter_rows(named=True):
             tss = self.training_load_analyzer.calculate_tss_for_run(
-                distance_m=row.get("session_total_distance", 0),
-                duration_s=row.get("session_total_timer_time", 0),
+                distance_m=row.get("session_total_distance") or 0,
+                duration_s=row.get("session_total_timer_time") or 0,
                 avg_heart_rate=row.get("session_avg_heart_rate"),
             )
             tss_values.append(tss)
@@ -970,8 +977,8 @@ class AnalyticsEngine:
         total_time = 0
 
         for row in hr_df.iter_rows(named=True):
-            avg_hr = row.get(hr_col, 0)
-            duration = row.get(duration_col, 0)
+            avg_hr = row.get(hr_col) or 0
+            duration = row.get(duration_col) or 0
 
             if avg_hr <= 0 or duration <= 0:
                 continue
@@ -1150,8 +1157,8 @@ class AnalyticsEngine:
             tss_values = []
             for row in df.iter_rows(named=True):
                 tss = self.calculate_tss_for_run(
-                    distance_m=row.get("session_total_distance", 0),
-                    duration_s=row.get("session_total_timer_time", 0),
+                    distance_m=row.get("session_total_distance") or 0,
+                    duration_s=row.get("session_total_timer_time") or 0,
                     avg_heart_rate=row.get("session_avg_heart_rate"),
                 )
                 tss_values.append(tss)
@@ -1437,8 +1444,8 @@ class AnalyticsEngine:
         tss_records = []
         for row in df.iter_rows(named=True):
             tss = self.calculate_tss_for_run(
-                distance_m=row.get("session_total_distance", 0),
-                duration_s=row.get("session_total_timer_time", 0),
+                distance_m=row.get("session_total_distance") or 0,
+                duration_s=row.get("session_total_timer_time") or 0,
                 avg_heart_rate=row.get("session_avg_heart_rate"),
             )
             timestamp = row.get("timestamp")

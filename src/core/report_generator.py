@@ -565,8 +565,8 @@ class ReportGenerator:
             total_tss = 0.0
             for row in df.iter_rows(named=True):
                 tss = self.analytics.calculate_tss_for_run(
-                    distance_m=row.get("total_distance", 0),
-                    duration_s=row.get("total_timer_time", 0),
+                    distance_m=row.get("total_distance") or 0,
+                    duration_s=row.get("total_timer_time") or 0,
                     avg_heart_rate=row.get("avg_heart_rate"),
                     age=config.age,
                     rest_hr=config.rest_hr,

@@ -11,7 +11,7 @@ from src.cli.handlers.data_handler import DataHandler
 app = typer.Typer(help="数据管理命令")
 
 
-@app.command()
+@app.command(name="import")
 def import_data(
     path: str = typer.Argument(..., help="FIT 文件或目录路径"),
     force: bool = typer.Option(False, "--force", "-f", help="强制导入，跳过去重"),
@@ -108,7 +108,9 @@ def stats(
 
         if df.is_empty():
             console.print("[yellow]暂无数据[/yellow]")
-            console.print("[dim]提示: 请先使用 'nanobotrun data import <路径>' 导入数据[/dim]")
+            console.print(
+                "[dim]提示: 请先使用 'nanobotrun data import <路径>' 导入数据[/dim]"
+            )
             return
 
         import polars as pl

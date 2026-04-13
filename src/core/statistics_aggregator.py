@@ -65,13 +65,17 @@ class StatisticsAggregator:
             if session_df.is_empty():
                 return pl.DataFrame()
 
+            distance_col = session_df["distance"].fill_null(0)
+            duration_col = session_df["duration"].fill_null(0)
+            avg_hr_col = session_df["avg_hr"].fill_null(0)
+
             total_runs = session_df.height
-            total_distance = session_df["distance"].sum()
-            total_timer_time = session_df["duration"].sum()
-            avg_distance = session_df["distance"].mean()
-            avg_timer_time = session_df["duration"].mean()
-            max_distance = session_df["distance"].max()
-            avg_heart_rate = session_df["avg_hr"].mean()
+            total_distance = distance_col.sum()
+            total_timer_time = duration_col.sum()
+            avg_distance = distance_col.mean()
+            avg_timer_time = duration_col.mean()
+            max_distance = distance_col.max()
+            avg_heart_rate = avg_hr_col.mean()
 
             result = pl.DataFrame(
                 {

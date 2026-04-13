@@ -142,6 +142,12 @@ jobs:
         echo "开始集成测试..."
         uv run pytest tests/integration/ -v --tb=short
         
+    - name: Run contract tests
+      run: |
+        echo "开始契约测试（验证CLI命令、数据字段、框架集成）..."
+        uv run pytest tests/integration/test_cli_contract.py tests/integration/test_data_contract.py tests/integration/test_framework_integration.py -v --tb=short
+        echo "契约测试完成"
+        
     - name: Run E2E tests
       run: |
         echo "开始端到端测试..."

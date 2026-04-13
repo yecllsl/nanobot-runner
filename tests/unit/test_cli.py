@@ -97,23 +97,23 @@ class TestCLICommands:
 
     def test_import_data_file_not_exists(self):
         """测试导入不存在的文件"""
-        result = runner.invoke(app, ["data", "import-data", "/nonexistent/path.fit"])
+        result = runner.invoke(app, ["data", "import", "/nonexistent/path.fit"])
         assert result.exit_code != 0
         assert "路径不存在" in result.output or "建议" in result.output
 
     def test_import_data_invalid_extension(self):
         """测试导入非.fit文件"""
-        result = runner.invoke(app, ["data", "import-data", "test.txt"])
+        result = runner.invoke(app, ["data", "import", "test.txt"])
         assert result.exit_code != 0
 
     def test_import_data_directory(self):
         """测试导入目录（不存在的目录）"""
-        result = runner.invoke(app, ["data", "import-data", "/nonexistent/dir"])
+        result = runner.invoke(app, ["data", "import", "/nonexistent/dir"])
         assert result.exit_code != 0
 
     def test_import_data_invalid_path(self):
         """测试无效路径"""
-        result = runner.invoke(app, ["data", "import-data", "test.fit"])
+        result = runner.invoke(app, ["data", "import", "test.fit"])
         assert result.exit_code != 0
 
     def test_stats(self):
@@ -158,12 +158,12 @@ class TestCLIImportFile:
 
     def test_import_data_file_success(self):
         """测试导入文件"""
-        result = runner.invoke(app, ["data", "import-data", "test.fit"])
+        result = runner.invoke(app, ["data", "import", "test.fit"])
         assert result.exit_code != 0
 
     def test_import_data_file_with_force_flag(self):
         """测试强制导入文件"""
-        result = runner.invoke(app, ["data", "import-data", "test.fit", "--force"])
+        result = runner.invoke(app, ["data", "import", "test.fit", "--force"])
         assert result.exit_code != 0
 
     def test_import_directory_with_fit_files(self):
@@ -178,13 +178,13 @@ class TestCLIImportFile:
                 mock_importer.import_file.return_value = {"status": "added"}
                 mock_importer_class.return_value = mock_importer
 
-                result = runner.invoke(app, ["data", "import-data", str(tmpdir_path)])
+                result = runner.invoke(app, ["data", "import", str(tmpdir_path)])
                 assert result.exit_code == 0
 
     def test_import_directory_empty(self):
         """测试导入空目录"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = runner.invoke(app, ["data", "import-data", tmpdir])
+            result = runner.invoke(app, ["data", "import", tmpdir])
             assert result.exit_code == 0
             assert "成功: 0" in result.output or "没有找到" in result.output
 
@@ -201,7 +201,7 @@ class TestCLIImportFile:
                 mock_importer.import_file.return_value = {"status": "added"}
                 mock_importer_class.return_value = mock_importer
 
-                result = runner.invoke(app, ["data", "import-data", str(tmpfile_path)])
+                result = runner.invoke(app, ["data", "import", str(tmpfile_path)])
                 assert result.exit_code == 0 or result.exit_code == 1
         finally:
             tmpfile_path.unlink(missing_ok=True)
@@ -219,7 +219,7 @@ class TestCLIImportFile:
                 mock_importer.import_file.return_value = {"status": "skipped"}
                 mock_importer_class.return_value = mock_importer
 
-                result = runner.invoke(app, ["data", "import-data", str(tmpfile_path)])
+                result = runner.invoke(app, ["data", "import", str(tmpfile_path)])
                 assert result.exit_code == 0 or result.exit_code == 1
         finally:
             tmpfile_path.unlink(missing_ok=True)
@@ -240,7 +240,7 @@ class TestCLIImportFile:
                 }
                 mock_importer_class.return_value = mock_importer
 
-                result = runner.invoke(app, ["data", "import-data", str(tmpfile_path)])
+                result = runner.invoke(app, ["data", "import", str(tmpfile_path)])
                 assert result.exit_code == 1
         finally:
             tmpfile_path.unlink(missing_ok=True)
@@ -261,7 +261,7 @@ class TestCLIImportFile:
                 ]
                 mock_importer_class.return_value = mock_importer
 
-                result = runner.invoke(app, ["data", "import-data", str(tmpdir_path)])
+                result = runner.invoke(app, ["data", "import", str(tmpdir_path)])
                 assert result.exit_code == 0
 
 

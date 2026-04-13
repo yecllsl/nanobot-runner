@@ -130,10 +130,12 @@ class DataHandler:
             return df
 
         if start_date:
-            df = df.filter(pl.col("timestamp") >= start_date)
+            start_dt = pl.lit(start_date).str.to_datetime("%Y-%m-%d")
+            df = df.filter(pl.col("timestamp") >= start_dt)
 
         if end_date:
-            df = df.filter(pl.col("timestamp") <= end_date)
+            end_dt = pl.lit(end_date).str.to_datetime("%Y-%m-%d")
+            df = df.filter(pl.col("timestamp") <= end_dt)
 
         return df
 

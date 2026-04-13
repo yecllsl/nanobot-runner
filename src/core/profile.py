@@ -1117,8 +1117,8 @@ class ProfileEngine:
 
             vdot_values = []
             for row in activity_rows:
-                distance = row.get("total_distance", 0)
-                duration = row.get("total_timer_time", 0)
+                distance = row.get("total_distance") or 0
+                duration = row.get("total_timer_time") or 0
 
                 if distance > 0 and duration > 0:
                     try:
@@ -1222,8 +1222,8 @@ class ProfileEngine:
             tss_values = []
             for row in df.iter_rows(named=True):
                 tss = analytics.calculate_tss_for_run(
-                    distance_m=row.get("total_distance", 0),
-                    duration_s=row.get("total_timer_time", 0),
+                    distance_m=row.get("total_distance") or 0,
+                    duration_s=row.get("total_timer_time") or 0,
                     avg_heart_rate=row.get("avg_heart_rate"),
                 )
                 if tss > 0:

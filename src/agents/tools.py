@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class BaseTool(ABC):
     """工具基类（适配nanobot-ai 0.1.4+）"""
 
+    concurrency_safe: bool = True
+
     def __init__(self, runner_tools: "RunnerTools"):
         self.runner_tools = runner_tools
 
@@ -123,7 +125,7 @@ class GetRunningStatsTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "获取跑步统计数据，包括总次数、总距离、总时长、平均距离、平均时长、最大距离、平均心率等"
+        return "获取跑步统计数据，包括总次数、总距离、平均距离等。返回JSON格式：{success: true, data: {total_runs: 总次数, total_distance: 总距离(米), total_duration: 总时长(秒), avg_distance: 平均距离(米), avg_duration: 平均时长(秒), max_distance: 最大距离(米), avg_heart_rate: 平均心率}} 或 {success: false, error: 错误信息}"
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -561,15 +563,28 @@ class RunnerTools:
 
         vdot_trend = []
         for row in session_df.iter_rows(named=True):
-            distance = row.get("distance", 0)
-            duration = row.get("duration", 0)
+            distance = row.get("distance") or 0
+            duration = row.get("duration") or 0
+            timestamp = row.get("timestamp")
 
             if distance > 0 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
+
+                date_str = "N/A"
+                if timestamp is not None:
+                    date_str = str(timestamp)[:10]
+
+                duration_min = duration / 60
+                hours = int(duration_min // 60)
+                minutes = int(duration_min % 60)
+                seconds = int(duration % 60)
+                duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
                 vdot_trend.append(
                     {
-                        "timestamp": str(row.get("timestamp", "N/A")),
-                        "distance": distance,
+                        "date": date_str,
+                        "distance_km": distance / 1000,
+                        "duration": duration_str,
                         "vdot": vdot,
                     }
                 )

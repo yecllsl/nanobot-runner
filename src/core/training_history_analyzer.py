@@ -275,9 +275,13 @@ class TrainingHistoryAnalyzer:
                 activities.append(
                     {
                         "timestamp": row.get("timestamp"),
-                        "distance_km": round(row.get("total_distance", 0) / 1000, 2),
-                        "duration_min": round(row.get("total_timer_time", 0) / 60, 1),
-                        "avg_hr": row.get("avg_heart_rate", 0),
+                        "distance_km": round(
+                            (row.get("total_distance") or 0) / 1000, 2
+                        ),
+                        "duration_min": round(
+                            (row.get("total_timer_time") or 0) / 60, 1
+                        ),
+                        "avg_hr": row.get("avg_heart_rate") or 0,
                     }
                 )
 
