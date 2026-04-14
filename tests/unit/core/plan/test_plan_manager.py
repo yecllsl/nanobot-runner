@@ -580,3 +580,94 @@ class TestPlanManagerGetActive:
 
         active_plan = manager.get_active_plan()
         assert active_plan is not None
+
+
+class TestPlanManagerErrorHandling:
+    """测试异常处理"""
+
+    @pytest.fixture
+    def manager(self):
+        """创建PlanManager实例"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
+
+    def test_load_plans_with_invalid_json(self):
+        """测试加载无效JSON文件"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+
+            plans_file = data_dir / "training_plans.json"
+            plans_file.write_text("invalid json", encoding="utf-8")
+
+            manager = PlanManager(context)
+            assert manager._plans == {}
+
+    def test_save_plans_with_permission_error(self, manager):
+        """测试保存计划时权限错误"""
+        import os
+
+        plan = create_test_plan("test_plan_1")
+        manager.create_plan(plan)
+
+        original_mode = manager.plans_file.stat().st_mode
+        try:
+            if os.name != "nt":
+                os.chmod(manager.plans_file, 0o000)
+                with pytest.raises(PlanManagerError, match="保存训练计划失败"):
+                    manager.create_plan(create_test_plan("test_plan_2"))
+        finally:
+            if os.name != "nt":
+                os.chmod(manager.plans_file, original_mode)
+
+    def test_get_plan_with_invalid_data(self, manager):
+        """测试获取无效数据的计划"""
+        plan = create_test_plan("test_plan_1")
+        manager.create_plan(plan)
+
+        manager._plans["test_plan_1"]["weeks"] = "invalid_data"
+        manager._save_plans()
+
+        retrieved = manager.get_plan("test_plan_1")
+        assert retrieved is None
+
+    def test_list_plans_with_invalid_plan(self, manager):
+        """测试列出包含无效数据的计划"""
+        plan = create_test_plan("test_plan_1")
+        manager.create_plan(plan)
+
+        manager._plans["invalid_plan"] = {"plan_id": "invalid", "weeks": "invalid"}
+        manager._save_plans()
+
+        plans = manager.list_plans()
+        assert len(plans) == 1
+        assert plans[0].plan_id == "test_plan_1"
+
+    def test_get_active_plan_with_invalid_data(self, manager):
+        """测试获取激活计划时遇到无效数据"""
+        plan = create_test_plan("test_plan_1")
+        manager.create_plan(plan)
+        manager.activate_plan("test_plan_1")
+
+        manager._plans["test_plan_1"]["weeks"] = "invalid_data"
+        manager._save_plans()
+
+        active_plan = manager.get_active_plan()
+        assert active_plan is None
+
+    def test_get_plan_status_without_status(self, manager):
+        """测试获取没有状态字段的计划状态"""
+        plan = create_test_plan("test_plan_1")
+        manager.create_plan(plan)
+
+        del manager._plans["test_plan_1"]["status"]
+        manager._save_plans()
+
+        status = manager.get_plan_status("test_plan_1")
+        assert status is None
