@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from src.core.models import HRDriftResult
+
 if TYPE_CHECKING:
     from src.core.storage import StorageManager
 
@@ -24,7 +26,7 @@ class HeartRateAnalyzer:
 
     def analyze_hr_drift(
         self, heart_rate: list[float], pace: list[float]
-    ) -> dict[str, Any]:
+    ) -> HRDriftResult:
         """
         分析心率漂移情况
 
@@ -33,10 +35,10 @@ class HeartRateAnalyzer:
             pace: 配速数据列表
 
         Returns:
-            dict: 分析结果
+            HRDriftResult: 分析结果
         """
         if not heart_rate or not pace:
-            return {"error": "数据量不足"}
+            return HRDriftResult(error="数据量不足")
 
         hr_clean = []
         pace_clean = []
@@ -47,7 +49,7 @@ class HeartRateAnalyzer:
                 pace_clean.append(p)
 
         if len(hr_clean) < 10 or len(pace_clean) < 10:
-            return {"error": "数据量不足"}
+            return HRDriftResult(error="数据量不足")
 
         try:
             hr_series = pl.Series("heart_rate", hr_clean)
@@ -76,14 +78,14 @@ class HeartRateAnalyzer:
             else:
                 assessment = "心率表现优异，状态非常好"
 
-            return {
-                "drift": round(drift, 2),
-                "drift_rate": round(drift_rate, 2),
-                "correlation": round(correlation, 3) if correlation else 0,
-                "assessment": assessment,
-            }
+            return HRDriftResult(
+                drift=round(drift, 2),
+                drift_rate=round(drift_rate, 2),
+                correlation=round(correlation, 3) if correlation else 0,
+                assessment=assessment,
+            )
         except Exception as e:
-            return {"error": f"分析失败: {str(e)}"}
+            return HRDriftResult(error=f"分析失败: {str(e)}")
 
     def analyze_hr_drift_vectorized(
         self, heart_rate: pl.Series, pace: pl.Series

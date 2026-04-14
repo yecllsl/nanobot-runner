@@ -687,4 +687,4 @@ class TestAnalyticsEngineDelegation:
 
         result = engine.analyze_hr_drift(heart_rate, pace)
 
-        assert "drift" in result or "error" in result
+        assert hasattr(result, "drift") or result.error is not None

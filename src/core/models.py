@@ -628,3 +628,47 @@ def create_default_user_preferences() -> UserPreferences:
         reminder_time="07:00",
         weather_alert_enabled=True,
     )
+
+
+@dataclass(frozen=True)
+class RunningStats:
+    """跑步统计数据"""
+
+    total_runs: int
+    total_distance: float
+    total_duration: float
+    avg_heart_rate: float
+    avg_pace: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        return {
+            "total_runs": self.total_runs,
+            "total_distance": self.total_distance,
+            "total_duration": self.total_duration,
+            "avg_heart_rate": self.avg_heart_rate,
+            "avg_pace": self.avg_pace,
+        }
+
+
+@dataclass(frozen=True)
+class HRDriftResult:
+    """心率漂移分析结果"""
+
+    drift: float = 0.0
+    drift_rate: float = 0.0
+    correlation: float = 0.0
+    assessment: str = ""
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result = {
+            "drift": self.drift,
+            "drift_rate": self.drift_rate,
+            "correlation": self.correlation,
+            "assessment": self.assessment,
+        }
+        if self.error is not None:
+            result["error"] = self.error
+        return result

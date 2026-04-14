@@ -115,10 +115,10 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_running_stats()
 
-        assert result["total_runs"] == 0
-        assert result["total_distance"] == 0.0
-        assert result["total_duration"] == 0.0
-        assert result["avg_heart_rate"] == 0.0
+        assert result.total_runs == 0
+        assert result.total_distance == 0.0
+        assert result.total_duration == 0.0
+        assert result.avg_heart_rate == 0.0
 
     def test_get_running_stats_success(
         self, stats_aggregator: StatisticsAggregator, mock_storage: MagicMock
@@ -138,10 +138,10 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_running_stats()
 
-        assert result["total_runs"] == 2
-        assert result["total_distance"] == 8.0
-        assert result["total_duration"] == round(3000.0 / 3600, 2)
-        assert "avg_pace" in result
+        assert result.total_runs == 2
+        assert result.total_distance == 8.0
+        assert result.total_duration == round(3000.0 / 3600, 2)
+        assert hasattr(result, "avg_pace")
 
     def test_get_running_stats_with_year(
         self, stats_aggregator: StatisticsAggregator, mock_storage: MagicMock
@@ -161,7 +161,7 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_running_stats(year=2026)
 
-        assert result["total_runs"] == 1
+        assert result.total_runs == 1
         mock_storage.read_parquet.assert_called_once_with([2026])
 
     def test_calculate_avg_pace_from_values_success(
@@ -296,7 +296,7 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_running_stats()
 
-        assert result["avg_heart_rate"] == 0.0
+        assert result.avg_heart_rate == 0.0
 
     def test_get_pace_distribution_with_zero_distance(
         self, stats_aggregator: StatisticsAggregator, mock_storage: MagicMock

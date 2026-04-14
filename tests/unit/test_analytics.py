@@ -170,10 +170,10 @@ class TestAnalyticsEngine:
 
         result = engine.analyze_hr_drift(heart_rate, pace)
 
-        assert "correlation" in result
-        assert "drift" in result
-        assert "assessment" in result
-        assert isinstance(result["correlation"], float)
+        assert hasattr(result, "correlation")
+        assert hasattr(result, "drift")
+        assert hasattr(result, "assessment")
+        assert isinstance(result.correlation, float)
 
     def test_analyze_hr_drift_insufficient_data(self):
         """测试数据量不足的心率漂移分析"""
@@ -184,7 +184,7 @@ class TestAnalyticsEngine:
 
         result = engine.analyze_hr_drift(heart_rate, pace)
 
-        assert result["error"] == "数据量不足"
+        assert result.error == "数据量不足"
 
     def test_analyze_hr_drift_empty_data(self):
         """测试空数据的心率漂移分析"""
@@ -192,7 +192,7 @@ class TestAnalyticsEngine:
 
         result = engine.analyze_hr_drift([], [])
 
-        assert result["error"] == "数据量不足"
+        assert result.error == "数据量不足"
 
     def test_calculate_atl_ctl_success(self):
         """测试成功计算ATL和CTL"""
@@ -336,8 +336,8 @@ class TestAnalyticsEngineAdvanced:
 
         result = engine.analyze_hr_drift(heart_rate, pace)
 
-        assert result["drift"] < 0
-        assert "assessment" in result
+        assert result.drift < 0
+        assert hasattr(result, "assessment")
 
     def test_analyze_hr_drift_with_positive_correlation(self):
         """测试正相关的心率漂移分析"""
@@ -348,7 +348,7 @@ class TestAnalyticsEngineAdvanced:
 
         result = engine.analyze_hr_drift(heart_rate, pace)
 
-        assert result["correlation"] > 0.5
+        assert result.correlation > 0.5
 
     def test_analyze_hr_drift_with_negative_correlation(self):
         """测试负相关的心率漂移分析"""
@@ -359,7 +359,7 @@ class TestAnalyticsEngineAdvanced:
 
         result = engine.analyze_hr_drift(heart_rate, pace)
 
-        assert result["correlation"] < -0.5
+        assert result.correlation < -0.5
 
     def test_calculate_atl_ctl_with_7_day_window(self):
         """测试7天窗口的ATL计算"""
@@ -548,8 +548,8 @@ class TestAnalyticsEngineAdvanced:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_running_stats(year=2024)
 
-        assert "total_runs" in result
-        assert result["total_runs"] == 2
+        assert hasattr(result, "total_runs")
+        assert result.total_runs == 2
 
     def test_get_running_stats_empty(self):
         """测试空数据统计"""
@@ -560,7 +560,7 @@ class TestAnalyticsEngineAdvanced:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_running_stats(year=2024)
 
-        assert result["total_runs"] == 0
+        assert result.total_runs == 0
 
 
 class TestTrainingLoad:

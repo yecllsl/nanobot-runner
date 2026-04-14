@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from src.core.heart_rate_analyzer import HeartRateAnalyzer
+from src.core.models import HRDriftResult, RunningStats
 from src.core.race_prediction import RacePredictionEngine
 from src.core.statistics_aggregator import StatisticsAggregator
 from src.core.training_load_analyzer import TrainingLoadAnalyzer
@@ -123,7 +124,7 @@ class AnalyticsEngine:
 
     def analyze_hr_drift(
         self, heart_rate: list[float], pace: list[float]
-    ) -> dict[str, Any]:
+    ) -> HRDriftResult:
         """
         分析心率漂移情况
 
@@ -132,7 +133,7 @@ class AnalyticsEngine:
             pace: 配速数据列表
 
         Returns:
-            dict: 分析结果
+            HRDriftResult: 分析结果
         """
         return self.heart_rate_analyzer.analyze_hr_drift(heart_rate, pace)
 
@@ -176,7 +177,7 @@ class AnalyticsEngine:
         """
         return self.training_load_analyzer.calculate_atl_ctl(tss_values)
 
-    def get_running_stats(self, year: int | None = None) -> dict[str, Any]:
+    def get_running_stats(self, year: int | None = None) -> RunningStats:
         """
         获取跑步统计数据
 
@@ -184,7 +185,7 @@ class AnalyticsEngine:
             year: 年份，不指定则统计所有数据
 
         Returns:
-            Dict[str, Any]: 统计信息字典
+            RunningStats: 统计信息
         """
         return self.statistics_aggregator.get_running_stats(year)
 

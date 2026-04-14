@@ -614,7 +614,8 @@ class RunnerTools:
             speed_values = df.select(pl.col("enhanced_speed")).to_series().to_list()
             pace_list = [1000 / s for s in speed_values if s and s > 0]
 
-        return self.analytics.analyze_hr_drift(heart_rate, pace_list)
+        result = self.analytics.analyze_hr_drift(heart_rate, pace_list)
+        return result.to_dict()
 
     def get_training_load(self, days: int = 42) -> dict[str, Any]:
         return self.analytics.get_training_load(days)

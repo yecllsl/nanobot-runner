@@ -118,17 +118,17 @@ class TestGetRunningStats:
         """测试基本统计数据"""
         stats = aggregator.get_running_stats()
 
-        assert stats["total_runs"] == 10
-        assert stats["total_distance"] == 50.0
-        assert stats["total_duration"] == 5.0
-        assert stats["avg_heart_rate"] == 150.0
+        assert stats.total_runs == 10
+        assert stats.total_distance == 50.0
+        assert stats.total_duration == 5.0
+        assert stats.avg_heart_rate == 150.0
 
     def test_get_running_stats_with_year(self, aggregator, mock_storage):
         """测试指定年份统计"""
         stats = aggregator.get_running_stats(year=2024)
 
         mock_storage.read_parquet.assert_called_once()
-        assert stats["total_runs"] == 10
+        assert stats.total_runs == 10
 
     def test_get_running_stats_empty(self):
         """测试空数据"""
@@ -138,9 +138,9 @@ class TestGetRunningStats:
 
         stats = aggregator.get_running_stats()
 
-        assert stats["total_runs"] == 0
-        assert stats["total_distance"] == 0.0
-        assert stats["total_duration"] == 0.0
+        assert stats.total_runs == 0
+        assert stats.total_distance == 0.0
+        assert stats.total_duration == 0.0
 
     def test_get_running_stats_error(self):
         """测试错误处理"""
@@ -375,7 +375,7 @@ class TestIntegration:
         pace_dist = aggregator.get_pace_distribution()
 
         assert summary.height == 1
-        assert stats["total_runs"] == 30
+        assert stats.total_runs == 30
         assert "zones" in pace_dist
 
     def test_year_filtering(self, aggregator, mock_storage):
@@ -383,5 +383,5 @@ class TestIntegration:
         stats_2024 = aggregator.get_running_stats(year=2024)
         pace_2024 = aggregator.get_pace_distribution(year=2024)
 
-        assert stats_2024["total_runs"] == 30
+        assert stats_2024.total_runs == 30
         assert "zones" in pace_2024

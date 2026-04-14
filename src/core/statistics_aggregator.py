@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from src.core.models import RunningStats
+
 if TYPE_CHECKING:
     from src.core.storage import StorageManager
 
@@ -130,7 +132,7 @@ class StatisticsAggregator:
         except Exception:
             return "0'00\""
 
-    def get_running_stats(self, year: int | None = None) -> dict[str, Any]:
+    def get_running_stats(self, year: int | None = None) -> RunningStats:
         """
         获取跑步统计数据
 
@@ -138,19 +140,20 @@ class StatisticsAggregator:
             year: 年份，不指定则统计所有数据
 
         Returns:
-            Dict[str, Any]: 统计信息字典
+            RunningStats: 统计信息
         """
         try:
             years = [year] if year else None
             lf = self.storage.read_parquet(years)
 
             if len(lf.collect_schema()) == 0:
-                return {
-                    "total_runs": 0,
-                    "total_distance": 0.0,
-                    "total_duration": 0.0,
-                    "avg_heart_rate": 0.0,
-                }
+                return RunningStats(
+                    total_runs=0,
+                    total_distance=0.0,
+                    total_duration=0.0,
+                    avg_heart_rate=0.0,
+                    avg_pace="0:00",
+                )
 
             session_df = (
                 lf.group_by("session_start_time")
@@ -165,7 +168,13 @@ class StatisticsAggregator:
             )
 
             if session_df.is_empty():
-                return {"total_runs": 0, "total_distance": 0.0, "total_duration": 0.0}
+                return RunningStats(
+                    total_runs=0,
+                    total_distance=0.0,
+                    total_duration=0.0,
+                    avg_heart_rate=0.0,
+                    avg_pace="0:00",
+                )
 
             total_runs = session_df.height
             total_distance = float(session_df["distance"].sum())
@@ -177,16 +186,15 @@ class StatisticsAggregator:
                 else 0.0
             )
 
-            stats = {
-                "total_runs": total_runs,
-                "total_distance": round(total_distance / 1000, 2),
-                "total_duration": round(total_duration / 3600, 2),
-                "avg_heart_rate": round(avg_heart_rate, 1),
-                "avg_pace": self._calculate_avg_pace_from_values(
+            return RunningStats(
+                total_runs=total_runs,
+                total_distance=round(total_distance / 1000, 2),
+                total_duration=round(total_duration / 3600, 2),
+                avg_heart_rate=round(avg_heart_rate, 1),
+                avg_pace=self._calculate_avg_pace_from_values(
                     total_distance, total_duration
                 ),
-            }
-            return stats
+            )
         except Exception as e:
             raise RuntimeError(f"获取统计数据失败: {e}") from e
 

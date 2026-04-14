@@ -28,22 +28,22 @@ class TestHeartRateAnalyzer:
         heart_rate = [150, 152, 155, 158, 160, 162, 165, 168, 170, 172, 174, 176]
         pace = [300, 298, 295, 293, 290, 288, 285, 283, 280, 278, 275, 273]
         result = hr_analyzer.analyze_hr_drift(heart_rate, pace)
-        assert "drift" in result
-        assert "drift_rate" in result
-        assert "correlation" in result
-        assert "assessment" in result
+        assert hasattr(result, "drift")
+        assert hasattr(result, "drift_rate")
+        assert hasattr(result, "correlation")
+        assert hasattr(result, "assessment")
 
     def test_analyze_hr_drift_empty_data(self, hr_analyzer):
         """测试空数据"""
         result = hr_analyzer.analyze_hr_drift([], [])
-        assert "error" in result
+        assert result.error is not None
 
     def test_analyze_hr_drift_insufficient_data(self, hr_analyzer):
         """测试数据量不足"""
         heart_rate = [150, 152]
         pace = [300, 298]
         result = hr_analyzer.analyze_hr_drift(heart_rate, pace)
-        assert "error" in result
+        assert result.error is not None
 
     def test_calculate_hr_zones(self, hr_analyzer):
         """测试心率区间计算"""
@@ -307,8 +307,8 @@ class TestHeartRateAnalyzerVectorized:
             heart_rate_series, pace_series
         )
 
-        assert abs(scalar_result["drift"] - vectorized_result["drift"]) < 0.1
-        assert abs(scalar_result["drift_rate"] - vectorized_result["drift_rate"]) < 0.1
+        assert abs(scalar_result.drift - vectorized_result["drift"]) < 0.1
+        assert abs(scalar_result.drift_rate - vectorized_result["drift_rate"]) < 0.1
 
     def test_calculate_zone_time_vectorized_basic(
         self, hr_analyzer: HeartRateAnalyzer
@@ -449,7 +449,7 @@ class TestHeartRateAnalyzerEdgeCases:
 
         # 正常情况不应该抛出异常
         result = hr_analyzer.analyze_hr_drift(heart_rate, pace)
-        assert "drift" in result or "error" in result
+        assert hasattr(result, "drift") or result.error is not None
 
     def test_analyze_hr_drift_negative_drift_rate(self, hr_analyzer):
         """测试负向心率漂移（心率下降）"""
@@ -459,10 +459,10 @@ class TestHeartRateAnalyzerEdgeCases:
 
         result = hr_analyzer.analyze_hr_drift(heart_rate, pace)
 
-        assert "drift" in result
-        assert result["drift"] < 0  # 负向漂移
-        assert result["drift_rate"] < 0
-        assert "心率表现优异" in result["assessment"]
+        assert hasattr(result, "drift")
+        assert result.drift < 0  # 负向漂移
+        assert result.drift_rate < 0
+        assert "心率表现优异" in result.assessment
 
     def test_analyze_hr_drift_vectorized_with_exception(self, hr_analyzer):
         """测试向量化心率漂移分析异常处理"""
