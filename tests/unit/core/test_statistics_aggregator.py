@@ -177,9 +177,9 @@ class TestGetPaceDistribution:
 
         result = aggregator.get_pace_distribution()
 
-        assert "zones" in result
-        assert "trend" in result
-        assert "total_count" in result
+        assert hasattr(result, "zones")
+        assert hasattr(result, "trend")
+        assert hasattr(result, "total_count")
 
     def test_get_pace_distribution_with_year(self, aggregator, mock_storage):
         """测试指定年份配速分布"""
@@ -193,7 +193,7 @@ class TestGetPaceDistribution:
         result = aggregator.get_pace_distribution(year=2024)
 
         mock_storage.read_parquet.assert_called_once()
-        assert "zones" in result
+        assert hasattr(result, "zones")
 
     def test_get_pace_distribution_empty(self):
         """测试空数据"""
@@ -203,8 +203,8 @@ class TestGetPaceDistribution:
 
         result = aggregator.get_pace_distribution()
 
-        assert result["zones"] == {}
-        assert "message" in result
+        assert result.zones == {}
+        assert hasattr(result, "message")
 
     def test_get_pace_distribution_error(self):
         """测试错误处理"""
@@ -376,7 +376,7 @@ class TestIntegration:
 
         assert summary.height == 1
         assert stats.total_runs == 30
-        assert "zones" in pace_dist
+        assert hasattr(pace_dist, "zones")
 
     def test_year_filtering(self, aggregator, mock_storage):
         """测试年份过滤"""
@@ -384,4 +384,4 @@ class TestIntegration:
         pace_2024 = aggregator.get_pace_distribution(year=2024)
 
         assert stats_2024.total_runs == 30
-        assert "zones" in pace_2024
+        assert hasattr(pace_2024, "zones")

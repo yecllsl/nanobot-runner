@@ -2003,10 +2003,10 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
 
-        assert "zones" in result
-        assert "trend" in result
-        assert "total_count" in result
-        assert result["total_count"] == 5
+        assert hasattr(result, "zones")
+        assert hasattr(result, "trend")
+        assert hasattr(result, "total_count")
+        assert result.total_count == 5
 
     def test_get_pace_distribution_empty_data(self):
         """测试空数据的配速分布"""
@@ -2018,9 +2018,9 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
 
-        assert result["zones"] == {}
-        assert result["trend"] == []
-        assert "message" in result
+        assert result.zones == {}
+        assert result.trend == []
+        assert hasattr(result, "message")
 
     def test_get_pace_distribution_with_year_filter(self):
         """测试带年份过滤的配速分布"""
@@ -2042,8 +2042,8 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution(year=2024)
 
-        assert "zones" in result
-        assert "trend" in result
+        assert hasattr(result, "zones")
+        assert hasattr(result, "trend")
         mock_storage.read_parquet.assert_called_once_with([2024])
 
     def test_get_pace_distribution_zone_classification(self):
@@ -2080,7 +2080,7 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
 
-        zones = result["zones"]
+        zones = result.zones
 
         # 验证每个区间都有数据
         assert "Z1" in zones
@@ -2129,8 +2129,8 @@ class TestPaceDistribution:
         result = engine.get_pace_distribution()
 
         # 所有跑步都在Z1区间（> 360秒/公里）
-        assert result["zones"]["Z1"]["count"] == 3
-        assert result["total_count"] == 3
+        assert result.zones["Z1"]["count"] == 3
+        assert result.total_count == 3
 
     def test_get_pace_distribution_trend_data(self):
         """测试趋势数据正确性"""
@@ -2154,7 +2154,7 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
 
-        trend = result["trend"]
+        trend = result.trend
         # 当前实现不返回趋势数据，只返回空列表
         assert len(trend) == 0
 
@@ -2185,7 +2185,7 @@ class TestPaceDistribution:
         result = engine.get_pace_distribution()
 
         # 只应该有1条有效记录
-        assert result["total_count"] == 1
+        assert result.total_count == 1
 
     def test_get_pace_distribution_performance(self):
         """测试性能要求（计算时间 < 2秒）"""
@@ -2219,7 +2219,7 @@ class TestPaceDistribution:
         elapsed_time = time.time() - start_time
 
         assert elapsed_time < 2.0, f"计算时间 {elapsed_time:.2f}秒 超过2秒限制"
-        assert result["total_count"] == 1000
+        assert result.total_count == 1000
 
     def test_get_pace_distribution_all_zones_present(self):
         """测试所有区间都存在（即使没有数据）"""
@@ -2243,7 +2243,7 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
 
-        zones = result["zones"]
+        zones = result.zones
 
         # 只有有数据的区间会存在
         assert "Z1" in zones
@@ -2291,7 +2291,7 @@ class TestPaceDistribution:
         result = engine.get_pace_distribution()
 
         # 应该在Z2区间（> 300秒/公里）
-        assert result["zones"]["Z2"]["count"] == 1
+        assert result.zones["Z2"]["count"] == 1
 
     def test_get_pace_distribution_multiple_runs_same_zone(self):
         """测试同一区间多次跑步"""
@@ -2320,7 +2320,7 @@ class TestPaceDistribution:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_pace_distribution()
 
-        assert result["zones"]["Z2"]["count"] == 3
+        assert result.zones["Z2"]["count"] == 3
 
 
 class TestTrainingLoadTrend:
@@ -3257,23 +3257,23 @@ class TestDailyReport:
         result = engine.generate_daily_report(age=30)
 
         # 验证返回结构
-        assert "date" in result
-        assert "greeting" in result
-        assert "yesterday_run" in result
-        assert "fitness_status" in result
-        assert "training_advice" in result
-        assert "weekly_plan" in result
-        assert "generated_at" in result
+        assert hasattr(result, "date")
+        assert hasattr(result, "greeting")
+        assert hasattr(result, "yesterday_run")
+        assert hasattr(result, "fitness_status")
+        assert hasattr(result, "training_advice")
+        assert hasattr(result, "weekly_plan")
+        assert hasattr(result, "generated_at")
 
         # 验证fitness_status结构
-        assert "atl" in result["fitness_status"]
-        assert "ctl" in result["fitness_status"]
-        assert "tsb" in result["fitness_status"]
-        assert "status" in result["fitness_status"]
+        assert "atl" in result.fitness_status
+        assert "ctl" in result.fitness_status
+        assert "tsb" in result.fitness_status
+        assert "status" in result.fitness_status
 
         # 验证weekly_plan是列表
-        assert isinstance(result["weekly_plan"], list)
-        assert len(result["weekly_plan"]) == 7
+        assert isinstance(result.weekly_plan, list)
+        assert len(result.weekly_plan) == 7
 
     def test_generate_daily_report_with_yesterday_run(self):
         """测试有昨日训练数据的晨报"""
@@ -3300,9 +3300,9 @@ class TestDailyReport:
         engine = AnalyticsEngine(mock_storage)
         result = engine.generate_daily_report(age=30)
 
-        assert result["yesterday_run"] is not None
-        assert result["yesterday_run"]["distance_km"] == 8.5
-        assert result["yesterday_run"]["duration_min"] == 45.0
+        assert result.yesterday_run is not None
+        assert result.yesterday_run["distance_km"] == 8.5
+        assert result.yesterday_run["duration_min"] == 45.0
 
     def test_generate_daily_report_no_yesterday_run(self):
         """测试无昨日训练数据的晨报"""
@@ -3318,7 +3318,7 @@ class TestDailyReport:
         engine = AnalyticsEngine(mock_storage)
         result = engine.generate_daily_report(age=30)
 
-        assert result["yesterday_run"] is None
+        assert result.yesterday_run is None
 
     def test_generate_greeting_morning(self):
         """测试早晨问候语"""
@@ -3706,7 +3706,7 @@ class TestDailyReport:
         elapsed_time = time.time() - start_time
 
         assert elapsed_time < 1.0, f"生成时间 {elapsed_time:.2f}秒 超过1秒限制"
-        assert "date" in result
+        assert hasattr(result, "date")
 
     def test_generate_daily_report_different_ages(self):
         """测试不同年龄的晨报生成"""
@@ -3724,8 +3724,8 @@ class TestDailyReport:
         result_25 = engine.generate_daily_report(age=25)
         result_50 = engine.generate_daily_report(age=50)
 
-        assert "date" in result_25
-        assert "date" in result_50
+        assert hasattr(result_25, "date")
+        assert hasattr(result_50, "date")
 
     def test_generate_training_advice_weekday_specific(self):
         """测试不同星期的训练建议"""
@@ -3806,15 +3806,15 @@ class TestDailyReport:
         ]
 
         for field in required_fields:
-            assert field in result, f"缺少字段: {field}"
+            assert hasattr(result, field), f"缺少字段: {field}"
 
         # 验证fitness_status子字段
         fitness_fields = ["atl", "ctl", "tsb", "status"]
         for field in fitness_fields:
-            assert field in result["fitness_status"], f"fitness_status缺少字段: {field}"
+            assert field in result.fitness_status, f"fitness_status缺少字段: {field}"
 
         # 验证weekly_plan子字段
-        for day_plan in result["weekly_plan"]:
+        for day_plan in result.weekly_plan:
             plan_fields = ["day", "date", "plan", "is_today", "is_past"]
             for field in plan_fields:
                 assert field in day_plan, f"weekly_plan项缺少字段: {field}"

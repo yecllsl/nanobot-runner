@@ -7,7 +7,14 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from src.core.heart_rate_analyzer import HeartRateAnalyzer
-from src.core.models import HRDriftResult, HRZoneResult, RunningStats
+from src.core.models import (
+    DailyReportData,
+    HRDriftResult,
+    HRZoneResult,
+    PaceDistributionResult,
+    RunningStats,
+    VdotTrendItem,
+)
 from src.core.race_prediction import RacePredictionEngine
 from src.core.statistics_aggregator import StatisticsAggregator
 from src.core.training_load_analyzer import TrainingLoadAnalyzer
@@ -237,7 +244,7 @@ class AnalyticsEngine:
         except Exception as e:
             raise ValueError(f"配速计算失败: {e}") from e
 
-    def get_vdot_trend(self, days: int = 30) -> list[dict[str, Any]]:
+    def get_vdot_trend(self, days: int = 30) -> list[VdotTrendItem]:
         """
         获取VDOT趋势数据
 
@@ -245,7 +252,7 @@ class AnalyticsEngine:
             days: 统计天数
 
         Returns:
-            List[Dict[str, Any]]: VDOT趋势数据
+            List[VdotTrendItem]: VDOT趋势数据
         """
         try:
             lf = self.storage.read_parquet()
@@ -285,15 +292,15 @@ class AnalyticsEngine:
             distance_series = df["distance_filled"]
             duration_series = df["duration_filled"]
 
-            trend_data = []
+            trend_data: list[VdotTrendItem] = []
             for i in range(df.height):
                 trend_data.append(
-                    {
-                        "date": date_series[i],
-                        "vdot": float(vdot_series[i]),
-                        "distance": float(distance_series[i]),
-                        "duration": float(duration_series[i]),
-                    }
+                    VdotTrendItem(
+                        date=date_series[i],
+                        vdot=float(vdot_series[i]),
+                        distance=float(distance_series[i]),
+                        duration=float(duration_series[i]),
+                    )
                 )
 
             return trend_data
@@ -1026,7 +1033,7 @@ class AnalyticsEngine:
             message="基于平均心率估算",
         )
 
-    def generate_daily_report(self, age: int = 30) -> dict[str, Any]:
+    def generate_daily_report(self, age: int = 30) -> DailyReportData:
         """
         生成每日晨报内容
 
@@ -1041,14 +1048,7 @@ class AnalyticsEngine:
             age: 年龄，用于计算最大心率和训练建议
 
         Returns:
-            Dict[str, Any]: 晨报内容字典，包含：
-                - date: 日期字符串
-                - greeting: 问候语
-                - yesterday_run: 昨日训练摘要（None表示无训练）
-                - fitness_status: 体能状态数据
-                - training_advice: 今日训练建议
-                - weekly_plan: 本周训练计划预览
-                - generated_at: 生成时间戳
+            DailyReportData: 晨报内容
         """
         from datetime import datetime, timedelta
 
@@ -1078,20 +1078,20 @@ class AnalyticsEngine:
         # 5. 生成本周训练计划预览
         weekly_plan = self._generate_weekly_plan(today, fitness_status, age)
 
-        return {
-            "date": date_str,
-            "greeting": greeting,
-            "yesterday_run": yesterday_run,
-            "fitness_status": {
+        return DailyReportData(
+            date=date_str,
+            greeting=greeting,
+            yesterday_run=yesterday_run,
+            fitness_status={
                 "atl": fitness_status.get("atl", 0.0),
                 "ctl": fitness_status.get("ctl", 0.0),
                 "tsb": fitness_status.get("tsb", 0.0),
                 "status": fitness_status.get("fitness_status", "数据不足"),
             },
-            "training_advice": training_advice,
-            "weekly_plan": weekly_plan,
-            "generated_at": now.isoformat(),
-        }
+            training_advice=training_advice,
+            weekly_plan=weekly_plan,
+            generated_at=now.isoformat(),
+        )
 
     def _generate_greeting(self, hour: int, weekday: int) -> str:
         """
@@ -1572,7 +1572,7 @@ class AnalyticsEngine:
             "total_runs": len(tss_records),
         }
 
-    def get_pace_distribution(self, year: int | None = None) -> dict[str, Any]:
+    def get_pace_distribution(self, year: int | None = None) -> PaceDistributionResult:
         """
         获取配速分布统计
 
@@ -1580,6 +1580,6 @@ class AnalyticsEngine:
             year: 年份，不指定则统计所有数据
 
         Returns:
-            Dict[str, Any]: 配速分布数据
+            PaceDistributionResult: 配速分布数据
         """
         return self.statistics_aggregator.get_pace_distribution(year)

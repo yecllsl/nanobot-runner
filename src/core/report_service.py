@@ -8,7 +8,7 @@ from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
 from src.core.logger import get_logger
-from src.core.models import ReportType
+from src.core.models import DailyReportData, ReportType
 from src.notify.feishu import FeishuBot
 
 if TYPE_CHECKING:
@@ -55,7 +55,7 @@ class ReportService:
 
     def generate_report(
         self, report_type: ReportType = ReportType.DAILY, age: int = 30
-    ) -> dict[str, Any]:
+    ) -> DailyReportData | dict[str, Any]:
         """
         生成报告
 
@@ -64,7 +64,7 @@ class ReportService:
             age: 年龄参数
 
         Returns:
-            dict: 报告数据
+            DailyReportData | dict: 报告数据
         """
         logger.debug(f"生成{report_type.value}报告，年龄：{age}")
 
@@ -335,7 +335,9 @@ class ReportService:
         return recommendations
 
     def push_report(
-        self, report_data: dict[str, Any], report_type: ReportType = ReportType.DAILY
+        self,
+        report_data: DailyReportData | dict[str, Any],
+        report_type: ReportType = ReportType.DAILY,
     ) -> dict[str, Any]:
         """
         推送报告
@@ -347,6 +349,12 @@ class ReportService:
         Returns:
             dict: 推送结果
         """
+        # 转换 dataclass 为字典
+        if isinstance(report_data, DailyReportData):
+            report_dict = report_data.to_dict()
+        else:
+            report_dict = report_data
+
         feishu = self._get_feishu_bot()
 
         if not feishu.auth.is_configured():
@@ -359,13 +367,13 @@ class ReportService:
 
         # 根据报告类型格式化内容
         if report_type == ReportType.DAILY:
-            content = self._format_report_content(report_data)
+            content = self._format_report_content(report_dict)
             title = "☀️ 每日跑步晨报"
         elif report_type == ReportType.WEEKLY:
-            content = self._format_weekly_report_content(report_data)
+            content = self._format_weekly_report_content(report_dict)
             title = "📊 每周跑步总结"
         elif report_type == ReportType.MONTHLY:
-            content = self._format_monthly_report_content(report_data)
+            content = self._format_monthly_report_content(report_dict)
             title = "📈 每月跑步总结"
         else:
             return {

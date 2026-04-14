@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.models import RunningStats
+from src.core.models import PaceDistributionResult, RunningStats
 
 if TYPE_CHECKING:
     from src.core.storage import StorageManager
@@ -246,7 +246,7 @@ class StatisticsAggregator:
         except Exception:
             return "0:00"
 
-    def get_pace_distribution(self, year: int | None = None) -> dict[str, Any]:
+    def get_pace_distribution(self, year: int | None = None) -> PaceDistributionResult:
         """
         获取配速分布统计
 
@@ -254,7 +254,7 @@ class StatisticsAggregator:
             year: 年份，不指定则统计所有数据
 
         Returns:
-            Dict[str, Any]: 配速分布数据
+            PaceDistributionResult: 配速分布数据
         """
         PACE_ZONES = {
             "Z1": {"min": 360, "max": float("inf"), "label": "恢复跑"},
@@ -269,7 +269,9 @@ class StatisticsAggregator:
             lf = self.storage.read_parquet(years)
 
             if len(lf.collect_schema()) == 0:
-                return {"zones": {}, "trend": [], "message": "无有效配速数据"}
+                return PaceDistributionResult(
+                    zones={}, trend=[], total_count=0, message="无有效配速数据"
+                )
 
             result = (
                 lf.with_columns(
@@ -304,7 +306,7 @@ class StatisticsAggregator:
                 .collect()
             )
 
-            zones = {}
+            zones: dict[str, dict[str, Any]] = {}
             for row in result.iter_rows(named=True):
                 zone = row["pace_zone"]
                 count = row["count"]
@@ -322,7 +324,9 @@ class StatisticsAggregator:
                         zones[zone]["count"] / total_count * 100, 2
                     )
 
-            return {"zones": zones, "trend": [], "total_count": total_count}
+            return PaceDistributionResult(
+                zones=zones, trend=[], total_count=total_count
+            )
 
         except Exception as e:
             raise RuntimeError(f"配速分布分析失败: {e}") from e

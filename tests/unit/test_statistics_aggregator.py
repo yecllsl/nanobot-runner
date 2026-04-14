@@ -205,9 +205,9 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_pace_distribution()
 
-        assert result["zones"] == {}
-        assert result["trend"] == []
-        assert "message" in result
+        assert result.zones == {}
+        assert result.trend == []
+        assert hasattr(result, "message")
 
     def test_get_pace_distribution_success(
         self, stats_aggregator: StatisticsAggregator, mock_storage: MagicMock
@@ -226,10 +226,10 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_pace_distribution()
 
-        assert "zones" in result
-        assert "trend" in result
-        assert "total_count" in result
-        assert result["total_count"] == 4
+        assert hasattr(result, "zones")
+        assert hasattr(result, "trend")
+        assert hasattr(result, "total_count")
+        assert result.total_count == 4
 
     def test_get_pace_distribution_with_year(
         self, stats_aggregator: StatisticsAggregator, mock_storage: MagicMock
@@ -248,7 +248,7 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_pace_distribution(year=2026)
 
-        assert "zones" in result
+        assert hasattr(result, "zones")
         mock_storage.read_parquet.assert_called_once_with([2026])
 
     def test_get_running_summary_runtime_error(
@@ -315,5 +315,5 @@ class TestStatisticsAggregator:
 
         result = stats_aggregator.get_pace_distribution()
 
-        assert "zones" in result
-        assert result["total_count"] == 1
+        assert hasattr(result, "zones")
+        assert result.total_count == 1

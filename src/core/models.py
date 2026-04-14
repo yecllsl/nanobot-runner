@@ -748,3 +748,68 @@ class ReportData:
         if self.error:
             result["error"] = self.error
         return result
+
+
+@dataclass(frozen=True)
+class VdotTrendItem:
+    """VDOT趋势数据项"""
+
+    date: str
+    vdot: float
+    distance: float
+    duration: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        return {
+            "date": self.date,
+            "vdot": self.vdot,
+            "distance": self.distance,
+            "duration": self.duration,
+        }
+
+
+@dataclass(frozen=True)
+class DailyReportData:
+    """每日晨报数据"""
+
+    date: str
+    greeting: str
+    yesterday_run: dict[str, Any] | None
+    fitness_status: dict[str, Any]
+    training_advice: str
+    weekly_plan: list[dict[str, Any]]
+    generated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        return {
+            "date": self.date,
+            "greeting": self.greeting,
+            "yesterday_run": self.yesterday_run,
+            "fitness_status": self.fitness_status,
+            "training_advice": self.training_advice,
+            "weekly_plan": self.weekly_plan,
+            "generated_at": self.generated_at,
+        }
+
+
+@dataclass(frozen=True)
+class PaceDistributionResult:
+    """配速分布分析结果"""
+
+    zones: dict[str, dict[str, Any]]
+    trend: list[dict[str, Any]]
+    total_count: int = 0
+    message: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result: dict[str, Any] = {
+            "zones": self.zones,
+            "trend": self.trend,
+            "total_count": self.total_count,
+        }
+        if self.message:
+            result["message"] = self.message
+        return result

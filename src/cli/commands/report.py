@@ -2,12 +2,15 @@
 # 包含 report 和 profile 命令
 
 
+from typing import Any
+
 import typer
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error, print_status
+from src.core.models import DailyReportData
 
 app = typer.Typer(help="报告和画像命令")
 profile_app = typer.Typer(help="用户画像管理")
@@ -336,17 +339,23 @@ def _display_report(report_data: dict) -> None:
         console.print(plan_table)
 
 
-def _display_weekly_report(report_data: dict) -> None:
+def _display_weekly_report(report_data: DailyReportData | dict[str, Any]) -> None:
     """
     在终端显示周报内容
 
     Args:
         report_data: 周报数据
     """
-    if "error" in report_data:
+    # 转换 dataclass 为字典
+    if isinstance(report_data, DailyReportData):
+        report_dict = report_data.to_dict()
+    else:
+        report_dict = report_data
+
+    if "error" in report_dict:
         print_error(
             {
-                "message": report_data["error"],
+                "message": report_dict["error"],
                 "suggestion": "请检查是否有跑步数据",
             }
         )
@@ -355,7 +364,7 @@ def _display_weekly_report(report_data: dict) -> None:
     console.print()
     console.print(
         Panel(
-            f"[bold]{report_data.get('date_range', '')}[/bold]\n{report_data.get('greeting', '')}",
+            f"[bold]{report_dict.get('date_range', '')}[/bold]\n{report_dict.get('greeting', '')}",
             title="[Weekly] 周报",
             border_style="blue",
         )
@@ -364,14 +373,14 @@ def _display_weekly_report(report_data: dict) -> None:
     summary_table = Table(title="本周训练统计", show_header=False)
     summary_table.add_column("指标", style="cyan")
     summary_table.add_column("数值", style="green")
-    summary_table.add_row("总次数", str(report_data.get("total_runs", 0)))
-    summary_table.add_row("总距离", f"{report_data.get('total_distance_km', 0)} km")
-    summary_table.add_row("总时长", f"{report_data.get('total_duration_min', 0)} 分钟")
-    summary_table.add_row("总TSS", f"{report_data.get('total_tss', 0)}")
-    summary_table.add_row("平均VDOT", f"{report_data.get('avg_vdot', 0)}")
+    summary_table.add_row("总次数", str(report_dict.get("total_runs", 0)))
+    summary_table.add_row("总距离", f"{report_dict.get('total_distance_km', 0)} km")
+    summary_table.add_row("总时长", f"{report_dict.get('total_duration_min', 0)} 分钟")
+    summary_table.add_row("总TSS", f"{report_dict.get('total_tss', 0)}")
+    summary_table.add_row("平均VDOT", f"{report_dict.get('avg_vdot', 0)}")
     console.print(summary_table)
 
-    training_load = report_data.get("training_load", {})
+    training_load = report_dict.get("training_load", {})
     if training_load:
         load_table = Table(title="训练负荷", show_header=False)
         load_table.add_column("指标", style="cyan")
@@ -390,7 +399,7 @@ def _display_weekly_report(report_data: dict) -> None:
         load_table.add_row("TSB (状态)", f"[{tsb_color}]{tsb}[/{tsb_color}]")
         console.print(load_table)
 
-    highlights = report_data.get("highlights", [])
+    highlights = report_dict.get("highlights", [])
     if highlights:
         console.print(
             Panel(
@@ -400,7 +409,7 @@ def _display_weekly_report(report_data: dict) -> None:
             )
         )
 
-    concerns = report_data.get("concerns", [])
+    concerns = report_dict.get("concerns", [])
     if concerns:
         console.print(
             Panel(
@@ -410,7 +419,7 @@ def _display_weekly_report(report_data: dict) -> None:
             )
         )
 
-    recommendations = report_data.get("recommendations", [])
+    recommendations = report_dict.get("recommendations", [])
     if recommendations:
         console.print(
             Panel(
@@ -421,17 +430,23 @@ def _display_weekly_report(report_data: dict) -> None:
         )
 
 
-def _display_monthly_report(report_data: dict) -> None:
+def _display_monthly_report(report_data: DailyReportData | dict[str, Any]) -> None:
     """
     在终端显示月报内容
 
     Args:
         report_data: 月报数据
     """
-    if "error" in report_data:
+    # 转换 dataclass 为字典
+    if isinstance(report_data, DailyReportData):
+        report_dict = report_data.to_dict()
+    else:
+        report_dict = report_data
+
+    if "error" in report_dict:
         print_error(
             {
-                "message": report_data["error"],
+                "message": report_dict["error"],
                 "suggestion": "请检查是否有跑步数据",
             }
         )
@@ -440,7 +455,7 @@ def _display_monthly_report(report_data: dict) -> None:
     console.print()
     console.print(
         Panel(
-            f"[bold]{report_data.get('date_range', '')}[/bold]\n{report_data.get('greeting', '')}",
+            f"[bold]{report_dict.get('date_range', '')}[/bold]\n{report_dict.get('greeting', '')}",
             title="[Monthly] 月报",
             border_style="blue",
         )
@@ -449,14 +464,14 @@ def _display_monthly_report(report_data: dict) -> None:
     summary_table = Table(title="本月训练统计", show_header=False)
     summary_table.add_column("指标", style="cyan")
     summary_table.add_column("数值", style="green")
-    summary_table.add_row("总次数", str(report_data.get("total_runs", 0)))
-    summary_table.add_row("总距离", f"{report_data.get('total_distance_km', 0)} km")
-    summary_table.add_row("总时长", f"{report_data.get('total_duration_min', 0)} 分钟")
-    summary_table.add_row("总TSS", f"{report_data.get('total_tss', 0)}")
-    summary_table.add_row("平均VDOT", f"{report_data.get('avg_vdot', 0)}")
+    summary_table.add_row("总次数", str(report_dict.get("total_runs", 0)))
+    summary_table.add_row("总距离", f"{report_dict.get('total_distance_km', 0)} km")
+    summary_table.add_row("总时长", f"{report_dict.get('total_duration_min', 0)} 分钟")
+    summary_table.add_row("总TSS", f"{report_dict.get('total_tss', 0)}")
+    summary_table.add_row("平均VDOT", f"{report_dict.get('avg_vdot', 0)}")
     console.print(summary_table)
 
-    training_load = report_data.get("training_load", {})
+    training_load = report_dict.get("training_load", {})
     if training_load:
         load_table = Table(title="训练负荷", show_header=False)
         load_table.add_column("指标", style="cyan")
@@ -475,7 +490,7 @@ def _display_monthly_report(report_data: dict) -> None:
         load_table.add_row("TSB (状态)", f"[{tsb_color}]{tsb}[/{tsb_color}]")
         console.print(load_table)
 
-    highlights = report_data.get("highlights", [])
+    highlights = report_dict.get("highlights", [])
     if highlights:
         console.print(
             Panel(
@@ -485,7 +500,7 @@ def _display_monthly_report(report_data: dict) -> None:
             )
         )
 
-    concerns = report_data.get("concerns", [])
+    concerns = report_dict.get("concerns", [])
     if concerns:
         console.print(
             Panel(
@@ -495,7 +510,7 @@ def _display_monthly_report(report_data: dict) -> None:
             )
         )
 
-    recommendations = report_data.get("recommendations", [])
+    recommendations = report_dict.get("recommendations", [])
     if recommendations:
         console.print(
             Panel(

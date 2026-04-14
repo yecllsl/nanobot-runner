@@ -508,10 +508,10 @@ class TestGetVdotTrend:
         trend = engine.get_vdot_trend(days=30)
 
         assert len(trend) == 3
-        assert all("date" in t for t in trend)
-        assert all("vdot" in t for t in trend)
-        assert all("distance" in t for t in trend)
-        assert all("duration" in t for t in trend)
+        assert all(hasattr(t, "date") for t in trend)
+        assert all(hasattr(t, "vdot") for t in trend)
+        assert all(hasattr(t, "distance") for t in trend)
+        assert all(hasattr(t, "duration") for t in trend)
 
     def test_get_vdot_trend_empty(self):
         """测试空数据的VDOT趋势"""
