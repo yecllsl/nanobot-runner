@@ -3,43 +3,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import Any
 
 from src.core.logger import get_logger
+from src.core.models import FitnessLevel, PlanType, TrainingType
 
 logger = get_logger(__name__)
-
-
-class PlanType(Enum):
-    """训练计划类型"""
-
-    BASE = "基础期"  # 打有氧基础
-    BUILD = "进展期"  # 提升专项能力
-    PEAK = "巅峰期"  # 赛前冲刺
-    RACE = "比赛期"  # 比赛周
-    RECOVERY = "恢复期"  # 赛后恢复
-
-
-class WorkoutType(Enum):
-    """训练课类型"""
-
-    EASY = "轻松跑"  # 有氧恢复
-    LONG = "长距离跑"  # 耐力训练
-    TEMPO = "节奏跑"  # 乳酸阈值训练
-    INTERVAL = "间歇跑"  # 最大摄氧量训练
-    RECOVERY = "恢复跑"  # 主动恢复
-    REST = "休息"  # 完全休息
-    CROSS = "交叉训练"  # 力量/游泳/骑行
-
-
-class FitnessLevel(Enum):
-    """体能水平"""
-
-    BEGINNER = "初学者"  # VDOT < 30
-    INTERMEDIATE = "中级"  # VDOT 30-44
-    ADVANCED = "进阶"  # VDOT 45-59
-    ELITE = "精英"  # VDOT >= 60
 
 
 @dataclass
@@ -47,7 +16,7 @@ class DailyPlan:
     """单日训练计划"""
 
     date: str  # 日期 (YYYY-MM-DD)
-    workout_type: WorkoutType  # 训练类型
+    workout_type: TrainingType  # 训练类型
     distance_km: float  # 距离 (公里)
     duration_min: int  # 预计时长 (分钟)
     target_pace_min_per_km: float | None = None  # 目标配速 (分钟/公里)
@@ -159,7 +128,7 @@ class TrainingPlan:
             for day_data in week_data.get("daily_plans", []):
                 daily_plan = DailyPlan(
                     date=day_data["date"],
-                    workout_type=WorkoutType(day_data["workout_type"]),
+                    workout_type=TrainingType(day_data["workout_type"]),
                     distance_km=day_data["distance_km"],
                     duration_min=day_data["duration_min"],
                     target_pace_min_per_km=day_data.get("target_pace_min_per_km"),
@@ -609,20 +578,20 @@ class TrainingPlanEngine:
         # 生成一周 7 天的训练计划（周一为休息日）
         daily_arrangements = [
             # (训练类型，距离系数，心率区间，备注)
-            (WorkoutType.REST, 0, None, "完全休息日"),  # 周一
-            (WorkoutType.EASY, easy_distance * 0.25, 2, "轻松有氧跑"),  # 周二
-            (WorkoutType.TEMPO, tempo_distance, 3, "节奏跑训练"),  # 周三
-            (WorkoutType.EASY, easy_distance * 0.25, 2, "恢复性轻松跑"),  # 周四
-            (WorkoutType.INTERVAL, interval_distance, 4, "间歇跑训练"),  # 周五
-            (WorkoutType.LONG, long_distance, 2, "长距离耐力跑"),  # 周六
-            (WorkoutType.EASY, easy_distance * 0.50, 2, "周末轻松跑"),  # 周日
+            (TrainingType.REST, 0, None, "完全休息日"),  # 周一
+            (TrainingType.EASY, easy_distance * 0.25, 2, "轻松有氧跑"),  # 周二
+            (TrainingType.TEMPO, tempo_distance, 3, "节奏跑训练"),  # 周三
+            (TrainingType.EASY, easy_distance * 0.25, 2, "恢复性轻松跑"),  # 周四
+            (TrainingType.INTERVAL, interval_distance, 4, "间歇跑训练"),  # 周五
+            (TrainingType.LONG, long_distance, 2, "长距离耐力跑"),  # 周六
+            (TrainingType.EASY, easy_distance * 0.50, 2, "周末轻松跑"),  # 周日
         ]
 
         # 处理交叉训练
         if cross_distance > 0:
             # 将周四改为交叉训练
             daily_arrangements[3] = (
-                WorkoutType.CROSS,
+                TrainingType.CROSS,
                 cross_distance,
                 None,
                 "交叉训练（力量/游泳/骑行）",
@@ -633,7 +602,7 @@ class TrainingPlanEngine:
         total_duration = 0
 
         for workout_type, distance_coef, hr_zone, notes in daily_arrangements:
-            if workout_type == WorkoutType.REST:
+            if workout_type == TrainingType.REST:
                 # 休息日
                 daily_plan = DailyPlan(
                     date=current_date.strftime("%Y-%m-%d"),
@@ -693,7 +662,7 @@ class TrainingPlanEngine:
                 return plan_type
         return PlanType.BASE
 
-    def _calculate_target_pace(self, vdot: float, workout_type: WorkoutType) -> float:
+    def _calculate_target_pace(self, vdot: float, workout_type: TrainingType) -> float:
         """
         根据 VDOT 和训练类型计算目标配速
 
@@ -710,13 +679,13 @@ class TrainingPlanEngine:
 
         # 根据训练类型调整
         pace_multipliers = {
-            WorkoutType.EASY: 1.2,  # 轻松跑比比赛配速慢 20%
-            WorkoutType.LONG: 1.15,  # 长距离慢 15%
-            WorkoutType.TEMPO: 0.95,  # 节奏跑快 5%
-            WorkoutType.INTERVAL: 0.90,  # 间歇跑快 10%
-            WorkoutType.RECOVERY: 1.4,  # 恢复跑慢 40%
-            WorkoutType.REST: 1.0,  # 休息日不适用
-            WorkoutType.CROSS: 1.0,  # 交叉训练不适用
+            TrainingType.EASY: 1.2,  # 轻松跑比比赛配速慢 20%
+            TrainingType.LONG: 1.15,  # 长距离慢 15%
+            TrainingType.TEMPO: 0.95,  # 节奏跑快 5%
+            TrainingType.INTERVAL: 0.90,  # 间歇跑快 10%
+            TrainingType.RECOVERY: 1.4,  # 恢复跑慢 40%
+            TrainingType.REST: 1.0,  # 休息日不适用
+            TrainingType.CROSS: 1.0,  # 交叉训练不适用
         }
 
         multiplier = pace_multipliers.get(workout_type, 1.0)
@@ -806,7 +775,7 @@ class TrainingPlanEngine:
 
         # 应用调整到每日计划
         for daily_plan in week_schedule.daily_plans:
-            if daily_plan.workout_type in [WorkoutType.REST, WorkoutType.RECOVERY]:
+            if daily_plan.workout_type in [TrainingType.REST, TrainingType.RECOVERY]:
                 # 休息日和恢复跑不调整
                 continue
 

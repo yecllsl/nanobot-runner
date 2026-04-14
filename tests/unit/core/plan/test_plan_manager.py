@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.plan.plan_manager import (
     PlanManager,
     PlanManagerError,
@@ -14,11 +15,8 @@ from src.core.plan.plan_manager import (
 )
 from src.core.training_plan import (
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     WeeklySchedule,
-    WorkoutType,
 )
 
 
@@ -26,7 +24,7 @@ def create_test_plan(plan_id: str) -> TrainingPlan:
     """创建测试训练计划"""
     daily_plan = DailyPlan(
         date="2026-04-10",
-        workout_type=WorkoutType.EASY,
+        workout_type=TrainingType.EASY,
         distance_km=5.0,
         duration_min=30,
     )

@@ -6,13 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.training_plan import (
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     WeeklySchedule,
-    WorkoutType,
 )
 from src.notify.feishu_calendar import (
     CalendarEventCreateRequest,
@@ -361,7 +359,7 @@ class TestFeishuCalendarSync:
             if i == 0:  # 周一休息
                 daily_plan = DailyPlan(
                     date=day_date.strftime("%Y-%m-%d"),
-                    workout_type=WorkoutType.REST,
+                    workout_type=TrainingType.REST,
                     distance_km=0.0,
                     duration_min=0,
                     notes="休息日",
@@ -369,7 +367,7 @@ class TestFeishuCalendarSync:
             else:
                 daily_plan = DailyPlan(
                     date=day_date.strftime("%Y-%m-%d"),
-                    workout_type=WorkoutType.EASY,
+                    workout_type=TrainingType.EASY,
                     distance_km=5.0 + i,
                     duration_min=30 + i * 5,
                     target_hr_zone=2,
@@ -404,7 +402,7 @@ class TestFeishuCalendarSync:
         """测试构建日历事件"""
         daily_plan = DailyPlan(
             date="2024-01-01",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.0,
             duration_min=60,
             target_hr_zone=2,
@@ -415,14 +413,14 @@ class TestFeishuCalendarSync:
         event = sync_service.build_calendar_event(daily_plan, date)
 
         assert "🏃" in event.summary
-        assert "轻松跑" in event.summary
+        assert "easy" in event.summary
         assert "10.00" in event.summary and "公里" in event.summary
         assert event.start_time.hour == 6
         assert event.start_time.minute == 0
         assert event.end_time.hour == 7
         assert event.end_time.minute == 0
         assert event.description is not None
-        assert "训练类型：轻松跑" in event.description
+        assert "训练类型：easy" in event.description
         assert "目标距离：10.0 km" in event.description
         assert "目标时长：60 分钟" in event.description
         assert len(event.reminders) == 1
@@ -441,7 +439,7 @@ class TestFeishuCalendarSync:
 
         daily_plan = DailyPlan(
             date="2024-01-01",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.0,
             duration_min=60,
         )
@@ -464,7 +462,7 @@ class TestFeishuCalendarSync:
 
         daily_plan = DailyPlan(
             date="2024-01-01",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.0,
             duration_min=60,
         )
@@ -546,7 +544,7 @@ class TestFeishuCalendarSync:
 
         daily_plan = DailyPlan(
             date="2024-01-01",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.0,
             duration_min=60,
         )
@@ -565,7 +563,7 @@ class TestFeishuCalendarSync:
 
         daily_plan = DailyPlan(
             date="2024-01-01",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.0,
             duration_min=60,
         )
@@ -582,7 +580,7 @@ class TestFeishuCalendarSync:
 
         daily_plan = DailyPlan(
             date="2024-01-01",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.0,
             duration_min=60,
         )
@@ -670,7 +668,7 @@ class TestIntegration:
                 day_date = today + timedelta(days=i)
                 daily_plan = DailyPlan(
                     date=day_date.strftime("%Y-%m-%d"),
-                    workout_type=WorkoutType.EASY,
+                    workout_type=TrainingType.EASY,
                     distance_km=5.0 + i,
                     duration_min=30 + i * 5,
                 )

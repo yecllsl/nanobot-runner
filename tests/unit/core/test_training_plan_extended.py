@@ -3,13 +3,11 @@
 
 from datetime import datetime
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.training_plan import (
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     WeeklySchedule,
-    WorkoutType,
 )
 
 
@@ -20,7 +18,7 @@ class TestDailyPlanExtended:
         """测试所有可选字段"""
         plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=10.5,
             duration_min=60,
             target_pace_min_per_km=5.5,
@@ -36,7 +34,7 @@ class TestDailyPlanExtended:
         )
 
         assert plan.date == "2026-04-10"
-        assert plan.workout_type == WorkoutType.EASY
+        assert plan.workout_type == TrainingType.EASY
         assert plan.distance_km == 10.5
         assert plan.duration_min == 60
         assert plan.target_pace_min_per_km == 5.5
@@ -54,7 +52,7 @@ class TestDailyPlanExtended:
         """测试包含None值的字典转换"""
         plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -73,13 +71,13 @@ class TestDailyPlanExtended:
     def test_daily_plan_all_workout_types(self):
         """测试所有训练类型"""
         workout_types = [
-            WorkoutType.EASY,
-            WorkoutType.LONG,
-            WorkoutType.TEMPO,
-            WorkoutType.INTERVAL,
-            WorkoutType.RECOVERY,
-            WorkoutType.REST,
-            WorkoutType.CROSS,
+            TrainingType.EASY,
+            TrainingType.LONG,
+            TrainingType.TEMPO,
+            TrainingType.INTERVAL,
+            TrainingType.RECOVERY,
+            TrainingType.REST,
+            TrainingType.CROSS,
         ]
 
         for workout_type in workout_types:
@@ -100,7 +98,7 @@ class TestWeeklyScheduleExtended:
         daily_plans = [
             DailyPlan(
                 date=f"2026-04-{10 + i:02d}",
-                workout_type=WorkoutType.EASY,
+                workout_type=TrainingType.EASY,
                 distance_km=5.0,
                 duration_min=30,
             )
@@ -132,7 +130,7 @@ class TestWeeklyScheduleExtended:
         daily_plans = [
             DailyPlan(
                 date="2026-04-10",
-                workout_type=WorkoutType.EASY,
+                workout_type=TrainingType.EASY,
                 distance_km=5.0,
                 duration_min=30,
             )
@@ -168,7 +166,7 @@ class TestTrainingPlanExtended:
         """测试训练计划创建"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -207,7 +205,7 @@ class TestTrainingPlanExtended:
         """测试训练计划字典转换"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -235,8 +233,8 @@ class TestTrainingPlanExtended:
 
         assert result["plan_id"] == "plan_001"
         assert result["user_id"] == "user_001"
-        assert result["plan_type"] == "基础期"
-        assert result["fitness_level"] == "中级"
+        assert result["plan_type"] == "base"
+        assert result["fitness_level"] == "intermediate"
         assert result["start_date"] == "2026-04-10"
         assert result["end_date"] == "2026-04-30"
         assert result["goal_distance_km"] == 21.2  # 四舍五入
@@ -251,8 +249,8 @@ class TestTrainingPlanExtended:
         data = {
             "plan_id": "plan_001",
             "user_id": "user_001",
-            "plan_type": "基础期",
-            "fitness_level": "中级",
+            "plan_type": "base",
+            "fitness_level": "intermediate",
             "start_date": "2026-04-10",
             "end_date": "2026-04-30",
             "goal_distance_km": 21.1,
@@ -265,12 +263,12 @@ class TestTrainingPlanExtended:
                     "daily_plans": [
                         {
                             "date": "2026-04-10",
-                            "workout_type": "轻松跑",
+                            "workout_type": "easy",
                             "distance_km": 5.0,
                             "duration_min": 30,
                             "target_pace_min_per_km": 6.0,
                             "target_hr_zone": 2,
-                            "notes": "轻松跑",
+                            "notes": "easy run",
                             "completed": False,
                             "actual_distance_km": None,
                             "actual_duration_min": None,
@@ -311,8 +309,8 @@ class TestTrainingPlanExtended:
         data = {
             "plan_id": "plan_001",
             "user_id": "user_001",
-            "plan_type": "基础期",
-            "fitness_level": "中级",
+            "plan_type": "base",
+            "fitness_level": "intermediate",
             "start_date": "2026-04-10",
             "end_date": "2026-04-30",
             "goal_distance_km": 21.1,
@@ -379,7 +377,7 @@ class TestTrainingPlanSerialization:
         """测试序列化往返"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.5,
             duration_min=35,
             target_pace_min_per_km=5.5,

@@ -6,44 +6,16 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.core.logger import get_logger
+from src.core.models import FitnessLevel, InjuryRiskLevel, TrainingPattern
 
 if TYPE_CHECKING:
     from src.core.storage import StorageManager
 
 logger = get_logger(__name__)
-
-
-class FitnessLevel(Enum):
-    """体能水平枚举"""
-
-    BEGINNER = "beginner"
-    INTERMEDIATE = "intermediate"
-    ADVANCED = "advanced"
-    ELITE = "elite"
-
-
-class TrainingPattern(Enum):
-    """训练模式枚举"""
-
-    REST = "休息型"  # 周跑量 < 10km
-    LIGHT = "轻松型"  # 周跑量 10-30km
-    MODERATE = "适度型"  # 周跑量 30-50km
-    INTENSE = "高强度型"  # 周跑量 50-80km
-    EXTREME = "极限型"  # 周跑量 >= 80km
-
-
-class InjuryRiskLevel(Enum):
-    """伤病风险等级枚举"""
-
-    LOW = "低"  # 风险评分 < 30
-    MEDIUM = "中"  # 风险评分 30-60
-    HIGH = "高"  # 风险评分 60-80
-    VERY_HIGH = "极高"  # 风险评分 > 80
 
 
 @dataclass
@@ -193,7 +165,7 @@ class ProfileStorageManager:
         profile.weekly_avg_distance_km = data.get("weekly_avg_distance_km", 0.0)
         profile.weekly_avg_duration_hours = data.get("weekly_avg_duration_hours", 0.0)
 
-        pattern_str = data.get("training_pattern", "休息型")
+        pattern_str = data.get("training_pattern", "rest")
         profile.training_pattern = (
             TrainingPattern(pattern_str)
             if pattern_str in [e.value for e in TrainingPattern]

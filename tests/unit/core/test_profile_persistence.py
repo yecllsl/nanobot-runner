@@ -105,7 +105,7 @@ class TestSaveProfileJson:
         assert data["total_activities"] == 10
         assert data["total_distance_km"] == 100.0
         assert data["avg_vdot"] == 45.5
-        assert data["fitness_level"] == "中级"
+        assert data["fitness_level"] == "intermediate"
         assert "updated_at" in data
 
     def test_save_profile_json_with_all_fields(self, manager):
@@ -149,7 +149,7 @@ class TestSaveProfileJson:
         assert data["user_id"] == "complete_user"
         assert data["total_activities"] == 50
         assert data["avg_heart_rate"] == 150.0
-        assert data["training_pattern"] == "适度型"
+        assert data["training_pattern"] == "moderate"
         assert data["notes"] == ["note1", "note2"]
 
     def test_save_profile_json_overwrite(self, manager):
@@ -592,9 +592,9 @@ class TestDictToProfile:
             "profile_date": datetime.now().isoformat(),
             "total_activities": 10,
             "total_distance_km": 100.0,
-            "fitness_level": "中级",
-            "training_pattern": "轻松型",
-            "injury_risk_level": "低",
+            "fitness_level": "intermediate",
+            "training_pattern": "light",
+            "injury_risk_level": "low",
         }
 
         profile = manager._dict_to_profile(data)

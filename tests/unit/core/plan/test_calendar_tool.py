@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.plan.calendar_tool import (
     CalendarTool,
     HealthCheckItem,
@@ -14,11 +15,8 @@ from src.core.plan.calendar_tool import (
 )
 from src.core.training_plan import (
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     WeeklySchedule,
-    WorkoutType,
 )
 from src.notify.feishu_calendar import CalendarSyncConfig
 
@@ -27,7 +25,7 @@ def create_test_plan(plan_id: str) -> TrainingPlan:
     """创建测试训练计划"""
     daily_plan = DailyPlan(
         date="2026-04-10",
-        workout_type=WorkoutType.EASY,
+        workout_type=TrainingType.EASY,
         distance_km=5.0,
         duration_min=30,
     )
@@ -147,7 +145,7 @@ class TestOptimisticUpdate:
         """测试乐观更新上下文创建"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -167,7 +165,7 @@ class TestOptimisticUpdate:
         """测试回滚数据存储"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
             event_id="original_event",
@@ -279,7 +277,7 @@ class TestSyncDailyWorkout:
         """测试创建单日训练"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -303,7 +301,7 @@ class TestSyncDailyWorkout:
         """测试更新模式下无event_id"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )

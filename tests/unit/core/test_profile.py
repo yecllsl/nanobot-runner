@@ -65,9 +65,9 @@ class TestRunnerProfile:
         assert result["total_activities"] == 10
         assert result["total_distance_km"] == 100.0
         assert result["avg_vdot"] == 40.0
-        assert result["fitness_level"] == "中级"
-        assert result["training_pattern"] == "轻松型"
-        assert result["injury_risk_level"] == "低"
+        assert result["fitness_level"] == "intermediate"
+        assert result["training_pattern"] == "light"
+        assert result["injury_risk_level"] == "low"
         assert "profile_date" in result
         assert "notes" in result
         assert isinstance(result["notes"], list)
@@ -94,10 +94,10 @@ class TestFitnessLevel:
 
     def test_fitness_level_values(self):
         """测试体能水平枚举值"""
-        assert FitnessLevel.BEGINNER.value == "初学者"
-        assert FitnessLevel.INTERMEDIATE.value == "中级"
-        assert FitnessLevel.ADVANCED.value == "进阶"
-        assert FitnessLevel.ELITE.value == "精英"
+        assert FitnessLevel.BEGINNER.value == "beginner"
+        assert FitnessLevel.INTERMEDIATE.value == "intermediate"
+        assert FitnessLevel.ADVANCED.value == "advanced"
+        assert FitnessLevel.ELITE.value == "elite"
 
 
 class TestTrainingPattern:
@@ -105,11 +105,11 @@ class TestTrainingPattern:
 
     def test_training_pattern_values(self):
         """测试训练模式枚举值"""
-        assert TrainingPattern.REST.value == "休息型"
-        assert TrainingPattern.LIGHT.value == "轻松型"
-        assert TrainingPattern.MODERATE.value == "适度型"
-        assert TrainingPattern.INTENSE.value == "高强度型"
-        assert TrainingPattern.EXTREME.value == "极限型"
+        assert TrainingPattern.REST.value == "rest"
+        assert TrainingPattern.LIGHT.value == "light"
+        assert TrainingPattern.MODERATE.value == "moderate"
+        assert TrainingPattern.INTENSE.value == "intense"
+        assert TrainingPattern.EXTREME.value == "extreme"
 
 
 class TestInjuryRiskLevel:
@@ -117,9 +117,9 @@ class TestInjuryRiskLevel:
 
     def test_injury_risk_level_values(self):
         """测试伤病风险枚举值"""
-        assert InjuryRiskLevel.LOW.value == "低"
-        assert InjuryRiskLevel.MEDIUM.value == "中"
-        assert InjuryRiskLevel.HIGH.value == "高"
+        assert InjuryRiskLevel.LOW.value == "low"
+        assert InjuryRiskLevel.MEDIUM.value == "medium"
+        assert InjuryRiskLevel.HIGH.value == "high"
 
 
 class TestProfileEngine:
@@ -267,7 +267,7 @@ class TestProfileEngine:
         result = engine.calculate_injury_risk(profile, age=30, resting_hr=60)
 
         assert result["risk_score"] < 30
-        assert result["risk_level"] == "低"
+        assert result["risk_level"] == "low"
         assert isinstance(result["risk_factors"], list)
         assert isinstance(result["recommendations"], list)
 
@@ -286,7 +286,7 @@ class TestProfileEngine:
         result = engine.calculate_injury_risk(profile, age=35, resting_hr=60)
 
         assert 30 <= result["risk_score"] < 60
-        assert result["risk_level"] == "中"
+        assert result["risk_level"] == "medium"
 
     def test_calculate_injury_risk_high_risk(self, engine):
         """测试高风险伤病风险评估"""
@@ -303,7 +303,7 @@ class TestProfileEngine:
         result = engine.calculate_injury_risk(profile, age=55, resting_hr=60)
 
         assert result["risk_score"] >= 60
-        assert result["risk_level"] == "高"
+        assert result["risk_level"] == "high"
         assert len(result["risk_factors"]) > 0
 
     def test_calculate_injury_risk_invalid_age(self, engine):

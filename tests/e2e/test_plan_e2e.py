@@ -8,15 +8,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.plan.calendar_tool import CalendarTool, SyncMode
 from src.core.plan.plan_manager import PlanManager, PlanStatus
 from src.core.training_plan import (
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     WeeklySchedule,
-    WorkoutType,
 )
 from src.notify.feishu_calendar import SyncResult
 
@@ -26,7 +24,7 @@ def create_e2e_plan(plan_id: str, with_event_id: bool = False) -> TrainingPlan:
     daily_plans = [
         DailyPlan(
             date=f"2026-04-{10 + i:02d}",
-            workout_type=WorkoutType.EASY if i % 2 == 0 else WorkoutType.LONG,
+            workout_type=TrainingType.EASY if i % 2 == 0 else TrainingType.LONG,
             distance_km=5.0 + i,
             duration_min=30 + i * 5,
             event_id=f"event_{i}" if with_event_id else None,

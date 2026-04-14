@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 
-class PlanStatus(Enum):
+class PlanStatus(StrEnum):
     """训练计划状态"""
 
     DRAFT = "draft"
@@ -22,15 +22,123 @@ class PlanStatus(Enum):
     CANCELLED = "cancelled"
 
 
-class TrainingType(Enum):
+class FitnessLevel(StrEnum):
+    """体能水平"""
+
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+    ELITE = "elite"
+
+    @property
+    def label(self) -> str:
+        """中文标签"""
+        labels = {
+            "beginner": "初学者",
+            "intermediate": "中级",
+            "advanced": "进阶",
+            "elite": "精英",
+        }
+        return labels[self.value]
+
+
+class PlanType(StrEnum):
+    """训练计划类型"""
+
+    BASE = "base"
+    BUILD = "build"
+    PEAK = "peak"
+    RACE = "race"
+    RECOVERY = "recovery"
+
+    @property
+    def label(self) -> str:
+        """中文标签"""
+        labels = {
+            "base": "基础期",
+            "build": "进展期",
+            "peak": "巅峰期",
+            "race": "比赛期",
+            "recovery": "恢复期",
+        }
+        return labels[self.value]
+
+
+class TrainingType(StrEnum):
     """训练类型"""
 
-    EASY_RUN = "轻松跑"
-    TEMPO_RUN = "节奏跑"
-    INTERVAL = "间歇跑"
-    LONG_RUN = "长距离跑"
-    RECOVERY = "恢复跑"
-    REST = "休息"
+    EASY = "easy"
+    LONG = "long"
+    TEMPO = "tempo"
+    INTERVAL = "interval"
+    RECOVERY = "recovery"
+    REST = "rest"
+    CROSS = "cross"
+
+    @property
+    def label(self) -> str:
+        """中文标签"""
+        labels = {
+            "easy": "轻松跑",
+            "long": "长距离跑",
+            "tempo": "节奏跑",
+            "interval": "间歇跑",
+            "recovery": "恢复跑",
+            "rest": "休息",
+            "cross": "交叉训练",
+        }
+        return labels[self.value]
+
+
+class ReportType(StrEnum):
+    """报告类型"""
+
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    TRAINING_CYCLE = "training_cycle"
+
+
+class TrainingPattern(StrEnum):
+    """训练模式"""
+
+    REST = "rest"
+    LIGHT = "light"
+    MODERATE = "moderate"
+    INTENSE = "intense"
+    EXTREME = "extreme"
+
+    @property
+    def label(self) -> str:
+        """中文标签"""
+        labels = {
+            "rest": "休息型",
+            "light": "轻松型",
+            "moderate": "适度型",
+            "intense": "高强度型",
+            "extreme": "极限型",
+        }
+        return labels[self.value]
+
+
+class InjuryRiskLevel(StrEnum):
+    """伤病风险等级"""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+
+    @property
+    def label(self) -> str:
+        """中文标签"""
+        labels = {
+            "low": "低",
+            "medium": "中",
+            "high": "高",
+            "very_high": "极高",
+        }
+        return labels[self.value]
 
 
 class DimensionType(Enum):

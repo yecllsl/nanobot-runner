@@ -2,7 +2,6 @@
 # 封装晨报、周报、月报生成、推送和定时调度逻辑
 
 from datetime import datetime, timedelta
-from enum import StrEnum
 from typing import Any
 
 from nanobot.cron.service import CronService
@@ -11,18 +10,11 @@ from nanobot.cron.types import CronSchedule
 from src.core.analytics import AnalyticsEngine
 from src.core.config import ConfigManager
 from src.core.logger import get_logger
+from src.core.models import ReportType
 from src.core.storage import StorageManager
 from src.notify.feishu import FeishuBot
 
 logger = get_logger(__name__)
-
-
-class ReportType(StrEnum):
-    """报告类型枚举"""
-
-    DAILY = "daily"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
 
 
 class ReportService:

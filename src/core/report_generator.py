@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -12,17 +11,10 @@ import polars as pl
 from src.core.analytics import AnalyticsEngine
 from src.core.config import ConfigManager
 from src.core.logger import get_logger
+from src.core.models import ReportType
 from src.core.storage import StorageManager
 
 logger = get_logger(__name__)
-
-
-class ReportType(Enum):
-    """报告类型枚举"""
-
-    WEEKLY = "weekly"  # 周报
-    MONTHLY = "monthly"  # 月报
-    TRAINING_CYCLE = "training_cycle"  # 训练周期报告
 
 
 @dataclass

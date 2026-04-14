@@ -17,6 +17,7 @@ import polars as pl
 from src.core.anomaly_data_filter import AnomalyDataFilter
 from src.core.injury_risk_analyzer import InjuryRiskAnalyzer
 from src.core.logger import get_logger
+from src.core.models import FitnessLevel
 from src.core.training_history_analyzer import TrainingHistoryAnalyzer
 from src.core.user_profile_manager import (
     InjuryRiskLevel,
@@ -305,13 +306,13 @@ class ProfileStorageManager:
             profile_date = datetime.fromisoformat(profile_date_str)
 
             # 处理枚举
-            fitness_level_str = profile_data.get("fitness_level", "初学者")
+            fitness_level_str = profile_data.get("fitness_level", "beginner")
             fitness_level = FitnessLevel(fitness_level_str)
 
-            training_pattern_str = profile_data.get("training_pattern", "休息型")
+            training_pattern_str = profile_data.get("training_pattern", "rest")
             training_pattern = TrainingPattern(training_pattern_str)
 
-            injury_risk_level_str = profile_data.get("injury_risk_level", "低")
+            injury_risk_level_str = profile_data.get("injury_risk_level", "low")
             injury_risk_level = InjuryRiskLevel(injury_risk_level_str)
 
             # 创建对象
@@ -541,15 +542,6 @@ class ProfileStorageManager:
 
         logger.info("双向同步成功")
         return True
-
-
-class FitnessLevel(Enum):
-    """体能水平等级"""
-
-    BEGINNER = "初学者"  # VDOT < 30
-    INTERMEDIATE = "中级"  # VDOT 30-45
-    ADVANCED = "进阶"  # VDOT 45-60
-    ELITE = "精英"  # VDOT >= 60
 
 
 class ProfileStaleStatus(Enum):

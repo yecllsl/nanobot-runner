@@ -89,8 +89,8 @@ class TestRunnerProfile:
         assert result["total_activities"] == 50
         assert result["total_distance_km"] == 500.0
         assert result["fitness_level"] == "intermediate"
-        assert result["training_pattern"] == "轻松型"
-        assert result["injury_risk_level"] == "低"
+        assert result["training_pattern"] == "light"
+        assert result["injury_risk_level"] == "low"
 
 
 class TestProfileStorageManager:

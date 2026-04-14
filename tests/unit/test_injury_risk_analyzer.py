@@ -164,7 +164,7 @@ class TestInjuryRiskAnalyzer:
         summary = injury_analyzer.get_risk_summary(sample_profile)
 
         assert summary["risk_score"] == 35.0
-        assert summary["risk_level"] == "中"
+        assert summary["risk_level"] == "medium"
         assert summary["atl"] == sample_profile.atl
         assert summary["ctl"] == sample_profile.ctl
         assert summary["tsb"] == sample_profile.tsb

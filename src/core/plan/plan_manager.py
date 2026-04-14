@@ -4,23 +4,13 @@
 import json
 import logging
 from datetime import datetime
-from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from src.core.models import PlanStatus
 from src.core.training_plan import TrainingPlan
 
 logger = logging.getLogger(__name__)
-
-
-class PlanStatus(StrEnum):
-    """训练计划状态"""
-
-    DRAFT = "draft"  # 草稿
-    ACTIVE = "active"  # 激活中
-    PAUSED = "paused"  # 已暂停
-    COMPLETED = "completed"  # 已完成
-    CANCELLED = "cancelled"  # 已取消
 
 
 class PlanStatusTransition:

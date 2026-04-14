@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.plan.calendar_tool import (
     CalendarTool,
     HealthCheckItem,
@@ -13,11 +14,8 @@ from src.core.plan.calendar_tool import (
 )
 from src.core.training_plan import (
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     WeeklySchedule,
-    WorkoutType,
 )
 from src.notify.feishu_calendar import SyncResult
 
@@ -26,7 +24,7 @@ def create_test_plan(plan_id: str, with_event_id: bool = False) -> TrainingPlan:
     """创建测试训练计划"""
     daily_plan = DailyPlan(
         date="2026-04-10",
-        workout_type=WorkoutType.EASY,
+        workout_type=TrainingType.EASY,
         distance_km=5.0,
         duration_min=30,
         event_id="event_123" if with_event_id else None,
@@ -166,7 +164,7 @@ class TestOptimisticUpdateExtended:
         plan = create_test_plan("test_plan")
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -194,7 +192,7 @@ class TestOptimisticUpdateExtended:
         plan = create_test_plan("test_plan")
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
             event_id="original_event",
@@ -223,7 +221,7 @@ class TestOptimisticUpdateExtended:
         plan = create_test_plan("test_plan")
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )
@@ -333,7 +331,7 @@ class TestSyncDailyWorkoutExtended:
         """TC-M5-018: 同步单日训练-UPDATE"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
             event_id="event_123",
@@ -358,7 +356,7 @@ class TestSyncDailyWorkoutExtended:
         """TC-M5-019: 同步单日训练-DELETE"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
             event_id="event_123",
@@ -385,7 +383,7 @@ class TestSyncDailyWorkoutExtended:
         """同步单日训练删除-无event_id"""
         daily_plan = DailyPlan(
             date="2026-04-10",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
         )

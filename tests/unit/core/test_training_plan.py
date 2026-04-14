@@ -5,15 +5,13 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.training_plan import (
     PHASE_CONFIG,
     DailyPlan,
-    FitnessLevel,
-    PlanType,
     TrainingPlan,
     TrainingPlanEngine,
     WeeklySchedule,
-    WorkoutType,
 )
 
 
@@ -24,7 +22,7 @@ class TestDailyPlan:
         """测试创建单日训练计划"""
         plan = DailyPlan(
             date="2024-01-15",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.0,
             duration_min=30,
             target_pace_min_per_km=6.0,
@@ -33,7 +31,7 @@ class TestDailyPlan:
         )
 
         assert plan.date == "2024-01-15"
-        assert plan.workout_type == WorkoutType.EASY
+        assert plan.workout_type == TrainingType.EASY
         assert plan.distance_km == 5.0
         assert plan.duration_min == 30
         assert plan.target_pace_min_per_km == 6.0
@@ -45,7 +43,7 @@ class TestDailyPlan:
         """测试转换为字典"""
         plan = DailyPlan(
             date="2024-01-15",
-            workout_type=WorkoutType.TEMPO,
+            workout_type=TrainingType.TEMPO,
             distance_km=8.5,
             duration_min=40,
             target_pace_min_per_km=4.5,
@@ -62,7 +60,7 @@ class TestDailyPlan:
         result = plan.to_dict()
 
         assert result["date"] == "2024-01-15"
-        assert result["workout_type"] == "节奏跑"
+        assert result["workout_type"] == "tempo"
         assert result["distance_km"] == 8.5
         assert result["duration_min"] == 40
         assert result["target_pace_min_per_km"] == 4.5
@@ -77,7 +75,7 @@ class TestDailyPlan:
         """测试字典转换的数值舍入"""
         plan = DailyPlan(
             date="2024-01-15",
-            workout_type=WorkoutType.EASY,
+            workout_type=TrainingType.EASY,
             distance_km=5.123456,
             duration_min=30,
             target_pace_min_per_km=6.789,
@@ -94,7 +92,7 @@ class TestDailyPlan:
         """测试可选字段"""
         plan = DailyPlan(
             date="2024-01-15",
-            workout_type=WorkoutType.REST,
+            workout_type=TrainingType.REST,
             distance_km=0.0,
             duration_min=0,
         )
@@ -137,7 +135,7 @@ class TestWeeklySchedule:
         schedule.daily_plans.append(
             DailyPlan(
                 date="2024-01-22",
-                workout_type=WorkoutType.EASY,
+                workout_type=TrainingType.EASY,
                 distance_km=5.0,
                 duration_min=30,
             )
@@ -145,7 +143,7 @@ class TestWeeklySchedule:
         schedule.daily_plans.append(
             DailyPlan(
                 date="2024-01-23",
-                workout_type=WorkoutType.LONG,
+                workout_type=TrainingType.LONG,
                 distance_km=10.0,
                 duration_min=60,
             )
@@ -171,8 +169,7 @@ class TestWeeklySchedule:
             end_date="2024-01-21",
             weekly_distance_km=50.0,
             weekly_duration_min=300,
-            focus="基础期",
-            notes="逐步增加跑量",
+            focus="base",
         )
 
         result = schedule.to_dict()
@@ -180,8 +177,7 @@ class TestWeeklySchedule:
         assert result["week_number"] == 1
         assert result["weekly_distance_km"] == 50.0
         assert result["weekly_duration_min"] == 300
-        assert result["focus"] == "基础期"
-        assert result["notes"] == "逐步增加跑量"
+        assert result["focus"] == "base"
         assert isinstance(result["daily_plans"], list)
 
 
@@ -225,8 +221,8 @@ class TestTrainingPlan:
         result = plan.to_dict()
 
         assert result["plan_id"] == "plan_001"
-        assert result["plan_type"] == "进展期"
-        assert result["fitness_level"] == "进阶"
+        assert result["plan_type"] == "build"
+        assert result["fitness_level"] == "advanced"
         assert result["goal_distance_km"] == 42.20
         assert result["notes"] == "全马训练计划"
         assert "created_at" in result
@@ -238,10 +234,10 @@ class TestFitnessLevel:
 
     def test_fitness_level_values(self):
         """测试体能水平枚举值"""
-        assert FitnessLevel.BEGINNER.value == "初学者"
-        assert FitnessLevel.INTERMEDIATE.value == "中级"
-        assert FitnessLevel.ADVANCED.value == "进阶"
-        assert FitnessLevel.ELITE.value == "精英"
+        assert FitnessLevel.BEGINNER.value == "beginner"
+        assert FitnessLevel.INTERMEDIATE.value == "intermediate"
+        assert FitnessLevel.ADVANCED.value == "advanced"
+        assert FitnessLevel.ELITE.value == "elite"
 
 
 class TestPlanType:
@@ -249,25 +245,25 @@ class TestPlanType:
 
     def test_plan_type_values(self):
         """测试计划类型枚举值"""
-        assert PlanType.BASE.value == "基础期"
-        assert PlanType.BUILD.value == "进展期"
-        assert PlanType.PEAK.value == "巅峰期"
-        assert PlanType.RACE.value == "比赛期"
-        assert PlanType.RECOVERY.value == "恢复期"
+        assert PlanType.BASE.value == "base"
+        assert PlanType.BUILD.value == "build"
+        assert PlanType.PEAK.value == "peak"
+        assert PlanType.RACE.value == "race"
+        assert PlanType.RECOVERY.value == "recovery"
 
 
-class TestWorkoutType:
-    """测试 WorkoutType 枚举"""
+class TestTrainingType:
+    """测试 TrainingType 枚举"""
 
     def test_workout_type_values(self):
         """测试训练类型枚举值"""
-        assert WorkoutType.EASY.value == "轻松跑"
-        assert WorkoutType.LONG.value == "长距离跑"
-        assert WorkoutType.TEMPO.value == "节奏跑"
-        assert WorkoutType.INTERVAL.value == "间歇跑"
-        assert WorkoutType.RECOVERY.value == "恢复跑"
-        assert WorkoutType.REST.value == "休息"
-        assert WorkoutType.CROSS.value == "交叉训练"
+        assert TrainingType.EASY.value == "easy"
+        assert TrainingType.LONG.value == "long"
+        assert TrainingType.TEMPO.value == "tempo"
+        assert TrainingType.INTERVAL.value == "interval"
+        assert TrainingType.RECOVERY.value == "recovery"
+        assert TrainingType.REST.value == "rest"
+        assert TrainingType.CROSS.value == "cross"
 
 
 class TestPhaseConfig:
@@ -420,8 +416,8 @@ class TestTrainingPlanEngine:
     def test_calculate_target_pace(self, engine):
         """测试目标配速计算"""
         # VDOT 越高，配速越快
-        pace_vdot40 = engine._calculate_target_pace(40, WorkoutType.EASY)
-        pace_vdot50 = engine._calculate_target_pace(50, WorkoutType.EASY)
+        pace_vdot40 = engine._calculate_target_pace(40, TrainingType.EASY)
+        pace_vdot50 = engine._calculate_target_pace(50, TrainingType.EASY)
 
         assert pace_vdot40 > pace_vdot50  # VDOT 低配速慢
         assert 3.0 <= pace_vdot40 <= 8.0  # 在合理范围内
@@ -431,9 +427,9 @@ class TestTrainingPlanEngine:
         """测试不同训练类型的目标配速"""
         vdot = 45
 
-        easy_pace = engine._calculate_target_pace(vdot, WorkoutType.EASY)
-        tempo_pace = engine._calculate_target_pace(vdot, WorkoutType.TEMPO)
-        interval_pace = engine._calculate_target_pace(vdot, WorkoutType.INTERVAL)
+        easy_pace = engine._calculate_target_pace(vdot, TrainingType.EASY)
+        tempo_pace = engine._calculate_target_pace(vdot, TrainingType.TEMPO)
+        interval_pace = engine._calculate_target_pace(vdot, TrainingType.INTERVAL)
 
         # 轻松跑最慢，间歇跑最快
         assert easy_pace > tempo_pace > interval_pace
@@ -457,7 +453,7 @@ class TestTrainingPlanEngine:
 
         # 应该包含休息日
         rest_days = [
-            day for day in schedule.daily_plans if day.workout_type == WorkoutType.REST
+            day for day in schedule.daily_plans if day.workout_type == TrainingType.REST
         ]
         assert len(rest_days) >= 1
 
