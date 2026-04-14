@@ -320,3 +320,160 @@ class TestPlanGenerator:
                 },
             ],
         }
+
+
+class TestPlanGeneratorExtended:
+    """PlanGenerator 扩展测试类"""
+
+    def setup_method(self):
+        """每个测试方法前的设置"""
+        self.mock_llm = Mock()
+        self.generator = PlanGenerator(llm_provider=self.mock_llm)
+
+        self.user_context = UserContext(
+            profile=RunnerProfile(
+                user_id="test_user",
+                profile_date=datetime.now(),
+                total_activities=100,
+                total_distance_km=1500.0,
+                total_duration_hours=150.0,
+                avg_vdot=45.0,
+                max_vdot=48.0,
+                weekly_avg_distance_km=30.0,
+                weekly_avg_duration_hours=3.5,
+                avg_pace_min_per_km=6.0,
+                resting_heart_rate=60.0,
+                max_heart_rate=190.0,
+            ),
+            recent_activities=[],
+            training_load=TrainingLoad(
+                atl=10.0,
+                ctl=12.0,
+                tsb=-2.0,
+                recent_4_weeks_distance_km=120.0,
+                last_week_distance_km=35.0,
+                avg_weekly_distance_km=30.0,
+                longest_run_km=15.0,
+                training_frequency=4,
+            ),
+            preferences=UserPreferences(
+                preferred_training_days=["monday", "wednesday", "friday", "sunday"],
+                preferred_training_time="morning",
+                enable_calendar_sync=True,
+            ),
+            historical_best_pace_min_per_km=5.5,
+        )
+
+    def test_generate_without_llm_provider(self):
+        """测试LLM提供者未设置"""
+        generator = PlanGenerator()
+
+        with pytest.raises(LLMError, match="LLM提供者未设置"):
+            generator.generate(
+                user_context=self.user_context,
+                goal_distance_km=21.0975,
+                goal_date="2026-05-01",
+            )
+
+    def test_parse_llm_response_with_json_block(self):
+        """测试解析包含```json代码块的响应"""
+        mock_response = self._create_mock_llm_response()
+        llm_response = f"```json\n{json.dumps(mock_response)}\n```"
+
+        plan = self.generator._parse_llm_response(
+            llm_response=llm_response,
+            user_context=self.user_context,
+            goal_distance_km=21.0975,
+            goal_date="2026-05-01",
+            target_time="2:00:00",
+        )
+
+        assert isinstance(plan, TrainingPlan)
+        assert plan.goal_distance_km == 21.0975
+
+    def test_parse_llm_response_with_code_block(self):
+        """测试解析包含```代码块的响应"""
+        mock_response = self._create_mock_llm_response()
+        llm_response = f"```\n{json.dumps(mock_response)}\n```"
+
+        plan = self.generator._parse_llm_response(
+            llm_response=llm_response,
+            user_context=self.user_context,
+            goal_distance_km=21.0975,
+            goal_date="2026-05-01",
+            target_time="2:00:00",
+        )
+
+        assert isinstance(plan, TrainingPlan)
+        assert plan.goal_distance_km == 21.0975
+
+    def test_generate_with_json_block_response(self):
+        """测试生成计划时LLM返回```json代码块"""
+        mock_response = self._create_mock_llm_response()
+        self.mock_llm.generate.return_value = (
+            f"```json\n{json.dumps(mock_response)}\n```"
+        )
+
+        plan = self.generator.generate(
+            user_context=self.user_context,
+            goal_distance_km=21.0975,
+            goal_date="2026-05-01",
+            target_time="2:00:00",
+        )
+
+        assert isinstance(plan, TrainingPlan)
+        assert plan.goal_distance_km == 21.0975
+
+    def test_generate_with_code_block_response(self):
+        """测试生成计划时LLM返回```代码块"""
+        mock_response = self._create_mock_llm_response()
+        self.mock_llm.generate.return_value = f"```\n{json.dumps(mock_response)}\n```"
+
+        plan = self.generator.generate(
+            user_context=self.user_context,
+            goal_distance_km=21.0975,
+            goal_date="2026-05-01",
+            target_time="2:00:00",
+        )
+
+        assert isinstance(plan, TrainingPlan)
+        assert plan.goal_distance_km == 21.0975
+
+    def _create_mock_llm_response(self) -> dict[str, Any]:
+        """创建模拟的LLM响应"""
+        return {
+            "plan_id": "plan_test_user_20260420",
+            "user_id": "test_user",
+            "status": "active",
+            "plan_type": "race_preparation",
+            "start_date": "2026-04-20",
+            "end_date": "2026-05-03",
+            "goal_distance_km": 21.0975,
+            "goal_date": "2026-05-01",
+            "target_time": "2:00:00",
+            "calendar_event_ids": {},
+            "created_at": "2026-04-20 10:00:00",
+            "updated_at": "2026-04-20 10:00:00",
+            "weeks": [
+                {
+                    "week_number": 1,
+                    "start_date": "2026-04-20",
+                    "end_date": "2026-04-26",
+                    "daily_plans": [
+                        {
+                            "date": "2026-04-20",
+                            "workout_type": "easy_run",
+                            "distance_km": 8.0,
+                            "duration_min": 48,
+                            "target_pace_min_per_km": 6.0,
+                            "target_hr_zone": 2,
+                            "notes": "轻松跑",
+                        }
+                    ],
+                    "weekly_distance_km": 8.0,
+                    "weekly_duration_min": 48,
+                    "phase": "base",
+                    "focus": "建立基础耐力",
+                }
+            ],
+        }
