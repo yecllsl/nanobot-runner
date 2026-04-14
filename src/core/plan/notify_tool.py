@@ -355,7 +355,7 @@ class NotifyTool:
         lines = []
 
         # 训练类型和距离
-        lines.append(f"**训练类型**：{daily_plan.workout_type}")
+        lines.append(f"**训练类型**：{daily_plan.workout_type.label}")
         lines.append(f"**训练距离**：{daily_plan.distance_km:.1f} km")
         lines.append(f"**预计时长**：{daily_plan.duration_min} 分钟")
 

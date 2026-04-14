@@ -248,27 +248,43 @@ class DailyPlan:
     """日计划"""
 
     date: str
-    workout_type: str
+    workout_type: TrainingType
     distance_km: float
     duration_min: int
     target_pace_min_per_km: float | None = None
     target_hr_zone: int | None = None
-    notes: str | None = None
+    notes: str = ""
     completed: bool = False
-    calendar_event_id: str | None = None
+    actual_distance_km: float | None = None
+    actual_duration_min: int | None = None
+    actual_avg_hr: int | None = None
+    rpe: int | None = None
+    hr_drift: float | None = None
+    event_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "date": self.date,
-            "workout_type": self.workout_type,
-            "distance_km": self.distance_km,
+            "workout_type": self.workout_type.value,
+            "distance_km": round(self.distance_km, 2),
             "duration_min": self.duration_min,
-            "target_pace_min_per_km": self.target_pace_min_per_km,
+            "target_pace_min_per_km": (
+                round(self.target_pace_min_per_km, 2)
+                if self.target_pace_min_per_km
+                else None
+            ),
             "target_hr_zone": self.target_hr_zone,
             "notes": self.notes,
             "completed": self.completed,
-            "calendar_event_id": self.calendar_event_id,
+            "actual_distance_km": (
+                round(self.actual_distance_km, 2) if self.actual_distance_km else None
+            ),
+            "actual_duration_min": self.actual_duration_min,
+            "actual_avg_hr": self.actual_avg_hr,
+            "rpe": self.rpe,
+            "hr_drift": round(self.hr_drift, 2) if self.hr_drift else None,
+            "event_id": self.event_id,
         }
 
 
@@ -279,12 +295,12 @@ class WeeklySchedule:
     week_number: int
     start_date: str
     end_date: str
-    daily_plans: list[DailyPlan]
-    weekly_distance_km: float
-    weekly_duration_min: int
-    phase: str
+    daily_plans: list[DailyPlan] = field(default_factory=list)
+    weekly_distance_km: float = 0.0
+    weekly_duration_min: int = 0
+    phase: str = ""
     focus: str = ""
-    notes: str | None = None
+    notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -293,7 +309,7 @@ class WeeklySchedule:
             "start_date": self.start_date,
             "end_date": self.end_date,
             "daily_plans": [plan.to_dict() for plan in self.daily_plans],
-            "weekly_distance_km": self.weekly_distance_km,
+            "weekly_distance_km": round(self.weekly_distance_km, 2),
             "weekly_duration_min": self.weekly_duration_min,
             "phase": self.phase,
             "focus": self.focus,
@@ -307,17 +323,19 @@ class TrainingPlan:
 
     plan_id: str
     user_id: str
-    status: str
-    plan_type: str
+    plan_type: PlanType
+    fitness_level: FitnessLevel
     start_date: str
     end_date: str
     goal_distance_km: float
     goal_date: str
-    target_time: str
-    weeks: list[WeeklySchedule]
-    calendar_event_ids: dict[str, str]
-    created_at: str
-    updated_at: str
+    weeks: list[WeeklySchedule] = field(default_factory=list)
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
+    notes: str = ""
+    status: PlanStatus = PlanStatus.DRAFT
+    target_time: str | None = None
+    calendar_event_ids: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -325,19 +343,90 @@ class TrainingPlan:
         return {
             "plan_id": self.plan_id,
             "user_id": self.user_id,
-            "status": self.status,
-            "plan_type": self.plan_type,
+            "plan_type": self.plan_type.value,
+            "fitness_level": self.fitness_level.value,
             "start_date": self.start_date,
             "end_date": self.end_date,
-            "goal_distance_km": self.goal_distance_km,
+            "goal_distance_km": round(self.goal_distance_km, 2),
             "goal_date": self.goal_date,
-            "target_time": self.target_time,
             "weeks": [week.to_dict() for week in self.weeks],
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "notes": self.notes,
+            "status": self.status.value,
+            "target_time": self.target_time,
             "calendar_event_ids": self.calendar_event_ids,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
             "metadata": self.metadata,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TrainingPlan:
+        """从字典创建训练计划"""
+        weeks = []
+        for week_data in data.get("weeks", []):
+            daily_plans = []
+            for day_data in week_data.get("daily_plans", []):
+                daily_plan = DailyPlan(
+                    date=day_data["date"],
+                    workout_type=TrainingType(day_data["workout_type"]),
+                    distance_km=day_data["distance_km"],
+                    duration_min=day_data["duration_min"],
+                    target_pace_min_per_km=day_data.get("target_pace_min_per_km"),
+                    target_hr_zone=day_data.get("target_hr_zone"),
+                    notes=day_data.get("notes", ""),
+                    completed=day_data.get("completed", False),
+                    actual_distance_km=day_data.get("actual_distance_km"),
+                    actual_duration_min=day_data.get("actual_duration_min"),
+                    actual_avg_hr=day_data.get("actual_avg_hr"),
+                    rpe=day_data.get("rpe"),
+                    hr_drift=day_data.get("hr_drift"),
+                    event_id=day_data.get("event_id"),
+                )
+                daily_plans.append(daily_plan)
+
+            week = WeeklySchedule(
+                week_number=week_data["week_number"],
+                start_date=week_data["start_date"],
+                end_date=week_data["end_date"],
+                daily_plans=daily_plans,
+                weekly_distance_km=week_data.get("weekly_distance_km", 0.0),
+                weekly_duration_min=week_data.get("weekly_duration_min", 0),
+                phase=week_data.get("phase", ""),
+                focus=week_data.get("focus", ""),
+                notes=week_data.get("notes", ""),
+            )
+            weeks.append(week)
+
+        created_at = data.get("created_at")
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+        elif created_at is None:
+            created_at = datetime.now()
+
+        updated_at = data.get("updated_at")
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at)
+        elif updated_at is None:
+            updated_at = datetime.now()
+
+        return cls(
+            plan_id=data["plan_id"],
+            user_id=data["user_id"],
+            plan_type=PlanType(data["plan_type"]),
+            fitness_level=FitnessLevel(data["fitness_level"]),
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            goal_distance_km=data["goal_distance_km"],
+            goal_date=data["goal_date"],
+            weeks=weeks,
+            created_at=created_at,
+            updated_at=updated_at,
+            notes=data.get("notes", ""),
+            status=PlanStatus(data.get("status", "draft")),
+            target_time=data.get("target_time"),
+            calendar_event_ids=data.get("calendar_event_ids", {}),
+            metadata=data.get("metadata"),
+        )
 
 
 @dataclass

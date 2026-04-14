@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 from src.core.models import (
     DailyPlan,
+    FitnessLevel,
     TrainingPlan,
     ValidationResult,
     Violation,
@@ -36,17 +37,15 @@ class TestHardValidator:
         return TrainingPlan(
             plan_id=plan_id,
             user_id="test_user",
-            status="active",
             plan_type="race_preparation",
+            fitness_level=FitnessLevel.INTERMEDIATE,
             goal_distance_km=goal_distance_km,
             goal_date=goal_date,
             start_date=weeks[0].start_date if weeks else today.strftime("%Y-%m-%d"),
             end_date=goal_date,
-            target_time="2:00:00",
             weeks=weeks,
+            target_time="2:00:00",
             calendar_event_ids={},
-            created_at=today.strftime("%Y-%m-%d %H:%M:%S"),
-            updated_at=today.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
     def test_validate_valid_plan(self):

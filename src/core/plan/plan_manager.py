@@ -7,8 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from src.core.models import PlanStatus
-from src.core.training_plan import TrainingPlan
+from src.core.models import PlanStatus, TrainingPlan
 
 logger = logging.getLogger(__name__)
 

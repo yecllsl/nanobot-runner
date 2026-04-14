@@ -11,7 +11,7 @@ import requests
 
 from src.cli.formatter import format_distance
 from src.core.config import ConfigManager
-from src.core.training_plan import DailyPlan, TrainingPlan
+from src.core.models import DailyPlan, TrainingPlan
 
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,7 @@ from src.core.models import (
     DailyPlan,
     NotifyResult,
     TrainingLoad,
+    TrainingType,
     UserContext,
     UserPreferences,
     WeatherInfo,
@@ -23,7 +24,7 @@ from src.core.plan.notify_tool import (
 
 def create_test_daily_plan(
     date: str = "2026-04-03",
-    workout_type: str = "轻松跑",
+    workout_type: TrainingType = TrainingType.EASY,
     distance_km: float = 10.0,
     duration_min: int = 60,
 ) -> DailyPlan:

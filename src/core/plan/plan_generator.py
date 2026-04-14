@@ -12,6 +12,7 @@ from src.core.exceptions import LLMError, ValidationError
 from src.core.logger import get_logger
 from src.core.models import (
     DailyPlan,
+    FitnessLevel,
     TrainingPlan,
     UserContext,
     WeeklySchedule,
@@ -316,17 +317,17 @@ class PlanGenerator:
             plan = TrainingPlan(
                 plan_id=plan_data["plan_id"],
                 user_id=plan_data["user_id"],
-                status=plan_data.get("status", "active"),
                 plan_type=plan_data["plan_type"],
+                fitness_level=getattr(
+                    user_context.profile, "fitness_level", FitnessLevel.INTERMEDIATE
+                ),
                 start_date=plan_data["start_date"],
                 end_date=plan_data["end_date"],
                 goal_distance_km=plan_data["goal_distance_km"],
                 goal_date=plan_data["goal_date"],
-                target_time=plan_data.get("target_time", target_time or ""),
                 weeks=weeks,
+                target_time=plan_data.get("target_time", target_time or ""),
                 calendar_event_ids=plan_data.get("calendar_event_ids", {}),
-                created_at=plan_data.get("created_at", datetime.now().isoformat()),
-                updated_at=plan_data.get("updated_at", datetime.now().isoformat()),
                 metadata=plan_data.get("metadata"),
             )
 
