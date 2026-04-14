@@ -1,6 +1,7 @@
 # 数据处理 Handler
 # 负责数据导入和统计的业务逻辑调用
 
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -116,7 +117,10 @@ class DataHandler:
         self, df: pl.DataFrame, start_date: str | None, end_date: str | None
     ) -> pl.DataFrame:
         """
-        按日期范围过滤数据
+        按日期范围过滤数据（基于会话开始时间）
+
+        使用 session_start_time 过滤，确保跨日期边界的会话被正确归入开始日期。
+        结束日期包含当天全天数据（即 < end_date + 1 day）。
 
         Args:
             df: 原始数据
@@ -126,16 +130,16 @@ class DataHandler:
         Returns:
             pl.DataFrame: 过滤后的数据
         """
-        if "timestamp" not in df.columns:
+        if "session_start_time" not in df.columns:
             return df
 
         if start_date:
-            start_dt = pl.lit(start_date).str.to_datetime("%Y-%m-%d")
-            df = df.filter(pl.col("timestamp") >= start_dt)
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            df = df.filter(pl.col("session_start_time") >= start_dt)
 
         if end_date:
-            end_dt = pl.lit(end_date).str.to_datetime("%Y-%m-%d")
-            df = df.filter(pl.col("timestamp") <= end_dt)
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            df = df.filter(pl.col("session_start_time") < end_dt)
 
         return df
 

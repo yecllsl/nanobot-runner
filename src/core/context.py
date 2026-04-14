@@ -9,7 +9,10 @@ from src.core.config import ConfigManager
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.parser import FitParser
+from src.core.plan.plan_manager import PlanManager
 from src.core.profile import ProfileEngine, ProfileStorageManager
+from src.core.report_service import ReportService
+from src.core.session_repository import SessionRepository
 from src.core.storage import StorageManager
 
 
@@ -29,6 +32,9 @@ class AppContext:
         analytics: 分析引擎
         profile_engine: 用户画像引擎
         profile_storage: 用户画像存储管理器
+        session_repo: Session数据仓储
+        report_service: 报告服务
+        plan_manager: 训练计划管理器
     """
 
     config: ConfigManager
@@ -39,6 +45,9 @@ class AppContext:
     analytics: AnalyticsEngine
     profile_engine: ProfileEngine
     profile_storage: ProfileStorageManager
+    session_repo: SessionRepository
+    report_service: ReportService
+    plan_manager: PlanManager
 
     # 可选的扩展组件
     _extensions: dict = field(default_factory=dict)
@@ -83,6 +92,9 @@ class AppContextFactory:
         analytics: AnalyticsEngine | None = None,
         profile_engine: ProfileEngine | None = None,
         profile_storage: ProfileStorageManager | None = None,
+        session_repo: SessionRepository | None = None,
+        report_service: ReportService | None = None,
+        plan_manager: PlanManager | None = None,
     ) -> AppContext:
         """
         创建应用上下文
@@ -98,6 +110,9 @@ class AppContextFactory:
             analytics: 分析引擎（可选）
             profile_engine: 用户画像引擎（可选）
             profile_storage: 用户画像存储管理器（可选）
+            session_repo: Session数据仓储（可选）
+            report_service: 报告服务（可选）
+            plan_manager: 训练计划管理器（可选）
 
         Returns:
             配置好的 AppContext 实例
@@ -134,6 +149,22 @@ class AppContextFactory:
         if profile_engine is None:
             profile_engine = ProfileEngine(storage)
 
+        # 创建或使用提供的Session数据仓储
+        if session_repo is None:
+            session_repo = SessionRepository(storage)
+
+        # 创建或使用提供的报告服务
+        if report_service is None:
+            report_service = ReportService(
+                config=config,
+                storage=storage,
+                analytics=analytics,
+            )
+
+        # 创建或使用提供的训练计划管理器
+        if plan_manager is None:
+            plan_manager = PlanManager(data_dir=config.data_dir)
+
         return AppContext(
             config=config,
             storage=storage,
@@ -143,6 +174,9 @@ class AppContextFactory:
             analytics=analytics,
             profile_engine=profile_engine,
             profile_storage=profile_storage,
+            session_repo=session_repo,
+            report_service=report_service,
+            plan_manager=plan_manager,
         )
 
     @staticmethod
@@ -155,6 +189,9 @@ class AppContextFactory:
         analytics: AnalyticsEngine | None = None,
         profile_engine: ProfileEngine | None = None,
         profile_storage: ProfileStorageManager | None = None,
+        session_repo: SessionRepository | None = None,
+        report_service: ReportService | None = None,
+        plan_manager: PlanManager | None = None,
     ) -> AppContext:
         """
         创建用于测试的应用上下文
@@ -171,6 +208,9 @@ class AppContextFactory:
             analytics: 分析引擎（可选）
             profile_engine: 用户画像引擎（可选）
             profile_storage: 用户画像存储管理器（可选）
+            session_repo: Session数据仓储（可选）
+            report_service: 报告服务（可选）
+            plan_manager: 训练计划管理器（可选）
 
         Returns:
             配置好的 AppContext 实例
@@ -184,6 +224,9 @@ class AppContextFactory:
             analytics=analytics,
             profile_engine=profile_engine,
             profile_storage=profile_storage,
+            session_repo=session_repo,
+            report_service=report_service,
+            plan_manager=plan_manager,
         )
 
 

@@ -47,6 +47,10 @@ async def _run_chat() -> None:
         config = load_config()
         agent_defaults = config.agents.defaults
 
+        # 覆盖默认模型为 glm-4（确保工具调用能力）
+        if agent_defaults.model in ["Qwen/Qwen2.5-7B-Instruct", "glm-4.7-flash"]:
+            agent_defaults.model = "glm-4"
+
         context = AppContextFactory.create()
         workspace = context.config.base_dir
         runner_tools = RunnerTools(context)

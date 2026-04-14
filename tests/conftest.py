@@ -15,6 +15,9 @@ def create_mock_context(
     analytics=None,
     profile_engine=None,
     profile_storage=None,
+    session_repo=None,
+    report_service=None,
+    plan_manager=None,
 ) -> AppContext:
     """
     创建 Mock 应用上下文
@@ -28,6 +31,9 @@ def create_mock_context(
         analytics: Mock 分析引擎（可选）
         profile_engine: Mock 用户画像引擎（可选）
         profile_storage: Mock 用户画像存储管理器（可选）
+        session_repo: Mock Session数据仓储（可选）
+        report_service: Mock 报告服务（可选）
+        plan_manager: Mock 训练计划管理器（可选）
 
     Returns:
         AppContext: Mock 应用上下文
@@ -58,6 +64,15 @@ def create_mock_context(
     if profile_storage is None:
         profile_storage = MagicMock()
 
+    if session_repo is None:
+        session_repo = MagicMock()
+
+    if report_service is None:
+        report_service = MagicMock()
+
+    if plan_manager is None:
+        plan_manager = MagicMock()
+
     return AppContext(
         config=config,
         storage=storage,
@@ -67,4 +82,7 @@ def create_mock_context(
         analytics=analytics,
         profile_engine=profile_engine,
         profile_storage=profile_storage,
+        session_repo=session_repo,
+        report_service=report_service,
+        plan_manager=plan_manager,
     )

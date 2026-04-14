@@ -328,7 +328,7 @@ class QueryByDateRangeTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "按日期范围查询跑步记录"
+        return "按日期范围查询跑步记录。返回JSON数组，每条记录包含 timestamp（时间）、distance（距离，单位公里）、duration（时长，单位秒）、heart_rate（平均心率）、pace（配速，单位分钟/公里）。当用户询问'某段时间跑了多少'、'上个月跑步'、'本周跑步'时使用此工具。"
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -364,7 +364,7 @@ class QueryByDistanceTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "按距离范围查询跑步记录"
+        return "按距离范围查询跑步记录。返回JSON数组，每条记录包含 timestamp（时间）、distance（距离，单位公里）、duration（时长，单位秒）、heart_rate（平均心率）、pace（配速，单位分钟/公里）。当用户询问'跑了多少公里'、'长距离跑步'、'短距离跑步'时使用此工具。"
 
     @property
     def parameters(self) -> dict[str, Any]:
