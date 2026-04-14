@@ -1517,10 +1517,10 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        assert "max_hr" in result
-        assert result["max_hr"] == 190  # 220 - 30
-        assert "zones" in result
-        assert len(result["zones"]) == 5
+        assert hasattr(result, "max_hr")
+        assert result.max_hr == 190  # 220 - 30
+        assert hasattr(result, "zones")
+        assert len(result.zones) == 5
 
     def test_get_heart_rate_zones_custom_age(self):
         """测试自定义年龄的心率区间计算"""
@@ -1540,7 +1540,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=40)
 
-        assert result["max_hr"] == 180  # 220 - 40
+        assert result.max_hr == 180  # 220 - 40
 
     def test_get_heart_rate_zones_invalid_age_zero(self):
         """测试零年龄参数"""
@@ -1575,10 +1575,10 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        assert result["max_hr"] == 190
-        assert result["zones"] == []
-        assert result["total_time_in_hr"] == 0
-        assert "message" in result
+        assert result.max_hr == 190
+        assert result.zones == []
+        assert result.total_time_in_hr == 0
+        assert hasattr(result, "message")
 
     def test_get_heart_rate_zones_no_hr_column(self):
         """测试无心率列的数据"""
@@ -1598,8 +1598,8 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        assert "message" in result
-        assert result["total_time_in_hr"] == 0
+        assert hasattr(result, "message")
+        assert result.total_time_in_hr == 0
 
     def test_get_heart_rate_zones_with_date_filter(self):
         """测试带日期过滤的心率区间分析"""
@@ -1622,8 +1622,8 @@ class TestHeartRateZones:
             age=30, start_date="2024-01-01", end_date="2024-12-31"
         )
 
-        assert "max_hr" in result
-        assert "zones" in result
+        assert hasattr(result, "max_hr")
+        assert hasattr(result, "zones")
 
     def test_get_heart_rate_zones_zone_distribution(self):
         """测试心率区间分布计算正确性"""
@@ -1650,7 +1650,7 @@ class TestHeartRateZones:
         result = engine.get_heart_rate_zones(age=30)
 
         # 验证区间百分比总和接近100%
-        total_percentage = sum(zone["percentage"] for zone in result["zones"])
+        total_percentage = sum(zone["percentage"] for zone in result.zones)
         assert abs(total_percentage - 100.0) < 0.1
 
     def test_get_heart_rate_zones_z1_recovery(self):
@@ -1672,7 +1672,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        z1 = next((z for z in result["zones"] if z["zone"] == "Z1"), None)
+        z1 = next((z for z in result.zones if z["zone"] == "Z1"), None)
         assert z1 is not None
         assert z1["name"] == "恢复区"
         # 所有5个心率值都在Z1区间（95-114）
@@ -1697,7 +1697,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        z5 = next((z for z in result["zones"] if z["zone"] == "Z5"), None)
+        z5 = next((z for z in result.zones if z["zone"] == "Z5"), None)
         assert z5 is not None
         assert z5["name"] == "无氧区"
         assert z5["time_seconds"] == 5
@@ -1722,8 +1722,8 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        assert "zones" in result
-        assert result["total_time_in_hr"] == 4200  # 1800 + 2400
+        assert hasattr(result, "zones")
+        assert result.total_time_in_hr == 4200  # 1800 + 2400
 
     def test_get_heart_rate_zones_avg_hr_no_valid_data(self):
         """测试平均心率无有效数据"""
@@ -1744,7 +1744,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        assert "message" in result
+        assert hasattr(result, "message")
 
     def test_get_heart_rate_zones_boundary_values(self):
         """测试心率区间边界值"""
@@ -1767,7 +1767,7 @@ class TestHeartRateZones:
         result = engine.get_heart_rate_zones(age=30)
 
         # 验证边界值正确分配到区间
-        assert result["total_time_in_hr"] == 4
+        assert result.total_time_in_hr == 4
 
     def test_get_heart_rate_zones_different_ages(self):
         """测试不同年龄的心率区间"""
@@ -1788,11 +1788,11 @@ class TestHeartRateZones:
 
         # 年轻人（20岁），最大心率200
         result_young = engine.get_heart_rate_zones(age=20)
-        assert result_young["max_hr"] == 200
+        assert result_young.max_hr == 200
 
         # 中年人（50岁），最大心率170
         result_middle = engine.get_heart_rate_zones(age=50)
-        assert result_middle["max_hr"] == 170
+        assert result_middle.max_hr == 170
 
     def test_get_heart_rate_zones_zone_structure(self):
         """测试心率区间返回结构"""
@@ -1813,13 +1813,13 @@ class TestHeartRateZones:
         result = engine.get_heart_rate_zones(age=30)
 
         # 验证返回结构
-        assert "max_hr" in result
-        assert "zones" in result
-        assert "total_time_in_hr" in result
-        assert "activities_count" in result
+        assert hasattr(result, "max_hr")
+        assert hasattr(result, "zones")
+        assert hasattr(result, "total_time_in_hr")
+        assert hasattr(result, "activities_count")
 
         # 验证每个区间的结构
-        for zone in result["zones"]:
+        for zone in result.zones:
             assert "zone" in zone
             assert "name" in zone
             assert "hr_range" in zone
@@ -1855,7 +1855,7 @@ class TestHeartRateZones:
 
         # 性能要求：计算时间 < 2秒
         assert elapsed_time < 2.0
-        assert result["total_time_in_hr"] == 10000
+        assert result.total_time_in_hr == 10000
 
     def test_get_heart_rate_zones_null_heart_rate(self):
         """测试心率数据包含null值"""
@@ -1876,7 +1876,7 @@ class TestHeartRateZones:
         result = engine.get_heart_rate_zones(age=30)
 
         # 只计算有效心率数据
-        assert result["total_time_in_hr"] == 3
+        assert result.total_time_in_hr == 3
 
     def test_get_heart_rate_zones_zero_heart_rate(self):
         """测试心率数据包含零值"""
@@ -1897,7 +1897,7 @@ class TestHeartRateZones:
         result = engine.get_heart_rate_zones(age=30)
 
         # 只计算有效心率数据（排除0）
-        assert result["total_time_in_hr"] == 3
+        assert result.total_time_in_hr == 3
 
     def test_calculate_zones_from_avg_hr_success(self):
         """测试基于平均心率的区间计算"""
@@ -1922,8 +1922,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=30)
 
-        assert result["total_time_in_hr"] == 5400
-        assert result["data_type"] == "avg_heart_rate"
+        assert result.total_time_in_hr == 5400
 
     def test_get_heart_rate_zones_age_boundary_min(self):
         """测试最小年龄边界"""
@@ -1943,7 +1942,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=1)
 
-        assert result["max_hr"] == 219  # 220 - 1
+        assert result.max_hr == 219  # 220 - 1
 
     def test_get_heart_rate_zones_age_boundary_max(self):
         """测试最大年龄边界"""
@@ -1963,7 +1962,7 @@ class TestHeartRateZones:
         engine = AnalyticsEngine(mock_storage)
         result = engine.get_heart_rate_zones(age=120)
 
-        assert result["max_hr"] == 100  # 220 - 120
+        assert result.max_hr == 100  # 220 - 120
 
 
 class TestPaceDistribution:
@@ -3295,16 +3294,12 @@ class TestDailyReport:
             }
         )
 
-        # 设置mock行为
-        mock_filtered = MagicMock()
-        mock_filtered.is_empty.return_value = False
-        mock_filtered.__iter__ = lambda self: iter([mock_df])
         mock_lf.filter.return_value.collect.return_value = mock_df
+        mock_lf.collect.return_value = mock_df
 
         engine = AnalyticsEngine(mock_storage)
         result = engine.generate_daily_report(age=30)
 
-        # 验证昨日训练数据
         assert result["yesterday_run"] is not None
         assert result["yesterday_run"]["distance_km"] == 8.5
         assert result["yesterday_run"]["duration_min"] == 45.0

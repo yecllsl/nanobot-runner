@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from src.core.heart_rate_analyzer import HeartRateAnalyzer
-from src.core.models import HRDriftResult, RunningStats
+from src.core.models import HRDriftResult, HRZoneResult, RunningStats
 from src.core.race_prediction import RacePredictionEngine
 from src.core.statistics_aggregator import StatisticsAggregator
 from src.core.training_load_analyzer import TrainingLoadAnalyzer
@@ -784,7 +784,7 @@ class AnalyticsEngine:
         age: int = 30,
         start_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> HRZoneResult:
         """
         计算心率区间分布
 
@@ -842,23 +842,23 @@ class AnalyticsEngine:
             df = lf.collect()
 
             if df.is_empty():
-                return {
-                    "max_hr": max_hr,
-                    "zones": [],
-                    "total_time_in_hr": 0,
-                    "activities_count": 0,
-                    "message": "暂无跑步数据",
-                }
+                return HRZoneResult(
+                    max_hr=max_hr,
+                    zones=[],
+                    total_time_in_hr=0,
+                    activities_count=0,
+                    message="暂无跑步数据",
+                )
 
             # 检查是否有心率数据
             if "heart_rate" not in df.columns and "avg_heart_rate" not in df.columns:
-                return {
-                    "max_hr": max_hr,
-                    "zones": [],
-                    "total_time_in_hr": 0,
-                    "activities_count": df.height,
-                    "message": "暂无心率数据",
-                }
+                return HRZoneResult(
+                    max_hr=max_hr,
+                    zones=[],
+                    total_time_in_hr=0,
+                    activities_count=df.height,
+                    message="暂无心率数据",
+                )
 
             # 使用秒级心率数据（heart_rate字段）进行精确分析
             if "heart_rate" in df.columns:
@@ -927,20 +927,20 @@ class AnalyticsEngine:
                     }
                 )
 
-            return {
-                "max_hr": max_hr,
-                "zones": zones,
-                "total_time_in_hr": total_time_in_hr,
-                "activities_count": df.height,
-                "age": age,
-            }
+            return HRZoneResult(
+                max_hr=max_hr,
+                zones=zones,
+                total_time_in_hr=total_time_in_hr,
+                activities_count=df.height,
+                message=f"年龄: {age}",
+            )
 
         except Exception as e:
             raise RuntimeError(f"心率区间分析失败: {e}") from e
 
     def _calculate_zones_from_avg_hr(
         self, df: pl.DataFrame, max_hr: int, zone_boundaries: dict[str, tuple]
-    ) -> dict[str, Any]:
+    ) -> HRZoneResult:
         """
         基于平均心率估算心率区间分布
 
@@ -966,13 +966,13 @@ class AnalyticsEngine:
         hr_df = df.filter(pl.col(hr_col).is_not_null() & (pl.col(hr_col) > 0))
 
         if hr_df.is_empty():
-            return {
-                "max_hr": max_hr,
-                "zones": [],
-                "total_time_in_hr": 0,
-                "activities_count": df.height,
-                "message": "暂无有效心率数据",
-            }
+            return HRZoneResult(
+                max_hr=max_hr,
+                zones=[],
+                total_time_in_hr=0,
+                activities_count=df.height,
+                message="暂无有效心率数据",
+            )
 
         zone_times = dict.fromkeys(zone_boundaries.keys(), 0)
         total_time = 0
@@ -1018,13 +1018,13 @@ class AnalyticsEngine:
                 }
             )
 
-        return {
-            "max_hr": max_hr,
-            "zones": zones,
-            "total_time_in_hr": int(total_time),
-            "activities_count": hr_df.height,
-            "data_type": "avg_heart_rate",
-        }
+        return HRZoneResult(
+            max_hr=max_hr,
+            zones=zones,
+            total_time_in_hr=int(total_time),
+            activities_count=hr_df.height,
+            message="基于平均心率估算",
+        )
 
     def generate_daily_report(self, age: int = 30) -> dict[str, Any]:
         """

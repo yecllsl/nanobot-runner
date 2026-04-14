@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.models import HRDriftResult
+from src.core.models import HRDriftResult, HRZoneResult
 
 if TYPE_CHECKING:
     from src.core.storage import StorageManager
@@ -463,7 +463,7 @@ class HeartRateAnalyzer:
         df: pl.DataFrame,
         max_hr: int,
         zone_boundaries: dict[str, tuple],
-    ) -> dict[str, Any]:
+    ) -> HRZoneResult:
         """
         使用平均心率估算心率区间分布
 
@@ -476,13 +476,13 @@ class HeartRateAnalyzer:
             dict: 心率区间分析结果
         """
         if "session_avg_heart_rate" not in df.columns:
-            return {
-                "max_hr": max_hr,
-                "zones": [],
-                "total_time_in_hr": 0,
-                "activities_count": df.height,
-                "message": "暂无心率数据",
-            }
+            return HRZoneResult(
+                max_hr=max_hr,
+                zones=[],
+                total_time_in_hr=0,
+                activities_count=df.height,
+                message="暂无心率数据",
+            )
 
         hr_df = df.filter(
             pl.col("session_avg_heart_rate").is_not_null()
@@ -490,13 +490,13 @@ class HeartRateAnalyzer:
         )
 
         if hr_df.is_empty():
-            return {
-                "max_hr": max_hr,
-                "zones": [],
-                "total_time_in_hr": 0,
-                "activities_count": df.height,
-                "message": "暂无心率数据",
-            }
+            return HRZoneResult(
+                max_hr=max_hr,
+                zones=[],
+                total_time_in_hr=0,
+                activities_count=df.height,
+                message="暂无心率数据",
+            )
 
         zone_times = {}
         for zone_name, (lower_pct, upper_pct, zone_desc) in zone_boundaries.items():
@@ -537,20 +537,20 @@ class HeartRateAnalyzer:
                 }
             )
 
-        return {
-            "max_hr": max_hr,
-            "zones": zones,
-            "total_time_in_hr": total_activities,
-            "activities_count": df.height,
-            "message": "基于平均心率估算",
-        }
+        return HRZoneResult(
+            max_hr=max_hr,
+            zones=zones,
+            total_time_in_hr=total_activities,
+            activities_count=df.height,
+            message="基于平均心率估算",
+        )
 
     def get_heart_rate_zones(
         self,
         age: int = 30,
         start_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> HRZoneResult:
         """
         计算心率区间分布
 
@@ -604,22 +604,22 @@ class HeartRateAnalyzer:
             df = lf.collect()
 
             if df.is_empty():
-                return {
-                    "max_hr": max_hr,
-                    "zones": [],
-                    "total_time_in_hr": 0,
-                    "activities_count": 0,
-                    "message": "暂无跑步数据",
-                }
+                return HRZoneResult(
+                    max_hr=max_hr,
+                    zones=[],
+                    total_time_in_hr=0,
+                    activities_count=0,
+                    message="暂无跑步数据",
+                )
 
             if "heart_rate" not in df.columns and "avg_heart_rate" not in df.columns:
-                return {
-                    "max_hr": max_hr,
-                    "zones": [],
-                    "total_time_in_hr": 0,
-                    "activities_count": df.height,
-                    "message": "暂无心率数据",
-                }
+                return HRZoneResult(
+                    max_hr=max_hr,
+                    zones=[],
+                    total_time_in_hr=0,
+                    activities_count=df.height,
+                    message="暂无心率数据",
+                )
 
             if "heart_rate" in df.columns:
                 hr_df = df.filter(
@@ -680,13 +680,13 @@ class HeartRateAnalyzer:
                     }
                 )
 
-            return {
-                "max_hr": max_hr,
-                "zones": zones,
-                "total_time_in_hr": total_time_in_hr,
-                "activities_count": df.height,
-                "age": age,
-            }
+            return HRZoneResult(
+                max_hr=max_hr,
+                zones=zones,
+                total_time_in_hr=total_time_in_hr,
+                activities_count=df.height,
+                message=f"年龄: {age}",
+            )
 
         except Exception as e:
             raise RuntimeError(f"心率区间分析失败: {e}") from e

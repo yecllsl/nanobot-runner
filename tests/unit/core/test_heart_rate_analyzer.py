@@ -326,9 +326,9 @@ class TestHeartRateAnalyzer:
 
         result = analyzer.get_heart_rate_zones(age=30)
 
-        assert "max_hr" in result
-        assert "zones" in result
-        assert result["max_hr"] == 190
+        assert hasattr(result, "max_hr")
+        assert hasattr(result, "zones")
+        assert result.max_hr == 190
 
     def test_get_heart_rate_zones_invalid_age(self, analyzer):
         """测试无效年龄"""
@@ -347,8 +347,8 @@ class TestHeartRateAnalyzer:
 
         result = analyzer.get_heart_rate_zones(age=30)
 
-        assert result["max_hr"] == 190
-        assert result["activities_count"] == 0
+        assert result.max_hr == 190
+        assert result.activities_count == 0
 
     def test_hr_drift_assessment_positive(self, analyzer):
         """测试正向心率漂移评估"""
@@ -403,6 +403,6 @@ class TestHeartRateAnalyzer:
 
         result = analyzer._calculate_zones_from_avg_hr(df, max_hr, zone_boundaries)
 
-        assert "max_hr" in result
-        assert "zones" in result
-        assert len(result["zones"]) == 5
+        assert hasattr(result, "max_hr")
+        assert hasattr(result, "zones")
+        assert len(result.zones) == 5

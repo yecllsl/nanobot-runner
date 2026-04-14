@@ -12,7 +12,7 @@ import pytest
 
 from src.core.analytics import AnalyticsEngine
 from src.core.config import ConfigManager
-from src.core.models import ReportType
+from src.core.models import ReportData, ReportType
 from src.core.report_generator import (
     ReportConfig,
     ReportGenerator,
@@ -303,11 +303,11 @@ class TestReportGenerator:
             end_date=datetime(2024, 1, 7),
         )
 
-        assert result["success"] is True
-        assert result["report_type"] == "weekly"
-        assert "content" in result
-        assert "data" in result
-        assert result["data"]["total_runs"] == 0
+        assert result.success is True
+        assert result.report_type == "weekly"
+        assert hasattr(result, "content")
+        assert hasattr(result, "data")
+        assert result.data["total_runs"] == 0
 
     def test_generate_report_invalid_date_range(self, report_generator):
         """测试生成报告（日期范围无效）"""
@@ -317,9 +317,9 @@ class TestReportGenerator:
             end_date=datetime(2024, 1, 1),
         )
 
-        assert result["success"] is False
-        assert "error" in result
-        assert "日期" in result["error"]
+        assert result.success is False
+        assert hasattr(result, "error")
+        assert "日期" in result.error
 
     def test_generate_report_monthly(self, report_generator, mock_analytics):
         """测试生成月报"""
@@ -332,8 +332,8 @@ class TestReportGenerator:
             end_date=datetime(2024, 1, 31),
         )
 
-        assert result["success"] is True
-        assert result["report_type"] == "monthly"
+        assert result.success is True
+        assert result.report_type == "monthly"
 
     def test_generate_report_training_cycle(self, report_generator, mock_analytics):
         """测试生成训练周期报告"""
@@ -346,8 +346,8 @@ class TestReportGenerator:
             end_date=datetime(2024, 2, 11),
         )
 
-        assert result["success"] is True
-        assert result["report_type"] == "training_cycle"
+        assert result.success is True
+        assert result.report_type == "training_cycle"
 
     def test_format_hr_zones(self, report_generator):
         """测试心率区间格式化"""
@@ -473,36 +473,42 @@ class TestConvenienceFunctions:
     def test_generate_weekly_report(self, mock_generator_class):
         """测试生成周报便捷函数"""
         mock_generator = MagicMock()
-        mock_generator.generate_report.return_value = {"success": True}
+        mock_generator.generate_report.return_value = ReportData(
+            success=True, report_type="weekly"
+        )
         mock_generator_class.return_value = mock_generator
 
         result = generate_weekly_report(age=35)
 
-        assert result["success"] is True
+        assert result.success is True
         mock_generator.generate_report.assert_called_once()
 
     @patch("src.core.report_generator.ReportGenerator")
     def test_generate_monthly_report(self, mock_generator_class):
         """测试生成月报便捷函数"""
         mock_generator = MagicMock()
-        mock_generator.generate_report.return_value = {"success": True}
+        mock_generator.generate_report.return_value = ReportData(
+            success=True, report_type="monthly"
+        )
         mock_generator_class.return_value = mock_generator
 
         result = generate_monthly_report(age=35)
 
-        assert result["success"] is True
+        assert result.success is True
         mock_generator.generate_report.assert_called_once()
 
     @patch("src.core.report_generator.ReportGenerator")
     def test_generate_training_cycle_report(self, mock_generator_class):
         """测试生成训练周期报告便捷函数"""
         mock_generator = MagicMock()
-        mock_generator.generate_report.return_value = {"success": True}
+        mock_generator.generate_report.return_value = ReportData(
+            success=True, report_type="training_cycle"
+        )
         mock_generator_class.return_value = mock_generator
 
         result = generate_training_cycle_report(age=35)
 
-        assert result["success"] is True
+        assert result.success is True
         mock_generator.generate_report.assert_called_once()
 
 

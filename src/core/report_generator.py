@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from src.core.logger import get_logger
-from src.core.models import ReportType
+from src.core.models import ReportData, ReportType
 
 if TYPE_CHECKING:
     from src.core.context import AppContext
@@ -260,7 +260,7 @@ class ReportGenerator:
         age: int = 30,
         rest_hr: int = 60,
         template_path: Path | None = None,
-    ) -> dict[str, Any]:
+    ) -> ReportData:
         """
         生成训练回顾报告
 
@@ -311,32 +311,32 @@ class ReportGenerator:
             )
 
             # 构建返回结果
-            result = {
-                "success": True,
-                "report_type": report_type.value,
-                "content": content,
-                "data": report_data,
-                "message": f"{self._get_report_type_name(report_type)}生成成功",
-                "generated_at": datetime.now().isoformat(),
-            }
+            result = ReportData(
+                success=True,
+                report_type=report_type.value,
+                content=content,
+                data=report_data,
+                message=f"{self._get_report_type_name(report_type)}生成成功",
+                generated_at=datetime.now().isoformat(),
+            )
 
             logger.info(f"报告生成成功：{report_type.value}")
             return result
 
         except ValueError as e:
             logger.error(f"报告生成失败（参数错误）: {e}")
-            return {
-                "success": False,
-                "error": f"参数错误：{e}",
-                "report_type": report_type.value if report_type else None,
-            }
+            return ReportData(
+                success=False,
+                report_type=report_type.value if report_type else None,
+                error=f"参数错误：{e}",
+            )
         except Exception as e:
             logger.error(f"报告生成失败：{e}")
-            return {
-                "success": False,
-                "error": f"生成失败：{e}",
-                "report_type": report_type.value if report_type else None,
-            }
+            return ReportData(
+                success=False,
+                report_type=report_type.value if report_type else None,
+                error=f"生成失败：{e}",
+            )
 
     def _calculate_start_date(
         self,
@@ -414,11 +414,12 @@ class ReportGenerator:
             training_load = self.analytics.get_training_load(days=42)
 
         # 获取心率区间分布
-        hr_zones_data = {}
+        hr_zones_data: dict[str, Any] = {}
         if config.include_hr_analysis:
-            hr_zones_data = self.analytics.get_heart_rate_zones(
+            hr_zones_result = self.analytics.get_heart_rate_zones(
                 age=config.age, start_date=start_str, end_date=end_str
             )
+            hr_zones_data = hr_zones_result.to_dict()
 
         # 获取 VDOT 趋势
         vdot_trend_data = []
@@ -936,7 +937,7 @@ def generate_weekly_report(
     end_date: datetime | None = None,
     age: int = 30,
     template_path: Path | None = None,
-) -> dict[str, Any]:
+) -> ReportData:
     """
     生成周报
 
@@ -964,7 +965,7 @@ def generate_monthly_report(
     end_date: datetime | None = None,
     age: int = 30,
     template_path: Path | None = None,
-) -> dict[str, Any]:
+) -> ReportData:
     """
     生成月报
 
@@ -992,7 +993,7 @@ def generate_training_cycle_report(
     end_date: datetime | None = None,
     age: int = 30,
     template_path: Path | None = None,
-) -> dict[str, Any]:
+) -> ReportData:
     """
     生成训练周期报告
 

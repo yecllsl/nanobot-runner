@@ -672,3 +672,55 @@ class HRDriftResult:
         if self.error is not None:
             result["error"] = self.error
         return result
+
+
+@dataclass(frozen=True)
+class HRZoneResult:
+    """心率区间分析结果"""
+
+    max_hr: int
+    zones: list[dict[str, Any]]
+    total_time_in_hr: int
+    activities_count: int
+    message: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        return {
+            "max_hr": self.max_hr,
+            "zones": self.zones,
+            "total_time_in_hr": self.total_time_in_hr,
+            "activities_count": self.activities_count,
+            "message": self.message,
+        }
+
+
+@dataclass(frozen=True)
+class ReportData:
+    """报告数据"""
+
+    success: bool
+    report_type: str | None
+    content: str = ""
+    data: dict[str, Any] = field(default_factory=dict)
+    message: str = ""
+    generated_at: str | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result: dict[str, Any] = {
+            "success": self.success,
+            "report_type": self.report_type,
+        }
+        if self.content:
+            result["content"] = self.content
+        if self.data:
+            result["data"] = self.data
+        if self.message:
+            result["message"] = self.message
+        if self.generated_at:
+            result["generated_at"] = self.generated_at
+        if self.error:
+            result["error"] = self.error
+        return result
