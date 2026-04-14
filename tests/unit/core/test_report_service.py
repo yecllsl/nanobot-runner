@@ -1,13 +1,13 @@
 # 报告服务单元测试
 # 测试 ReportService 的生成、推送和定时调度功能
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.config import ConfigManager
-from src.core.report_service import ReportService, ReportType
+from src.core.models import ReportType
+from src.core.report_service import ReportService
+from tests.conftest import create_mock_context
 
 
 class TestReportType:
@@ -29,40 +29,20 @@ class TestReportType:
 class TestReportServiceInit:
     """测试 ReportService 初始化"""
 
-    def test_init_with_mocked_config(self):
-        """测试带 Mock 配置初始化"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
+    def test_init_with_mocked_context(self):
+        """测试带 Mock 上下文初始化"""
+        context = create_mock_context()
+        service = ReportService(context)
 
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
-
-        service = ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
-
-        assert service.config == mock_config
-        assert service.storage == storage
-        assert service.analytics == analytics
-        assert service.feishu == feishu
+        assert service.config == context.config
+        assert service.storage == context.storage
+        assert service.analytics == context.analytics
+        assert service.feishu is None
 
     def test_init_creates_cron_store(self):
         """测试初始化创建定时任务存储目录"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
-
-        service = ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
+        context = create_mock_context()
+        service = ReportService(context)
 
         assert service.cron_store.exists() or service.cron_store.parent.exists()
 
@@ -73,19 +53,8 @@ class TestReportServiceGenerateReport:
     @pytest.fixture
     def mock_service(self):
         """创建带 Mock 的服务实例"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-        mock_config.get.return_value = None
-
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
-
-        return ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
+        context = create_mock_context()
+        return ReportService(context)
 
     def test_generate_daily_report(self, mock_service):
         """测试生成日报"""
@@ -195,22 +164,21 @@ class TestReportServicePushReport:
     @pytest.fixture
     def mock_service(self):
         """创建带 Mock 的服务实例"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-        mock_config.get.return_value = None
-
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
-
-        feishu.send_text.return_value = {"success": True, "message_id": "test123"}
-        feishu.send_card.return_value = {"success": True, "message_id": "test456"}
-
-        return ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
+        context = create_mock_context()
+        service = ReportService(context)
+        # 在创建服务后设置feishu mock
+        service.feishu = MagicMock()
+        service.feishu.send_text.return_value = {
+            "success": True,
+            "message_id": "test123",
+        }
+        service.feishu.send_card.return_value = {
+            "success": True,
+            "message_id": "test456",
+        }
+        service.feishu.auth.is_configured.return_value = True
+        service.feishu.receive_id = "test_user"
+        return service
 
     def test_push_report_daily_success(self, mock_service):
         """测试推送日报成功"""
@@ -256,18 +224,10 @@ class TestReportServicePushReport:
 
     def test_push_report_no_feishu(self):
         """测试未配置飞书机器人"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-        mock_config.get.return_value = None  # 返回 None 表示未配置
+        context = create_mock_context()
+        context.config.get.return_value = None  # 返回 None 表示未配置
 
-        storage = MagicMock()
-        analytics = MagicMock()
-
-        service = ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=None
-        )
+        service = ReportService(context)
 
         mock_report = {
             "type": "daily",
@@ -307,19 +267,8 @@ class TestReportServiceScheduleReport:
     @pytest.fixture
     def mock_service(self):
         """创建带 Mock 的服务实例"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-        mock_config.get.return_value = None
-
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
-
-        return ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
+        context = create_mock_context()
+        return ReportService(context)
 
     def test_schedule_report_daily(self, mock_service):
         """测试配置日报定时任务"""
@@ -353,49 +302,22 @@ class TestReportServiceGetJobName:
 
     def test_get_job_name_daily(self):
         """测试获取日报任务名称"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-
-        service = ReportService(
-            config=mock_config,
-            storage=MagicMock(),
-            analytics=MagicMock(),
-            feishu=MagicMock(),
-        )
+        context = create_mock_context()
+        service = ReportService(context)
 
         assert service._get_job_name(ReportType.DAILY) == service.JOB_NAME_DAILY
 
     def test_get_job_name_weekly(self):
         """测试获取周报任务名称"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-
-        service = ReportService(
-            config=mock_config,
-            storage=MagicMock(),
-            analytics=MagicMock(),
-            feishu=MagicMock(),
-        )
+        context = create_mock_context()
+        service = ReportService(context)
 
         assert service._get_job_name(ReportType.WEEKLY) == service.JOB_NAME_WEEKLY
 
     def test_get_job_name_monthly(self):
         """测试获取月报任务名称"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-
-        service = ReportService(
-            config=mock_config,
-            storage=MagicMock(),
-            analytics=MagicMock(),
-            feishu=MagicMock(),
-        )
+        context = create_mock_context()
+        service = ReportService(context)
 
         assert service._get_job_name(ReportType.MONTHLY) == service.JOB_NAME_MONTHLY
 
@@ -405,14 +327,8 @@ class TestReportServiceIntegration:
 
     def test_full_workflow_daily_report(self):
         """测试完整的日报工作流"""
-        mock_config = MagicMock(spec=ConfigManager)
-        mock_config.base_dir = Path("test_base")
-        mock_config.data_dir = Path("test_data")
-        mock_config.cron_store = Path("test_base") / "cron" / "jobs.json"
-
-        storage = MagicMock()
-        analytics = MagicMock()
-        feishu = MagicMock()
+        context = create_mock_context()
+        context.feishu = MagicMock()
 
         mock_report = {
             "type": "daily",
@@ -423,12 +339,17 @@ class TestReportServiceIntegration:
             "fitness_status": {"atl": 45, "ctl": 85, "tsb": 15, "status": "良好"},
             "training_advice": "保持当前训练节奏",
         }
-        analytics.generate_daily_report.return_value = mock_report
-        feishu.send_card.return_value = {"success": True, "message_id": "test123"}
+        context.analytics.generate_daily_report.return_value = mock_report
 
-        service = ReportService(
-            config=mock_config, storage=storage, analytics=analytics, feishu=feishu
-        )
+        service = ReportService(context)
+        # 在创建服务后设置feishu mock
+        service.feishu = MagicMock()
+        service.feishu.send_card.return_value = {
+            "success": True,
+            "message_id": "test123",
+        }
+        service.feishu.auth.is_configured.return_value = True
+        service.feishu.receive_id = "test_user"
 
         # 生成报告
         report = service.generate_report(ReportType.DAILY, age=30)

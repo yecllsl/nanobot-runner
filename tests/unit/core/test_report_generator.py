@@ -12,16 +12,17 @@ import pytest
 
 from src.core.analytics import AnalyticsEngine
 from src.core.config import ConfigManager
+from src.core.models import ReportType
 from src.core.report_generator import (
     ReportConfig,
     ReportGenerator,
-    ReportType,
     TemplateEngine,
     generate_monthly_report,
     generate_training_cycle_report,
     generate_weekly_report,
 )
 from src.core.storage import StorageManager
+from tests.conftest import create_mock_context
 
 
 class TestReportType:
@@ -192,11 +193,10 @@ class TestReportGenerator:
     @pytest.fixture
     def report_generator(self, mock_config, mock_storage, mock_analytics):
         """创建报告生成器实例"""
-        return ReportGenerator(
-            config=mock_config,
-            storage=mock_storage,
-            analytics=mock_analytics,
+        context = create_mock_context(
+            config=mock_config, storage=mock_storage, analytics=mock_analytics
         )
+        return ReportGenerator(context)
 
     def test_report_generator_initialization(self, report_generator):
         """测试报告生成器初始化"""
@@ -525,11 +525,10 @@ class TestEdgeCases:
         """创建报告生成器实例"""
         mock_storage = MagicMock()
         mock_analytics = MagicMock()
-        return ReportGenerator(
-            config=mock_config,
-            storage=mock_storage,
-            analytics=mock_analytics,
+        context = create_mock_context(
+            config=mock_config, storage=mock_storage, analytics=mock_analytics
         )
+        return ReportGenerator(context)
 
     def test_calculate_pace_edge_cases(self, report_generator):
         """测试配速计算边界条件"""

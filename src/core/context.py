@@ -149,19 +149,11 @@ class AppContextFactory:
         if session_repo is None:
             session_repo = SessionRepository(storage)
 
-        # 创建或使用提供的报告服务
-        if report_service is None:
-            report_service = ReportService(
-                config=config,
-                storage=storage,
-                analytics=analytics,
-            )
-
         # 创建或使用提供的训练计划管理器
         if plan_manager is None:
             plan_manager = PlanManager(data_dir=config.data_dir)
 
-        # 创建AppContext实例（profile_engine稍后设置）
+        # 创建AppContext实例（profile_engine和report_service稍后设置）
         context = AppContext(
             config=config,
             storage=storage,
@@ -172,9 +164,16 @@ class AppContextFactory:
             profile_engine=None,  # type: ignore
             profile_storage=profile_storage,
             session_repo=session_repo,
-            report_service=report_service,
+            report_service=None,  # type: ignore
             plan_manager=plan_manager,
         )
+
+        # 创建或使用提供的报告服务（需要AppContext）
+        if report_service is None:
+            report_service = ReportService(context)
+
+        # 设置report_service
+        context.report_service = report_service
 
         # 创建或使用提供的用户画像引擎（需要AppContext）
         if profile_engine is None:

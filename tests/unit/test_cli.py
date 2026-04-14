@@ -367,121 +367,138 @@ class TestCLIReport:
 
     def test_report_status_not_configured(self):
         """测试查看未配置的定时推送状态"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.get_schedule_status.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.get_schedule_status.return_value = {
                 "configured": False,
                 "enabled": False,
                 "message": "未配置定时推送",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--status"])
             assert result.exit_code == 0
 
     def test_report_status_configured(self):
         """测试查看已配置的定时推送状态"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.get_schedule_status.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.get_schedule_status.return_value = {
                 "configured": True,
                 "enabled": True,
                 "time": "07:00",
                 "push": True,
                 "age": 30,
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--status"])
             assert result.exit_code == 0
 
     def test_report_status_disabled(self):
         """测试查看已禁用的定时推送状态"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.get_schedule_status.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.get_schedule_status.return_value = {
                 "configured": True,
                 "enabled": False,
                 "time": "07:00",
                 "push": True,
                 "age": 30,
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--status"])
             assert result.exit_code == 0
 
     def test_report_schedule_success(self):
         """测试配置定时推送成功"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.schedule_report.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.schedule_report.return_value = {
                 "success": True,
                 "message": "已配置定时推送",
                 "next_run": "2024-01-01T07:00:00",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--schedule", "07:00"])
             assert result.exit_code == 0
 
     def test_report_schedule_invalid_time(self):
         """测试配置定时推送无效时间"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.schedule_report.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.schedule_report.return_value = {
                 "success": False,
                 "error": "时间格式无效",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--schedule", "25:00"])
             assert result.exit_code == 1
 
     def test_report_enable_success(self):
         """测试启用定时推送成功"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.enable_schedule.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.enable_schedule.return_value = {
                 "success": True,
                 "message": "定时推送已启用",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--enable"])
             assert result.exit_code == 0
 
     def test_report_disable_success(self):
         """测试禁用定时推送成功"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.enable_schedule.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.enable_schedule.return_value = {
                 "success": True,
                 "message": "定时推送已禁用",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--disable"])
             assert result.exit_code == 0
 
     def test_report_enable_no_job(self):
         """测试启用时没有定时任务"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.enable_schedule.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.enable_schedule.return_value = {
                 "success": False,
                 "error": "未找到定时任务",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--enable"])
             assert result.exit_code == 1
 
     def test_report_generate_success(self):
         """测试生成晨报成功"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.run_report_now.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.run_report_now.return_value = {
                 "success": True,
                 "report": {
                     "date": "2024年1月1日 周一",
@@ -497,16 +514,18 @@ class TestCLIReport:
                     "weekly_plan": [],
                 },
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report"])
             assert result.exit_code == 0
 
     def test_report_generate_with_push(self):
         """测试生成晨报并推送"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.run_report_now.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.run_report_now.return_value = {
                 "success": True,
                 "report": {
                     "date": "2024年1月1日",
@@ -517,16 +536,18 @@ class TestCLIReport:
                 },
                 "push_result": {"success": True, "message": "推送成功"},
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--push"])
             assert result.exit_code == 0
 
     def test_report_generate_with_push_failed(self):
         """测试生成晨报推送失败"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.run_report_now.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.run_report_now.return_value = {
                 "success": True,
                 "report": {
                     "date": "2024年1月1日",
@@ -537,29 +558,33 @@ class TestCLIReport:
                 },
                 "push_result": {"success": False, "error": "未配置Webhook"},
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--push"])
             assert result.exit_code == 0
 
     def test_report_generate_error(self):
         """测试生成晨报失败"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.run_report_now.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.run_report_now.return_value = {
                 "success": False,
                 "error": "数据库错误",
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report"])
             assert result.exit_code == 1
 
     def test_report_with_custom_age(self):
         """测试使用自定义年龄生成晨报"""
-        with patch("src.core.report_service.ReportService") as mock_service:
-            mock_instance = Mock()
-            mock_instance.run_report_now.return_value = {
+        with patch("src.core.context.get_context") as mock_get_context:
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.run_report_now.return_value = {
                 "success": True,
                 "report": {
                     "date": "test",
@@ -568,12 +593,13 @@ class TestCLIReport:
                     "weekly_plan": [],
                 },
             }
-            mock_service.return_value = mock_instance
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
 
             result = runner.invoke(app, ["report", "report", "--age", "40"])
             assert result.exit_code == 0
-            mock_instance.run_report_now.assert_called_once()
-            call_kwargs = mock_instance.run_report_now.call_args[1]
+            mock_service.run_report_now.assert_called_once()
+            call_kwargs = mock_service.run_report_now.call_args[1]
             assert call_kwargs.get("age") == 40
 
 

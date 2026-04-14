@@ -2,17 +2,17 @@
 # 封装晨报、周报、月报生成、推送和定时调度逻辑
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
-from src.core.analytics import AnalyticsEngine
-from src.core.config import ConfigManager
 from src.core.logger import get_logger
 from src.core.models import ReportType
-from src.core.storage import StorageManager
 from src.notify.feishu import FeishuBot
+
+if TYPE_CHECKING:
+    from src.core.context import AppContext
 
 logger = get_logger(__name__)
 
@@ -24,17 +24,18 @@ class ReportService:
     JOB_NAME_WEEKLY = "weekly_report"
     JOB_NAME_MONTHLY = "monthly_report"
 
-    def __init__(
-        self,
-        config: ConfigManager | None = None,
-        storage: StorageManager | None = None,
-        analytics: AnalyticsEngine | None = None,
-        feishu: FeishuBot | None = None,
-    ):
-        self.config = config or ConfigManager()
-        self.storage = storage or StorageManager(self.config.data_dir)
-        self.analytics = analytics or AnalyticsEngine(self.storage)
-        self.feishu = feishu
+    def __init__(self, context: "AppContext") -> None:
+        """
+        初始化报告服务
+
+        Args:
+            context: AppContext 实例
+        """
+        self.context = context
+        self.config = context.config
+        self.storage = context.storage
+        self.analytics = context.analytics
+        self.feishu: FeishuBot | None = None
 
         self.cron_store = self.config.cron_store
         self.cron_store.parent.mkdir(parents=True, exist_ok=True)

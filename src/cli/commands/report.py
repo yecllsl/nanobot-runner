@@ -37,10 +37,10 @@ def report(
         nanobotrun report --disable    # 禁用定时推送
         nanobotrun report --status     # 查看定时推送状态
     """
-    from src.core.report_service import ReportService
+    from src.core.context import get_context
 
     try:
-        service = ReportService()
+        service = get_context().report_service
 
         if status:
             schedule_status = service.get_schedule_status()
@@ -149,10 +149,11 @@ def weekly(
         nanobotrun report weekly              # 生成周报
         nanobotrun report weekly --push       # 生成并推送到飞书
     """
-    from src.core.report_service import ReportService, ReportType
+    from src.core.context import get_context
+    from src.core.models import ReportType
 
     try:
-        service = ReportService()
+        service = get_context().report_service
 
         with Progress(
             SpinnerColumn(),
@@ -202,10 +203,11 @@ def monthly(
         nanobotrun report monthly              # 生成月报
         nanobotrun report monthly --push       # 生成并推送到飞书
     """
-    from src.core.report_service import ReportService, ReportType
+    from src.core.context import get_context
+    from src.core.models import ReportType
 
     try:
-        service = ReportService()
+        service = get_context().report_service
 
         with Progress(
             SpinnerColumn(),

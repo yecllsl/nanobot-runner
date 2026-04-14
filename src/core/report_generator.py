@@ -4,15 +4,15 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.analytics import AnalyticsEngine
-from src.core.config import ConfigManager
 from src.core.logger import get_logger
 from src.core.models import ReportType
-from src.core.storage import StorageManager
+
+if TYPE_CHECKING:
+    from src.core.context import AppContext
 
 logger = get_logger(__name__)
 
@@ -239,26 +239,18 @@ class ReportGenerator:
     负责生成各种类型的训练回顾报告
     """
 
-    def __init__(
-        self,
-        config: ConfigManager | None = None,
-        storage: StorageManager | None = None,
-        analytics: AnalyticsEngine | None = None,
-        template_engine: TemplateEngine | None = None,
-    ) -> None:
+    def __init__(self, context: "AppContext") -> None:
         """
         初始化报告生成器
 
         Args:
-            config: 配置管理器（可选）
-            storage: 存储管理器（可选）
-            analytics: 分析引擎（可选）
-            template_engine: 模板引擎（可选）
+            context: AppContext 实例
         """
-        self.config = config or ConfigManager()
-        self.storage = storage or StorageManager(self.config.data_dir)
-        self.analytics = analytics or AnalyticsEngine(self.storage)
-        self.template_engine = template_engine or TemplateEngine()
+        self.context = context
+        self.config = context.config
+        self.storage = context.storage
+        self.analytics = context.analytics
+        self.template_engine = TemplateEngine()
 
     def generate_report(
         self,
@@ -956,7 +948,10 @@ def generate_weekly_report(
     Returns:
         Dict[str, Any]: 报告数据
     """
-    generator = ReportGenerator()
+    from src.core.context import get_context
+
+    context = get_context()
+    generator = ReportGenerator(context)
     return generator.generate_report(
         report_type=ReportType.WEEKLY,
         end_date=end_date,
@@ -981,7 +976,10 @@ def generate_monthly_report(
     Returns:
         Dict[str, Any]: 报告数据
     """
-    generator = ReportGenerator()
+    from src.core.context import get_context
+
+    context = get_context()
+    generator = ReportGenerator(context)
     return generator.generate_report(
         report_type=ReportType.MONTHLY,
         end_date=end_date,
@@ -1006,7 +1004,10 @@ def generate_training_cycle_report(
     Returns:
         Dict[str, Any]: 报告数据
     """
-    generator = ReportGenerator()
+    from src.core.context import get_context
+
+    context = get_context()
+    generator = ReportGenerator(context)
     return generator.generate_report(
         report_type=ReportType.TRAINING_CYCLE,
         end_date=end_date,
