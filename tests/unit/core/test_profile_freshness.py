@@ -24,6 +24,7 @@ from src.core.profile import (
     ProfileStaleStatus,
     RunnerProfile,
 )
+from tests.conftest import create_mock_context
 
 
 class TestProfileStaleStatus:
@@ -142,7 +143,8 @@ class TestProfileEngineCheckFreshness:
     @pytest.fixture
     def profile_engine(self, mock_storage):
         """创建 ProfileEngine 实例"""
-        return ProfileEngine(mock_storage)
+        context = create_mock_context(storage=mock_storage)
+        return ProfileEngine(context)
 
     def test_fresh_profile(self, profile_engine, mock_storage):
         """测试新鲜的画像（7 天内）"""
@@ -236,7 +238,8 @@ class TestProfileEngineFilterAnomalyData:
     @pytest.fixture
     def profile_engine(self, mock_storage):
         """创建 ProfileEngine 实例"""
-        return ProfileEngine(mock_storage)
+        context = create_mock_context(storage=mock_storage)
+        return ProfileEngine(context)
 
     @pytest.fixture
     def sample_activity_data(self):
@@ -422,7 +425,8 @@ class TestProfileEngineBuildFilterCondition:
     @pytest.fixture
     def profile_engine(self, mock_storage):
         """创建 ProfileEngine 实例"""
-        return ProfileEngine(mock_storage)
+        context = create_mock_context(storage=mock_storage)
+        return ProfileEngine(context)
 
     def test_strict_mode_returns_condition(self, profile_engine):
         """测试严格模式返回条件"""
@@ -492,7 +496,8 @@ class TestIntegration:
     @pytest.fixture
     def profile_engine(self, mock_storage):
         """创建 ProfileEngine 实例"""
-        return ProfileEngine(mock_storage)
+        context = create_mock_context(storage=mock_storage)
+        return ProfileEngine(context)
 
     def test_freshness_and_filter_integration(self, profile_engine, mock_storage):
         """测试保鲜期检查和异常过滤集成"""

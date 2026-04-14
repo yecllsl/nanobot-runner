@@ -145,10 +145,6 @@ class AppContextFactory:
         if profile_storage is None:
             profile_storage = ProfileStorageManager()
 
-        # 创建或使用提供的用户画像引擎
-        if profile_engine is None:
-            profile_engine = ProfileEngine(storage)
-
         # 创建或使用提供的Session数据仓储
         if session_repo is None:
             session_repo = SessionRepository(storage)
@@ -165,19 +161,29 @@ class AppContextFactory:
         if plan_manager is None:
             plan_manager = PlanManager(data_dir=config.data_dir)
 
-        return AppContext(
+        # 创建AppContext实例（profile_engine稍后设置）
+        context = AppContext(
             config=config,
             storage=storage,
             indexer=indexer,
             parser=parser,
             importer=importer,
             analytics=analytics,
-            profile_engine=profile_engine,
+            profile_engine=None,  # type: ignore
             profile_storage=profile_storage,
             session_repo=session_repo,
             report_service=report_service,
             plan_manager=plan_manager,
         )
+
+        # 创建或使用提供的用户画像引擎（需要AppContext）
+        if profile_engine is None:
+            profile_engine = ProfileEngine(context)
+
+        # 设置profile_engine
+        context.profile_engine = profile_engine
+
+        return context
 
     @staticmethod
     def create_for_testing(

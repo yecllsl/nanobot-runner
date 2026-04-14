@@ -14,6 +14,7 @@ from src.core.profile import (
     RunnerProfile,
     TrainingPattern,
 )
+from tests.conftest import create_mock_context
 
 
 class TestRunnerProfile:
@@ -134,7 +135,10 @@ class TestProfileEngine:
     @pytest.fixture
     def engine(self, mock_storage):
         """创建 ProfileEngine 实例"""
-        return ProfileEngine(mock_storage)
+        context = create_mock_context(storage=mock_storage)
+        # Mock analytics.calculate_vdot 方法
+        context.analytics.calculate_vdot = Mock(return_value=40.0)
+        return ProfileEngine(context)
 
     def test_init(self, engine, mock_storage):
         """测试初始化"""
@@ -685,7 +689,16 @@ class TestProfileIntegration:
 
     def test_build_profile_complete_workflow(self, mock_storage_with_data):
         """测试完整的画像构建工作流程"""
-        engine = ProfileEngine(mock_storage_with_data)
+        context = create_mock_context(storage=mock_storage_with_data)
+        # Mock analytics.calculate_vdot 方法
+        context.analytics.calculate_vdot = Mock(return_value=40.0)
+        # Mock analytics.calculate_tss_for_run 方法
+        context.analytics.calculate_tss_for_run = Mock(return_value=100.0)
+        # Mock analytics.calculate_atl_ctl 方法
+        context.analytics.calculate_atl_ctl = Mock(
+            return_value={"atl": 50.0, "ctl": 60.0}
+        )
+        engine = ProfileEngine(context)
 
         profile = engine.build_profile(
             user_id="test_user", days=30, age=30, resting_hr=60
@@ -734,7 +747,8 @@ class TestProfileIntegration:
 
     def test_injury_risk_assessment_workflow(self, mock_storage_with_data):
         """测试伤病风险评估工作流程"""
-        engine = ProfileEngine(mock_storage_with_data)
+        context = create_mock_context(storage=mock_storage_with_data)
+        engine = ProfileEngine(context)
 
         # 先构建画像
         profile = engine.build_profile(user_id="test_user", days=30)

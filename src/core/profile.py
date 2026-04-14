@@ -27,7 +27,7 @@ from src.core.user_profile_manager import (
 )
 
 if TYPE_CHECKING:
-    from src.core.storage import StorageManager
+    from src.core.context import AppContext
 
 logger = get_logger(__name__)
 
@@ -731,18 +731,19 @@ class RunnerProfile:  # type: ignore[no-redef]
 class ProfileEngine:
     """用户画像引擎"""
 
-    def __init__(self, storage_manager: StorageManager) -> None:
+    def __init__(self, context: AppContext) -> None:
         """
         初始化画像引擎
 
         Args:
-            storage_manager: StorageManager 实例
+            context: AppContext 实例
         """
-        self.storage = storage_manager
+        self.context = context
+        self.storage = context.storage
         self.storage_manager = ProfileStorageManager()
-        self.user_profile_manager = UserProfileManager(storage_manager)
+        self.user_profile_manager = UserProfileManager(context.storage)
         self.injury_risk_analyzer = InjuryRiskAnalyzer()
-        self.training_history_analyzer = TrainingHistoryAnalyzer(storage_manager)
+        self.training_history_analyzer = TrainingHistoryAnalyzer(context.storage)
         self.anomaly_data_filter = AnomalyDataFilter()
 
     def build_profile(
@@ -1087,9 +1088,7 @@ class ProfileEngine:
             profile: 画像对象
         """
         try:
-            from src.core.analytics import AnalyticsEngine
-
-            analytics = AnalyticsEngine(self.storage)
+            analytics = self.context.analytics
 
             df = lf.collect()
 
@@ -1202,10 +1201,7 @@ class ProfileEngine:
             profile: 画像对象
         """
         try:
-            from src.core.analytics import AnalyticsEngine
-
-            # 创建临时 AnalyticsEngine 实例
-            analytics = AnalyticsEngine(self.storage)
+            analytics = self.context.analytics
 
             df = lf.collect()
 
