@@ -133,10 +133,6 @@ class AppContextFactory:
         if parser is None:
             parser = FitParser()
 
-        # 创建或使用提供的导入服务
-        if importer is None:
-            importer = ImportService(parser, storage, indexer)
-
         # 创建或使用提供的分析引擎
         if analytics is None:
             analytics = AnalyticsEngine(storage)
@@ -149,24 +145,34 @@ class AppContextFactory:
         if session_repo is None:
             session_repo = SessionRepository(storage)
 
-        # 创建或使用提供的训练计划管理器
-        if plan_manager is None:
-            plan_manager = PlanManager(data_dir=config.data_dir)
-
-        # 创建AppContext实例（profile_engine和report_service稍后设置）
+        # 创建AppContext实例（importer、plan_manager、profile_engine和report_service稍后设置）
         context = AppContext(
             config=config,
             storage=storage,
             indexer=indexer,
             parser=parser,
-            importer=importer,
+            importer=None,  # type: ignore
             analytics=analytics,
             profile_engine=None,  # type: ignore
             profile_storage=profile_storage,
             session_repo=session_repo,
             report_service=None,  # type: ignore
-            plan_manager=plan_manager,
+            plan_manager=None,  # type: ignore
         )
+
+        # 创建或使用提供的导入服务（需要AppContext）
+        if importer is None:
+            importer = ImportService(context)
+
+        # 设置importer
+        context.importer = importer
+
+        # 创建或使用提供的训练计划管理器（需要AppContext）
+        if plan_manager is None:
+            plan_manager = PlanManager(context)
+
+        # 设置plan_manager
+        context.plan_manager = plan_manager
 
         # 创建或使用提供的报告服务（需要AppContext）
         if report_service is None:

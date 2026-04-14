@@ -285,13 +285,19 @@ class FeishuCalendarSync:
     MAX_RETRIES = 3
     RETRY_DELAY = 1.0  # 秒
 
-    def __init__(self, config: CalendarSyncConfig | None = None):
+    def __init__(
+        self,
+        config_manager: ConfigManager | None = None,
+        config: CalendarSyncConfig | None = None,
+    ):
         """
         初始化飞书日历同步服务
 
         Args:
+            config_manager: 配置管理器，不指定则创建默认实例
             config: 同步配置，不指定则从配置文件读取
         """
+        self.config_manager = config_manager or ConfigManager()
         self.config = config or self._load_config()
         self._api: FeishuCalendarAPI | None = None
 
@@ -304,8 +310,7 @@ class FeishuCalendarSync:
 
     def _load_config(self) -> CalendarSyncConfig:
         """从配置文件加载配置"""
-        config_manager = ConfigManager()
-        config_dict = config_manager.load_config()
+        config_dict = self.config_manager.load_config()
 
         return CalendarSyncConfig(
             enabled=config_dict.get("calendar_sync_enabled", True),

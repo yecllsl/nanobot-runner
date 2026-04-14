@@ -21,6 +21,21 @@ from src.notify.feishu_calendar import (
 )
 
 
+def create_mock_config_manager(config: CalendarSyncConfig) -> MagicMock:
+    """创建 Mock ConfigManager"""
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_config.return_value = {
+        "calendar_sync_enabled": config.enabled,
+        "calendar_id": config.calendar_id,
+        "calendar_reminder_minutes": config.reminder_minutes,
+        "calendar_sync_completed": config.sync_completed,
+        "calendar_include_description": config.include_description,
+        "feishu_app_id": config.app_id,
+        "feishu_app_secret": config.app_secret,
+    }
+    return mock_config_manager
+
+
 class TestCalendarSyncConfig:
     """测试 CalendarSyncConfig 配置类"""
 
@@ -326,7 +341,10 @@ class TestFeishuCalendarSync:
         with patch(
             "src.notify.feishu_calendar.FeishuCalendarAPI", return_value=mock_api
         ):
-            service = FeishuCalendarSync(mock_config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(mock_config),
+                config=mock_config,
+            )
             # 确保 service._api 使用的是我们的 mock 对象
             service._api = mock_api
             return service
@@ -381,7 +399,10 @@ class TestFeishuCalendarSync:
     def test_init_with_config(self, mock_config):
         """测试使用自定义配置初始化"""
         with patch("src.notify.feishu_calendar.FeishuCalendarAPI"):
-            service = FeishuCalendarSync(mock_config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(mock_config),
+                config=mock_config,
+            )
             assert service.config.enabled is True
             assert service.config.calendar_id == "test_calendar_id"
             assert service._api is not None
@@ -394,7 +415,9 @@ class TestFeishuCalendarSync:
             app_secret=None,
         )
         with patch("src.notify.feishu_calendar.logger") as mock_logger:
-            service = FeishuCalendarSync(config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(config), config=config
+            )
             assert service._api is None
             mock_logger.warning.assert_called_with("未配置飞书日历 API 凭证")
 
@@ -435,7 +458,9 @@ class TestFeishuCalendarSync:
             app_secret="test_app_secret",
         )
         with patch("src.notify.feishu_calendar.FeishuCalendarAPI"):
-            service = FeishuCalendarSync(config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(config), config=config
+            )
 
         daily_plan = DailyPlan(
             date="2024-01-01",
@@ -458,7 +483,9 @@ class TestFeishuCalendarSync:
             app_secret="test_app_secret",
         )
         with patch("src.notify.feishu_calendar.FeishuCalendarAPI"):
-            service = FeishuCalendarSync(config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(config), config=config
+            )
 
         daily_plan = DailyPlan(
             date="2024-01-01",
@@ -494,7 +521,9 @@ class TestFeishuCalendarSync:
         """测试同步功能未启用"""
         config = CalendarSyncConfig(enabled=False)
         with patch("src.notify.feishu_calendar.FeishuCalendarAPI"):
-            service = FeishuCalendarSync(config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(config), config=config
+            )
 
         plan = TrainingPlan(
             plan_id="test",
@@ -519,7 +548,9 @@ class TestFeishuCalendarSync:
             app_id=None,
             app_secret=None,
         )
-        service = FeishuCalendarSync(config)
+        service = FeishuCalendarSync(
+            config_manager=create_mock_config_manager(config), config=config
+        )
 
         plan = TrainingPlan(
             plan_id="test",
@@ -642,7 +673,9 @@ class TestIntegration:
                 return_value={"event_id": "event_123"}
             )
 
-            service = FeishuCalendarSync(config)
+            service = FeishuCalendarSync(
+                config_manager=create_mock_config_manager(config), config=config
+            )
 
             # 创建训练计划
             today = datetime.now()

@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,6 +18,7 @@ from src.core.training_plan import (
     TrainingPlan,
     WeeklySchedule,
 )
+from tests.conftest import create_mock_context
 
 
 def create_test_plan(plan_id: str) -> TrainingPlan:
@@ -120,26 +121,25 @@ class TestPlanStatusTransition:
 class TestPlanManagerInit:
     """测试PlanManager初始化"""
 
-    def test_init_with_data_dir(self):
-        """测试使用数据目录初始化"""
+    def test_init_with_context(self):
+        """测试使用AppContext初始化"""
         with tempfile.TemporaryDirectory() as tmpdir:
             data_dir = Path(tmpdir)
-            manager = PlanManager(data_dir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            manager = PlanManager(context)
             assert manager.data_dir == data_dir
             assert manager.plans_file == data_dir / "training_plans.json"
-
-    def test_init_without_data_dir(self):
-        """测试不指定数据目录初始化"""
-        with patch("src.core.config.ConfigManager") as mock_config:
-            mock_config.return_value.data_dir = Path("/tmp/test_data")
-            manager = PlanManager()
-            assert manager.data_dir == Path("/tmp/test_data")
 
     def test_init_creates_plans_file(self):
         """测试初始化创建计划文件"""
         with tempfile.TemporaryDirectory() as tmpdir:
             data_dir = Path(tmpdir)
-            manager = PlanManager(data_dir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            manager = PlanManager(context)
             assert manager.plans_file.exists()
 
 
@@ -150,7 +150,11 @@ class TestPlanManagerCreate:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_create_plan_success(self, manager):
         """测试成功创建计划"""
@@ -190,7 +194,11 @@ class TestPlanManagerGet:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_get_plan_success(self, manager):
         """测试成功获取计划"""
@@ -227,7 +235,11 @@ class TestPlanManagerUpdate:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_update_plan_success(self, manager):
         """测试成功更新计划"""
@@ -283,7 +295,11 @@ class TestPlanManagerCancel:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_cancel_plan_success(self, manager):
         """测试成功取消计划"""
@@ -331,7 +347,11 @@ class TestPlanManagerActivate:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_activate_plan_success(self, manager):
         """测试成功激活计划"""
@@ -366,7 +386,11 @@ class TestPlanManagerPause:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_pause_plan_success(self, manager):
         """测试成功暂停计划"""
@@ -401,7 +425,11 @@ class TestPlanManagerComplete:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_complete_plan_success(self, manager):
         """测试成功完成计划"""
@@ -436,7 +464,11 @@ class TestPlanManagerList:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_list_plans_empty(self, manager):
         """测试列出空计划列表"""
@@ -486,7 +518,11 @@ class TestPlanManagerDelete:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_delete_plan_success(self, manager):
         """测试成功删除计划"""
@@ -511,7 +547,11 @@ class TestPlanManagerGetActive:
     def manager(self):
         """创建PlanManager实例"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield PlanManager(Path(tmpdir))
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
 
     def test_get_active_plan_success(self, manager):
         """测试成功获取激活计划"""

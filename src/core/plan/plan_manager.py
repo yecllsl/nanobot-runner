@@ -4,10 +4,12 @@
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.core.models import PlanStatus, TrainingPlan
+
+if TYPE_CHECKING:
+    from src.core.context import AppContext
 
 logger = logging.getLogger(__name__)
 
@@ -52,21 +54,17 @@ class PlanManagerError(Exception):
 class PlanManager:
     """训练计划管理器"""
 
-    def __init__(self, data_dir: Path | None = None):
+    def __init__(self, context: "AppContext"):
         """
         初始化计划管理器
 
         Args:
-            data_dir: 数据目录，不指定则使用默认目录
+            context: AppContext 实例
         """
-        if data_dir is None:
-            from src.core.config import ConfigManager
-
-            config_manager = ConfigManager()
-            data_dir = config_manager.data_dir
-
-        self.data_dir = data_dir
-        self.plans_file = data_dir / "training_plans.json"
+        self.context = context
+        self.config = context.config
+        self.data_dir = self.config.data_dir
+        self.plans_file = self.data_dir / "training_plans.json"
         self._plans: dict[str, dict[str, Any]] = {}
         self._load_plans()
 

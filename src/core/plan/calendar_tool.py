@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from src.core.config import ConfigManager
 from src.core.models import DailyPlan, TrainingPlan
 from src.notify.feishu_calendar import (
     CalendarSyncConfig,
@@ -71,14 +72,21 @@ class OptimisticUpdateContext:
 class CalendarTool:
     """日历同步工具"""
 
-    def __init__(self, config: CalendarSyncConfig | None = None):
+    def __init__(
+        self,
+        config_manager: ConfigManager | None = None,
+        config: CalendarSyncConfig | None = None,
+    ):
         """
         初始化日历同步工具
 
         Args:
+            config_manager: 配置管理器，不指定则创建默认实例
             config: 同步配置，不指定则从配置文件读取
         """
-        self._sync_service = FeishuCalendarSync(config)
+        self._sync_service = FeishuCalendarSync(
+            config_manager=config_manager, config=config
+        )
         self._optimistic_contexts: dict[str, OptimisticUpdateContext] = {}
 
     async def pre_sync_check(

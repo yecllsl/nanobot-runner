@@ -9,13 +9,10 @@ from rich.console import Console
 from rich.progress import Progress, TaskID
 
 from src.core.exceptions import ParseError
-from src.core.indexer import IndexManager
 from src.core.logger import get_logger
-from src.core.parser import FitParser
-from src.core.storage import StorageManager
 
 if TYPE_CHECKING:
-    pass
+    from src.core.context import AppContext
 
 logger = get_logger(__name__)
 
@@ -23,17 +20,18 @@ logger = get_logger(__name__)
 class ImportService:
     """数据导入服务"""
 
-    def __init__(
-        self,
-        parser: FitParser | None = None,
-        storage: StorageManager | None = None,
-        indexer: IndexManager | None = None,
-    ) -> None:
-        """初始化导入服务"""
+    def __init__(self, context: "AppContext") -> None:
+        """
+        初始化导入服务
+
+        Args:
+            context: AppContext 实例
+        """
+        self.context = context
         self.console = Console()
-        self.parser = parser or FitParser()
-        self.indexer = indexer or IndexManager()
-        self.storage = storage or StorageManager()
+        self.parser = context.parser
+        self.indexer = context.indexer
+        self.storage = context.storage
 
     def scan_directory(self, directory: Path) -> list[Path]:
         """

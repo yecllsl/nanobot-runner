@@ -30,15 +30,21 @@ class FeishuAuth:
 
     TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"  # nosec B105
 
-    def __init__(self, app_id: str | None = None, app_secret: str | None = None):
+    def __init__(
+        self,
+        config: ConfigManager | None = None,
+        app_id: str | None = None,
+        app_secret: str | None = None,
+    ):
         """
         初始化认证管理器
 
         Args:
+            config: 配置管理器，不指定则创建默认实例
             app_id: 飞书应用 App ID，不指定则从配置文件读取
             app_secret: 飞书应用 App Secret，不指定则从配置文件读取
         """
-        self.config = ConfigManager()
+        self.config = config or ConfigManager()
         self.app_id = app_id or self.config.get("feishu_app_id")
         self.app_secret = app_secret or self.config.get("feishu_app_secret")
 
@@ -264,6 +270,7 @@ class FeishuBot:
 
     def __init__(
         self,
+        config: ConfigManager | None = None,
         app_id: str | None = None,
         app_secret: str | None = None,
         receive_id: str | None = None,
@@ -273,15 +280,16 @@ class FeishuBot:
         初始化飞书机器人
 
         Args:
+            config: 配置管理器，不指定则创建默认实例
             app_id: 飞书应用 App ID，不指定则从配置文件读取
             app_secret: 飞书应用 App Secret，不指定则从配置文件读取
             receive_id: 接收者 ID，不指定则从配置文件读取
             receive_id_type: 接收者 ID 类型，不指定则从配置文件读取（默认"user_id"）
         """
-        self.config = ConfigManager()
+        self.config = config or ConfigManager()
 
         # 初始化认证管理
-        self.auth = FeishuAuth(app_id=app_id, app_secret=app_secret)
+        self.auth = FeishuAuth(config=self.config, app_id=app_id, app_secret=app_secret)
 
         # 初始化消息 API
         self.message_api = FeishuMessageAPI(auth=self.auth)

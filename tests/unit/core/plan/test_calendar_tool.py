@@ -21,6 +21,21 @@ from src.core.training_plan import (
 from src.notify.feishu_calendar import CalendarSyncConfig
 
 
+def create_mock_config_manager(config: CalendarSyncConfig) -> MagicMock:
+    """创建 Mock ConfigManager"""
+    mock_config_manager = MagicMock()
+    mock_config_manager.load_config.return_value = {
+        "calendar_sync_enabled": config.enabled,
+        "calendar_id": config.calendar_id,
+        "calendar_reminder_minutes": config.reminder_minutes,
+        "calendar_sync_completed": config.sync_completed,
+        "calendar_include_description": config.include_description,
+        "feishu_app_id": config.app_id,
+        "feishu_app_secret": config.app_secret,
+    }
+    return mock_config_manager
+
+
 def create_test_plan(plan_id: str) -> TrainingPlan:
     """创建测试训练计划"""
     daily_plan = DailyPlan(
@@ -59,7 +74,9 @@ class TestCalendarToolInit:
             app_id="test_app_id",
             app_secret="test_app_secret",
         )
-        tool = CalendarTool(config)
+        tool = CalendarTool(
+            config_manager=create_mock_config_manager(config), config=config
+        )
         assert tool._sync_service.config.enabled is True
         assert tool._sync_service.config.calendar_id == "test_calendar_id"
 
