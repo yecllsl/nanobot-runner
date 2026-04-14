@@ -430,3 +430,804 @@ class TestPlanAnalyzer:
             goal_distance_km=42.195,
             target_time="3:00:00",
         )
+
+
+class TestPlanAnalyzerExtended:
+    """PlanAnalyzer 扩展测试类"""
+
+    def setup_method(self):
+        """每个测试方法前的设置"""
+        self.analyzer = PlanAnalyzer()
+
+        self.user_context = UserContext(
+            profile=RunnerProfile(
+                user_id="test_user",
+                profile_date=datetime.now(),
+                total_activities=100,
+                total_distance_km=1500.0,
+                total_duration_hours=150.0,
+                avg_vdot=45.0,
+                max_vdot=48.0,
+                weekly_avg_distance_km=30.0,
+                weekly_avg_duration_hours=3.5,
+                avg_pace_min_per_km=6.0,
+                resting_heart_rate=60.0,
+                max_heart_rate=190.0,
+            ),
+            recent_activities=[],
+            training_load=TrainingLoad(
+                atl=10.0,
+                ctl=12.0,
+                tsb=-2.0,
+                recent_4_weeks_distance_km=120.0,
+                last_week_distance_km=35.0,
+                avg_weekly_distance_km=30.0,
+                longest_run_km=15.0,
+                training_frequency=4,
+            ),
+            preferences=UserPreferences(
+                preferred_training_days=["monday", "wednesday", "friday", "sunday"],
+                preferred_training_time="morning",
+                enable_calendar_sync=True,
+            ),
+            historical_best_pace_min_per_km=5.5,
+        )
+
+    def _create_training_plan(
+        self,
+        plan_id: str,
+        weeks: list[WeeklySchedule],
+        goal_distance_km: float = 21.0975,
+        goal_date: str = None,
+        target_time: str = "2:00:00",
+    ) -> TrainingPlan:
+        """创建训练计划辅助方法"""
+        today = datetime.now()
+        if goal_date is None:
+            goal_date = (today + timedelta(days=14)).strftime("%Y-%m-%d")
+
+        return TrainingPlan(
+            plan_id=plan_id,
+            user_id="test_user",
+            plan_type="race_preparation",
+            fitness_level=FitnessLevel.INTERMEDIATE,
+            goal_distance_km=goal_distance_km,
+            goal_date=goal_date,
+            start_date=weeks[0].start_date if weeks else today.strftime("%Y-%m-%d"),
+            end_date=goal_date,
+            weeks=weeks,
+            target_time=target_time,
+            calendar_event_ids={},
+        )
+
+    def test_beginner_experience_level(self):
+        """测试初学者经验水平推断"""
+        beginner_context = UserContext(
+            profile=RunnerProfile(
+                user_id="beginner_user",
+                profile_date=datetime.now(),
+                total_activities=20,
+                total_distance_km=100.0,
+                total_duration_hours=12.0,
+                avg_vdot=35.0,
+                max_vdot=38.0,
+                weekly_avg_distance_km=10.0,
+                weekly_avg_duration_hours=1.5,
+                avg_pace_min_per_km=7.5,
+                resting_heart_rate=70.0,
+                max_heart_rate=195.0,
+            ),
+            recent_activities=[],
+            training_load=TrainingLoad(
+                atl=5.0,
+                ctl=6.0,
+                tsb=-1.0,
+                recent_4_weeks_distance_km=40.0,
+                last_week_distance_km=10.0,
+                avg_weekly_distance_km=10.0,
+                longest_run_km=5.0,
+                training_frequency=2,
+            ),
+            preferences=UserPreferences(
+                preferred_training_days=["tuesday", "thursday", "saturday"],
+                preferred_training_time="evening",
+                enable_calendar_sync=True,
+            ),
+            historical_best_pace_min_per_km=7.0,
+        )
+
+        today = datetime.now()
+        week1_start = today + timedelta(days=1)
+        week1_end = week1_start + timedelta(days=6)
+
+        daily_plans = [
+            DailyPlan(
+                date=(week1_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                workout_type="interval" if i < 4 else "rest",
+                distance_km=10.0 if i < 4 else 0.0,
+                duration_min=60 if i < 4 else 0,
+                target_hr_zone=4 if i < 4 else None,
+            )
+            for i in range(7)
+        ]
+
+        week1 = WeeklySchedule(
+            week_number=1,
+            start_date=week1_start.strftime("%Y-%m-%d"),
+            end_date=week1_end.strftime("%Y-%m-%d"),
+            daily_plans=daily_plans,
+            weekly_distance_km=40.0,
+            weekly_duration_min=240,
+            phase="base",
+            focus="高强度训练",
+        )
+
+        plan = self._create_training_plan("test_plan", [week1])
+
+        report = self.analyzer.analyze(plan=plan, user_context=beginner_context)
+
+        fitness_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_FITNESS
+            ),
+            None,
+        )
+
+        assert fitness_dim is not None
+        assert any("初学者" in issue for issue in fitness_dim.details.get("issues", []))
+
+    def test_poor_status(self):
+        """测试poor状态"""
+        beginner_context = UserContext(
+            profile=RunnerProfile(
+                user_id="beginner_user",
+                profile_date=datetime.now(),
+                total_activities=20,
+                total_distance_km=100.0,
+                total_duration_hours=12.0,
+                avg_vdot=35.0,
+                max_vdot=38.0,
+                weekly_avg_distance_km=10.0,
+                weekly_avg_duration_hours=1.5,
+                avg_pace_min_per_km=7.5,
+                resting_heart_rate=70.0,
+                max_heart_rate=195.0,
+            ),
+            recent_activities=[],
+            training_load=TrainingLoad(
+                atl=5.0,
+                ctl=6.0,
+                tsb=-1.0,
+                recent_4_weeks_distance_km=40.0,
+                last_week_distance_km=10.0,
+                avg_weekly_distance_km=10.0,
+                longest_run_km=5.0,
+                training_frequency=2,
+            ),
+            preferences=UserPreferences(
+                preferred_training_days=["tuesday", "thursday", "saturday"],
+                preferred_training_time="evening",
+                enable_calendar_sync=True,
+            ),
+            historical_best_pace_min_per_km=7.0,
+        )
+
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 3):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="long" if i == 6 else "interval",
+                    distance_km=50.0 if i == 6 else 25.0,
+                    duration_min=300 if i == 6 else 125,
+                    target_hr_zone=5,
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=200.0,
+                    weekly_duration_min=1050,
+                    phase="base",
+                    focus="极限训练",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks, goal_distance_km=42.195)
+
+        report = self.analyzer.analyze(plan=plan, user_context=beginner_context)
+
+        assert any(dim.status == "poor" for dim in report.dimensions)
+
+    def test_load_progression_over_10_percent(self):
+        """测试跑量增长超过10%"""
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 4):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            weekly_distance = 30.0 + (week_num - 1) * 10.0
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="easy_run" if i % 2 == 0 else "rest",
+                    distance_km=weekly_distance / 4 if i % 2 == 0 else 0.0,
+                    duration_min=int(weekly_distance / 4 * 6) if i % 2 == 0 else 0,
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=weekly_distance,
+                    weekly_duration_min=int(weekly_distance * 6),
+                    phase="build",
+                    focus="逐步增加跑量",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        load_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_LOAD
+            ),
+            None,
+        )
+
+        assert load_dim is not None
+        assert any("增长" in issue for issue in load_dim.details.get("issues", []))
+
+    def test_no_recovery_week(self):
+        """测试连续训练超过4周未安排减量恢复周"""
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 6):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="easy_run" if i % 2 == 0 else "rest",
+                    distance_km=8.0 if i % 2 == 0 else 0.0,
+                    duration_min=48 if i % 2 == 0 else 0,
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=32.0,
+                    weekly_duration_min=192,
+                    phase="build",
+                    focus="持续训练",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        load_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_LOAD
+            ),
+            None,
+        )
+
+        assert load_dim is not None
+        assert any("恢复周" in issue for issue in load_dim.details.get("issues", []))
+
+    def test_insufficient_taper(self):
+        """测试赛前减量不足"""
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 4):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            weekly_distance = 50.0 if week_num < 3 else 45.0
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="easy_run" if i % 2 == 0 else "rest",
+                    distance_km=weekly_distance / 4 if i % 2 == 0 else 0.0,
+                    duration_min=int(weekly_distance / 4 * 6) if i % 2 == 0 else 0,
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=weekly_distance,
+                    weekly_duration_min=int(weekly_distance * 6),
+                    phase="peak" if week_num == 2 else "taper",
+                    focus="赛前准备",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks, goal_distance_km=42.195)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        load_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_LOAD
+            ),
+            None,
+        )
+
+        assert load_dim is not None
+        assert any("减量" in issue for issue in load_dim.details.get("issues", []))
+
+    def test_consecutive_training_days(self):
+        """测试连续训练天数达到6天以上"""
+        today = datetime.now()
+        week1_start = today + timedelta(days=1)
+        week1_end = week1_start + timedelta(days=6)
+
+        daily_plans = [
+            DailyPlan(
+                date=(week1_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                workout_type="easy_run",
+                distance_km=8.0,
+                duration_min=48,
+            )
+            for i in range(7)
+        ]
+
+        week1 = WeeklySchedule(
+            week_number=1,
+            start_date=week1_start.strftime("%Y-%m-%d"),
+            end_date=week1_end.strftime("%Y-%m-%d"),
+            daily_plans=daily_plans,
+            weekly_distance_km=56.0,
+            weekly_duration_min=336,
+            phase="base",
+            focus="连续训练",
+        )
+
+        plan = self._create_training_plan("test_plan", [week1])
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        injury_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_INJURY
+            ),
+            None,
+        )
+
+        assert injury_dim is not None
+        assert any(
+            "连续训练" in issue for issue in injury_dim.details.get("issues", [])
+        )
+
+    def test_beginner_long_distance_run(self):
+        """测试初学者长距离跑"""
+        beginner_context = UserContext(
+            profile=RunnerProfile(
+                user_id="beginner_user",
+                profile_date=datetime.now(),
+                total_activities=20,
+                total_distance_km=100.0,
+                total_duration_hours=12.0,
+                avg_vdot=35.0,
+                max_vdot=38.0,
+                weekly_avg_distance_km=10.0,
+                weekly_avg_duration_hours=1.5,
+                avg_pace_min_per_km=7.5,
+                resting_heart_rate=70.0,
+                max_heart_rate=195.0,
+            ),
+            recent_activities=[],
+            training_load=TrainingLoad(
+                atl=5.0,
+                ctl=6.0,
+                tsb=-1.0,
+                recent_4_weeks_distance_km=40.0,
+                last_week_distance_km=10.0,
+                avg_weekly_distance_km=10.0,
+                longest_run_km=5.0,
+                training_frequency=2,
+            ),
+            preferences=UserPreferences(
+                preferred_training_days=["tuesday", "thursday", "saturday"],
+                preferred_training_time="evening",
+                enable_calendar_sync=True,
+            ),
+            historical_best_pace_min_per_km=7.0,
+        )
+
+        today = datetime.now()
+        week1_start = today + timedelta(days=1)
+        week1_end = week1_start + timedelta(days=6)
+
+        daily_plans = [
+            DailyPlan(
+                date=(week1_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                workout_type="long" if i == 6 else "rest",
+                distance_km=35.0 if i == 6 else 0.0,
+                duration_min=210 if i == 6 else 0,
+            )
+            for i in range(7)
+        ]
+
+        week1 = WeeklySchedule(
+            week_number=1,
+            start_date=week1_start.strftime("%Y-%m-%d"),
+            end_date=week1_end.strftime("%Y-%m-%d"),
+            daily_plans=daily_plans,
+            weekly_distance_km=35.0,
+            weekly_duration_min=210,
+            phase="base",
+            focus="长距离跑",
+        )
+
+        plan = self._create_training_plan("test_plan", [week1])
+
+        report = self.analyzer.analyze(plan=plan, user_context=beginner_context)
+
+        injury_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_INJURY
+            ),
+            None,
+        )
+
+        assert injury_dim is not None
+        assert any(
+            "初学者长距离" in issue for issue in injury_dim.details.get("issues", [])
+        )
+
+    def test_older_runner_high_intensity(self):
+        """测试50岁以上跑者高强度训练"""
+        from unittest.mock import MagicMock
+
+        older_profile = MagicMock()
+        older_profile.user_id = "older_user"
+        older_profile.total_activities = 100
+        older_profile.total_distance_km = 1500.0
+        older_profile.age = 55
+
+        older_context = UserContext(
+            profile=older_profile,
+            recent_activities=[],
+            training_load=TrainingLoad(
+                atl=10.0,
+                ctl=12.0,
+                tsb=-2.0,
+                recent_4_weeks_distance_km=120.0,
+                last_week_distance_km=35.0,
+                avg_weekly_distance_km=30.0,
+                longest_run_km=15.0,
+                training_frequency=4,
+            ),
+            preferences=UserPreferences(
+                preferred_training_days=["monday", "wednesday", "friday", "sunday"],
+                preferred_training_time="morning",
+                enable_calendar_sync=True,
+            ),
+            historical_best_pace_min_per_km=5.5,
+        )
+
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 3):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="interval" if i % 2 == 0 else "tempo",
+                    distance_km=10.0,
+                    duration_min=60,
+                    target_hr_zone=4,
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=70.0,
+                    weekly_duration_min=420,
+                    phase="build",
+                    focus="高强度训练",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks)
+
+        report = self.analyzer.analyze(plan=plan, user_context=older_context)
+
+        injury_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_INJURY
+            ),
+            None,
+        )
+
+        assert injury_dim is not None
+        assert any(
+            "50岁以上" in issue for issue in injury_dim.details.get("issues", [])
+        )
+        assert any("50岁以上" in warning for warning in report.warnings)
+
+    def test_insufficient_training_period(self):
+        """测试训练周期不足"""
+        today = datetime.now()
+        week1_start = today + timedelta(days=1)
+        week1_end = week1_start + timedelta(days=6)
+
+        daily_plans = [
+            DailyPlan(
+                date=(week1_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                workout_type="easy_run" if i % 2 == 0 else "rest",
+                distance_km=10.0 if i % 2 == 0 else 0.0,
+                duration_min=60 if i % 2 == 0 else 0,
+            )
+            for i in range(7)
+        ]
+
+        week1 = WeeklySchedule(
+            week_number=1,
+            start_date=week1_start.strftime("%Y-%m-%d"),
+            end_date=week1_end.strftime("%Y-%m-%d"),
+            daily_plans=daily_plans,
+            weekly_distance_km=40.0,
+            weekly_duration_min=240,
+            phase="base",
+            focus="建立基础",
+        )
+
+        plan = self._create_training_plan("test_plan", [week1], goal_distance_km=42.195)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        goal_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_GOAL
+            ),
+            None,
+        )
+
+        assert goal_dim is not None
+        assert any("训练周期" in issue for issue in goal_dim.details.get("issues", []))
+
+    def test_insufficient_peak_weekly_distance(self):
+        """测试峰值周跑量不足"""
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 13):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="easy_run" if i % 2 == 0 else "rest",
+                    distance_km=8.0 if i % 2 == 0 else 0.0,
+                    duration_min=48 if i % 2 == 0 else 0,
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=32.0,
+                    weekly_duration_min=192,
+                    phase="build",
+                    focus="逐步训练",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks, goal_distance_km=42.195)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        goal_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_GOAL
+            ),
+            None,
+        )
+
+        assert goal_dim is not None
+        assert any(
+            "峰值周跑量" in issue for issue in goal_dim.details.get("issues", [])
+        )
+
+    def test_insufficient_long_run_distance(self):
+        """测试最长训练跑距离不足"""
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 13):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="long"
+                    if i == 6
+                    else ("easy_run" if i % 2 == 0 else "rest"),
+                    distance_km=25.0 if i == 6 else (8.0 if i % 2 == 0 else 0.0),
+                    duration_min=150 if i == 6 else (48 if i % 2 == 0 else 0),
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=65.0,
+                    weekly_duration_min=390,
+                    phase="build",
+                    focus="长距离训练",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks, goal_distance_km=42.195)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        goal_dim = next(
+            (
+                d
+                for d in report.dimensions
+                if d.dimension == PlanAnalyzer.DIMENSION_GOAL
+            ),
+            None,
+        )
+
+        assert goal_dim is not None
+        assert any(
+            "最长训练跑" in issue for issue in goal_dim.details.get("issues", [])
+        )
+
+    def test_recommendations_generation(self):
+        """测试建议生成"""
+        today = datetime.now()
+        week1_start = today + timedelta(days=1)
+        week1_end = week1_start + timedelta(days=6)
+
+        daily_plans = [
+            DailyPlan(
+                date=(week1_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                workout_type="interval",
+                distance_km=12.0,
+                duration_min=60,
+                target_hr_zone=4,
+            )
+            for i in range(7)
+        ]
+
+        week1 = WeeklySchedule(
+            week_number=1,
+            start_date=week1_start.strftime("%Y-%m-%d"),
+            end_date=week1_end.strftime("%Y-%m-%d"),
+            daily_plans=daily_plans,
+            weekly_distance_km=84.0,
+            weekly_duration_min=420,
+            phase="base",
+            focus="高强度训练",
+        )
+
+        plan = self._create_training_plan("test_plan", [week1])
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        assert len(report.recommendations) > 0
+        assert any("建议" in rec for rec in report.recommendations)
+
+    def test_perfect_plan(self):
+        """测试完美计划"""
+        today = datetime.now()
+
+        weeks = []
+        for week_num in range(1, 13):
+            week_start = today + timedelta(days=(week_num - 1) * 7)
+            week_end = week_start + timedelta(days=6)
+
+            is_recovery_week = week_num % 4 == 0
+            weekly_distance = 50.0 if not is_recovery_week else 35.0
+
+            daily_plans = [
+                DailyPlan(
+                    date=(week_start + timedelta(days=i)).strftime("%Y-%m-%d"),
+                    workout_type="rest"
+                    if i == 0 or i == 3
+                    else ("long" if i == 6 else "easy_run"),
+                    distance_km=weekly_distance / 4
+                    if i not in [0, 3]
+                    else (weekly_distance / 2 if i == 6 else 0.0),
+                    duration_min=int(weekly_distance / 4 * 6)
+                    if i not in [0, 3]
+                    else (int(weekly_distance / 2 * 6) if i == 6 else 0),
+                )
+                for i in range(7)
+            ]
+
+            weeks.append(
+                WeeklySchedule(
+                    week_number=week_num,
+                    start_date=week_start.strftime("%Y-%m-%d"),
+                    end_date=week_end.strftime("%Y-%m-%d"),
+                    daily_plans=daily_plans,
+                    weekly_distance_km=weekly_distance,
+                    weekly_duration_min=int(weekly_distance * 6),
+                    phase="build" if not is_recovery_week else "recovery",
+                    focus="合理训练",
+                )
+            )
+
+        plan = self._create_training_plan("test_plan", weeks, goal_distance_km=42.195)
+
+        report = self.analyzer.analyze(plan=plan, user_context=self.user_context)
+
+        assert report.overall_score >= 60
+        assert len(report.recommendations) > 0
