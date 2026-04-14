@@ -214,7 +214,9 @@ class TestFeishuCalendarAPI:
 
         result = asyncio.run(api.create_event("calendar_id", event))
 
-        assert result == {"event_id": "test_event_id"}
+        assert result.success is True
+        assert result.event_id == "test_event_id"
+        assert "创建成功" in result.message
         mock_request.assert_called_once()
 
     @patch("src.notify.feishu_calendar.FeishuCalendarAPI._get_headers")
@@ -237,7 +239,9 @@ class TestFeishuCalendarAPI:
 
         result = asyncio.run(api.update_event("calendar_id", "event_id", update_data))
 
-        assert result == {"event_id": "test_event_id"}
+        assert result.success is True
+        assert result.event_id == "event_id"
+        assert "更新成功" in result.message
         mock_request.assert_called_once_with(
             "PATCH",
             "https://open.feishu.cn/open-apis/calendar/v4/calendars/calendar_id/events/event_id",
@@ -264,7 +268,9 @@ class TestFeishuCalendarAPI:
 
         result = asyncio.run(api.delete_event("calendar_id", "event_id"))
 
-        assert result == {}
+        assert result.success is True
+        assert result.event_id == "event_id"
+        assert "删除成功" in result.message
         mock_request.assert_called_once()
 
     @patch("src.notify.feishu_calendar.FeishuCalendarAPI._get_headers")
@@ -281,7 +287,9 @@ class TestFeishuCalendarAPI:
 
         result = asyncio.run(api.get_event("calendar_id", "event_id"))
 
-        assert result == {"event_id": "test_event_id", "summary": "测试事件"}
+        assert result.success is True
+        assert result.event_id == "event_id"
+        assert "获取成功" in result.message
         mock_request.assert_called_once()
 
     @patch("src.notify.feishu_calendar.FeishuCalendarAPI._get_headers")
@@ -506,13 +514,16 @@ class TestFeishuCalendarSync:
         sample_training_plan,
     ):
         """测试成功同步训练计划"""
-        # 设置 AsyncMock 的返回值
-        mock_api.create_event.return_value = {"event_id": "event_123"}
+        from src.notify.feishu_calendar import CalendarEventResult
+
+        mock_api.create_event.return_value = CalendarEventResult(
+            success=True, event_id="event_123", message="创建成功"
+        )
 
         result = asyncio.run(sync_service.sync_plan(sample_training_plan))
 
         assert result.success is True
-        assert "成功同步" in result.message
+        assert "成功同步" in result.message or "同步完成" in result.message
         assert result.details is not None
         assert result.details.get("synced_count", 0) > 0
         assert mock_api.create_event.call_count > 0
@@ -570,8 +581,11 @@ class TestFeishuCalendarSync:
 
     def test_sync_daily_workout_success(self, mock_api, sync_service):
         """测试成功同步单日训练"""
-        # 设置 AsyncMock 的返回值
-        mock_api.create_event.return_value = {"event_id": "event_123"}
+        from src.notify.feishu_calendar import CalendarEventResult
+
+        mock_api.create_event.return_value = CalendarEventResult(
+            success=True, event_id="event_123", message="创建成功"
+        )
 
         daily_plan = DailyPlan(
             date="2024-01-01",
@@ -607,7 +621,14 @@ class TestFeishuCalendarSync:
 
     def test_update_event_success(self, mock_api, sync_service):
         """测试成功更新事件"""
-        mock_api.update_event.return_value = {"event_id": "event_123"}
+        from src.notify.feishu_calendar import CalendarEventResult
+
+        mock_api.update_event.return_value = CalendarEventResult(
+            success=True,
+            event_id="event_123",
+            message="更新成功",
+            data={"event_id": "event_123"},
+        )
 
         daily_plan = DailyPlan(
             date="2024-01-01",
@@ -667,10 +688,14 @@ class TestIntegration:
 
         # 创建同步服务
         with patch("src.notify.feishu_calendar.FeishuCalendarAPI") as MockAPI:
+            from src.notify.feishu_calendar import CalendarEventResult
+
             mock_api_instance = MagicMock()
             MockAPI.return_value = mock_api_instance
             mock_api_instance.create_event = AsyncMock(
-                return_value={"event_id": "event_123"}
+                return_value=CalendarEventResult(
+                    success=True, event_id="event_123", message="创建成功"
+                )
             )
 
             service = FeishuCalendarSync(

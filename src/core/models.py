@@ -534,6 +534,30 @@ class SyncResult:
         }
 
 
+@dataclass(frozen=True)
+class CalendarEventResult:
+    """日历事件操作结果"""
+
+    success: bool
+    event_id: str | None = None
+    message: str = ""
+    error: str | None = None
+    data: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        result: dict[str, Any] = {"success": self.success}
+        if self.event_id:
+            result["event_id"] = self.event_id
+        if self.message:
+            result["message"] = self.message
+        if self.error:
+            result["error"] = self.error
+        if self.data:
+            result["data"] = self.data
+        return result
+
+
 @dataclass
 class BatchSyncResult:
     """批量同步结果"""

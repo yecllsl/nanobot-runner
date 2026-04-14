@@ -62,17 +62,8 @@ class HardValidator:
         for rule_name, rule_func in self.rules.items():
             try:
                 result = rule_func(plan, current_weekly_distance_km, goal_distance_km)
-                if not result["passed"]:
-                    violations.append(
-                        Violation(
-                            rule_id=rule_name,
-                            rule_name=result.get("rule_name", rule_name),
-                            actual_value=result.get("actual_value", 0.0),
-                            limit_value=result.get("limit_value", 0.0),
-                            message=result["message"],
-                            location=result.get("location"),
-                        )
-                    )
+                if not result.passed:
+                    violations.extend(result.violations)
             except Exception as e:
                 logger.error(f"规则{rule_name}校验失败: {e}")
                 violations.append(
@@ -103,7 +94,7 @@ class HardValidator:
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> dict[str, Any]:
+    ) -> ValidationResult:
         """
         规则1: 周跑量增长不超过10%
 
@@ -113,7 +104,7 @@ class HardValidator:
             goal_distance_km: 目标距离
 
         Returns:
-            Dict[str, Any]: 校验结果
+            ValidationResult: 校验结果
         """
         errors = []
         prev_distance = current_weekly_distance_km
@@ -135,24 +126,29 @@ class HardValidator:
             prev_distance = week.weekly_distance_km
 
         if errors:
-            return {
-                "passed": False,
-                "rule_name": "周跑量增长限制",
-                "message": f"第{errors[0]['week_number']}周跑量增长{errors[0]['increase_rate']}%，超过10%限制",
-                "actual_value": errors[0]["increase_rate"],
-                "limit_value": 10.0,
-                "location": f"第{errors[0]['week_number']}周",
-                "details": {"violations": errors},
-            }
+            violation = Violation(
+                rule_id=self.RULE_WEEKLY_INCREASE,
+                rule_name="周跑量增长限制",
+                actual_value=errors[0]["increase_rate"],
+                limit_value=10.0,
+                message=f"第{errors[0]['week_number']}周跑量增长{errors[0]['increase_rate']}%，超过10%限制",
+                location=f"第{errors[0]['week_number']}周",
+            )
+            return ValidationResult(
+                passed=False,
+                violations=[violation],
+                retry_count=0,
+                action="retry",
+            )
 
-        return {"passed": True}
+        return ValidationResult(passed=True, violations=[], retry_count=0, action=None)
 
     def _validate_rest_day(
         self,
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> dict[str, Any]:
+    ) -> ValidationResult:
         """
         规则2: 每周至少安排1天完全休息
 
@@ -162,7 +158,7 @@ class HardValidator:
             goal_distance_km: 目标距离
 
         Returns:
-            Dict[str, Any]: 校验结果
+            ValidationResult: 校验结果
         """
         errors = []
 
@@ -177,24 +173,29 @@ class HardValidator:
                 )
 
         if errors:
-            return {
-                "passed": False,
-                "rule_name": "休息日要求",
-                "message": f"第{errors[0]['week_number']}周没有安排休息日",
-                "actual_value": 0.0,
-                "limit_value": 1.0,
-                "location": f"第{errors[0]['week_number']}周",
-                "details": {"violations": errors},
-            }
+            violation = Violation(
+                rule_id=self.RULE_REST_DAY,
+                rule_name="休息日要求",
+                actual_value=0.0,
+                limit_value=1.0,
+                message=f"第{errors[0]['week_number']}周没有安排休息日",
+                location=f"第{errors[0]['week_number']}周",
+            )
+            return ValidationResult(
+                passed=False,
+                violations=[violation],
+                retry_count=0,
+                action="retry",
+            )
 
-        return {"passed": True}
+        return ValidationResult(passed=True, violations=[], retry_count=0, action=None)
 
     def _validate_long_run_ratio(
         self,
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> dict[str, Any]:
+    ) -> ValidationResult:
         """
         规则3: 长距离跑不超过周跑量的30%
 
@@ -204,7 +205,7 @@ class HardValidator:
             goal_distance_km: 目标距离
 
         Returns:
-            Dict[str, Any]: 校验结果
+            ValidationResult: 校验结果
         """
         errors = []
 
@@ -230,24 +231,29 @@ class HardValidator:
                     )
 
         if errors:
-            return {
-                "passed": False,
-                "rule_name": "长距离跑占比限制",
-                "message": f"第{errors[0]['week_number']}周长距离跑占比{errors[0]['ratio']}%，超过30%限制",
-                "actual_value": errors[0]["ratio"],
-                "limit_value": 30.0,
-                "location": f"第{errors[0]['week_number']}周",
-                "details": {"violations": errors},
-            }
+            violation = Violation(
+                rule_id=self.RULE_LONG_RUN_RATIO,
+                rule_name="长距离跑占比限制",
+                actual_value=errors[0]["ratio"],
+                limit_value=30.0,
+                message=f"第{errors[0]['week_number']}周长距离跑占比{errors[0]['ratio']}%，超过30%限制",
+                location=f"第{errors[0]['week_number']}周",
+            )
+            return ValidationResult(
+                passed=False,
+                violations=[violation],
+                retry_count=0,
+                action="retry",
+            )
 
-        return {"passed": True}
+        return ValidationResult(passed=True, violations=[], retry_count=0, action=None)
 
     def _validate_high_intensity_ratio(
         self,
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> dict[str, Any]:
+    ) -> ValidationResult:
         """
         规则4: 高强度训练（间歇/节奏）不超过周跑量的20%
 
@@ -257,7 +263,7 @@ class HardValidator:
             goal_distance_km: 目标距离
 
         Returns:
-            Dict[str, Any]: 校验结果
+            ValidationResult: 校验结果
         """
         errors = []
         high_intensity_types = {"interval", "tempo"}
@@ -283,24 +289,29 @@ class HardValidator:
                     )
 
         if errors:
-            return {
-                "passed": False,
-                "rule_name": "高强度训练占比限制",
-                "message": f"第{errors[0]['week_number']}周高强度训练占比{errors[0]['ratio']}%，超过20%限制",
-                "actual_value": errors[0]["ratio"],
-                "limit_value": 20.0,
-                "location": f"第{errors[0]['week_number']}周",
-                "details": {"violations": errors},
-            }
+            violation = Violation(
+                rule_id=self.RULE_HIGH_INTENSITY_RATIO,
+                rule_name="高强度训练占比限制",
+                actual_value=errors[0]["ratio"],
+                limit_value=20.0,
+                message=f"第{errors[0]['week_number']}周高强度训练占比{errors[0]['ratio']}%，超过20%限制",
+                location=f"第{errors[0]['week_number']}周",
+            )
+            return ValidationResult(
+                passed=False,
+                violations=[violation],
+                retry_count=0,
+                action="retry",
+            )
 
-        return {"passed": True}
+        return ValidationResult(passed=True, violations=[], retry_count=0, action=None)
 
     def _validate_single_run_distance(
         self,
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> dict[str, Any]:
+    ) -> ValidationResult:
         """
         规则5: 单次最长距离不超过目标距离的120%
 
@@ -310,10 +321,10 @@ class HardValidator:
             goal_distance_km: 目标距离
 
         Returns:
-            Dict[str, Any]: 校验结果
+            ValidationResult: 校验结果
         """
         max_distance = goal_distance_km * 1.20
-        errors = []
+        errors: list[dict[str, Any]] = []
 
         for week in plan.weeks:
             for day in week.daily_plans:
@@ -328,24 +339,29 @@ class HardValidator:
                     )
 
         if errors:
-            return {
-                "passed": False,
-                "rule_name": "单次跑步距离限制",
-                "message": f"第{errors[0]['week_number']}周{errors[0]['date']}的单次距离{errors[0]['distance']}km，超过最大限制{errors[0]['max_allowed']}km",
-                "actual_value": errors[0]["distance"],
-                "limit_value": errors[0]["max_allowed"],
-                "location": f"第{errors[0]['week_number']}周{errors[0]['date']}",
-                "details": {"violations": errors},
-            }
+            violation = Violation(
+                rule_id=self.RULE_SINGLE_RUN_DISTANCE,
+                rule_name="单次跑步距离限制",
+                actual_value=float(errors[0]["distance"]),
+                limit_value=float(errors[0]["max_allowed"]),
+                message=f"第{errors[0]['week_number']}周{errors[0]['date']}的单次距离{errors[0]['distance']}km，超过最大限制{errors[0]['max_allowed']}km",
+                location=f"第{errors[0]['week_number']}周{errors[0]['date']}",
+            )
+            return ValidationResult(
+                passed=False,
+                violations=[violation],
+                retry_count=0,
+                action="retry",
+            )
 
-        return {"passed": True}
+        return ValidationResult(passed=True, violations=[], retry_count=0, action=None)
 
     def _validate_taper_week(
         self,
         plan: TrainingPlan,
         current_weekly_distance_km: float,
         goal_distance_km: float,
-    ) -> dict[str, Any]:
+    ) -> ValidationResult:
         """
         规则6: 比赛前一周跑量减少40-60%
 
@@ -355,10 +371,12 @@ class HardValidator:
             goal_distance_km: 目标距离
 
         Returns:
-            Dict[str, Any]: 校验结果
+            ValidationResult: 校验结果
         """
         if not plan.weeks or len(plan.weeks) < 2:
-            return {"passed": True}
+            return ValidationResult(
+                passed=True, violations=[], retry_count=0, action=None
+            )
 
         goal_date = datetime.strptime(plan.goal_date, "%Y-%m-%d")
         last_week = plan.weeks[-1]
@@ -377,18 +395,19 @@ class HardValidator:
                 ) / peak_weekly_distance
 
                 if reduction_rate < 0.40:
-                    return {
-                        "passed": False,
-                        "rule_name": "赛前减量要求",
-                        "message": f"比赛周跑量仅减少{round(reduction_rate * 100, 2)}%，低于40%的最低减量要求",
-                        "actual_value": round(reduction_rate * 100, 2),
-                        "limit_value": 40.0,
-                        "location": "比赛周",
-                        "details": {
-                            "peak_distance": round(peak_weekly_distance, 2),
-                            "taper_distance": round(last_week.weekly_distance_km, 2),
-                            "reduction_rate": round(reduction_rate * 100, 2),
-                        },
-                    }
+                    violation = Violation(
+                        rule_id=self.RULE_TAPER_WEEK,
+                        rule_name="赛前减量要求",
+                        actual_value=round(reduction_rate * 100, 2),
+                        limit_value=40.0,
+                        message=f"比赛周跑量仅减少{round(reduction_rate * 100, 2)}%，低于40%的最低减量要求",
+                        location="比赛周",
+                    )
+                    return ValidationResult(
+                        passed=False,
+                        violations=[violation],
+                        retry_count=0,
+                        action="retry",
+                    )
 
-        return {"passed": True}
+        return ValidationResult(passed=True, violations=[], retry_count=0, action=None)

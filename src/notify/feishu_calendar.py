@@ -11,7 +11,7 @@ import requests
 
 from src.cli.formatter import format_distance
 from src.core.config import ConfigManager
-from src.core.models import DailyPlan, TrainingPlan
+from src.core.models import CalendarEventResult, DailyPlan, TrainingPlan
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class FeishuCalendarAPI:
 
     async def create_event(
         self, calendar_id: str, event: CalendarEventCreateRequest
-    ) -> dict[str, Any]:
+    ) -> CalendarEventResult:
         """
         创建日历事件
 
@@ -178,7 +178,7 @@ class FeishuCalendarAPI:
             event: 事件创建请求
 
         Returns:
-            Dict[str, Any]: API 响应，包含 event_id
+            CalendarEventResult: 创建结果，包含 event_id
 
         Raises:
             RuntimeError: 当创建失败时
@@ -204,11 +204,19 @@ class FeishuCalendarAPI:
             payload["reminders"] = event.reminders  # type: ignore[assignment]
 
         result = self._request("POST", endpoint, json=payload)
-        return result.get("data", {})
+        data = result.get("data", {})
+        event_id = data.get("event_id")
+
+        return CalendarEventResult(
+            success=True,
+            event_id=event_id,
+            message="事件创建成功",
+            data=data,
+        )
 
     async def update_event(
         self, calendar_id: str, event_id: str, event: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> CalendarEventResult:
         """
         更新日历事件
 
@@ -218,16 +226,25 @@ class FeishuCalendarAPI:
             event: 更新内容
 
         Returns:
-            Dict[str, Any]: API 响应
+            CalendarEventResult: 更新结果
 
         Raises:
             RuntimeError: 当更新失败时
         """
         endpoint = f"/calendars/{calendar_id}/events/{event_id}"
         result = self._request("PATCH", endpoint, json=event)
-        return result.get("data", {})
+        data = result.get("data", {})
 
-    async def delete_event(self, calendar_id: str, event_id: str) -> dict[str, Any]:
+        return CalendarEventResult(
+            success=True,
+            event_id=event_id,
+            message="事件更新成功",
+            data=data,
+        )
+
+    async def delete_event(
+        self, calendar_id: str, event_id: str
+    ) -> CalendarEventResult:
         """
         删除日历事件
 
@@ -236,16 +253,23 @@ class FeishuCalendarAPI:
             event_id: 事件 ID
 
         Returns:
-            Dict[str, Any]: API 响应
+            CalendarEventResult: 删除结果
 
         Raises:
             RuntimeError: 当删除失败时
         """
         endpoint = f"/calendars/{calendar_id}/events/{event_id}"
         result = self._request("DELETE", endpoint)
-        return result.get("data", {})
+        data = result.get("data", {})
 
-    async def get_event(self, calendar_id: str, event_id: str) -> dict[str, Any]:
+        return CalendarEventResult(
+            success=True,
+            event_id=event_id,
+            message="事件删除成功",
+            data=data,
+        )
+
+    async def get_event(self, calendar_id: str, event_id: str) -> CalendarEventResult:
         """
         获取日历事件
 
@@ -254,14 +278,21 @@ class FeishuCalendarAPI:
             event_id: 事件 ID
 
         Returns:
-            Dict[str, Any]: 事件详情
+            CalendarEventResult: 事件详情
 
         Raises:
             RuntimeError: 当获取失败时
         """
         endpoint = f"/calendars/{calendar_id}/events/{event_id}"
         result = self._request("GET", endpoint)
-        return result.get("data", {})
+        data = result.get("data", {})
+
+        return CalendarEventResult(
+            success=True,
+            event_id=event_id,
+            message="事件获取成功",
+            data=data,
+        )
 
     async def get_calendar_list(self) -> list[dict[str, Any]]:
         """
@@ -469,7 +500,7 @@ class FeishuCalendarSync:
                     event = self.build_calendar_event(daily_plan, run_date)
                     result = await self._api.create_event(calendar_id, event)
 
-                    event_id = result.get("event_id")
+                    event_id = result.event_id
                     if event_id:
                         event_ids.append(event_id)
                         synced_count += 1
@@ -542,7 +573,7 @@ class FeishuCalendarSync:
             # 创建事件
             result = await self._api.create_event(calendar_id, event)
 
-            event_id = result.get("event_id")
+            event_id = result.event_id
             if event_id:
                 logger.info(
                     f"同步单日训练成功：{date.strftime('%Y-%m-%d')} - {daily_plan.workout_type.value}"
@@ -627,7 +658,7 @@ class FeishuCalendarSync:
                 success=True,
                 message="日历事件已更新",
                 event_id=event_id,
-                details=result,
+                details=result.to_dict(),
             )
 
         except Exception as e:
