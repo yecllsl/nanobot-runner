@@ -2,11 +2,14 @@
 # 包含 gateway 命令
 
 import asyncio
+import logging
 
 import typer
-from loguru import logger
 
 from src.cli.common import console
+from src.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 app = typer.Typer(help="Gateway 服务命令")
 
@@ -46,16 +49,14 @@ def gateway(
     from src.agents.tools import RunnerTools, create_tools
 
     if verbose:
-        import logging
-
         logging.basicConfig(level=logging.DEBUG)
 
     if logs:
-        logger.enable("nanobot")
-        logger.enable("src")
+        logging.getLogger("nanobot").setLevel(logging.DEBUG)
+        logging.getLogger("src").setLevel(logging.DEBUG)
     else:
-        logger.disable("nanobot")
-        logger.disable("src")
+        logging.getLogger("nanobot").setLevel(logging.WARNING)
+        logging.getLogger("src").setLevel(logging.WARNING)
 
     config = load_config()
     provider = _make_provider(config)

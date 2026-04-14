@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from src.core.config_schema import AppConfig
+from src.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConfigManager:
@@ -45,9 +48,7 @@ class ConfigManager:
                 self.data_dir = Path(config["data_dir"])
                 self.index_file = self.data_dir / "index.json"
         except Exception as e:
-            import loguru
-
-            loguru.logger.debug(f"读取配置文件失败，使用默认路径: {e}")
+            logger.debug(f"读取配置文件失败，使用默认路径: {e}")
 
     def _ensure_dirs(self) -> None:
         """确保必要目录存在，并迁移旧的定时任务配置"""
@@ -59,19 +60,15 @@ class ConfigManager:
 
     def _migrate_old_cron_config(self) -> None:
         """迁移旧的定时任务配置到新位置"""
-        import loguru
-
         old_cron_store = Path.home() / ".nanobot" / "cron" / "jobs.json"
         new_cron_store = self.cron_store
 
         if old_cron_store.exists() and not new_cron_store.exists():
             try:
                 shutil.copy2(old_cron_store, new_cron_store)
-                loguru.logger.info(
-                    f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}"
-                )
+                logger.info(f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}")
             except Exception as e:
-                loguru.logger.warning(f"迁移定时任务配置失败：{e}")
+                logger.warning(f"迁移定时任务配置失败：{e}")
 
     def _ensure_config(self) -> None:
         """确保配置文件存在"""
