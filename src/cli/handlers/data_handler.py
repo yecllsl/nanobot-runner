@@ -29,6 +29,8 @@ class DataHandler:
         self.indexer = context.indexer
         self.parser = context.parser
         self.importer = context.importer
+        self.session_repo = context.session_repo
+        self.analytics = context.analytics
 
     def import_file(self, file_path: Path, force: bool = False) -> dict:
         """
@@ -153,48 +155,23 @@ class DataHandler:
         Returns:
             list[dict]: 训练记录列表
         """
-        from src.core.analytics import AnalyticsEngine
+        sessions = self.session_repo.get_recent_sessions(limit=limit)
 
-        lf = self.storage.read_parquet()
-
-        session_df = (
-            lf.group_by("session_start_time")
-            .agg(
-                [
-                    pl.col("session_start_time").first().alias("timestamp"),
-                    pl.col("session_total_distance").first().alias("distance"),
-                    pl.col("session_total_timer_time").first().alias("duration"),
-                    pl.col("session_avg_heart_rate").first().alias("avg_hr"),
-                ]
-            )
-            .sort("timestamp", descending=True)
-            .limit(limit)
-            .collect()
-        )
-
-        analytics = AnalyticsEngine(self.storage)
         runs = []
-
-        for row in session_df.iter_rows(named=True):
-            distance_raw = row.get("distance")
-            duration_raw = row.get("duration")
-            distance = float(distance_raw) if distance_raw is not None else 0.0
-            duration = float(duration_raw) if duration_raw is not None else 0.0
-            distance_km = distance / 1000
-            duration_min = duration / 60
-            pace = duration_min / distance_km if distance_km > 0 else 0
-
+        for session in sessions:
             vdot = None
-            if distance > 0 and duration > 0:
-                vdot = analytics.calculate_vdot(distance, duration)
+            if session.distance_m > 0 and session.duration_s > 0:
+                vdot = self.analytics.calculate_vdot(
+                    session.distance_m, session.duration_s
+                )
 
             runs.append(
                 {
-                    "timestamp": str(row.get("timestamp", "N/A")),
-                    "distance_km": round(distance_km, 2),
-                    "duration_min": round(duration_min, 1),
-                    "avg_pace_sec_km": round(pace, 1) if pace > 0 else None,
-                    "avg_heart_rate": row.get("avg_hr"),
+                    "timestamp": session.timestamp,
+                    "distance_km": round(session.distance_km, 2),
+                    "duration_min": round(session.duration_min, 1),
+                    "avg_pace_sec_km": session.avg_pace_sec_km,
+                    "avg_heart_rate": session.avg_heart_rate,
                     "vdot": round(vdot, 2) if vdot else None,
                 }
             )
