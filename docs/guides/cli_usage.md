@@ -214,14 +214,14 @@ uv run nanobotrun system config --set key=value
 ### 3.7 网关服务命令 (gateway)
 
 ```bash
-# 启动网关服务
+# 启动飞书机器人Gateway服务
 uv run nanobotrun gateway start
 
-# 停止网关服务
-uv run nanobotrun gateway stop
+# 启动时显示详细日志
+uv run nanobotrun gateway start --verbose --logs
 
-# 查看网关状态
-uv run nanobotrun gateway status
+# 指定端口
+uv run nanobotrun gateway start --port 18790
 ```
 
 ## 4. 输出格式

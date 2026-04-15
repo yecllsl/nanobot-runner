@@ -1,7 +1,8 @@
 # Gateway 相关命令
-# 包含 gateway 命令
+# 包含 gateway start 命令
 
 import asyncio
+import contextlib
 import logging
 
 import typer
@@ -14,8 +15,197 @@ logger = get_logger(__name__)
 app = typer.Typer(help="Gateway 服务命令")
 
 
+def _format_stats(data: dict) -> str:
+    """格式化训练统计数据"""
+    if "message" in data:
+        return data["message"]
+
+    total_runs = data.get("total_runs", 0)
+    total_distance = data.get("total_distance", 0.0)
+    total_duration = data.get("total_duration", 0.0)
+    avg_distance = data.get("avg_distance", 0.0)
+    avg_duration = data.get("avg_duration", 0.0)
+
+    hours = int(total_duration // 3600)
+    minutes = int((total_duration % 3600) // 60)
+
+    avg_pace = avg_duration / avg_distance / 60 if avg_distance > 0 else 0
+    pace_min = int(avg_pace)
+    pace_sec = int((avg_pace - pace_min) * 60)
+
+    return (
+        f"📊 训练统计\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"🏃 总跑步次数: {total_runs} 次\n"
+        f"📏 总距离: {total_distance:.2f} km\n"
+        f"⏱️ 总时长: {hours}小时{minutes}分钟\n"
+        f"📐 平均距离: {avg_distance:.2f} km\n"
+        f"⚡ 平均配速: {pace_min}'{pace_sec:02d}\"/km"
+    )
+
+
+def _format_recent(runs: list[dict]) -> str:
+    """格式化最近训练记录"""
+    if not runs:
+        return "暂无跑步记录"
+
+    lines = ["📋 最近训练记录", "━━━━━━━━━━━━━━━━"]
+    for i, run in enumerate(runs, 1):
+        date = run.get("timestamp", "N/A")[:10]
+        distance = run.get("distance_km", 0)
+        duration = run.get("duration", "N/A")
+        avg_hr = run.get("avg_hr", "-")
+
+        lines.append(f"{i}. {date} | {distance:.2f}km | {duration} | HR:{avg_hr}")
+
+    return "\n".join(lines)
+
+
+def _format_vdot(trend: list[dict]) -> str:
+    """格式化VDOT趋势"""
+    if not trend:
+        return "暂无VDOT数据"
+
+    lines = ["📈 VDOT趋势", "━━━━━━━━━━━━━━━━"]
+    for item in trend:
+        date = item.get("date", "N/A")
+        distance = item.get("distance_km", 0)
+        duration = item.get("duration", "N/A")
+        vdot = item.get("vdot", 0)
+
+        lines.append(f"{date} | {distance:.2f}km | {duration} | VDOT:{vdot:.1f}")
+
+    return "\n".join(lines)
+
+
+def _format_hr_drift(data: dict) -> str:
+    """格式化心率漂移分析"""
+    if "error" in data:
+        return data["error"]
+
+    correlation = data.get("correlation", 0)
+    is_drift = data.get("is_hr_drift", False)
+    avg_hr = data.get("avg_hr", 0)
+    hr_range = data.get("hr_range", [0, 0])
+
+    status = "⚠️ 存在心率漂移" if is_drift else "✅ 心率稳定"
+    drift_indicator = (
+        "🔴" if correlation < -0.7 else "🟡" if correlation < -0.5 else "🟢"
+    )
+
+    return (
+        f"💓 心率漂移分析\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"{drift_indicator} {status}\n"
+        f"📊 相关性: {correlation:.3f}\n"
+        f"❤️ 平均心率: {avg_hr:.0f} bpm\n"
+        f"📈 心率范围: {hr_range[0]:.0f} - {hr_range[1]:.0f} bpm"
+    )
+
+
+def _format_training_load(data: dict) -> str:
+    """格式化训练负荷"""
+    if "error" in data:
+        return data["error"]
+
+    atl = data.get("atl", 0)
+    ctl = data.get("ctl", 0)
+    tsb = data.get("tsb", 0)
+
+    status = "💪 体能充沛" if tsb > 10 else "⚖️ 训练平衡" if tsb > -10 else "😴 需要休息"
+
+    return (
+        f"🏋️ 训练负荷\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"🔥 ATL (急性负荷): {atl:.1f}\n"
+        f"💪 CTL (慢性负荷): {ctl:.1f}\n"
+        f"⚖️ TSB (训练平衡): {tsb:+.1f}\n"
+        f"{status}"
+    )
+
+
+def _register_runner_commands(agent, runner_tools):
+    """注册跑步业务命令到 CommandRouter，直接执行不走 LLM"""
+    from nanobot.bus.events import OutboundMessage
+    from nanobot.command.router import CommandContext
+
+    async def cmd_stats(ctx: CommandContext) -> OutboundMessage:
+        data = runner_tools.get_running_stats()
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=_format_stats(data),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    async def cmd_recent(ctx: CommandContext) -> OutboundMessage:
+        args = ctx.args.strip()
+        limit = 10
+        if args:
+            with contextlib.suppress(ValueError):
+                limit = int(args.split()[0])
+        data = runner_tools.get_recent_runs(limit)
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=_format_recent(data),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    async def cmd_vdot(ctx: CommandContext) -> OutboundMessage:
+        args = ctx.args.strip()
+        limit = 20
+        if args:
+            with contextlib.suppress(ValueError):
+                limit = int(args.split()[0])
+        data = runner_tools.get_vdot_trend(limit)
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=_format_vdot(data),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    async def cmd_hr_drift(ctx: CommandContext) -> OutboundMessage:
+        args = ctx.args.strip()
+        run_id = args.split()[0] if args else None
+        data = runner_tools.get_hr_drift_analysis(run_id)
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=_format_hr_drift(data),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    async def cmd_load(ctx: CommandContext) -> OutboundMessage:
+        args = ctx.args.strip()
+        days = 42
+        if args:
+            with contextlib.suppress(ValueError):
+                days = int(args.split()[0])
+        data = runner_tools.get_training_load(days)
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=_format_training_load(data),
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    agent.commands.exact("/stats", cmd_stats)
+    agent.commands.exact("/recent", cmd_recent)
+    agent.commands.prefix("/recent ", cmd_recent)
+    agent.commands.exact("/vd", cmd_vdot)
+    agent.commands.prefix("/vd ", cmd_vdot)
+    agent.commands.exact("/vdot", cmd_vdot)
+    agent.commands.prefix("/vdot ", cmd_vdot)
+    agent.commands.exact("/hr_drift", cmd_hr_drift)
+    agent.commands.prefix("/hr_drift ", cmd_hr_drift)
+    agent.commands.exact("/load", cmd_load)
+    agent.commands.prefix("/load ", cmd_load)
+
+
 @app.command()
-def gateway(
+def start(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
     logs: bool = typer.Option(False, "--logs", "-l", help="启用日志输出"),
@@ -25,13 +215,15 @@ def gateway(
 
     启动后可通过飞书App与"Nanobot-ai助手"机器人交互：
 
-    命令示例:
+    命令示例（直接执行，响应快）:
         /stats              # 查看训练统计
         /recent 5           # 查看最近5次训练
         /vd                 # 查看VDOT趋势
+        /hr_drift           # 查看心率漂移分析
+        /load               # 查看训练负荷
         /help               # 显示帮助
 
-    自然语言示例:
+    自然语言示例（需要LLM理解，响应较慢）:
         我最近跑得怎么样？
         给我一个训练建议
         我的VDOT是多少？
@@ -43,7 +235,6 @@ def gateway(
     from nanobot.config.loader import load_config
     from nanobot.cron.service import CronService
     from nanobot.heartbeat.service import HeartbeatService
-    from nanobot.session.manager import SessionManager
     from nanobot.utils.helpers import sync_workspace_templates
 
     from src.agents.tools import RunnerTools, create_tools
@@ -80,27 +271,26 @@ def gateway(
     sync_workspace_templates(workspace)
 
     bus = MessageBus()
-    session = SessionManager(bus=bus)
+
+    from nanobot.config.schema import AgentDefaults
+
+    defaults = AgentDefaults()
 
     agent = AgentLoop(
         bus=bus,
         provider=provider,
         workspace=workspace,
+        context_window_tokens=defaults.context_window_tokens,
     )
 
     if runner_tools:
         for tool in create_tools(runner_tools):
             agent.tools.register(tool)
+        _register_runner_commands(agent, runner_tools)
 
-    channels = ChannelManager(
-        workspace=workspace,
-        provider=provider,
-        agent=agent,
-        session=session,
-        bus=bus,
-    )
+    channels = ChannelManager(config=config, bus=bus)
 
-    cron = CronService(workspace=workspace, agent=agent)
+    cron = CronService(store_path=workspace / "cron.json")
 
     def on_heartbeat_execute():
         console.print("[dim]心跳检测执行中...[/dim]")
@@ -141,6 +331,7 @@ def gateway(
     console.print("  • /recent [数量] - 查看最近训练")
     console.print("  • /vd - 查看VDOT趋势")
     console.print("  • /hr_drift - 查看心率漂移")
+    console.print("  • /load - 查看训练负荷")
     console.print("  • /help - 显示帮助")
     console.print()
     console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")

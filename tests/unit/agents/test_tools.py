@@ -48,7 +48,7 @@ class TestBaseTool:
             errors = tool.validate_params({})
 
             assert len(errors) > 0
-            assert any("missing required field" in e for e in errors)
+            assert any("missing required" in e for e in errors)
 
     def test_validate_params_type_mismatch_string(self):
         """测试参数类型不匹配验证 - string"""
@@ -59,7 +59,7 @@ class TestBaseTool:
             errors = tool.validate_params({"start_date": 123, "end_date": 456})
 
             assert len(errors) > 0
-            assert any("must be string" in e for e in errors)
+            assert any("should be string" in e for e in errors)
 
     def test_validate_params_type_mismatch_integer(self):
         """测试参数类型不匹配验证 - integer"""
@@ -70,7 +70,7 @@ class TestBaseTool:
             errors = tool.validate_params({"limit": "not_an_integer"})
 
             assert len(errors) > 0
-            assert any("must be integer" in e for e in errors)
+            assert any("should be integer" in e for e in errors)
 
     def test_validate_params_type_mismatch_number(self):
         """测试参数类型不匹配验证 - number"""
@@ -83,7 +83,7 @@ class TestBaseTool:
             )
 
             assert len(errors) > 0
-            assert any("must be number" in e for e in errors)
+            assert any("should be number" in e for e in errors)
 
     def test_validate_params_valid(self):
         """测试有效参数验证"""
@@ -1042,7 +1042,7 @@ class TestBaseToolValidateParamsExtended:
             errors = tool.validate_params({})
 
             assert len(errors) > 0
-            assert any("missing required field" in e for e in errors)
+            assert any("missing required" in e for e in errors)
 
     def test_validate_params_update_memory_valid(self):
         """测试 UpdateMemoryTool 有效参数"""

@@ -3,18 +3,19 @@
 
 import json
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime, timedelta
 from typing import Any
 
 import polars as pl
+from nanobot.agent.tools.base import Tool
 
 from src.core.context import AppContext, AppContextFactory
 
 logger = logging.getLogger(__name__)
 
 
-class BaseTool(ABC):
+class BaseTool(Tool):
     """工具基类（适配nanobot-ai 0.1.4+）"""
 
     concurrency_safe: bool = True
@@ -41,47 +42,9 @@ class BaseTool(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, **kwargs: Any) -> str:
+    async def execute(self, **kwargs: Any) -> Any:
         """执行工具"""
         pass
-
-    def to_schema(self) -> dict[str, Any]:
-        """转换为OpenAI function schema格式"""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            },
-        }
-
-    def validate_params(self, params: dict[str, Any]) -> list[str]:
-        """验证工具参数"""
-        schema = self.parameters or {}
-        if schema.get("type", "object") != "object":
-            return [f"Schema must be object type, got {schema.get('type')!r}"]
-
-        errors = []
-        required = schema.get("required", [])
-        properties = schema.get("properties", {})
-
-        for field in required:
-            if field not in params:
-                errors.append(f"missing required field: {field}")
-
-        for field, value in params.items():
-            if field in properties:
-                prop_schema = properties[field]
-                prop_type = prop_schema.get("type")
-                if prop_type == "integer" and not isinstance(value, int):
-                    errors.append(f"{field} must be integer")
-                elif prop_type == "number" and not isinstance(value, (int, float)):
-                    errors.append(f"{field} must be number")
-                elif prop_type == "string" and not isinstance(value, str):
-                    errors.append(f"{field} must be string")
-
-        return errors
 
     def _run_sync(self, func, *args, **kwargs) -> str:
         """同步调用方法并返回 JSON 字符串
