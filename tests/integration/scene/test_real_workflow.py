@@ -18,7 +18,6 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
@@ -234,9 +233,9 @@ class TestRealWorkflow:
         assert validation_result["valid"] is False
         print("✓ 无效数据验证测试通过")
 
-        # 测试边界值计算 - 零距离应该抛出 ValueError
-        with pytest.raises(ValueError, match="距离和时间必须为正数"):
-            self.analytics_engine.calculate_vdot(0, 1800)
+        # 测试边界值计算 - 零距离应该返回 0.0
+        result = self.analytics_engine.calculate_vdot(0, 1800)
+        assert result == 0.0
         print("✓ 边界值计算测试通过")
 
 

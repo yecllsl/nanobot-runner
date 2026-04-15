@@ -6,58 +6,26 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
-from src.core.exceptions import NanobotRunnerError, ToolResult, ValidationError
+from src.core.exceptions import NanobotRunnerError, ValidationError
+from src.core.result import ToolResult
 
 logger = logging.getLogger(__name__)
 
 
-def tool_wrapper(func: Callable) -> Callable:
-    """
-    工具统一异常处理装饰器
-
-    将所有异常转换为统一的 ToolResult 格式返回
-
-    Args:
-        func: 被装饰的工具函数
-
-    Returns:
-        Callable: 装饰后的函数
-    """
-
-    @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> str:
-        try:
-            result = func(*args, **kwargs)
-            if isinstance(result, ToolResult):
-                return result.to_json()
-            return ToolResult(success=True, data=result).to_json()
-        except ValidationError as e:
-            logger.error(f"输入验证失败: {e.message}", exc_info=True)
-            return ToolResult(
-                success=False, error=f"输入验证失败: {e.message}"
-            ).to_json()
-        except FileNotFoundError as e:
-            logger.error(f"文件不存在: {e}", exc_info=True)
-            return ToolResult(success=False, error=f"文件不存在: {e}").to_json()
-        except NanobotRunnerError as e:
-            logger.error(f"业务错误: {e.message}", exc_info=True)
-            return ToolResult(success=False, error=e.message).to_json()
-        except Exception as e:
-            logger.error(f"内部错误: {e}", exc_info=True)
-            return ToolResult(success=False, error=f"内部错误: {e}").to_json()
-
-    return wrapper
-
-
-def handle_tool_errors(
-    default_response: Any = None, error_message: str = "抱歉，操作失败"
+def tool_handler(
+    return_format: str = "json",
+    default_response: Any = None,
+    error_message: str = "抱歉，操作失败",
 ) -> Callable:
     """
-    工具函数错误处理装饰器
+    统一工具异常处理装饰器
+
+    将所有异常转换为统一格式返回，支持JSON字符串或字典格式
 
     Args:
-        default_response: 默认返回值
-        error_message: 错误提示消息
+        return_format: 返回格式，"json" 返回JSON字符串，"dict" 返回字典
+        default_response: 默认返回值（仅dict格式有效）
+        error_message: 错误提示消息（仅dict格式有效）
 
     Returns:
         Callable: 装饰器函数
@@ -67,20 +35,47 @@ def handle_tool_errors(
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                return func(*args, **kwargs)
-            except NanobotRunnerError as e:
-                logger.error(
-                    f"工具调用失败：{func.__name__} - {e.message}", exc_info=True
-                )
-                return e.to_dict()
-            except FileNotFoundError:
+                result = func(*args, **kwargs)
+                if return_format == "json":
+                    if isinstance(result, ToolResult):
+                        return result.to_json()
+                    return ToolResult(success=True, data=result).to_json()
+                return result
+            except ValidationError as e:
+                logger.error(f"输入验证失败: {e.message}", exc_info=True)
+                if return_format == "json":
+                    return ToolResult(
+                        success=False, error=f"输入验证失败: {e.message}"
+                    ).to_json()
+                return {"error": f"输入验证失败: {e.message}"}
+            except FileNotFoundError as e:
+                logger.error(f"文件不存在: {e}", exc_info=True)
+                if return_format == "json":
+                    return ToolResult(success=False, error=f"文件不存在: {e}").to_json()
                 return {"error": "暂无数据，请先导入跑步数据"}
+            except NanobotRunnerError as e:
+                logger.error(f"业务错误: {e.message}", exc_info=True)
+                if return_format == "json":
+                    return ToolResult(success=False, error=e.message).to_json()
+                return e.to_dict()
             except ValueError as e:
+                logger.error(f"参数错误: {e}", exc_info=True)
+                if return_format == "json":
+                    return ToolResult(
+                        success=False, error=f"参数错误: {str(e)}"
+                    ).to_json()
                 return {"error": f"参数错误：{str(e)}"}
             except KeyError as e:
+                logger.error(f"数据字段缺失: {e}", exc_info=True)
+                if return_format == "json":
+                    return ToolResult(
+                        success=False, error=f"数据字段缺失: {str(e)}"
+                    ).to_json()
                 return {"error": f"数据字段缺失：{str(e)}"}
             except Exception as e:
-                logger.error(f"工具调用失败：{func.__name__} - {e}", exc_info=True)
+                logger.error(f"内部错误: {e}", exc_info=True)
+                if return_format == "json":
+                    return ToolResult(success=False, error=f"内部错误: {e}").to_json()
                 return default_response or {"error": error_message}
 
         return wrapper

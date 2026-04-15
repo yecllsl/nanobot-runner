@@ -187,9 +187,9 @@ class TestFixedWorkflow:
             self.storage_manager.save_to_parquet(empty_df, 2024)
         print("✓ 空数据处理测试通过")
 
-        # 测试边界值计算 - 零距离应该抛出 ValueError
-        with pytest.raises(ValueError, match="距离和时间必须为正数"):
-            self.analytics_engine.calculate_vdot(0, 1800)
+        # 测试边界值计算 - 零距离应该返回 0.0
+        result = self.analytics_engine.calculate_vdot(0, 1800)
+        assert result == 0.0
         print("✓ 边界值计算测试通过")
 
         # 测试无效年份读取

@@ -4,7 +4,7 @@
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -17,6 +17,7 @@ from src.core.training_plan import (
     WeeklySchedule,
 )
 from src.notify.feishu_calendar import SyncResult
+from tests.conftest import create_mock_context
 
 
 def create_e2e_plan(plan_id: str, with_event_id: bool = False) -> TrainingPlan:
@@ -62,7 +63,10 @@ class TestTrainingPlanE2E:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.fixture
     def calendar_tool(self):
@@ -125,7 +129,10 @@ class TestPlanAdjustmentE2E:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.fixture
     def calendar_tool(self):
@@ -183,7 +190,10 @@ class TestPlanCancellationE2E:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.fixture
     def calendar_tool(self):

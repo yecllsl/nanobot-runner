@@ -24,6 +24,15 @@ class ConfigManager:
     _cache_time: float = 0
     _cache_ttl: float = 300.0
 
+    @classmethod
+    def reset_cache(cls) -> None:
+        """重置配置缓存
+
+        用于测试场景，确保每次测试都从文件读取最新配置
+        """
+        cls._cache = None
+        cls._cache_time = 0
+
     def __init__(self) -> None:
         """初始化配置管理器"""
         config_dir = os.environ.get("NANOBOT_CONFIG_DIR")

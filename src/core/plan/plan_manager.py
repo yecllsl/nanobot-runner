@@ -3,9 +3,11 @@
 
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from src.core.exceptions import NanobotRunnerError
 from src.core.models import PlanStatus, TrainingPlan
 
 if TYPE_CHECKING:
@@ -45,10 +47,12 @@ class PlanStatusTransition:
         return to_status in allowed_transitions
 
 
-class PlanManagerError(Exception):
+@dataclass
+class PlanManagerError(NanobotRunnerError):
     """计划管理器异常"""
 
-    pass
+    error_code: str = "PLAN_MANAGER_ERROR"
+    recovery_suggestion: str | None = None
 
 
 class PlanManager:

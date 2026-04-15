@@ -50,10 +50,10 @@ class TestDataContract:
         assert isinstance(result, list)
         if result:
             first_item = result[0]
-            assert "date" in first_item, "缺少 date 字段"
-            assert "distance" in first_item, "缺少 distance 字段"
-            assert "vdot" in first_item, "缺少 vdot 字段"
-            assert "duration" in first_item, "缺少 duration 字段"
+            assert hasattr(first_item, "date"), "缺少 date 字段"
+            assert hasattr(first_item, "distance"), "缺少 distance 字段"
+            assert hasattr(first_item, "vdot"), "缺少 vdot 字段"
+            assert hasattr(first_item, "duration"), "缺少 duration 字段"
 
     def test_session_summary_field_names(self):
         """
@@ -101,11 +101,11 @@ class TestDataContract:
         stats_agg = StatisticsAggregator(mock_storage)
         result = stats_agg.get_running_stats()
 
-        assert "total_runs" in result
-        assert "total_distance" in result
-        assert "total_duration" in result
-        assert "avg_heart_rate" in result
-        assert "avg_pace" in result
+        assert hasattr(result, "total_runs")
+        assert hasattr(result, "total_distance")
+        assert hasattr(result, "total_duration")
+        assert hasattr(result, "avg_heart_rate")
+        assert hasattr(result, "avg_pace")
 
     def test_agent_tools_return_field_names(self):
         """
@@ -183,8 +183,8 @@ class TestNullValueHandling:
         stats_agg = StatisticsAggregator(mock_storage)
         result = stats_agg.get_running_stats()
 
-        assert result["total_runs"] >= 0
-        assert result["total_distance"] >= 0.0
+        assert result.total_runs >= 0
+        assert result.total_distance >= 0.0
 
     def test_statistics_with_null_duration(self):
         """
@@ -209,8 +209,8 @@ class TestNullValueHandling:
         stats_agg = StatisticsAggregator(mock_storage)
         result = stats_agg.get_running_stats()
 
-        assert result["total_runs"] >= 0
-        assert result["total_duration"] >= 0.0
+        assert result.total_runs >= 0
+        assert result.total_duration >= 0.0
 
     def test_statistics_with_all_nulls(self):
         """
@@ -268,8 +268,8 @@ class TestNullValueHandling:
             assert isinstance(result, list)
             if result:
                 for item in result:
-                    assert item.get("distance") is not None
-                    assert item.get("vdot") is not None
+                    assert item.distance is not None
+                    assert item.vdot is not None
         except (TypeError, RuntimeError):
             pass
 

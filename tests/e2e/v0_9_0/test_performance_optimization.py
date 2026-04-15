@@ -190,7 +190,10 @@ class TestPerformanceOptimizationE2E:
 
         print(f"  - 写入时间: {write_time:.3f}秒")
         print(f"  - 文件大小: {file_size:.2f}MB")
-        print(f"  - 写入速度: {len(test_data) / write_time:.0f}条/秒")
+        if write_time > 0:
+            print(f"  - 写入速度: {len(test_data) / write_time:.0f}条/秒")
+        else:
+            print("  - 写入速度: 极快（<1ms）")
 
         assert write_time < 5.0, f"写入时间应<5秒，实际: {write_time:.3f}秒"
 

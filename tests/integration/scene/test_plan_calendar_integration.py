@@ -20,6 +20,7 @@ from src.core.training_plan import (
     WeeklySchedule,
 )
 from src.notify.feishu_calendar import SyncResult
+from tests.conftest import create_mock_context
 
 
 def create_test_plan(plan_id: str, with_event_id: bool = False) -> TrainingPlan:
@@ -62,7 +63,10 @@ class TestCalendarPlanIntegration:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.fixture
     def calendar_tool(self):
@@ -130,7 +134,10 @@ class TestPlanLifecycle:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.mark.asyncio
     async def test_complete_lifecycle(self, plan_manager):
@@ -179,7 +186,10 @@ class TestBatchSyncWithStatus:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.fixture
     def calendar_tool(self):
@@ -238,7 +248,10 @@ class TestConcurrentOperations:
     @pytest.fixture
     def plan_manager(self, temp_dir):
         """创建PlanManager实例"""
-        return PlanManager(data_dir=temp_dir)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(config=mock_config)
+        return PlanManager(context)
 
     @pytest.mark.asyncio
     async def test_concurrent_create_operations(self, plan_manager):

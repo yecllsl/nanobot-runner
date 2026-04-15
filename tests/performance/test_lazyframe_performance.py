@@ -147,8 +147,10 @@ class TestLazyFramePerformance:
         print(f"📊 get_running_stats 性能: {elapsed:.4f}秒")
 
         assert elapsed < 1.0, f"查询耗时 {elapsed:.4f}秒，超过 1 秒限制"
-        assert isinstance(result, dict), "结果应为字典"
-        assert "total_runs" in result, "结果应包含 total_runs"
+        from src.core.models import RunningStats
+
+        assert isinstance(result, RunningStats), "结果应为 RunningStats"
+        assert hasattr(result, "total_runs"), "结果应包含 total_runs"
 
         print("✅ get_running_stats LazyFrame 测试通过")
 
@@ -203,8 +205,12 @@ class TestLazyFramePerformance:
         print(f"📊 get_pace_distribution 性能: {elapsed:.4f}秒")
 
         assert elapsed < 1.0, f"查询耗时 {elapsed:.4f}秒，超过 1 秒限制"
-        assert isinstance(result, dict), "结果应为字典"
-        assert "zones" in result, "结果应包含 zones"
+        from src.core.models import PaceDistributionResult
+
+        assert isinstance(result, PaceDistributionResult), (
+            "结果应为 PaceDistributionResult"
+        )
+        assert hasattr(result, "zones"), "结果应包含 zones"
 
         print("✅ get_pace_distribution LazyFrame 测试通过")
 

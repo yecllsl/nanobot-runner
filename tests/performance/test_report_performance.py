@@ -8,6 +8,7 @@ import tempfile
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
@@ -15,6 +16,7 @@ import pytest
 from src.core.analytics import AnalyticsEngine
 from src.core.report_service import ReportService
 from src.core.storage import StorageManager
+from tests.conftest import create_mock_context
 
 
 class TestReportPerformance:
@@ -30,12 +32,13 @@ class TestReportPerformance:
         # 生成测试数据
         self._generate_test_data()
 
-        # 创建 ReportService 实例
-        self.report_service = ReportService(
-            storage=self.storage,
-            analytics=self.analytics,
-            feishu=None,  # 不使用飞书推送
+        # 创建 ReportService 实例（使用依赖注入）
+        mock_config = MagicMock()
+        mock_config.data_dir = self.temp_dir
+        context = create_mock_context(
+            config=mock_config, storage=self.storage, analytics=self.analytics
         )
+        self.report_service = ReportService(context)
 
     def teardown_method(self):
         """测试后清理"""
@@ -96,16 +99,18 @@ class TestReportPerformance:
 
         # 性能要求：响应时间 < 1 秒
         assert elapsed < 1.0, f"晨报生成耗时 {elapsed:.3f}秒，超过 1 秒限制"
-        assert isinstance(result, dict), "生成结果应为字典类型"
-        assert "date" in result, "结果应包含 date 字段"
-        assert "greeting" in result, "结果应包含 greeting 字段"
-        assert "fitness_status" in result, "结果应包含 fitness_status 字段"
-        assert "training_advice" in result, "结果应包含 training_advice 字段"
-        assert "weekly_plan" in result, "结果应包含 weekly_plan 字段"
+        from src.core.models import DailyReportData
+
+        assert isinstance(result, DailyReportData), "生成结果应为 DailyReportData 类型"
+        assert hasattr(result, "date"), "结果应包含 date 字段"
+        assert hasattr(result, "greeting"), "结果应包含 greeting 字段"
+        assert hasattr(result, "fitness_status"), "结果应包含 fitness_status 字段"
+        assert hasattr(result, "training_advice"), "结果应包含 training_advice 字段"
+        assert hasattr(result, "weekly_plan"), "结果应包含 weekly_plan 字段"
 
         print(f"✅ 晨报生成性能测试通过: {elapsed:.3f}秒")
-        print(f"   日期: {result.get('date', 'N/A')}")
-        print(f"   问候语: {result.get('greeting', 'N/A')}")
+        print(f"   日期: {result.date}")
+        print(f"   问候语: {result.greeting}")
 
     @pytest.mark.performance
     def test_generate_report_with_yesterday_run(self):
@@ -143,10 +148,12 @@ class TestReportPerformance:
 
         # 性能要求：响应时间 < 1 秒
         assert elapsed < 1.0, f"晨报生成耗时 {elapsed:.3f}秒，超过 1 秒限制"
-        assert isinstance(result, dict), "生成结果应为字典类型"
+        from src.core.models import DailyReportData
+
+        assert isinstance(result, DailyReportData), "生成结果应为 DailyReportData 类型"
 
         # 验证昨日训练数据
-        yesterday_run = result.get("yesterday_run")
+        yesterday_run = result.yesterday_run
         # 注意：由于数据类型问题，可能无法正确读取昨日数据，这里放宽验证
         # 主要验证性能指标
         print(f"✅ 包含昨日训练的晨报生成性能测试通过: {elapsed:.3f}秒")
@@ -200,16 +207,25 @@ class TestReportPerformance:
 
         # 性能要求：响应时间 < 1 秒
         assert elapsed < 1.0, f"大数据量晨报生成耗时 {elapsed:.3f}秒，超过 1 秒限制"
-        assert isinstance(result, dict), "生成结果应为字典类型"
+        from src.core.models import DailyReportData
+
+        assert isinstance(result, DailyReportData), "生成结果应为 DailyReportData 类型"
 
         print(f"✅ 大数据量晨报生成性能测试通过: {elapsed:.3f}秒")
 
 
 def test_report_generation_baseline():
     """晨报生成基准测试 - 验证基础性能"""
+    from unittest.mock import MagicMock
+
     storage = StorageManager()
     analytics = AnalyticsEngine(storage)
-    report_service = ReportService(storage=storage, analytics=analytics, feishu=None)
+    mock_config = MagicMock()
+    mock_config.data_dir = storage.data_dir
+    context = create_mock_context(
+        config=mock_config, storage=storage, analytics=analytics
+    )
+    report_service = ReportService(context)
 
     # 测试空数据生成性能
     start_time = time.time()

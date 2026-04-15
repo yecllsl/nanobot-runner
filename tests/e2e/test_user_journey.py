@@ -167,7 +167,7 @@ class TestUserJourney:
                     "-m",
                     "src.cli",
                     "data",
-                    "import-data",
+                    "import",
                     str(fit_dir),
                     "--help",
                 ],

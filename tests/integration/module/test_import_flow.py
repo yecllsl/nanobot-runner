@@ -2,10 +2,12 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.storage import StorageManager
+from tests.conftest import create_mock_context
 
 
 class TestImportIntegration:
@@ -17,10 +19,13 @@ class TestImportIntegration:
             data_dir = Path(tmpdir) / "data"
             data_dir.mkdir()
 
-            # 初始化服务
-            service = ImportService()
-            service.storage = StorageManager(data_dir=data_dir)
-            service.indexer = IndexManager(index_file=data_dir / "index.json")
+            # 初始化服务（使用依赖注入）
+            mock_config = MagicMock()
+            mock_config.data_dir = data_dir
+            context = create_mock_context(config=mock_config)
+            context.storage = StorageManager(data_dir=data_dir)
+            context.indexer = IndexManager(index_file=data_dir / "index.json")
+            service = ImportService(context)
 
             # 模拟导入流程
             metadata = {
