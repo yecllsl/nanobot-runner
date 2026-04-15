@@ -4,7 +4,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen.svg)](./coverage.xml)
-[![Tests](https://img.shields.io/badge/tests-1991%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-2039%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 项目简介

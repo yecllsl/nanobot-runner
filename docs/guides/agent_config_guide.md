@@ -219,6 +219,6 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 
 ---
 
-**文档版本**: v0.4.1  
-**最后更新**: 2026-03-30  
+**文档版本**: v0.9.3  
+**最后更新**: 2026-04-15  
 **关联文档**: [CLI使用指南](./cli_usage.md)
