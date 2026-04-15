@@ -6,7 +6,7 @@
 # 用法:
 #   curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash
 #   或指定版本和目录:
-#   curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --version v0.9.2 --dir ~/my-runner
+#   curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --version v0.9.3 --dir ~/my-runner
 #   或先下载再执行:
 #   bash install.sh [--version TAG] [--dir PATH] [--skip-uv] [--verbose]
 # =============================================================================
@@ -286,9 +286,9 @@ parse_args() {
                 echo ""
                 echo "示例:"
                 echo "  bash install.sh"
-                echo "  bash install.sh --version v0.9.2"
+                echo "  bash install.sh --version v0.9.3"
                 echo "  bash install.sh --dir ~/apps/nanobot-runner"
-                echo "  curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --version v0.9.2"
+                echo "  curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --version v0.9.3"
                 exit 0
                 ;;
             *)

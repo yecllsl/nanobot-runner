@@ -1,6 +1,6 @@
 [project]
 name = "nanobot-runner"
-version = "0.9.2"
+version = "0.9.3"
 description = "Nanobot Runner - 桌面端私人AI跑步助理"
 readme = "README.md"
 requires-python = ">=3.11"
