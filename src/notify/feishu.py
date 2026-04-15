@@ -10,6 +10,7 @@ from typing import Any
 import requests
 
 from src.core.config import ConfigManager
+from src.core.models import OperationResult
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,7 @@ class FeishuBot:
 
     def _send_with_retry(
         self, send_func: Callable, retry_count: int = 0
-    ) -> dict[str, Any]:
+    ) -> OperationResult:
         """
         带重试机制的消息发送
 
@@ -316,11 +317,11 @@ class FeishuBot:
             retry_count: 当前重试次数
 
         Returns:
-            dict: API 响应
+            OperationResult: API 响应
         """
         try:
             result = send_func()
-            return {"success": True, "data": result}
+            return OperationResult(success=True, data=result)
 
         except RuntimeError as e:
             error_msg = str(e)
@@ -328,15 +329,15 @@ class FeishuBot:
                 logger.warning(f"{error_msg}，第 {retry_count + 1} 次重试...")
                 time.sleep(self.RETRY_DELAY)
                 return self._send_with_retry(send_func, retry_count + 1)
-            return {
-                "success": False,
-                "error": f"{error_msg}，已重试{self.MAX_RETRIES}次",
-            }
+            return OperationResult(
+                success=False,
+                error=f"{error_msg}，已重试{self.MAX_RETRIES}次",
+            )
 
         except Exception as e:
-            return {"success": False, "error": f"发送失败：{str(e)}"}
+            return OperationResult(success=False, error=f"发送失败：{str(e)}")
 
-    def send_text(self, text: str) -> dict[str, Any]:
+    def send_text(self, text: str) -> OperationResult:
         """
         发送文本消息
 
@@ -344,13 +345,13 @@ class FeishuBot:
             text: 消息文本
 
         Returns:
-            dict: API 响应
+            OperationResult: API 响应
         """
         if not self.auth.is_configured():
-            return {"success": False, "error": "未配置飞书应用凭证"}
+            return OperationResult(success=False, error="未配置飞书应用凭证")
 
         if not self.receive_id:
-            return {"success": False, "error": "未配置接收者 ID"}
+            return OperationResult(success=False, error="未配置接收者 ID")
 
         def _send() -> dict[str, Any]:
             return self.message_api.send_text(
@@ -361,7 +362,7 @@ class FeishuBot:
 
         return self._send_with_retry(_send)
 
-    def send_card(self, title: str, content: str) -> dict[str, Any]:
+    def send_card(self, title: str, content: str) -> OperationResult:
         """
         发送卡片消息
 
@@ -370,13 +371,13 @@ class FeishuBot:
             content: 卡片内容
 
         Returns:
-            dict: API 响应
+            OperationResult: API 响应
         """
         if not self.auth.is_configured():
-            return {"success": False, "error": "未配置飞书应用凭证"}
+            return OperationResult(success=False, error="未配置飞书应用凭证")
 
         if not self.receive_id:
-            return {"success": False, "error": "未配置接收者 ID"}
+            return OperationResult(success=False, error="未配置接收者 ID")
 
         card_payload = {
             "config": {"wide_screen_mode": True},
@@ -407,7 +408,7 @@ class FeishuBot:
 
         return self._send_with_retry(_send)
 
-    def send_import_notification(self, stats: dict[str, int]) -> dict[str, Any]:
+    def send_import_notification(self, stats: dict[str, int]) -> OperationResult:
         """
         发送导入通知
 
@@ -415,7 +416,7 @@ class FeishuBot:
             stats: 导入统计字典
 
         Returns:
-            dict: API 响应
+            OperationResult: API 响应
         """
         title = "📊 数据导入完成"
         content = f"""
@@ -428,7 +429,7 @@ class FeishuBot:
 
         return self.send_card(title, content.strip())
 
-    def send_daily_report(self, report_data: dict[str, Any]) -> dict[str, Any]:
+    def send_daily_report(self, report_data: dict[str, Any]) -> OperationResult:
         """
         发送每日晨报（飞书卡片消息格式）
 
@@ -442,14 +443,14 @@ class FeishuBot:
                 - weekly_plan: 本周训练计划预览
 
         Returns:
-            dict: API 响应
+            OperationResult: API 响应
         """
         # 检查是否配置了推送渠道
         if not self.auth.is_configured() or not self.receive_id:
-            return {
-                "success": False,
-                "error": "未配置飞书推送渠道。请配置 feishu_app_id、feishu_app_secret 和 feishu_receive_id。",
-            }
+            return OperationResult(
+                success=False,
+                error="未配置飞书推送渠道。请配置 feishu_app_id、feishu_app_secret 和 feishu_receive_id。",
+            )
 
         # 构建飞书卡片消息
         card_elements = []
@@ -549,20 +550,14 @@ class FeishuBot:
                 receive_id_type=self.receive_id_type,
             )
 
-        result = self._send_with_retry(_send)
-
-        # 兼容旧接口返回格式
-        if result.get("success"):
-            return {"success": True, "data": result.get("data")}
-        else:
-            return {"success": False, "error": result.get("error")}
+        return self._send_with_retry(_send)
 
 
 def test_connection(
     app_id: str | None = None,
     app_secret: str | None = None,
     receive_id: str | None = None,
-) -> dict[str, Any]:
+) -> OperationResult:
     """
     测试飞书应用机器人连接
 
@@ -572,12 +567,12 @@ def test_connection(
         receive_id: 接收者 ID，不指定则从配置文件读取
 
     Returns:
-        dict: 连接测试结果
+        OperationResult: 连接测试结果
     """
     bot = FeishuBot(app_id=app_id, app_secret=app_secret, receive_id=receive_id)
     result = bot.send_text("测试消息：如果收到此消息，说明飞书应用机器人配置正确")
 
-    if not result.get("success"):
-        return {"success": False, "error": result.get("error")}
+    if not result.success:
+        return OperationResult(success=False, error=result.error)
 
-    return {"success": True, "message": "飞书应用机器人配置正确"}
+    return OperationResult(success=True, message="飞书应用机器人配置正确")

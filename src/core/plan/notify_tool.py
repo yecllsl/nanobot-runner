@@ -188,7 +188,7 @@ class NotifyTool:
                 content=message,
             )
 
-            if result.get("success"):
+            if result.success:
                 logger.info(f"训练提醒发送成功：{daily_plan.date}")
                 return NotifyResult(
                     sent=True,
@@ -197,7 +197,7 @@ class NotifyTool:
                     weather_info=weather_info,
                 )
             else:
-                error_msg = result.get("error", "未知错误")
+                error_msg = result.error or "未知错误"
                 logger.error(f"训练提醒发送失败：{error_msg}")
                 return NotifyResult(
                     sent=False,

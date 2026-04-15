@@ -2,7 +2,7 @@
 # 包含 report 和 profile 命令
 
 
-from typing import Any
+from typing import Any, cast
 
 import typer
 from rich.panel import Panel
@@ -10,7 +10,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error, print_status
-from src.core.models import DailyReportData
+from src.core.models import MonthlyReportData, WeeklyReportData
 
 app = typer.Typer(help="报告和画像命令")
 profile_app = typer.Typer(help="用户画像管理")
@@ -47,21 +47,19 @@ def report(
 
         if status:
             schedule_status = service.get_schedule_status()
-            if schedule_status.get("configured"):
-                state_color = "green" if schedule_status.get("enabled") else "yellow"
-                state_text = "已启用" if schedule_status.get("enabled") else "已禁用"
+            if schedule_status.configured:
+                state_color = "green" if schedule_status.enabled else "yellow"
+                state_text = "已启用" if schedule_status.enabled else "已禁用"
                 console.print(
                     f"[bold]定时推送状态:[/bold] [{state_color}]{state_text}[/{state_color}]"
                 )
                 console.print(
-                    f"  推送时间: [cyan]{schedule_status.get('time', 'N/A')}[/cyan]"
+                    f"  推送时间: [cyan]{schedule_status.time or 'N/A'}[/cyan]"
                 )
                 console.print(
-                    f"  推送到飞书: {'[green]是[/green]' if schedule_status.get('push') else '[dim]否[/dim]'}"
+                    f"  推送到飞书: {'[green]是[/green]' if schedule_status.push else '[dim]否[/dim]'}"
                 )
-                console.print(
-                    f"  年龄设置: [cyan]{schedule_status.get('age', 30)}[/cyan] 岁"
-                )
+                console.print(f"  年龄设置: [cyan]{schedule_status.age}[/cyan] 岁")
             else:
                 print_status("未配置定时推送", "warning")
                 console.print(
@@ -71,8 +69,8 @@ def report(
 
         if enable is not None:
             result = service.enable_schedule(enabled=enable)
-            if result.get("success"):
-                print_status(result.get("message", ""), "success")
+            if result.success:
+                print_status(result.message or "", "success")
             else:
                 print_error(CLIError.schedule_not_found())
                 raise typer.Exit(1)
@@ -87,12 +85,12 @@ def report(
                 progress.add_task("正在配置定时推送", total=None)
                 result = service.schedule_report(time_str=schedule, push=push, age=age)
 
-            if result.get("success"):
-                print_status(result.get("message", ""), "success")
+            if result.success:
+                print_status(result.message or "", "success")
             else:
                 print_error(
                     {
-                        "message": result.get("error", "配置失败"),
+                        "message": result.error or "配置失败",
                         "suggestion": "请确保时间格式为 HH:MM，例如: 07:00",
                     }
                 )
@@ -105,23 +103,23 @@ def report(
             transient=True,
         ) as progress:
             progress.add_task("正在生成晨报", total=None)
-            result = service.run_report_now(push=push, age=age)
+            report_result = service.run_report_now(push=push, age=age)
 
-        if not result.get("success"):
+        if not report_result.get("success"):
             print_error(
                 {
-                    "message": f"生成晨报失败: {result.get('error', '未知错误')}",
+                    "message": f"生成晨报失败: {report_result.get('error', '未知错误')}",
                     "suggestion": "请检查是否有跑步数据，或使用 'nanobotrun data import <路径>' 导入数据",
                 }
             )
             raise typer.Exit(1)
 
-        report_data = result.get("report", {})
+        report_data = report_result.get("report", {})
 
         _display_report(report_data)
 
         if push:
-            push_result = result.get("push_result", {})
+            push_result = report_result.get("push_result", {})
             if push_result.get("success"):
                 print_status("晨报已推送到飞书", "success")
             else:
@@ -175,14 +173,19 @@ def weekly(
             )
             raise typer.Exit(1)
 
-        _display_weekly_report(result)
+        _display_weekly_report(
+            cast(
+                WeeklyReportData | dict[str, Any],
+                result.to_dict() if hasattr(result, "to_dict") else result,
+            )
+        )
 
         if push:
             push_result = service.push_report(result, report_type=ReportType.WEEKLY)
-            if push_result.get("success"):
+            if push_result.success:
                 print_status("周报已推送到飞书", "success")
             else:
-                print_error(CLIError.push_failed(push_result.get("error", "未知错误")))
+                print_error(CLIError.push_failed(push_result.error or "未知错误"))
 
     except Exception as e:
         print_error(
@@ -229,14 +232,19 @@ def monthly(
             )
             raise typer.Exit(1)
 
-        _display_monthly_report(result)
+        _display_monthly_report(
+            cast(
+                MonthlyReportData | dict[str, Any],
+                result.to_dict() if hasattr(result, "to_dict") else result,
+            )
+        )
 
         if push:
             push_result = service.push_report(result, report_type=ReportType.MONTHLY)
-            if push_result.get("success"):
+            if push_result.success:
                 print_status("月报已推送到飞书", "success")
             else:
-                print_error(CLIError.push_failed(push_result.get("error", "未知错误")))
+                print_error(CLIError.push_failed(push_result.error or "未知错误"))
 
     except Exception as e:
         print_error(
@@ -339,7 +347,7 @@ def _display_report(report_data: dict) -> None:
         console.print(plan_table)
 
 
-def _display_weekly_report(report_data: DailyReportData | dict[str, Any]) -> None:
+def _display_weekly_report(report_data: WeeklyReportData | dict[str, Any]) -> None:
     """
     在终端显示周报内容
 
@@ -347,7 +355,7 @@ def _display_weekly_report(report_data: DailyReportData | dict[str, Any]) -> Non
         report_data: 周报数据
     """
     # 转换 dataclass 为字典
-    if isinstance(report_data, DailyReportData):
+    if isinstance(report_data, WeeklyReportData):
         report_dict = report_data.to_dict()
     else:
         report_dict = report_data
@@ -430,7 +438,7 @@ def _display_weekly_report(report_data: DailyReportData | dict[str, Any]) -> Non
         )
 
 
-def _display_monthly_report(report_data: DailyReportData | dict[str, Any]) -> None:
+def _display_monthly_report(report_data: MonthlyReportData | dict[str, Any]) -> None:
     """
     在终端显示月报内容
 
@@ -438,7 +446,7 @@ def _display_monthly_report(report_data: DailyReportData | dict[str, Any]) -> No
         report_data: 月报数据
     """
     # 转换 dataclass 为字典
-    if isinstance(report_data, DailyReportData):
+    if isinstance(report_data, MonthlyReportData):
         report_dict = report_data.to_dict()
     else:
         report_dict = report_data

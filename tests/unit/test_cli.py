@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from src.cli.app import app
 from src.cli.common import CLIError, print_error, print_status
+from src.core.models import OperationResult, ScheduleStatus
 
 runner = CliRunner()
 
@@ -370,11 +371,11 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.get_schedule_status.return_value = {
-                "configured": False,
-                "enabled": False,
-                "message": "未配置定时推送",
-            }
+            mock_service.get_schedule_status.return_value = ScheduleStatus(
+                configured=False,
+                enabled=False,
+                message="未配置定时推送",
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 
@@ -386,13 +387,13 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.get_schedule_status.return_value = {
-                "configured": True,
-                "enabled": True,
-                "time": "07:00",
-                "push": True,
-                "age": 30,
-            }
+            mock_service.get_schedule_status.return_value = ScheduleStatus(
+                configured=True,
+                enabled=True,
+                time="07:00",
+                push=True,
+                age=30,
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 
@@ -404,13 +405,13 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.get_schedule_status.return_value = {
-                "configured": True,
-                "enabled": False,
-                "time": "07:00",
-                "push": True,
-                "age": 30,
-            }
+            mock_service.get_schedule_status.return_value = ScheduleStatus(
+                configured=True,
+                enabled=False,
+                time="07:00",
+                push=True,
+                age=30,
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 
@@ -422,11 +423,11 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.schedule_report.return_value = {
-                "success": True,
-                "message": "已配置定时推送",
-                "next_run": "2024-01-01T07:00:00",
-            }
+            mock_service.schedule_report.return_value = OperationResult(
+                success=True,
+                message="已配置定时推送",
+                data={"next_run": "2024-01-01T07:00:00"},
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 
@@ -438,10 +439,10 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.schedule_report.return_value = {
-                "success": False,
-                "error": "时间格式无效",
-            }
+            mock_service.schedule_report.return_value = OperationResult(
+                success=False,
+                error="时间格式无效",
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 
@@ -453,10 +454,10 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.enable_schedule.return_value = {
-                "success": True,
-                "message": "定时推送已启用",
-            }
+            mock_service.enable_schedule.return_value = OperationResult(
+                success=True,
+                message="定时推送已启用",
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 
@@ -468,10 +469,10 @@ class TestCLIReport:
         with patch("src.core.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
-            mock_service.enable_schedule.return_value = {
-                "success": True,
-                "message": "定时推送已禁用",
-            }
+            mock_service.enable_schedule.return_value = OperationResult(
+                success=True,
+                message="定时推送已禁用",
+            )
             mock_context.report_service = mock_service
             mock_get_context.return_value = mock_context
 

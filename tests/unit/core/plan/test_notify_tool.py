@@ -8,6 +8,7 @@ import pytest
 from src.core.models import (
     DailyPlan,
     NotifyResult,
+    OperationResult,
     TrainingLoad,
     TrainingType,
     UserContext,
@@ -218,7 +219,9 @@ class TestNotifyToolSendReminder:
         """创建NotifyTool实例"""
         mock_bot = Mock()
         mock_bot.send_card = Mock(
-            return_value={"success": True, "data": {"message_id": "test_msg_id"}}
+            return_value=OperationResult(
+                success=True, data={"message_id": "test_msg_id"}
+            )
         )
         mock_weather = Mock()
         mock_weather.get_weather = Mock(
@@ -328,7 +331,7 @@ class TestNotifyToolSendReminder:
     def test_send_reminder_send_failure(self, notify_tool):
         """测试发送失败"""
         notify_tool.feishu_bot.send_card = Mock(
-            return_value={"success": False, "error": "网络错误"}
+            return_value=OperationResult(success=False, error="网络错误")
         )
 
         daily_plan = create_test_daily_plan()
@@ -601,7 +604,9 @@ class TestNotifyToolWeatherAlertDisabled:
         """创建NotifyTool实例"""
         mock_bot = Mock()
         mock_bot.send_card = Mock(
-            return_value={"success": True, "data": {"message_id": "test_msg_id"}}
+            return_value=OperationResult(
+                success=True, data={"message_id": "test_msg_id"}
+            )
         )
         mock_weather = Mock()
         mock_weather.get_weather = Mock(

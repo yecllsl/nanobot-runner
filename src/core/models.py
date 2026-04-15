@@ -813,3 +813,145 @@ class PaceDistributionResult:
         if self.message:
             result["message"] = self.message
         return result
+
+
+@dataclass(frozen=True)
+class OperationResult:
+    """通用操作结果"""
+
+    success: bool
+    message: str = ""
+    error: str = ""
+    data: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result: dict[str, Any] = {"success": self.success}
+        if self.message:
+            result["message"] = self.message
+        if self.error:
+            result["error"] = self.error
+        if self.data:
+            result["data"] = self.data
+        return result
+
+
+@dataclass(frozen=True)
+class WeeklyReportData:
+    """周报数据"""
+
+    type: str = "weekly"
+    date_range: str = ""
+    greeting: str = ""
+    total_runs: int = 0
+    total_distance_km: float = 0.0
+    total_duration_min: float = 0.0
+    total_tss: float = 0.0
+    avg_vdot: float = 0.0
+    training_load: dict[str, Any] | None = None
+    highlights: list[str] | None = None
+    concerns: list[str] | None = None
+    recommendations: list[str] | None = None
+    error: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result: dict[str, Any] = {
+            "type": self.type,
+            "date_range": self.date_range,
+            "greeting": self.greeting,
+            "total_runs": self.total_runs,
+            "total_distance_km": self.total_distance_km,
+            "total_duration_min": self.total_duration_min,
+            "total_tss": self.total_tss,
+            "avg_vdot": self.avg_vdot,
+        }
+        if self.training_load:
+            result["training_load"] = self.training_load
+        if self.highlights:
+            result["highlights"] = self.highlights
+        if self.concerns:
+            result["concerns"] = self.concerns
+        if self.recommendations:
+            result["recommendations"] = self.recommendations
+        if self.error:
+            result["error"] = self.error
+        return result
+
+
+@dataclass(frozen=True)
+class MonthlyReportData:
+    """月报数据"""
+
+    type: str = "monthly"
+    month: str = ""
+    greeting: str = ""
+    total_runs: int = 0
+    total_distance_km: float = 0.0
+    total_duration_min: float = 0.0
+    total_tss: float = 0.0
+    avg_vdot: float = 0.0
+    avg_weekly_distance_km: float = 0.0
+    avg_weekly_duration_min: float = 0.0
+    training_load: dict[str, Any] | None = None
+    highlights: list[str] | None = None
+    concerns: list[str] | None = None
+    recommendations: list[str] | None = None
+    error: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result: dict[str, Any] = {
+            "type": self.type,
+            "month": self.month,
+            "greeting": self.greeting,
+            "total_runs": self.total_runs,
+            "total_distance_km": self.total_distance_km,
+            "total_duration_min": self.total_duration_min,
+            "total_tss": self.total_tss,
+            "avg_vdot": self.avg_vdot,
+            "avg_weekly_distance_km": self.avg_weekly_distance_km,
+            "avg_weekly_duration_min": self.avg_weekly_duration_min,
+        }
+        if self.training_load:
+            result["training_load"] = self.training_load
+        if self.highlights:
+            result["highlights"] = self.highlights
+        if self.concerns:
+            result["concerns"] = self.concerns
+        if self.recommendations:
+            result["recommendations"] = self.recommendations
+        if self.error:
+            result["error"] = self.error
+        return result
+
+
+@dataclass(frozen=True)
+class ScheduleStatus:
+    """定时推送状态"""
+
+    enabled: bool
+    configured: bool
+    time: str = ""
+    push: bool = True
+    age: int = 30
+    job_id: str = ""
+    message: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典"""
+        result: dict[str, Any] = {
+            "enabled": self.enabled,
+            "configured": self.configured,
+        }
+        if self.time:
+            result["time"] = self.time
+        if self.push:
+            result["push"] = self.push
+        if self.age:
+            result["age"] = self.age
+        if self.job_id:
+            result["job_id"] = self.job_id
+        if self.message:
+            result["message"] = self.message
+        return result

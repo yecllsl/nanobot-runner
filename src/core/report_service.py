@@ -8,7 +8,14 @@ from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
 from src.core.logger import get_logger
-from src.core.models import DailyReportData, ReportType
+from src.core.models import (
+    DailyReportData,
+    MonthlyReportData,
+    OperationResult,
+    ReportType,
+    ScheduleStatus,
+    WeeklyReportData,
+)
 from src.notify.feishu import FeishuBot
 
 if TYPE_CHECKING:
@@ -55,7 +62,7 @@ class ReportService:
 
     def generate_report(
         self, report_type: ReportType = ReportType.DAILY, age: int = 30
-    ) -> DailyReportData | dict[str, Any]:
+    ) -> DailyReportData | WeeklyReportData | MonthlyReportData:
         """
         生成报告
 
@@ -64,7 +71,7 @@ class ReportService:
             age: 年龄参数
 
         Returns:
-            DailyReportData | dict: 报告数据
+            DailyReportData | WeeklyReportData | MonthlyReportData: 报告数据
         """
         logger.debug(f"生成{report_type.value}报告，年龄：{age}")
 
@@ -77,7 +84,7 @@ class ReportService:
         else:
             raise ValueError(f"不支持的报告类型：{report_type}")
 
-    def _generate_weekly_report(self, age: int = 30) -> dict[str, Any]:
+    def _generate_weekly_report(self, age: int = 30) -> WeeklyReportData:
         """
         生成周报
 
@@ -85,7 +92,7 @@ class ReportService:
             age: 年龄参数
 
         Returns:
-            dict: 周报数据
+            WeeklyReportData: 周报数据
         """
         now = datetime.now()
         start_of_week = now - timedelta(days=now.weekday())
@@ -113,30 +120,30 @@ class ReportService:
             # 获取训练负荷
             training_load = self.analytics.get_training_load(days=7)
 
-            return {
-                "type": "weekly",
-                "date_range": f"{start_date.strftime('%m.%d')}-{end_date.strftime('%m.%d')}",
-                "greeting": f"本周训练总结 ({start_date.strftime('%m.%d')}-{end_date.strftime('%m.%d')})",
-                "total_runs": total_runs,
-                "total_distance_km": round(total_distance / 1000, 2),
-                "total_duration_min": round(total_duration / 60, 1),
-                "total_tss": round(total_tss, 1),
-                "avg_vdot": round(avg_vdot, 1),
-                "training_load": training_load,
-                "highlights": self._identify_weekly_highlights(runs),
-                "concerns": self._identify_weekly_concerns(runs),
-                "recommendations": self._generate_weekly_recommendations(
+            return WeeklyReportData(
+                type="weekly",
+                date_range=f"{start_date.strftime('%m.%d')}-{end_date.strftime('%m.%d')}",
+                greeting=f"本周训练总结 ({start_date.strftime('%m.%d')}-{end_date.strftime('%m.%d')})",
+                total_runs=total_runs,
+                total_distance_km=round(total_distance / 1000, 2),
+                total_duration_min=round(total_duration / 60, 1),
+                total_tss=round(total_tss, 1),
+                avg_vdot=round(avg_vdot, 1),
+                training_load=training_load,
+                highlights=self._identify_weekly_highlights(runs),
+                concerns=self._identify_weekly_concerns(runs),
+                recommendations=self._generate_weekly_recommendations(
                     runs, training_load
                 ),
-            }
+            )
         except Exception as e:
             logger.error(f"生成周报失败：{e}", exc_info=True)
-            return {
-                "type": "weekly",
-                "error": f"生成失败：{str(e)}",
-            }
+            return WeeklyReportData(
+                type="weekly",
+                error=f"生成失败：{str(e)}",
+            )
 
-    def _generate_monthly_report(self, age: int = 30) -> dict[str, Any]:
+    def _generate_monthly_report(self, age: int = 30) -> MonthlyReportData:
         """
         生成月报
 
@@ -144,7 +151,7 @@ class ReportService:
             age: 年龄参数
 
         Returns:
-            dict: 月报数据
+            MonthlyReportData: 月报数据
         """
         now = datetime.now()
         start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -176,30 +183,30 @@ class ReportService:
             # 获取训练负荷
             training_load = self.analytics.get_training_load(days=30)
 
-            return {
-                "type": "monthly",
-                "month": now.strftime("%Y年%m月"),
-                "greeting": f"本月训练总结 ({now.strftime('%Y年%m月')})",
-                "total_runs": total_runs,
-                "total_distance_km": round(total_distance / 1000, 2),
-                "total_duration_min": round(total_duration / 60, 1),
-                "total_tss": round(total_tss, 1),
-                "avg_vdot": round(avg_vdot, 1),
-                "avg_weekly_distance_km": round(avg_weekly_distance, 2),
-                "avg_weekly_duration_min": round(avg_weekly_duration, 1),
-                "training_load": training_load,
-                "highlights": self._identify_monthly_highlights(runs),
-                "concerns": self._identify_monthly_concerns(runs),
-                "recommendations": self._generate_monthly_recommendations(
+            return MonthlyReportData(
+                type="monthly",
+                month=now.strftime("%Y年%m月"),
+                greeting=f"本月训练总结 ({now.strftime('%Y年%m月')})",
+                total_runs=total_runs,
+                total_distance_km=round(total_distance / 1000, 2),
+                total_duration_min=round(total_duration / 60, 1),
+                total_tss=round(total_tss, 1),
+                avg_vdot=round(avg_vdot, 1),
+                avg_weekly_distance_km=round(avg_weekly_distance, 2),
+                avg_weekly_duration_min=round(avg_weekly_duration, 1),
+                training_load=training_load,
+                highlights=self._identify_monthly_highlights(runs),
+                concerns=self._identify_monthly_concerns(runs),
+                recommendations=self._generate_monthly_recommendations(
                     runs, training_load
                 ),
-            }
+            )
         except Exception as e:
             logger.error(f"生成月报失败：{e}", exc_info=True)
-            return {
-                "type": "monthly",
-                "error": f"生成失败：{str(e)}",
-            }
+            return MonthlyReportData(
+                type="monthly",
+                error=f"生成失败：{str(e)}",
+            )
 
     def _identify_weekly_highlights(self, runs: list[dict]) -> list[str]:
         """识别本周亮点"""
@@ -336,9 +343,12 @@ class ReportService:
 
     def push_report(
         self,
-        report_data: DailyReportData | dict[str, Any],
+        report_data: DailyReportData
+        | WeeklyReportData
+        | MonthlyReportData
+        | dict[str, Any],
         report_type: ReportType = ReportType.DAILY,
-    ) -> dict[str, Any]:
+    ) -> OperationResult:
         """
         推送报告
 
@@ -347,10 +357,10 @@ class ReportService:
             report_type: 报告类型
 
         Returns:
-            dict: 推送结果
+            OperationResult: 推送结果
         """
         # 转换 dataclass 为字典
-        if isinstance(report_data, DailyReportData):
+        if hasattr(report_data, "to_dict"):
             report_dict = report_data.to_dict()
         else:
             report_dict = report_data
@@ -359,11 +369,11 @@ class ReportService:
 
         if not feishu.auth.is_configured():
             logger.warning("未配置飞书应用机器人")
-            return {"success": False, "error": "未配置飞书应用机器人"}
+            return OperationResult(success=False, error="未配置飞书应用机器人")
 
         if not feishu.receive_id:
             logger.warning("未配置飞书接收者 ID")
-            return {"success": False, "error": "未配置飞书接收者 ID"}
+            return OperationResult(success=False, error="未配置飞书接收者 ID")
 
         # 根据报告类型格式化内容
         if report_type == ReportType.DAILY:
@@ -376,19 +386,18 @@ class ReportService:
             content = self._format_monthly_report_content(report_dict)
             title = "📈 每月跑步总结"
         else:
-            return {
-                "success": False,
-                "error": f"不支持的报告类型：{report_type}",
-            }
+            return OperationResult(
+                success=False, error=f"不支持的报告类型：{report_type}"
+            )
 
         result = feishu.send_card(title, content)
 
-        if "error" in result:
-            logger.error(f"推送{report_type.value}报告失败：{result['error']}")
-            return {"success": False, "error": result["error"]}
+        if not result.success:
+            logger.error(f"推送{report_type.value}报告失败：{result.error}")
+            return OperationResult(success=False, error=result.error)
 
         logger.info(f"{report_type.value}报告推送成功")
-        return {"success": True, "message": f"{report_type.value}报告推送成功"}
+        return OperationResult(success=True, message=f"{report_type.value}报告推送成功")
 
     def _format_report_content(self, report_data: dict[str, Any]) -> str:
         """格式化报告内容 (晨报)"""
@@ -525,7 +534,7 @@ class ReportService:
         push: bool = True,
         age: int = 30,
         report_type: ReportType = ReportType.DAILY,
-    ) -> dict[str, Any]:
+    ) -> OperationResult:
         """
         配置定时推送
 
@@ -536,13 +545,13 @@ class ReportService:
             report_type: 报告类型
 
         Returns:
-            dict: 配置结果
+            OperationResult: 配置结果
         """
         try:
             hour, minute = map(int, time_str.split(":"))
             if not (0 <= hour <= 23 and 0 <= minute <= 59):
                 logger.error(f"时间格式无效：{time_str}")
-                return {"success": False, "error": "时间格式无效"}
+                return OperationResult(success=False, error="时间格式无效")
 
             now = datetime.now()
             target_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -582,22 +591,22 @@ class ReportService:
             logger.info(
                 f"配置定时{report_type.value}推送成功，下次推送时间：{target_time}"
             )
-            return {
-                "success": True,
-                "message": f"已配置定时{report_type.value}推送，下次推送时间：{target_time.strftime('%Y-%m-%d %H:%M')}",
-                "next_run": target_time.isoformat(),
-            }
+            return OperationResult(
+                success=True,
+                message=f"已配置定时{report_type.value}推送，下次推送时间：{target_time.strftime('%Y-%m-%d %H:%M')}",
+                data={"next_run": target_time.isoformat()},
+            )
 
         except ValueError as e:
             logger.error(f"时间格式错误：{e}")
-            return {"success": False, "error": f"时间格式错误：{e}"}
+            return OperationResult(success=False, error=f"时间格式错误：{e}")
         except Exception as e:
             logger.error(f"配置定时推送失败：{e}")
-            return {"success": False, "error": f"配置失败：{e}"}
+            return OperationResult(success=False, error=f"配置失败：{e}")
 
     def enable_schedule(
         self, enabled: bool = True, report_type: ReportType = ReportType.DAILY
-    ) -> dict[str, Any]:
+    ) -> OperationResult:
         """
         启用/禁用定时推送
 
@@ -606,7 +615,7 @@ class ReportService:
             report_type: 报告类型
 
         Returns:
-            dict: 操作结果
+            OperationResult: 操作结果
         """
         try:
             jobs = self.cron_service.list_jobs(include_disabled=True)
@@ -619,10 +628,10 @@ class ReportService:
 
             if not job_id:
                 logger.warning(f"未找到定时任务 ({report_type.value})")
-                return {
-                    "success": False,
-                    "error": f"未找到定时任务，请先使用 --schedule 配置 ({report_type.value})",
-                }
+                return OperationResult(
+                    success=False,
+                    error=f"未找到定时任务，请先使用 --schedule 配置 ({report_type.value})",
+                )
 
             self.cron_service.enable_job(job_id, enabled=enabled)
 
@@ -630,15 +639,17 @@ class ReportService:
 
             status = "已启用" if enabled else "已禁用"
             logger.info(f"定时{report_type.value}推送{status}")
-            return {"success": True, "message": f"定时{report_type.value}推送{status}"}
+            return OperationResult(
+                success=True, message=f"定时{report_type.value}推送{status}"
+            )
 
         except Exception as e:
             logger.error(f"操作失败：{e}")
-            return {"success": False, "error": f"操作失败：{e}"}
+            return OperationResult(success=False, error=f"操作失败：{e}")
 
     def get_schedule_status(
         self, report_type: ReportType = ReportType.DAILY
-    ) -> dict[str, Any]:
+    ) -> ScheduleStatus:
         """
         获取定时推送状态
 
@@ -646,7 +657,7 @@ class ReportService:
             report_type: 报告类型
 
         Returns:
-            dict: 状态信息
+            ScheduleStatus: 状态信息
         """
         try:
             jobs = self.cron_service.list_jobs(include_disabled=True)
@@ -659,11 +670,11 @@ class ReportService:
 
             if not job:
                 logger.debug(f"未配置定时{report_type.value}推送")
-                return {
-                    "enabled": False,
-                    "configured": False,
-                    "message": f"未配置定时{report_type.value}推送",
-                }
+                return ScheduleStatus(
+                    enabled=False,
+                    configured=False,
+                    message=f"未配置定时{report_type.value}推送",
+                )
 
             import json
 
@@ -673,28 +684,28 @@ class ReportService:
                 config = {}
 
             logger.debug(f"定时{report_type.value}推送状态：enabled={job.enabled}")
-            return {
-                "enabled": job.enabled,
-                "configured": True,
-                "time": config.get(
+            return ScheduleStatus(
+                enabled=job.enabled,
+                configured=True,
+                time=config.get(
                     "time", self.config.get(f"report_schedule_{report_type.value}")
                 ),
-                "push": config.get(
+                push=config.get(
                     "push", self.config.get(f"report_push_{report_type.value}", True)
                 ),
-                "age": config.get(
+                age=config.get(
                     "age", self.config.get(f"report_age_{report_type.value}", 30)
                 ),
-                "job_id": job.id,
-            }
+                job_id=job.id,
+            )
 
         except Exception as e:
             logger.error(f"获取定时{report_type.value}推送状态失败：{e}")
-            return {
-                "enabled": False,
-                "configured": False,
-                "error": str(e),
-            }
+            return ScheduleStatus(
+                enabled=False,
+                configured=False,
+                message=str(e),
+            )
 
     async def run_scheduled_report(
         self, report_type: ReportType = ReportType.DAILY
@@ -710,17 +721,17 @@ class ReportService:
         """
         try:
             status = self.get_schedule_status(report_type=report_type)
-            age = status.get("age", 30)
-            push = status.get("push", True)
+            age = status.age
+            push = status.push
 
             report_data = self.generate_report(report_type=report_type, age=age)
 
             if push:
                 result = self.push_report(report_data, report_type=report_type)
                 logger.info(
-                    f"定时{report_type.value}推送执行完成：success={result.get('success')}"
+                    f"定时{report_type.value}推送执行完成：success={result.success}"
                 )
-                return result.get("success", False)
+                return result.success
 
             logger.info(f"定时{report_type.value}推送执行完成（仅生成）")
             return True
@@ -750,16 +761,23 @@ class ReportService:
             logger.debug(f"立即生成{report_type.value}报告，push={push}, age={age}")
             report_data = self.generate_report(report_type=report_type, age=age)
 
+            # 转换 dataclass 为字典
+            report_dict: dict[str, Any]
+            if hasattr(report_data, "to_dict"):
+                report_dict = report_data.to_dict()
+            else:
+                report_dict = report_data  # type: ignore[assignment]
+
             result = {
                 "success": True,
-                "report": report_data,
+                "report": report_dict,
             }
 
             if push:
                 push_result = self.push_report(report_data, report_type=report_type)
-                result["push_result"] = push_result
+                result["push_result"] = push_result.to_dict()
                 logger.info(
-                    f"{report_type.value}报告生成并推送完成：success={push_result.get('success')}"
+                    f"{report_type.value}报告生成并推送完成：success={push_result.success}"
                 )
 
             return result

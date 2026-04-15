@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.models import ReportType
+from src.core.models import OperationResult, ReportType
 from src.core.report_service import ReportService
 from tests.conftest import create_mock_context
 
@@ -47,13 +47,13 @@ class TestReportServiceWeeklyReport:
 
         result = mock_service.generate_report(report_type=ReportType.WEEKLY)
 
-        assert result["type"] == "weekly"
-        assert "date_range" in result
-        assert "greeting" in result
-        assert "total_runs" in result
-        assert "highlights" in result
-        assert "concerns" in result
-        assert "recommendations" in result
+        assert result.type == "weekly"
+        assert hasattr(result, "date_range")
+        assert hasattr(result, "greeting")
+        assert hasattr(result, "total_runs")
+        assert hasattr(result, "highlights")
+        assert hasattr(result, "concerns")
+        assert hasattr(result, "recommendations")
 
     def test_generate_weekly_report_with_data(self, mock_service):
         """测试使用真实数据生成周报"""
@@ -80,10 +80,10 @@ class TestReportServiceWeeklyReport:
 
         result = mock_service.generate_report(report_type=ReportType.WEEKLY)
 
-        assert result["total_runs"] == 2
-        assert result["total_distance_km"] > 0
-        assert result["total_tss"] > 0
-        assert result["avg_vdot"] > 0
+        assert result.total_runs == 2
+        assert result.total_distance_km > 0
+        assert result.total_tss > 0
+        assert result.avg_vdot > 0
 
     def test_generate_weekly_report_highlights(self, mock_service):
         """测试周报亮点识别"""
@@ -163,11 +163,11 @@ class TestReportServiceMonthlyReport:
 
         result = mock_service.generate_report(report_type=ReportType.MONTHLY)
 
-        assert result["type"] == "monthly"
-        assert "month" in result
-        assert "greeting" in result
-        assert "total_runs" in result
-        assert "avg_weekly_distance_km" in result
+        assert result.type == "monthly"
+        assert hasattr(result, "month")
+        assert hasattr(result, "greeting")
+        assert hasattr(result, "total_runs")
+        assert hasattr(result, "avg_weekly_distance_km")
 
     def test_generate_monthly_report_highlights(self, mock_service):
         """测试月报亮点识别"""
@@ -211,7 +211,7 @@ class TestReportServicePush:
         # 在创建服务后设置feishu mock
         service.feishu = MagicMock()
         service.feishu.webhook = "https://test.webhook.com"
-        service.feishu.send_card.return_value = {"code": 0}
+        service.feishu.send_card.return_value = OperationResult(success=True)
         service.feishu.auth.is_configured.return_value = True
         service.feishu.receive_id = "test_user"
         return service
@@ -230,7 +230,7 @@ class TestReportServicePush:
             report_data, report_type=ReportType.DAILY
         )
 
-        assert result["success"] is True
+        assert result.success is True
         mock_service_with_feishu.feishu.send_card.assert_called_once()
 
     def test_push_weekly_report(self, mock_service_with_feishu):
@@ -249,7 +249,7 @@ class TestReportServicePush:
             report_data, report_type=ReportType.WEEKLY
         )
 
-        assert result["success"] is True
+        assert result.success is True
         call_args = mock_service_with_feishu.feishu.send_card.call_args
         assert "每周跑步总结" in call_args[0][0]
 
@@ -269,7 +269,7 @@ class TestReportServicePush:
             report_data, report_type=ReportType.MONTHLY
         )
 
-        assert result["success"] is True
+        assert result.success is True
         call_args = mock_service_with_feishu.feishu.send_card.call_args
         assert "每月跑步总结" in call_args[0][0]
 
@@ -283,8 +283,8 @@ class TestReportServicePush:
 
         result = service.push_report({}, report_type=ReportType.DAILY)
 
-        assert result["success"] is False
-        assert "未配置" in result["error"]
+        assert result.success is False
+        assert "未配置" in result.error
 
 
 class TestReportServiceSchedule:
@@ -305,8 +305,8 @@ class TestReportServiceSchedule:
             report_type=ReportType.DAILY,
         )
 
-        assert result["success"] is True
-        assert "daily" in result["message"]
+        assert result.success is True
+        assert "daily" in result.message
 
     def test_schedule_weekly_report(self, mock_service):
         """测试配置周报定时推送"""
@@ -317,8 +317,8 @@ class TestReportServiceSchedule:
             report_type=ReportType.WEEKLY,
         )
 
-        assert result["success"] is True
-        assert "weekly" in result["message"]
+        assert result.success is True
+        assert "weekly" in result.message
 
     def test_schedule_monthly_report(self, mock_service):
         """测试配置月报定时推送"""
@@ -329,8 +329,8 @@ class TestReportServiceSchedule:
             report_type=ReportType.MONTHLY,
         )
 
-        assert result["success"] is True
-        assert "monthly" in result["message"]
+        assert result.success is True
+        assert "monthly" in result.message
 
     def test_schedule_invalid_time(self, mock_service):
         """测试无效时间格式"""
@@ -339,8 +339,8 @@ class TestReportServiceSchedule:
             report_type=ReportType.DAILY,
         )
 
-        assert result["success"] is False
-        assert "时间格式无效" in result["error"]
+        assert result.success is False
+        assert "时间格式无效" in result.error
 
     def test_get_job_name(self, mock_service):
         """测试获取任务名称"""
@@ -433,7 +433,7 @@ class TestReportServiceRunReportNow:
         # 在创建服务后设置feishu mock
         service.feishu = MagicMock()
         service.feishu.webhook = "https://test.webhook.com"
-        service.feishu.send_card.return_value = {"code": 0}
+        service.feishu.send_card.return_value = OperationResult(success=True)
         service.feishu.auth.is_configured.return_value = True
         service.feishu.receive_id = "test_user"
         return service
