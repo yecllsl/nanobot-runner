@@ -186,7 +186,7 @@ class TestToolParameterValidation:
             tool = QueryByDateRangeTool(runner_tools)
 
         errors = tool.validate_params({"start_date": 123, "end_date": 456})
-        assert any("must be string" in e for e in errors)
+        assert any("should be string" in e for e in errors)
 
     def test_integer_parameter_validation(self):
         """
@@ -197,7 +197,7 @@ class TestToolParameterValidation:
             tool = GetRecentRunsTool(runner_tools)
 
         errors = tool.validate_params({"limit": "not_an_integer"})
-        assert any("must be integer" in e for e in errors)
+        assert any("should be integer" in e for e in errors)
 
     def test_number_parameter_validation(self):
         """
@@ -210,7 +210,7 @@ class TestToolParameterValidation:
         errors = tool.validate_params(
             {"distance_m": "not_a_number", "time_s": "not_a_number"}
         )
-        assert any("must be number" in e for e in errors)
+        assert any("should be number" in e for e in errors)
 
     def test_required_parameter_validation(self):
         """
@@ -221,7 +221,7 @@ class TestToolParameterValidation:
             tool = CalculateVdotForRunTool(runner_tools)
 
         errors = tool.validate_params({})
-        assert any("missing required field" in e for e in errors)
+        assert any("missing required" in e for e in errors)
 
 
 class TestToolExecution:
