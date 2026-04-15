@@ -761,4 +761,125 @@ class TestProfileIntegration:
         assert "risk_factors" in risk_result
         assert "recommendations" in risk_result
         assert isinstance(risk_result["risk_factors"], list)
-        assert isinstance(risk_result["recommendations"], list)
+
+
+class TestProfileStorageManager:
+    """测试 ProfileStorageManager"""
+
+    @pytest.fixture
+    def temp_workspace(self, tmp_path):
+        """创建临时工作目录"""
+        workspace = tmp_path / "nanobot-runner"
+        workspace.mkdir(parents=True)
+        return workspace
+
+    @pytest.fixture
+    def storage_manager(self, temp_workspace):
+        """创建 ProfileStorageManager 实例"""
+        from src.core.profile import ProfileStorageManager
+
+        return ProfileStorageManager(workspace_dir=temp_workspace)
+
+    @pytest.fixture
+    def sample_profile(self):
+        """创建示例画像"""
+        return RunnerProfile(
+            user_id="test_user",
+            profile_date=datetime.now(),
+            total_activities=50,
+            total_distance_km=500.0,
+            avg_vdot=45.0,
+            fitness_level=FitnessLevel.INTERMEDIATE,
+        )
+
+    def test_init_creates_directories(self, temp_workspace):
+        """测试初始化时创建目录"""
+        from src.core.profile import ProfileStorageManager
+
+        storage = ProfileStorageManager(workspace_dir=temp_workspace)
+
+        assert storage.workspace_dir.exists()
+        assert (storage.workspace_dir / "data").exists()
+        assert (storage.workspace_dir / "memory").exists()
+
+    def test_save_and_load_profile_json(self, storage_manager, sample_profile):
+        """测试保存和加载 profile.json"""
+        saved = storage_manager.save_profile_json(sample_profile)
+        assert saved is True
+
+        loaded = storage_manager.load_profile_json()
+        assert loaded is not None
+        assert loaded.user_id == sample_profile.user_id
+        assert loaded.total_activities == sample_profile.total_activities
+        assert loaded.avg_vdot == sample_profile.avg_vdot
+
+    def test_load_profile_json_not_exists(self, storage_manager):
+        """测试加载不存在的 profile.json"""
+        result = storage_manager.load_profile_json()
+        assert result is None
+
+    def test_save_memory_md(self, storage_manager, sample_profile):
+        """测试保存 MEMORY.md"""
+        content = "# Test Memory\n\nThis is a test."
+        saved = storage_manager.save_memory_md(content, profile=sample_profile)
+        assert saved is True
+
+        loaded = storage_manager.load_memory_md()
+        assert loaded is not None
+        assert "Test Memory" in loaded
+
+    def test_save_memory_md_append(self, storage_manager, sample_profile):
+        """测试追加模式保存 MEMORY.md"""
+        content1 = "# First Content"
+        content2 = "# Second Content"
+
+        storage_manager.save_memory_md(content1, profile=sample_profile)
+        storage_manager.save_memory_md(content2, append=True)
+
+        loaded = storage_manager.load_memory_md()
+        assert "First Content" in loaded
+        assert "Second Content" in loaded
+
+    def test_load_memory_md_not_exists(self, storage_manager):
+        """测试加载不存在的 MEMORY.md"""
+        result = storage_manager.load_memory_md()
+        assert result is None
+
+    def test_sync_dual_storage_json_to_md(self, storage_manager, sample_profile):
+        """测试从 profile.json 同步到 MEMORY.md"""
+        result = storage_manager.sync_dual_storage(
+            sample_profile, sync_direction="json_to_md"
+        )
+        assert result is True
+
+        loaded = storage_manager.load_memory_md()
+        assert loaded is not None
+
+    def test_sync_dual_storage_invalid_direction(self, storage_manager, sample_profile):
+        """测试无效的同步方向"""
+        with pytest.raises((RuntimeError, ValueError)):
+            storage_manager.sync_dual_storage(sample_profile, sync_direction="invalid")
+
+    def test_merge_profile_to_md(self, storage_manager, sample_profile):
+        """测试智能合并画像到 MEMORY.md"""
+        result = storage_manager.merge_profile_to_md(sample_profile)
+        assert result is True
+
+        loaded = storage_manager.load_memory_md()
+        assert loaded is not None
+
+    def test_merge_profile_to_md_with_agent_notes(
+        self, storage_manager, sample_profile
+    ):
+        """测试保留 Agent 笔记的合并"""
+        storage_manager.save_memory_md(
+            "# Existing Content\n\n<!-- @agent: This is an agent note -->"
+        )
+
+        result = storage_manager.merge_profile_to_md(
+            sample_profile, preserve_agent_notes=True
+        )
+        assert result is True
+
+        loaded = storage_manager.load_memory_md()
+        assert loaded is not None
