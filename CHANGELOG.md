@@ -88,6 +88,21 @@
 
 ### 技术债务清理
 
+#### 类型安全改造
+- **数据类定义**: 定义多种数据类替代字典返回值
+  - HRZoneResult: 心率区间结果
+  - ReportData: 报告数据
+  - CalendarEventResult: 日历事件结果
+  - VdotTrendItem: VDOT趋势项
+  - DailyReportData: 日报数据
+  - PaceDistributionResult: 配速分布结果
+- **models.py统一**: 合并dataclass定义到models.py，统一管理
+- **枚举统一**: 统一枚举类定义，消除重复
+
+#### 日志系统统一
+- **loguru清理**: 清除loguru依赖，统一使用get_logger
+- **日志规范**: 统一日志输出格式和级别
+
 #### 代码规范
 - **类型安全**: 消除Dict[str, Any]返回值，使用类型安全的数据类
 - **导入优化**: 统一导入路径，确保模块导入一致性
