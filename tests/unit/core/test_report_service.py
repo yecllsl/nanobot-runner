@@ -1,7 +1,7 @@
 # 报告服务单元测试
 # 测试 ReportService 的生成、推送和定时调度功能
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -223,11 +223,15 @@ class TestReportServicePushReport:
 
         assert result.success is True
 
-    def test_push_report_no_feishu(self):
+    @patch("src.core.report_service.FeishuBot")
+    def test_push_report_no_feishu(self, mock_feishu_bot):
         """测试未配置飞书机器人"""
         context = create_mock_context()
         context.config.get.return_value = None  # 返回 None 表示未配置
 
+        mock_auth = MagicMock()
+        mock_auth.is_configured.return_value = False
+        mock_feishu_bot.return_value = MagicMock(auth=mock_auth, receive_id=None)
         service = ReportService(context)
 
         mock_report = {

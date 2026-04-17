@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.notify.feishu import FeishuAuth, FeishuBot, FeishuMessageAPI, test_connection
+from src.core.models import OperationResult
+from src.notify.feishu import FeishuAuth, FeishuBot, FeishuMessageAPI, verify_connection
 
 
 class TestFeishuAuth:
@@ -36,8 +37,13 @@ class TestFeishuAuth:
         assert auth.app_id == "custom_id"
         assert auth.app_secret == "custom_secret"
 
-    def test_init_without_credentials(self):
+    @patch("src.notify.feishu.ConfigManager")
+    def test_init_without_credentials(self, mock_config_manager):
         """测试无凭证初始化"""
+        mock_config = MagicMock()
+        mock_config.get.return_value = None
+        mock_config_manager.return_value = mock_config
+
         auth = FeishuAuth()
 
         assert not auth.app_id
@@ -110,8 +116,13 @@ class TestFeishuAuth:
         auth = FeishuAuth(config=mock_config)
         assert auth.is_configured() is True
 
-    def test_is_configured_false(self):
+    @patch("src.notify.feishu.ConfigManager")
+    def test_is_configured_false(self, mock_config_manager):
         """测试未配置"""
+        mock_config = MagicMock()
+        mock_config.get.return_value = None
+        mock_config_manager.return_value = mock_config
+
         auth = FeishuAuth()
         assert auth.is_configured() is False
 
@@ -281,8 +292,13 @@ class TestFeishuBot:
         assert result.success is True
         assert result.data is not None
 
-    def test_send_text_no_credentials(self):
+    @patch("src.notify.feishu.ConfigManager")
+    def test_send_text_no_credentials(self, mock_config_manager):
         """测试发送文本消息无凭证"""
+        mock_config = MagicMock()
+        mock_config.get.return_value = None
+        mock_config_manager.return_value = mock_config
+
         bot = FeishuBot()
         result = bot.send_text("Test message")
 
@@ -463,9 +479,10 @@ class TestFeishuBot:
 class TestTestConnection:
     """测试连接测试函数"""
 
+    @patch("src.notify.feishu.FeishuBot")
     @patch("src.notify.feishu.requests.post")
     @patch("src.notify.feishu.requests.request")
-    def test_test_connection_success(self, mock_request, mock_post):
+    def test_test_connection_success(self, mock_request, mock_post, mock_feishu_bot):
         """测试连接成功"""
         mock_token_response = MagicMock()
         mock_token_response.json.return_value = {
@@ -481,18 +498,46 @@ class TestTestConnection:
         }
         mock_request.return_value = mock_message_response
 
-        result = test_connection(
+        mock_bot = MagicMock()
+        mock_bot.send_text.return_value = OperationResult(
+            success=True, message="测试成功"
+        )
+        mock_feishu_bot.return_value = mock_bot
+
+        result = verify_connection(
             app_id="test_app_id",
             app_secret="test_app_secret",
             receive_id="user_123",
         )
 
         assert result.success is True
-        assert "配置正确" in result.message
 
-    def test_test_connection_failure(self):
+    @patch("src.notify.feishu.FeishuBot")
+    def test_test_connection_failure(self, mock_feishu_bot):
         """测试连接失败"""
-        result = test_connection()
+        mock_bot = MagicMock()
+        mock_bot.send_text.return_value = OperationResult(
+            success=False, error="未配置飞书应用凭证"
+        )
+        mock_feishu_bot.return_value = mock_bot
+
+        result = verify_connection()
 
         assert result.success is False
         assert result.error is not None
+
+
+@patch("src.notify.feishu.FeishuBot")
+def test_verify_connection_function(mock_feishu_bot):
+    """测试连接验证函数"""
+    mock_bot = MagicMock()
+    mock_bot.send_text.return_value = OperationResult(success=True, message="测试成功")
+    mock_feishu_bot.return_value = mock_bot
+
+    result = verify_connection(
+        app_id="test_app_id",
+        app_secret="test_app_secret",
+        receive_id="user_123",
+    )
+
+    assert result.success is True

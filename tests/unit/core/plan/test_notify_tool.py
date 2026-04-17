@@ -195,8 +195,10 @@ class TestWeatherService:
 class TestNotifyToolInit:
     """测试NotifyTool初始化"""
 
-    def test_init_default(self):
+    @patch("src.core.plan.notify_tool.FeishuBot")
+    def test_init_default(self, mock_feishu_bot):
         """测试默认初始化"""
+        mock_feishu_bot.return_value = Mock()
         tool = NotifyTool()
         assert tool.feishu_bot is not None
         assert tool.weather_service is not None
@@ -388,7 +390,9 @@ class TestNotifyToolCheckTrainingCompleted:
     @pytest.fixture
     def notify_tool(self):
         """创建NotifyTool实例"""
-        return NotifyTool()
+        mock_bot = Mock()
+        mock_weather = Mock()
+        return NotifyTool(feishu_bot=mock_bot, weather_service=mock_weather)
 
     def test_check_training_completed_true(self, notify_tool):
         """测试已完成训练"""
@@ -420,7 +424,9 @@ class TestNotifyToolBuildMessage:
     @pytest.fixture
     def notify_tool(self):
         """创建NotifyTool实例"""
-        return NotifyTool()
+        mock_bot = Mock()
+        mock_weather = Mock()
+        return NotifyTool(feishu_bot=mock_bot, weather_service=mock_weather)
 
     def test_build_reminder_message_basic(self, notify_tool):
         """测试构建基本消息"""
@@ -519,7 +525,9 @@ class TestNotifyToolGetTodayPlan:
     @pytest.fixture
     def notify_tool(self):
         """创建NotifyTool实例"""
-        return NotifyTool()
+        mock_bot = Mock()
+        mock_weather = Mock()
+        return NotifyTool(feishu_bot=mock_bot, weather_service=mock_weather)
 
     def test_get_today_plan_found(self, notify_tool):
         """测试找到今日计划"""
@@ -563,7 +571,9 @@ class TestNotifyToolDoNotDisturbTime:
     @pytest.fixture
     def notify_tool(self):
         """创建NotifyTool实例"""
-        return NotifyTool()
+        mock_bot = Mock()
+        mock_weather = Mock()
+        return NotifyTool(feishu_bot=mock_bot, weather_service=mock_weather)
 
     def test_check_do_not_disturb_time_night(self, notify_tool):
         """测试夜间免打扰时段"""

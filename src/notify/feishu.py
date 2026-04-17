@@ -553,13 +553,13 @@ class FeishuBot:
         return self._send_with_retry(_send)
 
 
-def test_connection(
+def verify_connection(
     app_id: str | None = None,
     app_secret: str | None = None,
     receive_id: str | None = None,
 ) -> OperationResult:
     """
-    测试飞书应用机器人连接
+    验证飞书应用机器人连接
 
     Args:
         app_id: 飞书应用 App ID，不指定则从配置文件读取
@@ -567,7 +567,7 @@ def test_connection(
         receive_id: 接收者 ID，不指定则从配置文件读取
 
     Returns:
-        OperationResult: 连接测试结果
+        OperationResult: 连接验证结果
     """
     bot = FeishuBot(app_id=app_id, app_secret=app_secret, receive_id=receive_id)
     result = bot.send_text("测试消息：如果收到此消息，说明飞书应用机器人配置正确")
@@ -576,3 +576,7 @@ def test_connection(
         return OperationResult(success=False, error=result.error)
 
     return OperationResult(success=True, message="飞书应用机器人配置正确")
+
+
+# 保持向后兼容的别名
+test_connection = verify_connection
