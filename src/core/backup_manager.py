@@ -145,27 +145,36 @@ class BackupManager:
             restored = 0
             failed = 0
 
-            tar_path = backup_path.with_suffix(".tar.gz")
-            if tar_path.exists():
-                with tarfile.open(tar_path, "r:gz") as tar:
+            if (
+                backup_path.is_file()
+                and backup_path.suffix == ".gz"
+                and ".tar" in backup_path.name
+            ):
+                with tarfile.open(backup_path, "r:gz") as tar:
                     tar.extractall(path=backup_path.parent)
                     restored = len(tar.getmembers())
             else:
-                for item in backup_path.iterdir():
-                    if item.name == "backup_info.json":
-                        continue
-                    try:
-                        target = Path.home() / ".nanobot-runner" / item.name
-                        if item.is_file():
-                            shutil.copy2(item, target)
-                            restored += 1
-                        elif item.is_dir():
-                            shutil.copytree(item, target, dirs_exist_ok=True)
-                            count, _, _ = self._compute_dir_stats(target)
-                            restored += count
-                    except OSError as e:
-                        logger.warning(f"恢复文件失败: {item} - {e}")
-                        failed += 1
+                tar_path = backup_path.with_suffix(".tar.gz")
+                if tar_path.exists():
+                    with tarfile.open(tar_path, "r:gz") as tar:
+                        tar.extractall(path=backup_path.parent)
+                        restored = len(tar.getmembers())
+                else:
+                    for item in backup_path.iterdir():
+                        if item.name == "backup_info.json":
+                            continue
+                        try:
+                            target = Path.home() / ".nanobot-runner" / item.name
+                            if item.is_file():
+                                shutil.copy2(item, target)
+                                restored += 1
+                            elif item.is_dir():
+                                shutil.copytree(item, target, dirs_exist_ok=True)
+                                count, _, _ = self._compute_dir_stats(target)
+                                restored += count
+                        except OSError as e:
+                            logger.warning(f"恢复文件失败: {item} - {e}")
+                            failed += 1
 
             logger.info(f"备份恢复完成: 恢复 {restored} 个, 失败 {failed} 个")
             return {"restored_files": restored, "failed_files": failed}
@@ -186,6 +195,18 @@ class BackupManager:
             bool: 备份是否完整
         """
         backup_path = backup_info.backup_path
+
+        if (
+            backup_path.is_file()
+            and backup_path.suffix == ".gz"
+            and ".tar" in backup_path.name
+        ):
+            try:
+                with tarfile.open(backup_path, "r:gz") as tar:
+                    tar.getmembers()
+                return True
+            except tarfile.TarError:
+                return False
 
         tar_path = backup_path.with_suffix(".tar.gz")
         if tar_path.exists():

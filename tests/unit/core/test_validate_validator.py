@@ -163,3 +163,146 @@ class TestConfigValidator:
 
             result = validator.test_api_connectivity()
             assert result.is_connected is False
+
+    def test_validate_format_config_not_dict(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text('"not a dict"', encoding="utf-8")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            errors = validator.validate_format()
+            assert any("根元素必须是对象" in e.message for e in errors)
+
+    def test_validate_format_os_error(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text("{}", encoding="utf-8")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch("builtins.open", side_effect=OSError("permission denied")):
+                errors = validator.validate_format()
+                assert any("文件读取失败" in e.message for e in errors)
+
+    def test_validate_completeness_load_config_exception(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(config, "load_config", side_effect=Exception("fail")):
+                errors = validator.validate_completeness()
+                assert errors == []
+
+    def test_validate_validity_load_config_exception(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(config, "load_config", side_effect=Exception("fail")):
+                errors = validator.validate_validity()
+                assert errors == []
+
+    def test_validate_consistency_with_inconsistencies(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(
+                config,
+                "validate_config_consistency",
+                return_value=[
+                    {
+                        "field": "llm_provider",
+                        "env_value": "anthropic",
+                        "file_value": "openai",
+                    }
+                ],
+            ):
+                warnings = validator.validate_consistency()
+                assert len(warnings) == 1
+                assert warnings[0].field == "llm_provider"
+
+    def test_test_api_connectivity_load_config_exception(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(config, "load_config", side_effect=Exception("fail")):
+                result = validator.test_api_connectivity()
+                assert result.is_connected is False
+                assert "无法加载配置" in result.error_message
+
+    def test_test_api_connectivity_with_provider(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4", "data_dir": "/tmp/data"}),
+            encoding="utf-8",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(
+                validator.env_manager, "get_env", return_value="sk-test-key"
+            ):
+                result = validator.test_api_connectivity(provider="anthropic")
+                assert result.provider == "anthropic"
+                assert result.is_connected is True
+
+    def test_test_api_connectivity_openai_mock(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4", "data_dir": "/tmp/data"}),
+            encoding="utf-8",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(
+                validator.env_manager, "get_env", return_value="sk-test-key"
+            ):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    from unittest.mock import Mock
+
+                    mock_resp = Mock()
+                    mock_resp.read.return_value = b'{"data": []}'
+                    mock_resp.__enter__ = Mock(return_value=mock_resp)
+                    mock_resp.__exit__ = Mock(return_value=False)
+                    mock_urlopen.return_value = mock_resp
+
+                    result = validator.test_api_connectivity(provider="openai")
+                    assert result.is_connected is True
+
+    def test_test_api_connectivity_openai_error(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4", "data_dir": "/tmp/data"}),
+            encoding="utf-8",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            validator = ConfigValidator(config=config)
+
+            with patch.object(
+                validator.env_manager, "get_env", return_value="sk-test-key"
+            ):
+                with patch(
+                    "urllib.request.urlopen",
+                    side_effect=Exception("connection failed"),
+                ):
+                    result = validator.test_api_connectivity(provider="openai")
+                    assert result.is_connected is False
+                    assert "connection failed" in result.error_message

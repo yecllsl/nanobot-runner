@@ -4,14 +4,18 @@ from unittest.mock import patch
 
 import pytest
 
+from src.core.backup_manager import BackupManager
 from src.core.config import ConfigManager
+from src.core.exceptions import StorageError
 from src.core.migrate.engine import MigrationEngine
 from src.core.migrate.models import (
+    BackupInfo,
     MigrationResult,
     RollbackResult,
     VersionInfo,
 )
 from src.core.migrate.strategy import (
+    MigrationStrategy,
     MigrationStrategyFactory,
     V08xMigrationStrategy,
     V09xMigrationStrategy,
@@ -177,6 +181,139 @@ class TestMigrationEngine:
             assert result is not None
             assert result.version == "0.8.3"
 
+    def test_detect_old_version_legacy_bad_json(self, tmp_path: Path) -> None:
+        legacy = tmp_path / ".nanobot"
+        legacy.mkdir()
+        (legacy / "config.json").write_text("invalid json{{{", encoding="utf-8")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.detect_old_version()
+            assert result is not None
+            assert result.version == "0.8.0"
+
+    def test_detect_old_version_legacy_with_data(self, tmp_path: Path) -> None:
+        legacy = tmp_path / ".nanobot"
+        legacy.mkdir()
+        (legacy / "config.json").write_text(
+            json.dumps({"version": "0.8.3"}), encoding="utf-8"
+        )
+        data_dir = legacy / "data"
+        data_dir.mkdir()
+        (data_dir / "test.txt").write_text("data", encoding="utf-8")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.detect_old_version()
+            assert result is not None
+            assert result.has_data is True
+
+    def test_detect_old_version_legacy_no_data(self, tmp_path: Path) -> None:
+        legacy = tmp_path / ".nanobot"
+        legacy.mkdir()
+        (legacy / "config.json").write_text(
+            json.dumps({"version": "0.8.3"}), encoding="utf-8"
+        )
+        (legacy / "data").mkdir()
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.detect_old_version()
+            assert result is not None
+            assert result.has_data is False
+
+    def test_detect_old_version_current_old_version(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.2", "data_dir": str(tmp_path / "data")}),
+            encoding="utf-8",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.detect_old_version()
+            assert result is not None
+            assert result.version == "0.9.2"
+
+    def test_detect_old_version_current_bad_json(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text("bad json{{{", encoding="utf-8")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.detect_old_version()
+            assert result is None
+
+    def test_detect_old_version_current_already_latest(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4", "data_dir": str(tmp_path / "data")}),
+            encoding="utf-8",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.detect_old_version()
+            assert result is None
+
+    def test_create_backup_success(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4"}), encoding="utf-8"
+        )
+
+        backup_dir = tmp_path / "backups"
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            engine.backup_manager = BackupManager(backup_base_dir=backup_dir)
+
+            backup_info = engine.create_backup()
+            assert backup_info is not None
+            assert backup_info.file_count > 0
+
+    def test_create_backup_no_source_raises(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+
+            with pytest.raises(StorageError, match="没有可备份的数据"):
+                engine.create_backup()
+
+    def test_create_backup_with_legacy(self, tmp_path: Path) -> None:
+        legacy = tmp_path / ".nanobot"
+        legacy.mkdir()
+        (legacy / "config.json").write_text(
+            json.dumps({"version": "0.8.3"}), encoding="utf-8"
+        )
+
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4"}), encoding="utf-8"
+        )
+
+        backup_dir = tmp_path / "backups"
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            engine.backup_manager = BackupManager(backup_base_dir=backup_dir)
+
+            backup_info = engine.create_backup()
+            assert backup_info is not None
+
     def test_migrate_no_old_version(self, tmp_path: Path) -> None:
         with patch.object(Path, "home", return_value=tmp_path):
             config = ConfigManager(allow_default=True)
@@ -185,7 +322,191 @@ class TestMigrationEngine:
             assert result.success is True
             assert any("未检测到" in w for w in result.warnings)
 
+    def test_migrate_with_unsupported_version(self, tmp_path: Path) -> None:
+        legacy = tmp_path / ".nanobot"
+        legacy.mkdir()
+        (legacy / "config.json").write_text(
+            json.dumps({"version": "0.8.3"}), encoding="utf-8"
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+
+            with patch.object(
+                engine,
+                "detect_old_version",
+                return_value=VersionInfo(
+                    version="1.0.0",
+                    config_path=legacy / "config.json",
+                    data_path=legacy / "data",
+                    has_data=False,
+                ),
+            ):
+                result = engine.migrate(auto=True)
+                assert result.success is False
+                assert any("不支持的版本号" in e for e in result.errors)
+
+    def test_migrate_with_v08_strategy_auto(self, tmp_path: Path) -> None:
+        legacy = tmp_path / ".nanobot"
+        legacy.mkdir()
+        (legacy / "config.json").write_text(
+            json.dumps({"version": "0.8.3", "auto_push_feishu": True}),
+            encoding="utf-8",
+        )
+        (legacy / "data").mkdir()
+        (legacy / "data" / "test.txt").write_text("data", encoding="utf-8")
+
+        backup_dir = tmp_path / "backups"
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            engine.backup_manager = BackupManager(backup_base_dir=backup_dir)
+
+            result = engine.migrate(auto=True)
+            assert isinstance(result, MigrationResult)
+
+    def test_migrate_with_explicit_strategy(self, tmp_path: Path) -> None:
+        strategy = V09xMigrationStrategy(source_version="0.9.0")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+
+            result = engine.migrate(strategy=strategy, auto=True)
+            assert isinstance(result, MigrationResult)
+
+    def test_migrate_non_auto_creates_backup(self, tmp_path: Path) -> None:
+        strategy = V09xMigrationStrategy(source_version="0.9.0")
+        backup_dir = tmp_path / "backups"
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            engine.backup_manager = BackupManager(backup_base_dir=backup_dir)
+
+            result = engine.migrate(strategy=strategy, auto=False)
+            assert isinstance(result, MigrationResult)
+
+    def test_migrate_config_errors_skip_path_update(self, tmp_path: Path) -> None:
+        from unittest.mock import Mock
+
+        mock_strategy = Mock(spec=MigrationStrategy)
+        mock_strategy.migrate_config.return_value = MigrationResult(
+            success=False, errors=["config error"]
+        )
+        mock_strategy.migrate_data.return_value = MigrationResult(success=True)
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+
+            result = engine.migrate(strategy=mock_strategy, auto=True)
+            assert result.success is False
+            mock_strategy.update_paths.assert_not_called()
+
+    def test_migrate_exception_returns_failure(self, tmp_path: Path) -> None:
+        from unittest.mock import Mock
+
+        mock_strategy = Mock(spec=MigrationStrategy)
+        mock_strategy.migrate_config.side_effect = RuntimeError("unexpected")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+
+            result = engine.migrate(strategy=mock_strategy, auto=True)
+            assert result.success is False
+            assert any("unexpected" in e for e in result.errors)
+
+    def test_rollback_no_backup(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+
+            result = engine.rollback()
+            assert result.success is False
+            assert any("没有可用的备份" in e for e in result.errors)
+
+    def test_rollback_with_explicit_backup(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / "config.json").write_text(
+            json.dumps({"version": "0.9.4"}), encoding="utf-8"
+        )
+
+        backup_dir = tmp_path / "backups"
+        backup_mgr = BackupManager(backup_base_dir=backup_dir)
+        backup_info = backup_mgr.create_backup(source_paths=[source], compress=False)
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config, backup_manager=backup_mgr)
+
+            result = engine.rollback(backup_info=backup_info)
+            assert isinstance(result, RollbackResult)
+
+    def test_rollback_with_last_backup(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / "config.json").write_text(
+            json.dumps({"version": "0.9.4"}), encoding="utf-8"
+        )
+
+        backup_dir = tmp_path / "backups"
+        backup_mgr = BackupManager(backup_base_dir=backup_dir)
+        backup_info = backup_mgr.create_backup(source_paths=[source], compress=False)
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config, backup_manager=backup_mgr)
+            engine._last_backup = backup_info
+
+            result = engine.rollback()
+            assert isinstance(result, RollbackResult)
+
+    def test_rollback_storage_error(self, tmp_path: Path) -> None:
+        from unittest.mock import Mock
+
+        mock_backup_mgr = Mock()
+        mock_backup_mgr.restore_backup.side_effect = StorageError("restore failed")
+
+        backup_info = BackupInfo(
+            backup_path=tmp_path / "backup",
+            backup_time="20260418_120000",
+            file_count=1,
+            total_size=100,
+            checksum="abc",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config, backup_manager=mock_backup_mgr)
+
+            result = engine.rollback(backup_info=backup_info)
+            assert result.success is False
+            assert any("restore failed" in e for e in result.errors)
+
     def test_verify_migration(self, tmp_path: Path) -> None:
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            engine = MigrationEngine(config=config)
+            result = engine.verify_migration()
+            assert isinstance(result, MigrationResult)
+
+    def test_verify_migration_with_data_files(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.json").write_text(
+            json.dumps({"version": "0.9.4", "data_dir": str(tmp_path / "data")}),
+            encoding="utf-8",
+        )
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "activities_2024.parquet").write_text("fake", encoding="utf-8")
+
         with patch.object(Path, "home", return_value=tmp_path):
             config = ConfigManager(allow_default=True)
             engine = MigrationEngine(config=config)
