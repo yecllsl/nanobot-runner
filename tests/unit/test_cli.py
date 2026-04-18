@@ -876,36 +876,73 @@ class TestCLIInit:
 
     def test_init_command(self):
         """测试 init 命令"""
-        with patch("src.core.config.ConfigManager") as mock_config:
-            mock_config_instance = Mock()
-            mock_config_instance.data_dir = MagicMock()
-            mock_workspace = MagicMock()
-            mock_workspace.exists.return_value = False
-            mock_workspace.mkdir = Mock()
-            mock_config_instance.data_dir.parent = mock_workspace
-            mock_config.return_value = mock_config_instance
+        with patch("src.core.config.ConfigManager") as mock_config_cls:
+            mock_config = Mock()
+            mock_config.data_dir = MagicMock()
+            mock_config_cls.return_value = mock_config
 
-            with patch("nanobot.utils.helpers.sync_workspace_templates") as mock_sync:
-                mock_sync.return_value = ["AGENTS.md", "SOUL.md"]
+            with patch("src.core.init.wizard.InitWizard") as mock_wizard_cls:
+                mock_wizard = Mock()
+                mock_env_info = Mock()
+                mock_env_info.python_version = "3.11"
+                mock_env_info.os_type = "Windows"
+                mock_env_info.os_version = "10"
+                mock_env_info.missing_dependencies = []
+                mock_wizard.detect_environment.return_value = mock_env_info
 
-                result = runner.invoke(app, ["system", "init"])
-                assert result.exit_code == 0
+                mock_result = Mock()
+                mock_result.success = True
+                mock_result.config_path = "/tmp/config.json"
+                mock_result.env_path = None
+                mock_result.warnings = []
+                mock_result.next_steps = ["运行 nanobotrun data import"]
+                mock_wizard.run.return_value = mock_result
+                mock_wizard_cls.return_value = mock_wizard
+
+                with patch(
+                    "src.core.migrate.engine.MigrationEngine"
+                ) as mock_engine_cls:
+                    mock_engine = Mock()
+                    mock_engine.detect_old_version.return_value = None
+                    mock_engine_cls.return_value = mock_engine
+
+                    result = runner.invoke(app, ["system", "init"])
+                    assert result.exit_code == 0
 
     def test_init_workspace_exists(self):
         """测试 init 工作区已存在"""
-        with patch("src.core.config.ConfigManager") as mock_config:
-            mock_config_instance = Mock()
-            mock_config_instance.data_dir = MagicMock()
-            mock_workspace = MagicMock()
-            mock_workspace.exists.return_value = True
-            mock_config_instance.data_dir.parent = mock_workspace
-            mock_config.return_value = mock_config_instance
+        with patch("src.core.config.ConfigManager") as mock_config_cls:
+            mock_config = Mock()
+            mock_config.data_dir = MagicMock()
+            mock_config_cls.return_value = mock_config
 
-            with patch("nanobot.utils.helpers.sync_workspace_templates") as mock_sync:
-                mock_sync.return_value = []
+            with patch("src.core.init.wizard.InitWizard") as mock_wizard_cls:
+                mock_wizard = Mock()
+                mock_env_info = Mock()
+                mock_env_info.python_version = "3.11"
+                mock_env_info.os_type = "Windows"
+                mock_env_info.os_version = "10"
+                mock_env_info.missing_dependencies = []
+                mock_wizard.detect_environment.return_value = mock_env_info
 
-                result = runner.invoke(app, ["system", "init"])
-                assert result.exit_code == 0
+                mock_result = Mock()
+                mock_result.success = True
+                mock_result.config_path = "/tmp/config.json"
+                mock_result.env_path = None
+                mock_result.warnings = []
+                mock_result.next_steps = []
+                mock_wizard.run.return_value = mock_result
+                mock_wizard_cls.return_value = mock_wizard
+
+                with patch(
+                    "src.core.migrate.engine.MigrationEngine"
+                ) as mock_engine_cls:
+                    mock_engine = Mock()
+                    mock_engine.detect_old_version.return_value = None
+                    mock_engine_cls.return_value = mock_engine
+
+                    result = runner.invoke(app, ["system", "init"])
+                    assert result.exit_code == 0
 
 
 class TestCLIMemory:

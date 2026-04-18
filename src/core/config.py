@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -14,10 +15,30 @@ from src.core.logger import get_logger
 logger = get_logger(__name__)
 
 
+class ConfigSource(Enum):
+    ENV = "env"
+    FILE = "file"
+    DEFAULT = "default"
+
+
+ENV_KEY_MAPPING: dict[str, str] = {
+    "data_dir": "NANOBOT_DATA_DIR",
+    "workspace_dir": "NANOBOT_WORKSPACE_DIR",
+    "auto_push_feishu": "NANOBOT_AUTO_PUSH_FEISHU",
+    "feishu_app_id": "NANOBOT_FEISHU_APP_ID",
+    "feishu_app_secret": "NANOBOT_FEISHU_APP_SECRET",
+    "feishu_receive_id": "NANOBOT_FEISHU_RECEIVE_ID",
+    "feishu_receive_id_type": "NANOBOT_FEISHU_RECEIVE_ID_TYPE",
+    "timezone": "NANOBOT_TIMEZONE",
+    "default_year": "NANOBOT_DEFAULT_YEAR",
+}
+
+
 class ConfigManager:
     """配置管理器，管理项目配置和本地数据目录
 
     使用缓存机制提升配置读取性能，避免频繁的文件 I/O 操作。
+    支持环境变量覆盖（优先级：环境变量 > 配置文件 > 默认值）和无配置模式。
     """
 
     _cache: dict[str, Any] | None = None
@@ -33,31 +54,81 @@ class ConfigManager:
         cls._cache = None
         cls._cache_time = 0
 
-    def __init__(self) -> None:
-        """初始化配置管理器"""
-        config_dir = os.environ.get("NANOBOT_CONFIG_DIR")
-        if config_dir:
-            self.base_dir = Path(config_dir)
-        else:
-            self.base_dir = Path.home() / ".nanobot-runner"
+    def __init__(self, allow_default: bool = False) -> None:
+        """初始化配置管理器
 
-        self.config_file = self.base_dir / "config.json"
+        Args:
+            allow_default: 是否允许使用默认配置（配置文件不存在时），
+                           用于初始化向导等场景解决Bootstrap问题
+        """
+        self.allow_default = allow_default
+        self._using_default = False
 
-        self.data_dir = self.base_dir / "data"
+        self.config_file = self._detect_config_file()
+
+        config_dir = self.config_file.parent
+        self.base_dir = config_dir
+        self.data_dir = config_dir / "data"
         self.index_file = self.data_dir / "index.json"
-        self.cron_dir = self.base_dir / "cron"
+        self.cron_dir = config_dir / "cron"
         self.cron_store = self.cron_dir / "jobs.json"
 
-        self._ensure_dirs()
-        self._ensure_config()
+        if not self._using_default:
+            self._ensure_dirs()
+            self._ensure_config()
 
-        try:
-            config = self.load_config()
-            if "data_dir" in config:
-                self.data_dir = Path(config["data_dir"])
-                self.index_file = self.data_dir / "index.json"
-        except Exception as e:
-            logger.debug(f"读取配置文件失败，使用默认路径: {e}")
+            try:
+                config = self.load_config()
+                if "data_dir" in config:
+                    self.data_dir = Path(config["data_dir"])
+                    self.index_file = self.data_dir / "index.json"
+            except Exception as e:
+                logger.debug(f"读取配置文件失败，使用默认路径: {e}")
+
+    def _detect_config_file(self) -> Path:
+        """检测配置文件路径
+
+        优先级：
+        1. 环境变量 NANOBOT_CONFIG_FILE
+        2. 环境变量 NANOBOT_CONFIG_DIR 下的 config.json
+        3. ~/.nanobot-runner/config.json
+
+        Returns:
+            Path: 配置文件路径
+        """
+        if env_file := os.getenv("NANOBOT_CONFIG_FILE"):
+            path = Path(env_file)
+            if path.exists() or not self.allow_default:
+                return path
+
+        if config_dir := os.getenv("NANOBOT_CONFIG_DIR"):
+            path = Path(config_dir) / "config.json"
+            if path.exists() or not self.allow_default:
+                return path
+
+        default_path = Path.home() / ".nanobot-runner" / "config.json"
+        if default_path.exists() or not self.allow_default:
+            return default_path
+
+        self._using_default = True
+        return default_path
+
+    @staticmethod
+    def _get_default_config() -> dict[str, Any]:
+        """获取默认配置
+
+        Returns:
+            dict: 默认配置字典
+        """
+        return {
+            "version": "0.9.4",
+            "data_dir": str(Path.home() / ".nanobot-runner" / "data"),
+            "auto_push_feishu": False,
+            "feishu_app_id": "",
+            "feishu_app_secret": "",
+            "feishu_receive_id": "",
+            "feishu_receive_id_type": "user_id",
+        }
 
     def _ensure_dirs(self) -> None:
         """确保必要目录存在，并迁移旧的定时任务配置"""
@@ -82,16 +153,7 @@ class ConfigManager:
     def _ensure_config(self) -> None:
         """确保配置文件存在"""
         if not self.config_file.exists():
-            default_config = {
-                "version": "0.1.0",
-                "data_dir": str(self.data_dir),
-                "auto_push_feishu": False,
-                "feishu_app_id": "",
-                "feishu_app_secret": "",
-                "feishu_receive_id": "",
-                "feishu_receive_id_type": "user_id",
-            }
-            self.save_config(default_config)
+            self.save_config(self._get_default_config())
 
     def _invalidate_cache(self) -> None:
         """清除配置缓存"""
@@ -146,6 +208,9 @@ class ConfigManager:
         Raises:
             ValueError: 配置验证失败时抛出
         """
+        if self._using_default:
+            return self._get_default_config()
+
         if use_cache and self._is_cache_valid():
             if ConfigManager._cache is None:
                 raise RuntimeError("配置缓存状态异常：缓存有效但值为 None")
@@ -214,6 +279,105 @@ class ConfigManager:
         """
         self._invalidate_cache()
         return self.load_config(use_cache=False)
+
+    def load_config_with_env_override(self) -> dict[str, Any]:
+        """加载配置并支持环境变量覆盖
+
+        配置加载优先级：环境变量 > 配置文件 > 默认值
+
+        Returns:
+            dict[str, Any]: 合并后的配置字典
+        """
+        config = self.load_config()
+
+        for config_key, env_key in ENV_KEY_MAPPING.items():
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                config[config_key] = self._cast_env_value(config_key, env_value)
+
+        return config
+
+    @staticmethod
+    def _cast_env_value(key: str, value: str) -> Any:
+        """将环境变量字符串值转换为对应类型
+
+        Args:
+            key: 配置项键名
+            value: 环境变量字符串值
+
+        Returns:
+            Any: 类型转换后的值
+        """
+        bool_keys = {"auto_push_feishu"}
+        int_keys = {"default_year"}
+
+        if key in bool_keys:
+            return value.lower() in ("true", "1", "yes")
+        if key in int_keys:
+            try:
+                return int(value)
+            except ValueError:
+                return value
+        return value
+
+    def get_config_source(self, field: str) -> ConfigSource:
+        """获取配置值的来源
+
+        Args:
+            field: 配置项键名
+
+        Returns:
+            ConfigSource: 配置值来源
+        """
+        env_key = ENV_KEY_MAPPING.get(field)
+        if env_key and os.getenv(env_key) is not None:
+            return ConfigSource.ENV
+
+        if self._using_default:
+            return ConfigSource.DEFAULT
+
+        try:
+            config = self.load_config()
+            if field in config:
+                return ConfigSource.FILE
+        except Exception:
+            pass
+
+        return ConfigSource.DEFAULT
+
+    def validate_config_consistency(self) -> list[dict[str, str]]:
+        """验证配置一致性
+
+        检查环境变量与配置文件之间的值是否冲突。
+
+        Returns:
+            list[dict[str, str]]: 不一致项列表，每项包含field、env_value、file_value
+        """
+        inconsistencies: list[dict[str, str]] = []
+
+        if self._using_default:
+            return inconsistencies
+
+        try:
+            file_config = self.load_config()
+        except Exception:
+            return inconsistencies
+
+        for config_key, env_key in ENV_KEY_MAPPING.items():
+            env_value = os.getenv(env_key)
+            if env_value is not None and config_key in file_config:
+                file_value = str(file_config[config_key])
+                casted_env = self._cast_env_value(config_key, env_value)
+                if str(casted_env) != file_value:
+                    inconsistencies.append(
+                        {
+                            "field": config_key,
+                            "env_value": env_value,
+                            "file_value": file_value,
+                        }
+                    )
+
+        return inconsistencies
 
 
 config = ConfigManager()

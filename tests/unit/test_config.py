@@ -39,7 +39,7 @@ class TestConfigManager:
             with open(cm.config_file, encoding="utf-8") as f:
                 config_data = json.load(f)
 
-            assert config_data["version"] == "0.1.0"
+            assert config_data["version"] == "0.9.4"
             assert "data_dir" in config_data
             assert "auto_push_feishu" in config_data
             assert "feishu_app_id" in config_data

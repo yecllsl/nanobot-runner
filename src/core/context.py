@@ -95,6 +95,7 @@ class AppContextFactory:
         session_repo: SessionRepository | None = None,
         report_service: ReportService | None = None,
         plan_manager: PlanManager | None = None,
+        allow_default: bool = False,
     ) -> AppContext:
         """
         创建应用上下文
@@ -113,13 +114,14 @@ class AppContextFactory:
             session_repo: Session数据仓储（可选）
             report_service: 报告服务（可选）
             plan_manager: 训练计划管理器（可选）
+            allow_default: 是否允许使用默认配置（配置文件不存在时）
 
         Returns:
             配置好的 AppContext 实例
         """
         # 创建或使用提供的配置管理器
         if config is None:
-            config = ConfigManager()
+            config = ConfigManager(allow_default=allow_default)
 
         # 创建或使用提供的存储管理器
         if storage is None:
@@ -203,6 +205,7 @@ class AppContextFactory:
         session_repo: SessionRepository | None = None,
         report_service: ReportService | None = None,
         plan_manager: PlanManager | None = None,
+        allow_default: bool = False,
     ) -> AppContext:
         """
         创建用于测试的应用上下文
@@ -238,6 +241,7 @@ class AppContextFactory:
             session_repo=session_repo,
             report_service=report_service,
             plan_manager=plan_manager,
+            allow_default=allow_default,
         )
 
 
