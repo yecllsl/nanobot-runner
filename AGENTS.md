@@ -47,17 +47,33 @@
 
 **v0.9.0 架构重构**：CLI按领域拆分，引入依赖注入机制。
 
+**v0.9.4 配置管理扩展**：新增配置管理基础设施。
+
 ```
 src/
 ├── core/                       # 核心模块
 │   ├── context.py              # 应用上下文 (v0.9.0新增)
 │   ├── session_repository.py   # Session仓储层 (v0.9.0新增)
+│   ├── config.py               # 配置管理 (v0.9.4扩展)
+│   ├── env_manager.py          # 环境变量管理 (v0.9.4新增)
+│   ├── workspace/              # 工作区管理 (v0.9.4新增)
+│   │   └── manager.py
+│   ├── migrate/                # 数据迁移 (v0.9.4新增)
+│   │   └── engine.py
+│   ├── backup_manager.py       # 备份管理 (v0.9.4新增)
+│   ├── verify_manager.py       # 数据校验 (v0.9.4新增)
+│   ├── init/                   # 初始化模块 (v0.9.4新增)
+│   │   ├── wizard.py
+│   │   ├── prompts.py
+│   │   ├── generator.py
+│   │   └── models.py
+│   ├── validate/               # 配置验证 (v0.9.4新增)
+│   │   └── validator.py
 │   ├── parser.py               # FIT文件解析
 │   ├── storage.py              # Parquet存储管理
 │   ├── indexer.py              # SHA256去重索引
 │   ├── analytics.py            # 数据分析引擎
 │   ├── profile.py              # 用户画像管理
-│   ├── config.py               # 配置管理
 │   └── exceptions.py           # 自定义异常
 ├── agents/tools.py             # Agent 工具集: BaseTool + RunnerTools
 ├── notify/                     # 飞书通知
@@ -70,6 +86,7 @@ src/
 │   │   ├── agent.py            # Agent交互命令
 │   │   ├── report.py           # 报告生成命令
 │   │   ├── system.py           # 系统管理命令
+│   │   ├── init.py             # 初始化命令 (v0.9.4新增)
 │   │   └── gateway.py          # Gateway服务命令
 │   ├── handlers/               # 业务逻辑调用层
 │   │   ├── data_handler.py
@@ -94,7 +111,7 @@ FIT文件 → FitParser → IndexManager(SHA256去重) → StorageManager → Pa
 用户查询 ← RunnerTools ← AnalyticsEngine ← LazyFrame ← read_parquet
 ```
 
-#### 依赖注入流程 (v0.9.0新增)
+#### 依赖注入流程 (v0.9.0新增, v0.9.4扩展)
 
 ```
 AppContextFactory.create_context()
@@ -103,7 +120,11 @@ AppContext
     ├── storage: StorageManager
     ├── analytics: AnalyticsEngine
     ├── profile: ProfileEngine
-    └── session_repo: SessionRepository
+    ├── session_repo: SessionRepository
+    ├── config: ConfigManager          (v0.9.4新增)
+    ├── workspace: WorkspaceManager    (v0.9.4新增)
+    ├── backup: BackupManager          (v0.9.4新增)
+    └── verify: VerifyManager          (v0.9.4新增)
     ↓
 CLI Handlers / Agent Tools
 ```
@@ -286,11 +307,24 @@ uv run nanobotrun report weekly      # 生成周报
 uv run nanobotrun report monthly     # 生成月报
 ```
 
+### 初始化 (v0.9.4新增)
+
+```bash
+uv run nanobotrun init                 # 交互式初始化
+uv run nanobotrun init --mode migrate  # 迁移模式
+uv run nanobotrun init --mode repair   # 修复模式
+uv run nanobotrun init --auto          # 自动模式
+```
+
 ### 系统管理
 
 ```bash
-uv run nanobotrun system config      # 查看配置
-uv run nanobotrun system version     # 查看版本
+uv run nanobotrun system config        # 查看配置
+uv run nanobotrun system version       # 查看版本
+uv run nanobotrun system validate      # 验证配置 (v0.9.4新增)
+uv run nanobotrun system backup        # 创建备份 (v0.9.4新增)
+uv run nanobotrun system restore       # 恢复备份 (v0.9.4新增)
+uv run nanobotrun system migrate       # 数据迁移 (v0.9.4新增)
 ```
 
 ### 测试

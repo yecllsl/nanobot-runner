@@ -110,21 +110,85 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 
 ### 4.1 config.json 结构
 
+**v0.9.4 更新**: 配置结构已扩展，支持更多配置项。
+
 ```json
 {
+  "version": "0.9.4",
   "data_dir": "~/.nanobot-runner/data",
   "default_year": 2024,
-  "timezone": "Asia/Shanghai"
+  "timezone": "Asia/Shanghai",
+  "llm_provider": "anthropic",
+  "llm_model": "claude-3-5-sonnet-20241022",
+  "enable_feishu": false,
+  "user_profile": {
+    "height_cm": 175,
+    "weight_kg": 70,
+    "resting_hr": 60,
+    "max_hr": 190,
+    "weekly_mileage_km": 50
+  }
 }
 ```
 
 ### 4.2 配置项说明
 
-| 配置项 | 类型 | 说明 |
-|--------|------|------|
-| `data_dir` | string | 数据存储目录 |
-| `default_year` | int | 默认查询年份 |
-| `timezone` | string | 时区设置 |
+| 配置项 | 类型 | 说明 | 版本 |
+|--------|------|------|------|
+| `version` | string | 配置文件版本 | v0.9.4 |
+| `data_dir` | string | 数据存储目录 | - |
+| `default_year` | int | 默认查询年份 | - |
+| `timezone` | string | 时区设置 | - |
+| `llm_provider` | string | LLM提供商 | v0.9.4 |
+| `llm_model` | string | LLM模型 | v0.9.4 |
+| `enable_feishu` | bool | 启用飞书集成 | v0.9.4 |
+| `user_profile` | object | 用户身体参数 | v0.9.4 |
+
+### 4.3 环境变量配置 (.env.local)
+
+**v0.9.4 新增**: 敏感配置可通过 `.env.local` 文件管理。
+
+```bash
+# LLM API Key
+NANOBOT_LLM_API_KEY=sk-your-api-key
+
+# 飞书配置（可选）
+NANOBOT_FEISHU_APP_ID=cli_xxx
+NANOBOT_FEISHU_APP_SECRET=xxx
+NANOBOT_FEISHU_RECEIVE_ID=ou_xxx
+```
+
+**配置优先级**: 环境变量 > 配置文件 > 默认值
+
+### 4.4 配置验证
+
+**v0.9.4 新增**: 使用 `nanobotrun system validate` 验证配置。
+
+```bash
+# 验证配置
+uv run nanobotrun system validate
+
+# 预期输出
+✅ 配置格式验证通过
+✅ 配置完整性验证通过
+✅ 配置有效性验证通过
+✅ 配置一致性验证通过
+```
+
+### 4.5 配置备份与恢复
+
+**v0.9.4 新增**: 支持配置自动备份和手动恢复。
+
+```bash
+# 创建备份
+uv run nanobotrun system backup
+
+# 查看备份列表
+uv run nanobotrun system backup --list
+
+# 恢复备份
+uv run nanobotrun system restore --backup-id backup_20260418_120000
+```
 
 ## 5. 记忆系统
 
