@@ -7,6 +7,7 @@
 - 执行 ruff format 代码格式化检查
 - 执行 ruff check 代码质量检查
 - 执行 mypy 类型检查
+- 执行 bandit 安全扫描检查
 - 执行 pytest 单元测试
 - 检查 Schema/TOOL_DESCRIPTIONS 更新
 - 生成详细的检查报告
@@ -194,9 +195,118 @@ class PreCommitChecker:
             return CheckResult(
                 name="Schema/TOOL_DESCRIPTIONS 更新检查",
                 status=CheckStatus.FAILED,
-                message=f"检查异常: {e}",
+                message=f"检查异常: {e} ({duration:.2f}s)",
                 duration=duration,
-                command="手动检查 Schema 和 TOOL_DESCRIPTIONS"
+                command="手动检查 Schema 和 TOOL_DESCRIPTIONS",
+                output=str(e)
+            )
+    
+    def check_bandit_security(self) -> CheckResult:
+        """检查代码安全性（bandit扫描）"""
+        start_time = time.time()
+        
+        try:
+            logger.info("开始执行: bandit 安全扫描")
+            
+            # 执行bandit扫描，生成JSON报告
+            command = "uv run bandit -r src/ -f json -s B101,B601 -ll"
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                cwd=self.project_root,
+                timeout=120  # 2分钟超时
+            )
+            
+            duration = time.time() - start_time
+            
+            # 解析bandit报告
+            try:
+                import json
+                report = json.loads(result.stdout)
+                
+                # 统计HIGH和MEDIUM严重性问题
+                high_count = sum(1 for r in report.get('results', []) 
+                               if r.get('issue_severity') == 'HIGH')
+                medium_count = sum(1 for r in report.get('results', []) 
+                                 if r.get('issue_severity') == 'MEDIUM')
+                
+                if high_count > 0 or medium_count > 0:
+                    # 发现安全问题
+                    issues = []
+                    for r in report.get('results', []):
+                        if r.get('issue_severity') in ['HIGH', 'MEDIUM']:
+                            issues.append(
+                                f"  - [{r.get('issue_severity')}] {r.get('test_id')}: "
+                                f"{r.get('issue_text')} ({r.get('filename')}:{r.get('line_number')})"
+                            )
+                    
+                    output = f"发现安全问题:\n" + "\n".join(issues[:10])  # 只显示前10个问题
+                    if len(issues) > 10:
+                        output += f"\n  ... 还有 {len(issues) - 10} 个问题"
+                    
+                    return CheckResult(
+                        name="bandit 安全扫描",
+                        status=CheckStatus.FAILED,
+                        message=f"发现 {high_count} 个HIGH和 {medium_count} 个MEDIUM严重性问题 ({duration:.2f}s)",
+                        duration=duration,
+                        command=command,
+                        output=output
+                    )
+                else:
+                    # 无安全问题
+                    return CheckResult(
+                        name="bandit 安全扫描",
+                        status=CheckStatus.PASSED,
+                        message=f"未发现HIGH或MEDIUM严重性问题 ({duration:.2f}s)",
+                        duration=duration,
+                        command=command,
+                        output=result.stdout
+                    )
+                    
+            except json.JSONDecodeError:
+                # JSON解析失败，可能是bandit未找到问题
+                if result.returncode == 0:
+                    return CheckResult(
+                        name="bandit 安全扫描",
+                        status=CheckStatus.PASSED,
+                        message=f"安全扫描通过 ({duration:.2f}s)",
+                        duration=duration,
+                        command=command,
+                        output=result.stdout
+                    )
+                else:
+                    return CheckResult(
+                        name="bandit 安全扫描",
+                        status=CheckStatus.WARNING,
+                        message=f"安全扫描完成，但无法解析报告 ({duration:.2f}s)",
+                        duration=duration,
+                        command=command,
+                        output=result.stdout + result.stderr
+                    )
+                    
+        except subprocess.TimeoutExpired:
+            duration = time.time() - start_time
+            return CheckResult(
+                name="bandit 安全扫描",
+                status=CheckStatus.FAILED,
+                message=f"执行超时 ({duration:.2f}s)",
+                duration=duration,
+                command=command,
+                output="命令执行超时"
+            )
+        except Exception as e:
+            duration = time.time() - start_time
+            return CheckResult(
+                name="bandit 安全扫描",
+                status=CheckStatus.FAILED,
+                message=f"执行异常: {e} ({duration:.2f}s)",
+                duration=duration,
+                command=command,
+                output=str(e)
             )
     
     def run_all_checks(self) -> bool:
@@ -208,6 +318,7 @@ class PreCommitChecker:
             self.check_ruff_format,
             self.check_ruff_lint,
             self.check_mypy_types,
+            self.check_bandit_security,  # 新增安全扫描检查
             self.check_pytest_tests,
             self.check_schema_updates
         ]
