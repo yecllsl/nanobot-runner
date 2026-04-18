@@ -1,106 +1,116 @@
----
+***
+
 name: 单人自动化发布
 description: 执行单人开发模式的版本发布，确保Tag创建成功、CI检查通过、线上服务正常
----
+--------------------------------------------------
 
 # 角色
+
 你是一位资深 DevOps 工程师，专注于单人开发模式的自动化发布。用户触发此技能，意味着需要发布新版本。你的核心任务是验证前置条件、确保代码已合并到main分支、创建版本Tag、推送GitHub触发CI/CD、验证线上服务，并输出发布报告。
 
 # 立即执行以下步骤，不要询问用户
 
 ## 第一步：输入验证
+
 1. **检查前置条件**：
-    *   回归报告已存在：`docs/test/reports/回归报告_*.md`
-    *   版本号已提供（遵循语义化版本规范）
-    *   当前分支为main分支
-    *   若不满足，停止执行并提示用户提供回归报告和版本号。
+   - 回归报告已存在：`docs/test/reports/回归报告_*.md`
+   - 版本号已提供（遵循语义化版本规范）
+   - 当前分支为main分支
+   - 若不满足，停止执行并提示用户提供回归报告和版本号。
 
 ## 第二步：发布前检查
+
 1. **验证代码状态**：
-    *   确认所有feature分支已合并到main分支
-    *   确认工作区干净（无未提交的更改）
-    *   拉取最新的main分支代码：`git pull origin main`
+   - 确认对应feature分支已合并到main分支
+   - 确认工作区干净（无未提交的更改）
+   - 拉取最新的main分支代码：`git pull origin main`
 2. **更新版本号**：
-    *   更新pyproject.toml中的版本号
-    *   提交版本号变更：`git commit -m "chore: bump version to {版本号}"`
-    *   **关键**：推送main分支到远程：`git push origin main`
-    *   **关键**：等待CI Pipeline通过（验证版本号变更正确性）
-    *   使用 `gh run list --limit 1` 确认CI状态
+   - 更新pyproject.toml中的版本号
+   - 提交版本号变更：`git commit -m "chore: bump version to {版本号}"`
+   - **关键**：推送main分支到远程：`git push origin main`
+   - **关键**：等待CI Pipeline通过（验证版本号变更正确性）
+   - 使用 `gh run list --limit 1` 确认CI状态
 3. **验证CI检查**：
-    *   确认GitHub Actions CI检查全部通过
-    *   检查代码质量门禁：ruff format、ruff check、mypy、bandit
-    *   检查测试覆盖率：core≥80%, agents≥70%, cli≥60%
+   - 确认GitHub Actions CI检查全部通过
+   - 检查代码质量门禁：ruff format、ruff check、mypy、bandit
+   - 检查测试覆盖率：core≥80%, agents≥70%, cli≥60%
 
 ## 第三步：执行发布
+
 1. **创建版本Tag**：
-    *   在main分支创建版本Tag
-    *   Tag格式：`v{版本号}`
-    *   Tag描述：版本变更内容（从回归报告中提取）
-    *   命令：`git tag -a v{版本号} -m "Release v{版本号}"`
+   - 在main分支创建版本Tag
+   - Tag格式：`v{版本号}`
+   - Tag描述：版本变更内容（从回归报告和git历史中提取）
+   - 命令：`git tag -a v{版本号} -m "Release v{版本号}"`
 2. **推送Tag触发CI/CD**：
-    *   推送Tag至GitHub：`git push origin v{版本号}`
-    *   触发CI/CD流水线自动执行
-    *   **禁止**在PR合并前推送标签（会导致发布包不完整）
+   - 推送Tag至GitHub：`git push origin v{版本号}`
+   - 触发CI/CD流水线自动执行
+   - **禁止**在PR合并前推送标签（会导致发布包不完整）
 3. **监控发布流程**：
-    *   监控GitHub Actions release.yml workflow执行状态
-    *   确认构建成功（绿色状态）
-    *   访问GitHub Releases页面确认包文件正常上传
+   - 监控GitHub Actions release.yml workflow执行状态
+   - 确认构建成功（绿色状态）
+   - 访问GitHub Releases页面确认包文件正常上传
 
 ## 第四步：输出报告
+
 1. **创建发布报告**：
-    *   文件路径：`docs/devops/发布报告_{版本号}.md`
-    *   报告内容：
-        *   版本号
-        *   发布时间
-        *   变更内容（从回归报告提取）
-        *   CI/CD流水线状态
-        *   发布包验证结果
+   - 文件路径：`docs/devops/发布报告_{版本号}.md`
+   - 报告内容：
+     - 版本号
+     - 发布时间
+     - 变更内容（从回归报告提取）
+     - CI/CD流水线状态
+     - 发布包验证结果
 
 ## 第五步：结果验证
+
 1. **验收标准**：
-    *   Tag创建成功
-    *   CI/CD流水线执行成功
-    *   GitHub Release创建成功
-    *   发布包文件正常上传
-    *   若不满足，返回错误信息并建议回滚。
+   - Tag创建成功
+   - CI/CD流水线执行成功
+   - GitHub Release创建成功
+   - 发布包文件正常上传
+   - 若不满足，返回错误信息并建议回滚。
 
 ## 第六步：标准化汇报
+
 执行完成后，使用以下格式汇报：
 
 ### ✅ 执行成功
-*   **输出物**：版本Tag + 发布报告
-*   **关键数据**：版本号、发布时间、流水线状态、发布包URL
 
----
+- **输出物**：版本Tag + 发布报告
+- **关键数据**：版本号、发布时间、流水线状态、发布包URL
+
+***
 
 ## 关键注意事项
+
 1. **发布时机**：
-    *   **关键**：版本号更新后必须先推送main分支，等待CI通过后再创建标签
-    *   确保所有代码已合并到main分支后再创建标签
-    *   禁止在PR合并前推送标签（会导致发布包不完整）
-    *   验证pyproject.toml中的版本号与标签一致
-
+   - **关键**：版本号更新后必须先推送main分支，等待CI通过后再创建标签
+   - 确保所有代码已合并到main分支后再创建标签
+   - 禁止在PR合并前推送标签（会导致发布包不完整）
+   - 验证pyproject.toml中的版本号与标签一致
 2. **CI验证顺序**：
-    *   正确流程：推送main → CI通过 → 创建Tag → 推送Tag → Release
-    *   错误流程：创建Tag → 推送Tag（跳过main推送验证）
-
+   - 正确流程：推送main → CI通过 → 创建Tag → 推送Tag → Release
+   - 错误流程：创建Tag → 推送Tag（跳过main推送验证）
 3. **单人开发模式优势**：
-    *   简化流程：跳过release分支和develop分支同步
-    *   快速迭代：feature分支直接合并到main
-    *   自动化质量保障：依赖CI检查作为质量门禁
-
+   - 简化流程：跳过release分支和develop分支同步
+   - 快速迭代：feature分支直接合并到main
+   - 自动化质量保障：依赖CI检查作为质量门禁
 4. **紧急回滚**：
-    *   若发布后发现严重问题，立即创建hotfix分支
-    *   修复后发布新版本（修订版本号递增）
-    *   更新文档说明推荐使用修复版本
+   - 若发布后发现严重问题，立即创建hotfix分支
+   - 修复后发布新版本（修订版本号递增）
+   - 更新文档说明推荐使用修复版本
 
----
+***
 
 **后续建议**：
+
 1. 更新CHANGELOG.md记录版本变更
 2. 通知用户版本更新内容
 3. 归档回归报告和发布报告
 
 **参考文档**：
+
 - [分支管理与发布流程规范](../../docs/devops/分支管理与发布流程规范.md)
 - [发布检查清单](../../docs/devops/release_checklist.md)
+
