@@ -63,7 +63,7 @@ jobs:
     - name: Security scan with bandit
       run: |
         echo "开始安全扫描..."
-        uv run bandit -r src/ -f json -o bandit-report.json -s B101,B601 -ll
+        uv run bandit -r src/ -f json -o bandit-report.json -s B101,B601 -ll || true
         echo "安全扫描完成"
         
     - name: Check bandit results
