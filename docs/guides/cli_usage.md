@@ -198,7 +198,35 @@ uv run nanobotrun report generate --type monthly
 uv run nanobotrun report profile
 ```
 
-### 3.6 系统管理命令 (system)
+### 3.6 初始化命令 (init)
+
+**v0.9.4 新增**: 初始化命令用于配置工作区和用户设置。
+
+```bash
+# 全新初始化（交互式）
+uv run nanobotrun init
+
+# 迁移模式（从旧版本迁移）
+uv run nanobotrun init --mode migrate
+
+# 修复模式（修复配置问题）
+uv run nanobotrun init --mode repair
+
+# 自动模式（非交互式）
+uv run nanobotrun init --auto
+
+# 指定工作区目录
+uv run nanobotrun init --workspace /path/to/workspace
+```
+
+**初始化流程**:
+1. 选择 LLM Provider (OpenAI/Anthropic/DeepSeek)
+2. 配置 API Key 和模型
+3. 配置业务参数（身高、体重、静息心率等）
+4. 配置飞书集成（可选）
+5. 验证配置有效性
+
+### 3.7 系统管理命令 (system)
 
 ```bash
 # 查看版本信息
@@ -209,6 +237,34 @@ uv run nanobotrun system config --show
 
 # 设置配置项
 uv run nanobotrun system config --set key=value
+
+# 验证配置（v0.9.4 新增）
+uv run nanobotrun system validate
+
+# 创建备份（v0.9.4 新增）
+uv run nanobotrun system backup
+
+# 恢复备份（v0.9.4 新增）
+uv run nanobotrun system restore --backup-id <id>
+
+# 数据迁移（v0.9.4 新增）
+uv run nanobotrun system migrate
+
+# 查看备份列表（v0.9.4 新增）
+uv run nanobotrun system backup --list
+```
+
+### 3.8 网关服务命令 (gateway)
+
+```bash
+# 启动飞书机器人Gateway服务
+uv run nanobotrun gateway start
+
+# 启动时显示详细日志
+uv run nanobotrun gateway start --verbose --logs
+
+# 指定端口
+uv run nanobotrun gateway start --port 18790
 ```
 
 ### 3.7 网关服务命令 (gateway)

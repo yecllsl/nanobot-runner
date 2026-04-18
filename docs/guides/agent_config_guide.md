@@ -8,16 +8,24 @@
 
 ### 2.1 目录结构
 
+**v0.9.4 更新**: 配置文件结构已扩展，支持环境变量配置和备份管理。
+
 ```
 ~/.nanobot-runner/
 ├── AGENTS.md          # Agent行为准则
 ├── SOUL.md            # 人格设定
 ├── USER.md            # 用户画像
 ├── config.json        # 应用配置
+├── .env.local         # 环境变量配置（v0.9.4 新增）
+├── backups/           # 配置备份目录（v0.9.4 新增）
+│   └── backup_YYYYMMDD_HHMMSS/
+│       ├── backup_info.json
+│       └── config.json
 ├── memory/
 │   ├── MEMORY.md      # 长期记忆
 │   └── HISTORY.md     # 事件日志
 └── data/
+    ├── activities_*.parquet
     └── profile.json   # 结构化画像数据
 ```
 
@@ -30,6 +38,8 @@
 | Agent行为 | `~/.nanobot-runner/AGENTS.md` | 业务配置 |
 | 人格设定 | `~/.nanobot-runner/SOUL.md` | 业务配置 |
 | 用户画像 | `~/.nanobot-runner/USER.md` | 业务配置 |
+| 环境变量 | `~/.nanobot-runner/.env.local` | 敏感配置（v0.9.4 新增） |
+| 配置备份 | `~/.nanobot-runner/backups/` | 自动备份（v0.9.4 新增） |
 
 ## 3. 核心配置文件
 

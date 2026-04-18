@@ -3,9 +3,11 @@
 桌面端私人AI跑步助理
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Code Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen.svg)](./coverage.xml)
-[![Tests](https://img.shields.io/badge/tests-2039%20passed-brightgreen.svg)]()
+[![Code Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](./coverage.xml)
+[![Tests](https://img.shields.io/badge/tests-2002%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **最新版本**: v0.9.4 - 新增配置管理基础设施和初始化向导
 
 ## 项目简介
 
