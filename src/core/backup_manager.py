@@ -77,7 +77,8 @@ class BackupManager:
                     checksum_parts.extend(cks)
 
             checksum = hashlib.md5(
-                ",".join(sorted(checksum_parts)).encode()
+                ",".join(sorted(checksum_parts)).encode(),
+                usedforsecurity=False,
             ).hexdigest()
 
             if compress:
@@ -151,14 +152,33 @@ class BackupManager:
                 and ".tar" in backup_path.name
             ):
                 with tarfile.open(backup_path, "r:gz") as tar:
-                    tar.extractall(path=backup_path.parent)
-                    restored = len(tar.getmembers())
+                    # 安全过滤：防止路径遍历攻击
+                    members = tar.getmembers()
+                    safe_members = []
+                    for member in members:
+                        if not member.name.startswith("/") and ".." not in member.name:
+                            safe_members.append(member)
+                    tar.extractall(
+                        path=backup_path.parent, members=safe_members, filter="data"
+                    )  # nosec: B202
+                    restored = len(safe_members)
             else:
                 tar_path = backup_path.with_suffix(".tar.gz")
                 if tar_path.exists():
                     with tarfile.open(tar_path, "r:gz") as tar:
-                        tar.extractall(path=backup_path.parent)
-                        restored = len(tar.getmembers())
+                        # 安全过滤：防止路径遍历攻击
+                        members = tar.getmembers()
+                        safe_members = []
+                        for member in members:
+                            if (
+                                not member.name.startswith("/")
+                                and ".." not in member.name
+                            ):
+                                safe_members.append(member)
+                        tar.extractall(
+                            path=backup_path.parent, members=safe_members, filter="data"
+                        )  # nosec: B202
+                        restored = len(safe_members)
                 else:
                     for item in backup_path.iterdir():
                         if item.name == "backup_info.json":
@@ -221,7 +241,10 @@ class BackupManager:
             return False
 
         _, _, checksums = self._compute_dir_stats(backup_path)
-        current_checksum = hashlib.md5(",".join(sorted(checksums)).encode()).hexdigest()
+        current_checksum = hashlib.md5(
+            ",".join(sorted(checksums)).encode(),
+            usedforsecurity=False,
+        ).hexdigest()
 
         return current_checksum == backup_info.checksum
 
@@ -325,7 +348,7 @@ class BackupManager:
         Returns:
             str: MD5校验和
         """
-        hasher = hashlib.md5()
+        hasher = hashlib.md5(usedforsecurity=False)
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(8192), b""):
                 hasher.update(chunk)
@@ -350,7 +373,7 @@ class BackupManager:
                 file_count += 1
                 total_size += item.stat().st_size
                 try:
-                    hasher = hashlib.md5()
+                    hasher = hashlib.md5(usedforsecurity=False)
                     with open(item, "rb") as f:
                         for chunk in iter(lambda: f.read(8192), b""):
                             hasher.update(chunk)

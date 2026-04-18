@@ -326,7 +326,7 @@ class ConfigValidator:
                 headers={"Authorization": f"Bearer {api_key}"},
             )
             start = time.time()
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # nosec: B310
                 _ = resp.read()
             return ConnectivityResult(
                 provider="openai",
