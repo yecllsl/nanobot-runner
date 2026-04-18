@@ -33,7 +33,7 @@ jobs:
     - name: Install dependencies
       run: |
         echo "正在使用uv安装依赖..."
-        uv sync --all-extras --no-cache
+        uv sync --all-extras --no-cache --index-url https://pypi.org/simple
         echo "依赖安装完成"
         
     - name: Verify tool installations
@@ -135,7 +135,7 @@ jobs:
     - name: Install dependencies
       run: |
         echo "正在使用uv安装依赖..."
-        uv sync --all-extras
+        uv sync --all-extras --index-url https://pypi.org/simple
         echo "依赖安装完成"
         
     - name: Verify test dependencies
@@ -223,7 +223,7 @@ jobs:
     - name: Install dependencies
       run: |
         echo "正在使用uv安装依赖..."
-        uv sync --all-extras
+        uv sync --all-extras --index-url https://pypi.org/simple
         echo "依赖安装完成"
         
     - name: Build package
