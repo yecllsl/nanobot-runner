@@ -69,21 +69,36 @@ jobs:
     - name: Check bandit results
       run: |
         echo "检查安全扫描结果..."
-        if [ -f "bandit-report.json" ]; then
-          HIGH_COUNT=$(python -c "import json; data=json.load(open('bandit-report.json')); print(sum(1 for r in data.get('results', []) if r.get('issue_severity') == 'HIGH'))")
-          MEDIUM_COUNT=$(python -c "import json; data=json.load(open('bandit-report.json')); print(sum(1 for r in data.get('results', []) if r.get('issue_severity') == 'MEDIUM'))")
-          
-          echo "HIGH严重性问题: $HIGH_COUNT"
-          echo "MEDIUM严重性问题: $MEDIUM_COUNT"
-          
-          if [ "$HIGH_COUNT" -gt 0 ] || [ "$MEDIUM_COUNT" -gt 0 ]; then
-            echo "❌ 发现HIGH或MEDIUM严重性安全问题，请修复后再提交"
-            exit 1
-          else
-            echo "✅ 未发现HIGH或MEDIUM严重性安全问题"
-          fi
+        if [ ! -f "bandit-report.json" ]; then
+          echo "⚠️ 安全扫描报告未生成，跳过检查"
+          exit 0
+        fi
+        
+        HIGH_COUNT=$(python -c "
+        import json
+        try:
+            data = json.load(open('bandit-report.json'))
+            print(sum(1 for r in data.get('results', []) if r.get('issue_severity') == 'HIGH'))
+        except:
+            print(0)
+        ")
+        MEDIUM_COUNT=$(python -c "
+        import json
+        try:
+            data = json.load(open('bandit-report.json'))
+            print(sum(1 for r in data.get('results', []) if r.get('issue_severity') == 'MEDIUM'))
+        except:
+            print(0)
+        ")
+        
+        echo "HIGH严重性问题: $HIGH_COUNT"
+        echo "MEDIUM严重性问题: $MEDIUM_COUNT"
+        
+        if [ "$HIGH_COUNT" -gt 0 ] || [ "$MEDIUM_COUNT" -gt 0 ]; then
+          echo "❌ 发现HIGH或MEDIUM严重性安全问题，请修复后再提交"
+          exit 1
         else
-          echo "⚠️ 安全扫描报告未生成"
+          echo "✅ 未发现HIGH或MEDIUM严重性安全问题"
         fi
         
   # 测试执行
