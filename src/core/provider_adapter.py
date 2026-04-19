@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from src.core.config import ConfigManager
@@ -207,8 +208,6 @@ class RunnerProviderAdapter:
         Returns:
             Any: nanobot配置对象
         """
-        import os
-
         try:
             from nanobot.config.loader import load_config_from_dict
 
@@ -236,6 +235,20 @@ class RunnerProviderAdapter:
             feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
             feishu_receive_id = os.getenv("NANOBOT_FEISHU_RECEIVE_ID")
 
+            if not (feishu_app_id and feishu_app_secret):
+                env_file = Path.home() / ".nanobot-runner" / ".env.local"
+                if env_file.exists():
+                    env_vars = self._parse_env_file(env_file)
+                    feishu_app_id = feishu_app_id or env_vars.get(
+                        "NANOBOT_FEISHU_APP_ID"
+                    )
+                    feishu_app_secret = feishu_app_secret or env_vars.get(
+                        "NANOBOT_FEISHU_APP_SECRET"
+                    )
+                    feishu_receive_id = feishu_receive_id or env_vars.get(
+                        "NANOBOT_FEISHU_RECEIVE_ID"
+                    )
+
             if feishu_app_id and feishu_app_secret:
                 nanobot_dict["channels"] = {
                     "feishu": {
@@ -256,6 +269,34 @@ class RunnerProviderAdapter:
                 f"无法构建nanobot配置: {e}",
                 recovery_suggestion="请确认已安装nanobot-ai",
             ) from e
+
+    @staticmethod
+    def _parse_env_file(env_file: Path) -> dict[str, str]:
+        """解析 .env 文件
+
+        Args:
+            env_file: .env 文件路径
+
+        Returns:
+            dict[str, str]: 环境变量字典
+        """
+        env_vars: dict[str, str] = {}
+        try:
+            with open(env_file, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip().strip("\"'")
+                    if key and value:
+                        env_vars[key] = value
+        except Exception as e:
+            logger.debug(f"解析 .env 文件失败: {e}")
+        return env_vars
 
     def _has_runner_llm_config(self) -> bool:
         """检查项目配置中是否有LLM配置
