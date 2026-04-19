@@ -505,18 +505,17 @@ class TestUpdateMemoryTool:
     @pytest.mark.anyio
     async def test_execute_save_failure(self):
         """测试保存失败"""
+        mock_profile_storage = MagicMock()
+        mock_profile_storage.save_memory_md.return_value = False
+
         with patch("src.core.storage.StorageManager"):
-            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
-                mock_profile_storage = MagicMock()
-                MockProfileStorage.return_value = mock_profile_storage
-                mock_profile_storage.save_memory_md.return_value = False
+            runner_tools = RunnerTools()
+            runner_tools.profile_storage = mock_profile_storage
+            tool = UpdateMemoryTool(runner_tools)
 
-                runner_tools = RunnerTools()
-                tool = UpdateMemoryTool(runner_tools)
+            result = await tool.execute(note="测试笔记")
 
-                result = await tool.execute(note="测试笔记")
-
-                assert "error" in result
+            assert "error" in result
 
 
 class TestCreateTools:
@@ -529,7 +528,7 @@ class TestCreateTools:
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 10
+            assert len(tools) == 18
 
     def test_create_tools_contains_all_tools(self):
         """测试包含所有工具"""

@@ -8,6 +8,7 @@ from src.cli.commands import (
     analysis_app,
     data_app,
     gateway_app,
+    plan_app,
     report_app,
     system_app,
 )
@@ -24,6 +25,7 @@ app.add_typer(agent_app, name="agent")
 app.add_typer(report_app, name="report")
 app.add_typer(system_app, name="system")
 app.add_typer(gateway_app, name="gateway")
+app.add_typer(plan_app, name="plan")
 
 if __name__ == "__main__":
     app()

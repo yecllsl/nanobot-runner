@@ -53,6 +53,13 @@ class CLIError:
             "suggestion": "请检查飞书 Webhook 配置，或运行 'nanobotrun config --show' 查看当前配置",
         }
 
+    @staticmethod
+    def execution_record_failed(error: str) -> dict:
+        return {
+            "message": f"执行反馈记录失败: {error}",
+            "suggestion": "请检查计划ID和日期是否正确，使用 'nanobotrun plan stats <plan_id>' 查看计划状态",
+        }
+
 
 def print_error(error_info: dict[str, Any]) -> None:
     """打印带恢复建议的错误消息

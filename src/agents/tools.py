@@ -62,8 +62,12 @@ class BaseTool(Tool):
             if isinstance(result, dict) and "error" in result:
                 logger.warning(f"工具返回错误: {result}")
                 return json.dumps(result, ensure_ascii=False, default=str)
-            # 如果结果是 dict 且包含 message 字段（如暂无数据），转换为 error 格式
-            if isinstance(result, dict) and "message" in result:
+            # 如果结果是 dict 且仅含 message 字段（如暂无数据），转换为 error 格式
+            if (
+                isinstance(result, dict)
+                and "message" in result
+                and "success" not in result
+            ):
                 logger.info(f"工具返回消息: {result}")
                 return json.dumps(
                     {"error": result["message"]}, ensure_ascii=False, default=str
@@ -423,6 +427,364 @@ class GenerateTrainingPlanTool(BaseTool):
         )
 
 
+class RecordPlanExecutionTool(BaseTool):
+    """记录计划执行反馈工具 - v0.10.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "record_plan_execution"
+
+    @property
+    def description(self) -> str:
+        return "记录训练计划执行反馈，包括完成度、体感评分、反馈备注等。当用户说'记录训练反馈'、'今天跑完了'、'训练完成'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string",
+                    "description": "训练计划ID",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "日期（YYYY-MM-DD）",
+                },
+                "completion_rate": {
+                    "type": "number",
+                    "description": "完成度（0.0-1.0），1.0表示完全完成",
+                },
+                "effort_score": {
+                    "type": "integer",
+                    "description": "体感评分（1-10），1最轻松，10最吃力",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "反馈备注",
+                },
+                "actual_distance_km": {
+                    "type": "number",
+                    "description": "实际距离（公里）",
+                },
+                "actual_duration_min": {
+                    "type": "integer",
+                    "description": "实际时长（分钟）",
+                },
+                "actual_avg_hr": {
+                    "type": "integer",
+                    "description": "实际平均心率",
+                },
+            },
+            "required": ["plan_id", "date"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.record_plan_execution,
+            plan_id=kwargs.get("plan_id", ""),
+            date=kwargs.get("date", ""),
+            completion_rate=kwargs.get("completion_rate"),
+            effort_score=kwargs.get("effort_score"),
+            notes=kwargs.get("notes", ""),
+            actual_distance_km=kwargs.get("actual_distance_km"),
+            actual_duration_min=kwargs.get("actual_duration_min"),
+            actual_avg_hr=kwargs.get("actual_avg_hr"),
+        )
+
+
+class GetPlanExecutionStatsTool(BaseTool):
+    """获取计划执行统计工具 - v0.10.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_plan_execution_stats"
+
+    @property
+    def description(self) -> str:
+        return "获取训练计划执行统计，包括完成率、平均体感评分、总距离等。当用户询问'训练完成情况'、'计划执行统计'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string",
+                    "description": "训练计划ID",
+                },
+            },
+            "required": ["plan_id"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.get_plan_execution_stats,
+            plan_id=kwargs.get("plan_id", ""),
+        )
+
+
+class AnalyzeTrainingResponseTool(BaseTool):
+    """训练响应分析工具 - v0.10.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "analyze_training_response"
+
+    @property
+    def description(self) -> str:
+        return "分析训练响应模式，识别用户最适应和最不适应的训练类型。当用户询问'训练适应情况'、'哪种训练最适合我'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string",
+                    "description": "训练计划ID",
+                },
+            },
+            "required": ["plan_id"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.analyze_training_response,
+            plan_id=kwargs.get("plan_id", ""),
+        )
+
+
+class AdjustPlanTool(BaseTool):
+    """计划调整工具 - v0.11.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "adjust_plan"
+
+    @property
+    def description(self) -> str:
+        return "调整训练计划。支持自然语言调整指令，如'下周减量'、'把周三的间歇跑改成轻松跑'。当用户说'调整计划'、'减量'、'加量'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string",
+                    "description": "训练计划ID",
+                },
+                "adjustment_request": {
+                    "type": "string",
+                    "description": "调整请求（自然语言），如'下周减量20%'、'增加间歇跑'",
+                },
+                "confirmation_required": {
+                    "type": "boolean",
+                    "description": "是否需要确认后再执行调整（默认true）",
+                },
+            },
+            "required": ["plan_id", "adjustment_request"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.adjust_plan,
+            plan_id=kwargs.get("plan_id", ""),
+            adjustment_request=kwargs.get("adjustment_request", ""),
+            confirmation_required=kwargs.get("confirmation_required", True),
+        )
+
+
+class GetPlanAdjustmentSuggestionsTool(BaseTool):
+    """获取计划调整建议工具 - v0.11.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_plan_adjustment_suggestions"
+
+    @property
+    def description(self) -> str:
+        return "获取训练计划调整建议。基于训练数据和执行反馈，生成个性化调整建议。当用户说'给我建议'、'如何调整'、'训练建议'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string",
+                    "description": "训练计划ID",
+                },
+            },
+            "required": ["plan_id"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.get_plan_adjustment_suggestions,
+            plan_id=kwargs.get("plan_id", ""),
+        )
+
+
+class EvaluateGoalAchievementTool(BaseTool):
+    """目标达成评估工具 - v0.12.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "evaluate_goal_achievement"
+
+    @property
+    def description(self) -> str:
+        return "评估目标达成概率。基于当前体能、训练趋势和目标差距，预测目标达成概率和关键风险。当用户说'我能达到目标吗'、'目标评估'、'达成概率'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "goal_type": {
+                    "type": "string",
+                    "description": "目标类型（vdot/5k/10k/half_marathon/marathon）",
+                },
+                "goal_value": {
+                    "type": "number",
+                    "description": "目标值（VDOT值或秒数）",
+                },
+                "current_vdot": {
+                    "type": "number",
+                    "description": "当前VDOT值",
+                },
+                "weeks_available": {
+                    "type": "integer",
+                    "description": "可用训练周数（可选）",
+                },
+            },
+            "required": ["goal_type", "goal_value", "current_vdot"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.evaluate_goal_achievement,
+            goal_type=kwargs.get("goal_type", "vdot"),
+            goal_value=kwargs.get("goal_value", 0.0),
+            current_vdot=kwargs.get("current_vdot", 0.0),
+            weeks_available=kwargs.get("weeks_available"),
+        )
+
+
+class CreateLongTermPlanTool(BaseTool):
+    """创建长期训练规划工具 - v0.12.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "create_long_term_plan"
+
+    @property
+    def description(self) -> str:
+        return "创建长期训练规划。支持年度/赛季/多周期规划，自动生成基础期、提升期、巅峰期、减量期。当用户说'制定长期计划'、'备赛计划'、'年度规划'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_name": {
+                    "type": "string",
+                    "description": "计划名称",
+                },
+                "current_vdot": {
+                    "type": "number",
+                    "description": "当前VDOT值",
+                },
+                "target_vdot": {
+                    "type": "number",
+                    "description": "目标VDOT值（可选）",
+                },
+                "target_race": {
+                    "type": "string",
+                    "description": "目标赛事名称（可选）",
+                },
+                "target_date": {
+                    "type": "string",
+                    "description": "目标日期（YYYY-MM-DD，可选）",
+                },
+                "total_weeks": {
+                    "type": "integer",
+                    "description": "总训练周数（默认16）",
+                },
+                "fitness_level": {
+                    "type": "string",
+                    "description": "体能水平（beginner/intermediate/advanced/elite，默认intermediate）",
+                },
+            },
+            "required": ["plan_name", "current_vdot"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.create_long_term_plan,
+            plan_name=kwargs.get("plan_name", ""),
+            current_vdot=kwargs.get("current_vdot", 0.0),
+            target_vdot=kwargs.get("target_vdot"),
+            target_race=kwargs.get("target_race"),
+            target_date=kwargs.get("target_date"),
+            total_weeks=kwargs.get("total_weeks", 16),
+            fitness_level=kwargs.get("fitness_level", "intermediate"),
+        )
+
+
+class GetSmartTrainingAdviceTool(BaseTool):
+    """获取智能训练建议工具 - v0.12.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_smart_training_advice"
+
+    @property
+    def description(self) -> str:
+        return "获取智能训练建议。基于训练数据和体能状态，生成训练、恢复、营养、伤病预防等多维度建议。当用户说'给我训练建议'、'如何恢复'、'营养建议'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "current_vdot": {
+                    "type": "number",
+                    "description": "当前VDOT值（可选）",
+                },
+                "weekly_volume_km": {
+                    "type": "number",
+                    "description": "周跑量（公里，可选）",
+                },
+                "training_consistency": {
+                    "type": "number",
+                    "description": "训练一致性（0-1，可选）",
+                },
+                "injury_risk": {
+                    "type": "string",
+                    "description": "伤病风险（low/medium/high，可选）",
+                },
+                "goal_type": {
+                    "type": "string",
+                    "description": "目标类型（5k/10k/half_marathon/marathon，可选）",
+                },
+            },
+            "required": [],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.get_smart_training_advice,
+            current_vdot=kwargs.get("current_vdot"),
+            weekly_volume_km=kwargs.get("weekly_volume_km", 0.0),
+            training_consistency=kwargs.get("training_consistency", 1.0),
+            injury_risk=kwargs.get("injury_risk", "low"),
+            goal_type=kwargs.get("goal_type"),
+        )
+
+
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
@@ -777,7 +1139,6 @@ class RunnerTools:
         try:
             from src.core.training_plan import TrainingPlanEngine
 
-            # 获取用户画像
             profile = self.profile_storage.load_profile_json()
             if not profile:
                 return {"error": "未找到用户画像，请先导入跑步数据"}
@@ -788,7 +1149,6 @@ class RunnerTools:
             age = profile_dict.get("age", 30)
             resting_hr = profile_dict.get("resting_hr", 60)
 
-            # 生成训练计划
             engine = TrainingPlanEngine()
             plan = engine.generate_plan(
                 user_id="default",
@@ -812,6 +1172,338 @@ class RunnerTools:
             logger.error(f"生成训练计划失败：{e}")
             return {"error": str(e)}
 
+    def record_plan_execution(
+        self,
+        plan_id: str,
+        date: str,
+        completion_rate: float | None = None,
+        effort_score: int | None = None,
+        notes: str = "",
+        actual_distance_km: float | None = None,
+        actual_duration_min: int | None = None,
+        actual_avg_hr: int | None = None,
+    ) -> dict[str, Any]:
+        """记录计划执行反馈
+
+        Args:
+            plan_id: 计划ID
+            date: 日期（YYYY-MM-DD）
+            completion_rate: 完成度（0.0-1.0）
+            effort_score: 体感评分（1-10）
+            notes: 反馈备注
+            actual_distance_km: 实际距离（公里）
+            actual_duration_min: 实际时长（分钟）
+            actual_avg_hr: 实际平均心率
+
+        Returns:
+            dict: 记录结果
+        """
+        try:
+            from src.core.context import get_context
+
+            context = get_context()
+            plan_manager = context.plan_manager
+            result = plan_manager.record_execution(
+                plan_id=plan_id,
+                date=date,
+                completion_rate=completion_rate,
+                effort_score=effort_score,
+                notes=notes,
+                actual_distance_km=actual_distance_km,
+                actual_duration_min=actual_duration_min,
+                actual_avg_hr=actual_avg_hr,
+            )
+            return result
+        except Exception as e:
+            logger.error(f"记录执行反馈失败：{e}")
+            return {"error": str(e)}
+
+    def get_plan_execution_stats(self, plan_id: str) -> dict[str, Any]:
+        """获取计划执行统计
+
+        Args:
+            plan_id: 计划ID
+
+        Returns:
+            dict: 执行统计数据
+        """
+        try:
+            from src.core.context import get_context
+
+            context = get_context()
+            execution_repo = context.plan_execution_repo
+            stats = execution_repo.get_plan_execution_stats(plan_id)
+            return stats.to_dict()
+        except Exception as e:
+            logger.error(f"获取执行统计失败：{e}")
+            return {"error": str(e)}
+
+    def analyze_training_response(self, plan_id: str) -> dict[str, Any]:
+        """分析训练响应模式
+
+        Args:
+            plan_id: 计划ID
+
+        Returns:
+            dict: 训练响应分析结果
+        """
+        try:
+            from src.core.context import get_context
+
+            context = get_context()
+            analyzer = context.training_response_analyzer
+            return analyzer.analyze_plan_response(plan_id)
+        except Exception as e:
+            logger.error(f"训练响应分析失败：{e}")
+            return {"error": str(e)}
+
+    def adjust_plan(
+        self,
+        plan_id: str,
+        adjustment_request: str,
+        confirmation_required: bool = True,
+    ) -> dict[str, Any]:
+        """调整训练计划
+
+        Args:
+            plan_id: 计划ID
+            adjustment_request: 调整请求（自然语言）
+            confirmation_required: 是否需要确认
+
+        Returns:
+            dict: 调整结果
+        """
+        try:
+            from src.core.context import get_context
+
+            context = get_context()
+            validator = context.plan_adjustment_validator
+
+            default_adjustment = validator.get_default_adjustment(adjustment_request)
+
+            validation = validator.validate(default_adjustment)
+
+            if not validation.passed:
+                violation_msgs = [v.message for v in validation.violations]
+                return {
+                    "success": False,
+                    "error": "调整建议不符合运动科学原则",
+                    "violations": violation_msgs,
+                }
+
+            if confirmation_required:
+                return {
+                    "success": True,
+                    "plan_id": plan_id,
+                    "adjustment": default_adjustment.to_dict(),
+                    "validation": {"passed": True},
+                    "requires_confirmation": True,
+                }
+
+            return {
+                "success": True,
+                "plan_id": plan_id,
+                "adjustment": default_adjustment.to_dict(),
+                "validation": {"passed": True},
+                "requires_confirmation": False,
+            }
+        except Exception as e:
+            logger.error(f"调整训练计划失败：{e}")
+            return {"error": str(e)}
+
+    def get_plan_adjustment_suggestions(self, plan_id: str) -> dict[str, Any]:
+        """获取计划调整建议
+
+        Args:
+            plan_id: 计划ID
+
+        Returns:
+            dict: 调整建议
+        """
+        try:
+            from src.core.context import get_context
+
+            context = get_context()
+            execution_repo = context.plan_execution_repo
+            stats = execution_repo.get_plan_execution_stats(plan_id)
+
+            suggestions: list[dict[str, Any]] = []
+
+            if stats.completion_rate < 0.5:
+                suggestions.append(
+                    {
+                        "suggestion_type": "training",
+                        "suggestion_content": "完成率偏低，建议降低训练量或增加恢复日",
+                        "priority": "high",
+                        "confidence": 0.8,
+                    }
+                )
+
+            if stats.avg_effort_score > 7:
+                suggestions.append(
+                    {
+                        "suggestion_type": "recovery",
+                        "suggestion_content": "体感评分偏高，建议减少高强度训练比例",
+                        "priority": "high",
+                        "confidence": 0.75,
+                    }
+                )
+
+            if stats.avg_hr_drift is not None and stats.avg_hr_drift > 5.0:
+                suggestions.append(
+                    {
+                        "suggestion_type": "training",
+                        "suggestion_content": "心率漂移较大，建议增加有氧基础训练",
+                        "priority": "medium",
+                        "confidence": 0.7,
+                    }
+                )
+
+            if not suggestions:
+                suggestions.append(
+                    {
+                        "suggestion_type": "training",
+                        "suggestion_content": "训练状态良好，保持当前计划即可",
+                        "priority": "low",
+                        "confidence": 0.6,
+                    }
+                )
+
+            return {
+                "success": True,
+                "plan_id": plan_id,
+                "suggestions": suggestions,
+            }
+        except Exception as e:
+            logger.error(f"获取调整建议失败：{e}")
+            return {"error": str(e)}
+
+    def evaluate_goal_achievement(
+        self,
+        goal_type: str,
+        goal_value: float,
+        current_vdot: float,
+        weeks_available: int | None = None,
+    ) -> dict[str, Any]:
+        """评估目标达成概率 - v0.12.0新增
+
+        Args:
+            goal_type: 目标类型
+            goal_value: 目标值
+            current_vdot: 当前VDOT
+            weeks_available: 可用周数
+
+        Returns:
+            dict: 评估结果
+        """
+        try:
+            from src.core.plan.goal_prediction_engine import GoalPredictionEngine
+
+            engine = GoalPredictionEngine()
+            evaluation = engine.evaluate_goal(
+                goal_type=goal_type,
+                goal_value=goal_value,
+                current_vdot=current_vdot,
+                weeks_available=weeks_available,
+            )
+
+            return {
+                "success": True,
+                "data": evaluation.to_dict(),
+            }
+        except Exception as e:
+            logger.error(f"目标评估失败：{e}")
+            return {"success": False, "error": str(e)}
+
+    def create_long_term_plan(
+        self,
+        plan_name: str,
+        current_vdot: float,
+        target_vdot: float | None = None,
+        target_race: str | None = None,
+        target_date: str | None = None,
+        total_weeks: int = 16,
+        fitness_level: str = "intermediate",
+    ) -> dict[str, Any]:
+        """创建长期训练规划 - v0.12.0新增
+
+        Args:
+            plan_name: 计划名称
+            current_vdot: 当前VDOT
+            target_vdot: 目标VDOT
+            target_race: 目标赛事
+            target_date: 目标日期
+            total_weeks: 总周数
+            fitness_level: 体能水平
+
+        Returns:
+            dict: 规划结果
+        """
+        try:
+            from src.core.plan.long_term_plan_generator import LongTermPlanGenerator
+
+            generator = LongTermPlanGenerator()
+            plan = generator.generate_plan(
+                plan_name=plan_name,
+                current_vdot=current_vdot,
+                target_vdot=target_vdot,
+                target_race=target_race,
+                target_date=target_date,
+                total_weeks=total_weeks,
+                fitness_level=fitness_level,
+            )
+
+            return {
+                "success": True,
+                "data": plan.to_dict(),
+            }
+        except Exception as e:
+            logger.error(f"创建长期规划失败：{e}")
+            return {"success": False, "error": str(e)}
+
+    def get_smart_training_advice(
+        self,
+        current_vdot: float | None = None,
+        weekly_volume_km: float = 0.0,
+        training_consistency: float = 1.0,
+        injury_risk: str = "low",
+        goal_type: str | None = None,
+    ) -> dict[str, Any]:
+        """获取智能训练建议 - v0.12.0新增
+
+        Args:
+            current_vdot: 当前VDOT
+            weekly_volume_km: 周跑量
+            training_consistency: 训练一致性
+            injury_risk: 伤病风险
+            goal_type: 目标类型
+
+        Returns:
+            dict: 建议结果
+        """
+        try:
+            from src.core.plan.smart_advice_engine import SmartAdviceEngine
+
+            engine = SmartAdviceEngine()
+            advices = engine.generate_advice(
+                current_vdot=current_vdot,
+                weekly_volume_km=weekly_volume_km,
+                training_consistency=training_consistency,
+                injury_risk=injury_risk,
+                goal_type=goal_type,
+            )
+
+            return {
+                "success": True,
+                "data": {
+                    "advices": [a.to_dict() for a in advices],
+                    "total_count": len(advices),
+                },
+            }
+        except Exception as e:
+            logger.error(f"获取训练建议失败：{e}")
+            return {"success": False, "error": str(e)}
+
 
 def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
@@ -826,6 +1518,14 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         QueryByDistanceTool(runner_tools),
         UpdateMemoryTool(runner_tools),
         GenerateTrainingPlanTool(runner_tools),
+        RecordPlanExecutionTool(runner_tools),
+        GetPlanExecutionStatsTool(runner_tools),
+        AnalyzeTrainingResponseTool(runner_tools),
+        AdjustPlanTool(runner_tools),
+        GetPlanAdjustmentSuggestionsTool(runner_tools),
+        EvaluateGoalAchievementTool(runner_tools),
+        CreateLongTermPlanTool(runner_tools),
+        GetSmartTrainingAdviceTool(runner_tools),
     ]
 
 
@@ -876,6 +1576,76 @@ TOOL_DESCRIPTIONS = {
         "parameters": {
             "note": "观察笔记内容",
             "category": "笔记分类（training/preference/injury/other，默认 other）",
+        },
+    },
+    "record_plan_execution": {
+        "description": "记录训练计划执行反馈，包括完成度、体感评分、反馈备注等。返回JSON格式：{success: true, data: {plan_id: 计划ID, date: 日期, message: 反馈消息}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plan_id": "训练计划ID（必填）",
+            "date": "日期，格式YYYY-MM-DD（必填）",
+            "completion_rate": "完成度（0.0-1.0，可选）",
+            "effort_score": "体感评分（1-10，可选）",
+            "notes": "反馈备注（可选）",
+            "actual_distance_km": "实际距离（公里，可选）",
+            "actual_duration_min": "实际时长（分钟，可选）",
+            "actual_avg_hr": "实际平均心率（可选）",
+        },
+    },
+    "get_plan_execution_stats": {
+        "description": "获取训练计划执行统计，包括完成率、平均体感评分、总距离等。返回JSON格式：{success: true, data: {plan_id, total_planned_days, completed_days, completion_rate, avg_effort_score, total_distance_km, total_duration_min, avg_hr, avg_hr_drift}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plan_id": "训练计划ID（必填）",
+        },
+    },
+    "analyze_training_response": {
+        "description": "分析训练响应模式，识别用户最适应和最不适应的训练类型。返回JSON格式：{success: true, data: {plan_id, stats, patterns, overall_assessment, weak_types, strong_types}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plan_id": "训练计划ID（必填）",
+        },
+    },
+    "adjust_plan": {
+        "description": "调整训练计划。支持自然语言调整指令，如'下周减量'、'把周三的间歇跑改成轻松跑'。返回JSON格式：{success: true, data: {plan_id, adjustment, validation, requires_confirmation}} 或 {success: false, error: 错误信息, violations: 违规列表}",
+        "parameters": {
+            "plan_id": "训练计划ID（必填）",
+            "adjustment_request": "调整请求（自然语言），如'下周减量20%'、'增加间歇跑'（必填）",
+            "confirmation_required": "是否需要确认后再执行调整（默认true）",
+        },
+    },
+    "get_plan_adjustment_suggestions": {
+        "description": "获取训练计划调整建议。基于训练数据和执行反馈，生成个性化调整建议。返回JSON格式：{success: true, data: {plan_id, suggestions}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plan_id": "训练计划ID（必填）",
+        },
+    },
+    "evaluate_goal_achievement": {
+        "description": "评估目标达成概率。基于当前体能、训练趋势和目标差距，预测目标达成概率和关键风险。返回JSON格式：{success: true, data: {goal_type, goal_value, current_value, achievement_probability, key_risks, improvement_suggestions, estimated_weeks_to_achieve, confidence, gap, achievement_rate}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "goal_type": "目标类型（vdot/5k/10k/half_marathon/marathon，必填）",
+            "goal_value": "目标值（VDOT值或秒数，必填）",
+            "current_vdot": "当前VDOT值（必填）",
+            "weeks_available": "可用训练周数（可选）",
+        },
+    },
+    "create_long_term_plan": {
+        "description": "创建长期训练规划。支持年度/赛季/多周期规划，自动生成基础期、提升期、巅峰期、减量期。返回JSON格式：{success: true, data: {plan_name, target_race, target_date, current_vdot, target_vdot, total_weeks, cycles, weekly_volume_range_km, key_milestones}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plan_name": "计划名称（必填）",
+            "current_vdot": "当前VDOT值（必填）",
+            "target_vdot": "目标VDOT值（可选）",
+            "target_race": "目标赛事名称（可选）",
+            "target_date": "目标日期（YYYY-MM-DD，可选）",
+            "total_weeks": "总训练周数（默认16）",
+            "fitness_level": "体能水平（beginner/intermediate/advanced/elite，默认intermediate）",
+        },
+    },
+    "get_smart_training_advice": {
+        "description": "获取智能训练建议。基于训练数据和体能状态，生成训练、恢复、营养、伤病预防等多维度建议。返回JSON格式：{success: true, data: {advices: [{advice_type, content, priority, context, confidence, related_metrics}], total_count}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "current_vdot": "当前VDOT值（可选）",
+            "weekly_volume_km": "周跑量（公里，可选）",
+            "training_consistency": "训练一致性（0-1，可选）",
+            "injury_risk": "伤病风险（low/medium/high，可选）",
+            "goal_type": "目标类型（5k/10k/half_marathon/marathon，可选）",
         },
     },
 }

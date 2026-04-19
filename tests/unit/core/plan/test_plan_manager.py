@@ -671,3 +671,112 @@ class TestPlanManagerErrorHandling:
 
         status = manager.get_plan_status("test_plan_1")
         assert status is None
+
+
+class TestPlanManagerRecordExecution:
+    """测试记录执行反馈 - v0.10.0新增"""
+
+    @pytest.fixture
+    def manager(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            config = MagicMock()
+            config.data_dir = data_dir
+            context = create_mock_context(config=config)
+            yield PlanManager(context)
+
+    @pytest.fixture
+    def manager_with_plan(self, manager):
+        plan = create_test_plan("test_exec_plan")
+        manager.create_plan(plan)
+        return manager
+
+    def test_record_execution_success(self, manager_with_plan):
+        result = manager_with_plan.record_execution(
+            plan_id="test_exec_plan",
+            date="2026-04-10",
+            completion_rate=0.8,
+            effort_score=6,
+            notes="感觉不错",
+        )
+        assert result["success"] is True
+        assert result["plan_id"] == "test_exec_plan"
+        assert result["date"] == "2026-04-10"
+
+    def test_record_execution_updates_daily_plan(self, manager_with_plan):
+        manager_with_plan.record_execution(
+            plan_id="test_exec_plan",
+            date="2026-04-10",
+            completion_rate=0.9,
+            effort_score=5,
+        )
+        plan = manager_with_plan.get_plan("test_exec_plan")
+        day = plan.weeks[0].daily_plans[0]
+        assert day.completion_rate == 0.9
+        assert day.effort_score == 5
+
+    def test_record_execution_sets_completed_when_full(self, manager_with_plan):
+        manager_with_plan.record_execution(
+            plan_id="test_exec_plan",
+            date="2026-04-10",
+            completion_rate=1.0,
+        )
+        plan = manager_with_plan.get_plan("test_exec_plan")
+        day = plan.weeks[0].daily_plans[0]
+        assert day.completed is True
+
+    def test_record_execution_with_actual_data(self, manager_with_plan):
+        manager_with_plan.record_execution(
+            plan_id="test_exec_plan",
+            date="2026-04-10",
+            actual_distance_km=5.2,
+            actual_duration_min=32,
+            actual_avg_hr=148,
+        )
+        plan = manager_with_plan.get_plan("test_exec_plan")
+        day = plan.weeks[0].daily_plans[0]
+        assert day.actual_distance_km == 5.2
+        assert day.actual_duration_min == 32
+        assert day.actual_avg_hr == 148
+
+    def test_record_execution_invalid_completion_rate(self, manager_with_plan):
+        with pytest.raises(PlanManagerError, match="0.0-1.0"):
+            manager_with_plan.record_execution(
+                plan_id="test_exec_plan",
+                date="2026-04-10",
+                completion_rate=1.5,
+            )
+
+    def test_record_execution_invalid_effort_score(self, manager_with_plan):
+        with pytest.raises(PlanManagerError, match="1-10"):
+            manager_with_plan.record_execution(
+                plan_id="test_exec_plan",
+                date="2026-04-10",
+                effort_score=15,
+            )
+
+    def test_record_execution_plan_not_found(self, manager):
+        with pytest.raises(PlanManagerError, match="计划不存在"):
+            manager.record_execution(
+                plan_id="nonexistent",
+                date="2026-04-10",
+                completion_rate=0.8,
+            )
+
+    def test_record_execution_date_not_in_plan(self, manager_with_plan):
+        with pytest.raises(PlanManagerError, match="日期不存在"):
+            manager_with_plan.record_execution(
+                plan_id="test_exec_plan",
+                date="2026-05-01",
+                completion_rate=0.8,
+            )
+
+    def test_record_execution_feedback_notes(self, manager_with_plan):
+        manager_with_plan.record_execution(
+            plan_id="test_exec_plan",
+            date="2026-04-10",
+            notes="今天状态很好",
+        )
+        plan = manager_with_plan.get_plan("test_exec_plan")
+        day = plan.weeks[0].daily_plans[0]
+        assert day.feedback_notes == "今天状态很好"

@@ -154,6 +154,89 @@ class PlanManager:
             logger.error(f"解析训练计划失败：{e}")
             return None
 
+    def record_execution(
+        self,
+        plan_id: str,
+        date: str,
+        completion_rate: float | None = None,
+        effort_score: int | None = None,
+        notes: str = "",
+        actual_distance_km: float | None = None,
+        actual_duration_min: int | None = None,
+        actual_avg_hr: int | None = None,
+    ) -> dict[str, Any]:
+        """记录计划执行反馈
+
+        更新指定日期的训练计划执行情况，支持记录完成度、体感评分、反馈备注等。
+
+        Args:
+            plan_id: 计划ID
+            date: 日期（YYYY-MM-DD）
+            completion_rate: 完成度（0.0-1.0）
+            effort_score: 体感评分（1-10）
+            notes: 反馈备注
+            actual_distance_km: 实际距离（公里）
+            actual_duration_min: 实际时长（分钟）
+            actual_avg_hr: 实际平均心率
+
+        Returns:
+            dict: 更新结果，包含success和message字段
+
+        Raises:
+            PlanManagerError: 当计划不存在或参数无效时
+        """
+        if plan_id not in self._plans:
+            raise PlanManagerError(f"计划不存在：{plan_id}")
+
+        if completion_rate is not None and not 0.0 <= completion_rate <= 1.0:
+            raise PlanManagerError("完成度必须在0.0-1.0之间")
+
+        if effort_score is not None and not 1 <= effort_score <= 10:
+            raise PlanManagerError("体感评分必须在1-10之间")
+
+        plan = self.get_plan(plan_id)
+        if not plan:
+            raise PlanManagerError(f"计划解析失败：{plan_id}")
+
+        target_day = None
+        for week in plan.weeks:
+            for day in week.daily_plans:
+                if day.date == date:
+                    target_day = day
+                    break
+            if target_day:
+                break
+
+        if not target_day:
+            raise PlanManagerError(f"日期不存在于计划中：{date}")
+
+        if completion_rate is not None:
+            target_day.completion_rate = completion_rate
+        if effort_score is not None:
+            target_day.effort_score = effort_score
+        if notes:
+            target_day.feedback_notes = notes
+        if actual_distance_km is not None:
+            target_day.actual_distance_km = actual_distance_km
+        if actual_duration_min is not None:
+            target_day.actual_duration_min = actual_duration_min
+        if actual_avg_hr is not None:
+            target_day.actual_avg_hr = actual_avg_hr
+
+        if completion_rate is not None and completion_rate >= 1.0:
+            target_day.completed = True
+
+        self._plans[plan_id] = plan.to_dict()
+        self._save_plans()
+
+        logger.info(f"记录执行反馈成功：计划={plan_id}, 日期={date}")
+        return {
+            "success": True,
+            "message": f"已记录{date}的执行反馈",
+            "plan_id": plan_id,
+            "date": date,
+        }
+
     def get_plan_status(self, plan_id: str) -> PlanStatus | None:
         """
         获取计划状态
