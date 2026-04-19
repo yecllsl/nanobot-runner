@@ -2,10 +2,12 @@
 # 提供依赖注入和统一的对象管理
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from src.core.analytics import AnalyticsEngine
 from src.core.config import ConfigManager
+from src.core.env_manager import EnvManager
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.parser import FitParser
@@ -119,6 +121,16 @@ class AppContextFactory:
         Returns:
             配置好的 AppContext 实例
         """
+        import os
+
+        env_file: Path | None = None
+        if env_path := os.getenv("NANOBOT_CONFIG_DIR"):
+            env_file = Path(env_path) / ".env.local"
+        else:
+            env_file = Path.home() / ".nanobot-runner" / ".env.local"
+
+        EnvManager(env_file=env_file).load_env()
+
         # 创建或使用提供的配置管理器
         if config is None:
             config = ConfigManager(allow_default=allow_default)
