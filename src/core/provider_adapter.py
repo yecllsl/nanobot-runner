@@ -207,6 +207,8 @@ class RunnerProviderAdapter:
         Returns:
             Any: nanobot配置对象
         """
+        import os
+
         try:
             from nanobot.config.loader import load_config_from_dict
 
@@ -229,6 +231,23 @@ class RunnerProviderAdapter:
                 nanobot_dict["providers"][provider_name]["base_url"] = llm_dict[
                     "base_url"
                 ]
+
+            feishu_app_id = os.getenv("NANOBOT_FEISHU_APP_ID")
+            feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
+            feishu_receive_id = os.getenv("NANOBOT_FEISHU_RECEIVE_ID")
+
+            if feishu_app_id and feishu_app_secret:
+                nanobot_dict["channels"] = {
+                    "feishu": {
+                        "enabled": True,
+                        "app_id": feishu_app_id,
+                        "app_secret": feishu_app_secret,
+                        "receive_id": feishu_receive_id or "",
+                        "receive_id_type": os.getenv(
+                            "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
+                        ),
+                    }
+                }
 
             return load_config_from_dict(nanobot_dict)
         except (ImportError, Exception) as e:
