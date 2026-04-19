@@ -253,6 +253,15 @@ def format_agent_response(response: Any) -> None:
     Args:
         response: Agent回复内容
     """
+    from rich.markdown import Markdown
+
+    if isinstance(response, str):
+        console.print()
+        md = Markdown(response)
+        console.print(md)
+        console.print()
+        return
+
     if isinstance(response, dict):
         if "error" in response:
             console.print(format_error(response["error"]))
