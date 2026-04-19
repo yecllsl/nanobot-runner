@@ -24,7 +24,7 @@ class InitPrompts:
 
             provider = questionary.select(
                 "选择 LLM Provider:",
-                choices=["openai", "anthropic", "deepseek", "other"],
+                choices=["openai", "anthropic", "deepseek", "zhipu", "other"],
                 default="openai",
             ).ask()
 
@@ -181,5 +181,6 @@ class InitPrompts:
             "openai": "gpt-4o-mini",
             "anthropic": "claude-3-5-sonnet-20241022",
             "deepseek": "deepseek-chat",
+            "zhipu": "glm-4-flash",
         }
         return defaults.get(provider, "gpt-4o-mini")
