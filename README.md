@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Nanobot Runner
 
 桌面端私人AI跑步助理
@@ -387,6 +388,5 @@ uv cache clean && uv sync --reinstall           # Linux/macOS
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
-
-**版本**: v0.9.5
+**版本**: v0.9.5
 **最后更新**: 2026-04-20

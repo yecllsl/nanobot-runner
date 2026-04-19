@@ -245,7 +245,7 @@ class UserContext:
 
 @dataclass
 class DailyPlan:
-    """日计划"""
+    """日计划 - v0.10.0扩展"""
 
     date: str
     workout_type: TrainingType
@@ -261,6 +261,9 @@ class DailyPlan:
     rpe: int | None = None
     hr_drift: float | None = None
     event_id: str | None = None
+    completion_rate: float | None = None
+    effort_score: int | None = None
+    feedback_notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -285,6 +288,11 @@ class DailyPlan:
             "rpe": self.rpe,
             "hr_drift": round(self.hr_drift, 2) if self.hr_drift else None,
             "event_id": self.event_id,
+            "completion_rate": (
+                round(self.completion_rate, 2) if self.completion_rate else None
+            ),
+            "effort_score": self.effort_score,
+            "feedback_notes": self.feedback_notes,
         }
 
 
@@ -381,6 +389,9 @@ class TrainingPlan:
                     rpe=day_data.get("rpe"),
                     hr_drift=day_data.get("hr_drift"),
                     event_id=day_data.get("event_id"),
+                    completion_rate=day_data.get("completion_rate"),
+                    effort_score=day_data.get("effort_score"),
+                    feedback_notes=day_data.get("feedback_notes", ""),
                 )
                 daily_plans.append(daily_plan)
 
@@ -621,6 +632,60 @@ class NotifyResult:
         }
 
 
+@dataclass
+class PlanExecutionStats:
+    """计划执行统计 - v0.10.0新增"""
+
+    plan_id: str
+    total_planned_days: int
+    completed_days: int
+    completion_rate: float
+    avg_effort_score: float
+    total_distance_km: float
+    total_duration_min: int
+    avg_hr: int | None
+    avg_hr_drift: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "plan_id": self.plan_id,
+            "total_planned_days": self.total_planned_days,
+            "completed_days": self.completed_days,
+            "completion_rate": round(self.completion_rate, 2),
+            "avg_effort_score": round(self.avg_effort_score, 2),
+            "total_distance_km": round(self.total_distance_km, 2),
+            "total_duration_min": self.total_duration_min,
+            "avg_hr": self.avg_hr,
+            "avg_hr_drift": (
+                round(self.avg_hr_drift, 3) if self.avg_hr_drift else None
+            ),
+        }
+
+
+@dataclass
+class TrainingResponsePattern:
+    """训练响应模式 - v0.10.0新增"""
+
+    workout_type: TrainingType
+    avg_completion_rate: float
+    avg_effort_score: float
+    avg_hr_drift: float
+    sample_count: int
+    recommendation: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "workout_type": self.workout_type.value,
+            "avg_completion_rate": round(self.avg_completion_rate, 2),
+            "avg_effort_score": round(self.avg_effort_score, 2),
+            "avg_hr_drift": round(self.avg_hr_drift, 3),
+            "sample_count": self.sample_count,
+            "recommendation": self.recommendation,
+        }
+
+
 def create_training_plan_id(user_id: str) -> str:
     """
     生成训练计划ID
@@ -813,6 +878,208 @@ class PaceDistributionResult:
         if self.message:
             result["message"] = self.message
         return result
+
+
+@dataclass
+class PlanAdjustment:
+    """计划调整 - v0.11.0新增"""
+
+    adjustment_type: str
+    original_value: Any
+    adjusted_value: Any
+    reason: str
+    confidence: float
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence必须在0.0-1.0之间，当前值：{self.confidence}")
+        valid_types = {"volume", "intensity", "type", "date"}
+        if self.adjustment_type not in valid_types:
+            raise ValueError(
+                f"adjustment_type必须是{valid_types}之一，当前值：{self.adjustment_type}"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "adjustment_type": self.adjustment_type,
+            "original_value": self.original_value,
+            "adjusted_value": self.adjusted_value,
+            "reason": self.reason,
+            "confidence": round(self.confidence, 2),
+        }
+
+
+@dataclass
+class PlanSuggestion:
+    """计划调整建议 - v0.11.0新增"""
+
+    suggestion_type: str
+    suggestion_content: str
+    priority: str
+    context: str
+    confidence: float
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence必须在0.0-1.0之间，当前值：{self.confidence}")
+        valid_priorities = {"high", "medium", "low"}
+        if self.priority not in valid_priorities:
+            raise ValueError(
+                f"priority必须是{valid_priorities}之一，当前值：{self.priority}"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "suggestion_type": self.suggestion_type,
+            "suggestion_content": self.suggestion_content,
+            "priority": self.priority,
+            "context": self.context,
+            "confidence": round(self.confidence, 2),
+        }
+
+
+@dataclass
+class GoalAchievementEvaluation:
+    """目标达成评估 - v0.12.0新增"""
+
+    goal_type: str
+    goal_value: float
+    current_value: float
+    achievement_probability: float
+    key_risks: list[str]
+    improvement_suggestions: list[str]
+    estimated_weeks_to_achieve: int | None
+    confidence: float
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.achievement_probability <= 1.0:
+            raise ValueError(
+                f"achievement_probability必须在0.0-1.0之间，当前值：{self.achievement_probability}"
+            )
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence必须在0.0-1.0之间，当前值：{self.confidence}")
+
+    @property
+    def gap(self) -> float:
+        """目标差距"""
+        return self.goal_value - self.current_value
+
+    @property
+    def achievement_rate(self) -> float:
+        """当前达成率"""
+        if self.goal_value == 0:
+            return 0.0
+        return min(self.current_value / self.goal_value, 1.0)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "goal_type": self.goal_type,
+            "goal_value": self.goal_value,
+            "current_value": self.current_value,
+            "achievement_probability": round(self.achievement_probability, 2),
+            "key_risks": self.key_risks,
+            "improvement_suggestions": self.improvement_suggestions,
+            "estimated_weeks_to_achieve": self.estimated_weeks_to_achieve,
+            "confidence": round(self.confidence, 2),
+            "gap": round(self.gap, 2),
+            "achievement_rate": round(self.achievement_rate, 2),
+        }
+
+
+@dataclass
+class TrainingCycle:
+    """训练周期"""
+
+    cycle_type: str
+    start_date: str
+    end_date: str
+    weekly_volume_km: float
+    key_workouts: list[str]
+    goal: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "cycle_type": self.cycle_type,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "weekly_volume_km": self.weekly_volume_km,
+            "key_workouts": self.key_workouts,
+            "goal": self.goal,
+        }
+
+
+@dataclass
+class LongTermPlan:
+    """长期训练规划 - v0.12.0新增"""
+
+    plan_name: str
+    target_race: str | None
+    target_date: str | None
+    current_vdot: float | None
+    target_vdot: float | None
+    total_weeks: int
+    cycles: list[TrainingCycle]
+    weekly_volume_range_km: tuple[float, float]
+    key_milestones: list[str]
+
+    def __post_init__(self) -> None:
+        if self.total_weeks < 4:
+            raise ValueError(f"total_weeks不能小于4，当前值：{self.total_weeks}")
+
+    @property
+    def has_target_race(self) -> bool:
+        """是否有目标比赛"""
+        return self.target_race is not None and self.target_date is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "plan_name": self.plan_name,
+            "target_race": self.target_race,
+            "target_date": self.target_date,
+            "current_vdot": self.current_vdot,
+            "target_vdot": self.target_vdot,
+            "total_weeks": self.total_weeks,
+            "cycles": [c.to_dict() for c in self.cycles],
+            "weekly_volume_range_km": list(self.weekly_volume_range_km),
+            "key_milestones": self.key_milestones,
+            "has_target_race": self.has_target_race,
+        }
+
+
+@dataclass
+class SmartTrainingAdvice:
+    """智能训练建议 - v0.12.0新增"""
+
+    advice_type: str
+    content: str
+    priority: str
+    context: str
+    confidence: float
+    related_metrics: list[str]
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence必须在0.0-1.0之间，当前值：{self.confidence}")
+        valid_types = {"training", "recovery", "nutrition", "injury_prevention"}
+        if self.advice_type not in valid_types:
+            raise ValueError(
+                f"advice_type必须是{valid_types}之一，当前值：{self.advice_type}"
+            )
+        valid_priorities = {"high", "medium", "low"}
+        if self.priority not in valid_priorities:
+            raise ValueError(
+                f"priority必须是{valid_priorities}之一，当前值：{self.priority}"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "advice_type": self.advice_type,
+            "content": self.content,
+            "priority": self.priority,
+            "context": self.context,
+            "confidence": round(self.confidence, 2),
+            "related_metrics": self.related_metrics,
+        }
 
 
 @dataclass(frozen=True)

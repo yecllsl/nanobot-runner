@@ -51,6 +51,8 @@
 
 **v0.9.5 Gateway服务增强**：适配nanobot 0.1.5，修复飞书通道配置，优化报告数据准确性。
 
+**v0.10.0~v0.12.0 智能跑步计划**：新增三层架构（数据感知层+智能调整层+预测规划层）。
+
 ```
 src/
 ├── core/                       # 核心模块
@@ -78,7 +80,21 @@ src/
 │   ├── profile.py              # 用户画像管理
 │   ├── provider_adapter.py     # LLM Provider适配器 (v0.9.5新增)
 │   ├── report_service.py       # 报告服务 (v0.9.4新增)
-│   └── exceptions.py           # 自定义异常
+│   ├── exceptions.py           # 自定义异常
+│   └── plan/                   # 智能跑步计划模块 (v0.10.0~v0.12.0新增)
+│       ├── __init__.py
+│       ├── models.py           # 计划数据模型
+│       ├── plan_manager.py     # 计划管理器
+│       ├── plan_generator.py   # 计划生成器
+│       ├── plan_analyzer.py    # 计划分析器
+│       ├── plan_execution_repository.py  # 计划执行仓储 (v0.10.0)
+│       ├── training_response_analyzer.py # 训练响应分析器 (v0.10.0)
+│       ├── plan_adjustment_validator.py  # 计划调整校验器 (v0.11.0)
+│       ├── prompt_template_engine.py     # Prompt模板引擎 (v0.11.0)
+│       ├── plan_modification_dialog.py   # 计划修改对话管理器 (v0.11.0)
+│       ├── goal_prediction_engine.py     # 目标预测引擎 (v0.12.0)
+│       ├── long_term_plan_generator.py   # 长期规划引擎 (v0.12.0)
+│       └── smart_advice_engine.py        # 智能建议引擎 (v0.12.0)
 ├── agents/tools.py             # Agent 工具集: BaseTool + RunnerTools
 ├── notify/                     # 飞书通知
 │   ├── feishu.py
@@ -91,10 +107,12 @@ src/
 │   │   ├── report.py           # 报告生成命令 (v0.9.4新增)
 │   │   ├── system.py           # 系统管理命令
 │   │   ├── init.py             # 初始化命令 (v0.9.4新增)
-│   │   └── gateway.py          # Gateway服务命令
+│   │   ├── gateway.py          # Gateway服务命令
+│   │   └── plan.py             # 计划管理命令 (v0.10.0~v0.12.0新增)
 │   ├── handlers/               # 业务逻辑调用层
 │   │   ├── data_handler.py
-│   │   └── analysis_handler.py
+│   │   ├── analysis_handler.py
+│   │   └── plan_handler.py     # 计划处理层 (v0.10.0~v0.12.0新增)
 │   ├── app.py                  # CLI 应用入口
 │   ├── common.py               # CLI公共组件
 │   ├── formatter.py            # Rich 格式化输出 (v0.9.0迁移)
@@ -115,7 +133,7 @@ FIT文件 → FitParser → IndexManager(SHA256去重) → StorageManager → Pa
 用户查询 ← RunnerTools ← AnalyticsEngine ← LazyFrame ← read_parquet
 ```
 
-#### 依赖注入流程 (v0.9.0新增, v0.9.4扩展)
+#### 依赖注入流程 (v0.9.0新增, v0.9.4扩展, v0.10.0~v0.12.0扩展)
 
 ```
 AppContextFactory.create_context()
@@ -125,10 +143,18 @@ AppContext
     ├── analytics: AnalyticsEngine
     ├── profile: ProfileEngine
     ├── session_repo: SessionRepository
-    ├── config: ConfigManager          (v0.9.4新增)
-    ├── workspace: WorkspaceManager    (v0.9.4新增)
-    ├── backup: BackupManager          (v0.9.4新增)
-    └── verify: VerifyManager          (v0.9.4新增)
+    ├── config: ConfigManager                    (v0.9.4新增)
+    ├── workspace: WorkspaceManager              (v0.9.4新增)
+    ├── backup: BackupManager                    (v0.9.4新增)
+    ├── verify: VerifyManager                    (v0.9.4新增)
+    ├── plan_manager: PlanManager                (v0.10.0~v0.12.0新增)
+    ├── plan_execution_repo: PlanExecutionRepository  (v0.10.0新增)
+    ├── plan_adjustment_validator: PlanAdjustmentValidator  (v0.11.0新增)
+    ├── prompt_template_engine: PromptTemplateEngine        (v0.11.0新增)
+    ├── plan_modification_dialog_manager: PlanModificationDialogManager  (v0.11.0新增)
+    ├── goal_prediction_engine: GoalPredictionEngine        (v0.12.0新增)
+    ├── long_term_plan_generator: LongTermPlanGenerator     (v0.12.0新增)
+    └── smart_advice_engine: SmartAdviceEngine              (v0.12.0新增)
     ↓
 CLI Handlers / Agent Tools
 ```
@@ -331,6 +357,28 @@ uv run nanobotrun system restore       # 恢复备份 (v0.9.4新增)
 uv run nanobotrun system migrate       # 数据迁移 (v0.9.4新增)
 ```
 
+### 智能跑步计划 (v0.10.0~v0.12.0新增)
+
+```bash
+# 计划管理
+uv run nanobotrun plan create --goal "全马破4" --race-date 2024-12-01    # 创建训练计划
+uv run nanobotrun plan list                                              # 列出所有计划
+uv run nanobotrun plan show --plan-id <plan_id>                          # 查看计划详情
+uv run nanobotrun plan delete --plan-id <plan_id>                        # 删除计划
+
+# 计划执行与反馈 (v0.10.0)
+uv run nanobotrun plan status --plan-id <plan_id>                        # 查看计划完成度
+uv run nanobotrun plan feedback --plan-id <plan_id> --session-id <session_id> --rpe 7  # 记录训练反馈
+
+# 计划调整 (v0.11.0)
+uv run nanobotrun plan adjust --plan-id <plan_id> --request "下周减量恢复"  # 调整训练计划
+
+# 长期规划与目标评估 (v0.12.0)
+uv run nanobotrun plan generate-long-term --goal "全马破3" --race-date 2025-03-30  # 生成长期规划
+uv run nanobotrun plan evaluate-goal --goal "全马破4" --race-date 2024-12-01       # 评估目标达成概率
+uv run nanobotrun plan advice                                            # 获取智能训练建议
+```
+
 ### 测试
 
 ```bash
@@ -392,6 +440,23 @@ uv run mypy src/ --ignore-missing-imports  # 类型检查
 | **CTL** | 慢性训练负荷，42天EWMA | CTL 65 表示体能基础扎实 |
 | **TSB** | 训练压力平衡，CTL - ATL | TSB +10 表示体能充沛 |
 | **心率漂移** | 有氧能力评估指标 | 相关性<-0.7 判定为漂移 |
+| **TrainingPlan** | 训练计划，包含多周训练安排 | 16周全马破4计划 |
+| **PlanWeek** | 计划周，包含7天训练安排 | 第8周，跑量60km |
+| **PlanDay** | 计划日，单日训练安排 | 周二，间歇跑，10km |
+| **RPE** | 主观疲劳度，1-10分 | RPE 7 表示较累 |
+| **TrainingPhase** | 训练阶段 | 基础期/进展期/巅峰期/比赛期/恢复期 |
+
+### 智能跑步计划术语 (v0.10.0~v0.12.0)
+
+| 术语 | 定义 | 示例 |
+|------|------|------|
+| **数据感知层** | v0.10.0，收集训练反馈，跟踪计划完成度 | TrainingResponseAnalyzer |
+| **智能调整层** | v0.11.0，LLM驱动计划调整，自然语言修改 | PlanAdjustmentValidator |
+| **预测规划层** | v0.12.0，目标达成评估，长期周期规划 | GoalPredictionEngine |
+| **硬性规则** | 必须遵守的训练规则，违反则拒绝调整 | 周跑量≤120km |
+| **软性规则** | 建议遵守的训练规则，违反则警告 | 有氧跑比例≥70% |
+| **对话状态** | 计划修改对话的状态 | initiated → suggestion → confirmed → completed |
+| **目标预测** | 基于训练数据预测目标达成概率 | 全马破4概率65% |
 
 ### 数据结构
 
@@ -400,6 +465,15 @@ uv run mypy src/ --ignore-missing-imports  # 类型检查
 | `SessionSummary` | Session 摘要数据 | `src/core/session_repository.py` |
 | `SessionDetail` | Session 详细数据 | `src/core/session_repository.py` |
 | `SessionVdot` | Session VDOT 数据 | `src/core/session_repository.py` |
+| `TrainingPlan` | 训练计划数据 | `src/core/plan/models.py` |
+| `PlanWeek` | 计划周数据 | `src/core/plan/models.py` |
+| `PlanDay` | 计划日数据 | `src/core/plan/models.py` |
+| `TrainingFeedback` | 训练反馈数据 | `src/core/plan/models.py` |
+| `PlanCompletionStatus` | 计划完成度状态 | `src/core/plan/models.py` |
+| `GoalPredictionResult` | 目标预测结果 | `src/core/plan/models.py` |
+| `SmartAdvice` | 智能建议数据 | `src/core/plan/models.py` |
+| `DialogContext` | 对话上下文 | `src/core/plan/plan_modification_dialog.py` |
+| `DialogState` | 对话状态枚举 | `src/core/plan/plan_modification_dialog.py` |
 
 ---
 
@@ -408,11 +482,15 @@ uv run mypy src/ --ignore-missing-imports  # 类型检查
 | 文档 | 路径 | 内容 |
 |------|------|------|
 | 架构设计 | `docs/architecture/架构设计说明书.md` | 系统架构、模块设计、数据流 |
+| 智能跑步计划架构 | `docs/architecture/智能跑步计划架构设计.md` | 三层架构设计 (v0.10.0~v0.12.0) |
 | API 参考 | `docs/api/api_reference.md` | 核心类和方法签名 |
 | CLI 使用 | `docs/guides/cli_usage.md` | 命令详解、参数说明 |
 | Agent 配置 | `docs/guides/agent_config_guide.md` | 配置文件、路径说明 |
 | 开发指南 | `docs/guides/development_guide.md` | Polars 规范、异常处理、类型注解 |
 | Agent 工具扩展 | `docs/guides/agent_tools_guide.md` | 新增工具步骤、TOOL_DESCRIPTIONS |
+| 智能跑步计划PRD | `docs/requirements/PRD_智能跑步计划.md` | 产品需求文档 (v0.10.0~v0.12.0) |
+| 测试策略 | `docs/test/strategy_v0.10.0-v0.12.0.md` | 测试策略文档 |
+| 测试报告 | `docs/test/reports/测试报告_v0.10.0-v0.12.0.md` | 测试执行报告 |
 | 测试指南 | `docs/guides/testing_guide.md` | Mock 策略、测试数据、隐私红线 |
 
 ---

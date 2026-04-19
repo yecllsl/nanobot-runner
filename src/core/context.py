@@ -76,6 +76,97 @@ class AppContext:
         """
         self._extensions[name] = instance
 
+    @property
+    def plan_execution_repo(self) -> Any:
+        """获取计划执行仓储（v0.10.0新增）"""
+        from src.core.plan.plan_execution_repository import PlanExecutionRepository
+
+        repo = self.get_extension("plan_execution_repo")
+        if repo is None:
+            repo = PlanExecutionRepository(self.plan_manager)
+            self.set_extension("plan_execution_repo", repo)
+        return repo
+
+    @property
+    def training_response_analyzer(self) -> Any:
+        """获取训练响应分析器（v0.10.0新增）"""
+        from src.core.plan.training_response_analyzer import TrainingResponseAnalyzer
+
+        analyzer = self.get_extension("training_response_analyzer")
+        if analyzer is None:
+            analyzer = TrainingResponseAnalyzer(self.plan_execution_repo)
+            self.set_extension("training_response_analyzer", analyzer)
+        return analyzer
+
+    @property
+    def plan_adjustment_validator(self) -> Any:
+        """获取计划调整校验器（v0.11.0新增）"""
+        from src.core.plan.plan_adjustment_validator import PlanAdjustmentValidator
+
+        validator = self.get_extension("plan_adjustment_validator")
+        if validator is None:
+            validator = PlanAdjustmentValidator()
+            self.set_extension("plan_adjustment_validator", validator)
+        return validator
+
+    @property
+    def prompt_template_engine(self) -> Any:
+        """获取Prompt模板引擎（v0.11.0新增）"""
+        from src.core.plan.prompt_template_engine import PromptTemplateEngine
+
+        engine = self.get_extension("prompt_template_engine")
+        if engine is None:
+            engine = PromptTemplateEngine()
+            self.set_extension("prompt_template_engine", engine)
+        return engine
+
+    @property
+    def plan_modification_dialog_manager(self) -> Any:
+        """获取计划修改对话管理器（v0.11.0新增）"""
+        from src.core.plan.plan_modification_dialog import PlanModificationDialogManager
+
+        manager = self.get_extension("plan_modification_dialog_manager")
+        if manager is None:
+            manager = PlanModificationDialogManager(
+                validator=self.plan_adjustment_validator,
+                prompt_engine=self.prompt_template_engine,
+            )
+            self.set_extension("plan_modification_dialog_manager", manager)
+        return manager
+
+    @property
+    def goal_prediction_engine(self) -> Any:
+        """获取目标预测引擎（v0.12.0新增）"""
+        from src.core.plan.goal_prediction_engine import GoalPredictionEngine
+
+        engine = self.get_extension("goal_prediction_engine")
+        if engine is None:
+            engine = GoalPredictionEngine()
+            self.set_extension("goal_prediction_engine", engine)
+        return engine
+
+    @property
+    def long_term_plan_generator(self) -> Any:
+        """获取长期规划生成器（v0.12.0新增）"""
+        from src.core.plan.long_term_plan_generator import LongTermPlanGenerator
+
+        generator = self.get_extension("long_term_plan_generator")
+        if generator is None:
+            generator = LongTermPlanGenerator()
+            self.set_extension("long_term_plan_generator", generator)
+        return generator
+
+    @property
+    def smart_advice_engine(self) -> Any:
+        """获取智能建议引擎（v0.12.0新增）"""
+        from src.core.plan.smart_advice_engine import SmartAdviceEngine
+
+        engine = self.get_extension("smart_advice_engine")
+        if engine is None:
+            engine = SmartAdviceEngine()
+            self.set_extension("smart_advice_engine", engine)
+        return engine
+
 
 class AppContextFactory:
     """
