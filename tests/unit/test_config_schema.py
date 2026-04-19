@@ -183,7 +183,7 @@ class TestAppConfigToDict:
             feishu_receive_id_type="open_id",
         )
         config_dict = app_config.to_dict()
-        assert len(config_dict) == 7
+        assert len(config_dict) == 10
         assert config_dict["feishu_receive_id_type"] == "open_id"
 
 

@@ -112,16 +112,23 @@ class InitPrompts:
             return {"NANOBOT_AUTO_PUSH_FEISHU": "false"}
 
     @staticmethod
-    def run_full_wizard(skip_optional: bool = False) -> dict[str, Any]:
+    def run_full_wizard(
+        skip_optional: bool = False,
+        agent_mode: bool = True,
+    ) -> dict[str, Any]:
         """运行完整的配置向导
 
         Args:
             skip_optional: 是否跳过可选项
+            agent_mode: 是否配置LLM（True=Agent模式，False=数据模式）
 
         Returns:
             dict[str, Any]: 完整配置字典，包含 config 和 env_vars
         """
-        llm_env = InitPrompts.run_llm_provider_wizard()
+        llm_env: dict[str, str] = {}
+        if agent_mode:
+            llm_env = InitPrompts.run_llm_provider_wizard()
+
         business_config = InitPrompts.run_business_config_wizard()
 
         feishu_env: dict[str, str] = {}
@@ -129,13 +136,18 @@ class InitPrompts:
             feishu_env = InitPrompts.run_feishu_config_wizard()
 
         config: dict[str, Any] = {
-            "version": "0.9.4",
-            "llm_provider": llm_env.get("NANOBOT_LLM_PROVIDER", "openai"),
-            "llm_model": llm_env.get("NANOBOT_LLM_MODEL", "gpt-4o-mini"),
+            "version": "0.9.5",
             **business_config,
             "auto_push_feishu": feishu_env.get("NANOBOT_AUTO_PUSH_FEISHU", "false")
             == "true",
         }
+
+        if agent_mode:
+            config["llm_provider"] = llm_env.get("NANOBOT_LLM_PROVIDER", "openai")
+            config["llm_model"] = llm_env.get("NANOBOT_LLM_MODEL", "gpt-4o-mini")
+            base_url = llm_env.get("NANOBOT_LLM_BASE_URL", "")
+            if base_url:
+                config["llm_base_url"] = base_url
 
         env_vars = {**llm_env, **feishu_env}
 

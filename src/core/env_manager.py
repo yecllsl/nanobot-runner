@@ -155,3 +155,52 @@ class EnvManager:
             str: .env.example 文件内容
         """
         return _ENV_TEMPLATE
+
+    def get_llm_env_vars(self) -> dict[str, str | None]:
+        """获取LLM相关环境变量
+
+        Returns:
+            dict[str, str | None]: LLM环境变量字典
+        """
+        return {
+            "provider": os.getenv("NANOBOT_LLM_PROVIDER"),
+            "model": os.getenv("NANOBOT_LLM_MODEL"),
+            "api_key": os.getenv("NANOBOT_LLM_API_KEY"),
+            "base_url": os.getenv("NANOBOT_LLM_BASE_URL"),
+        }
+
+    def has_llm_api_key(self) -> bool:
+        """检查是否配置了LLM API Key
+
+        Returns:
+            bool: 是否存在API Key
+        """
+        return bool(os.getenv("NANOBOT_LLM_API_KEY"))
+
+    def load_llm_env(self, env_file: Path | None = None) -> dict[str, str]:
+        """加载LLM相关环境变量
+
+        优先加载指定文件中的环境变量，然后返回LLM配置。
+
+        Args:
+            env_file: 环境变量文件路径
+
+        Returns:
+            dict[str, str]: 加载的LLM环境变量
+        """
+        self.load_env(env_file)
+
+        llm_keys = [
+            "NANOBOT_LLM_PROVIDER",
+            "NANOBOT_LLM_MODEL",
+            "NANOBOT_LLM_API_KEY",
+            "NANOBOT_LLM_BASE_URL",
+        ]
+
+        loaded: dict[str, str] = {}
+        for key in llm_keys:
+            value = os.getenv(key)
+            if value:
+                loaded[key] = value
+
+        return loaded

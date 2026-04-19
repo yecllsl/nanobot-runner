@@ -28,11 +28,12 @@ class AppConfig:
     feishu_app_secret: str | None = None
     feishu_receive_id: str | None = None
     feishu_receive_id_type: str = "user_id"
+    llm_provider: str | None = None
+    llm_model: str | None = None
+    llm_base_url: str | None = None
 
-    # 必填字段列表（类变量，非实例字段）
     REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
 
-    # 字段类型映射（类变量，非实例字段）
     FIELD_TYPES: ClassVar[dict[str, type | tuple[type, ...]]] = {
         "version": str,
         "data_dir": str,
@@ -41,6 +42,9 @@ class AppConfig:
         "feishu_app_secret": (str, type(None)),
         "feishu_receive_id": (str, type(None)),
         "feishu_receive_id_type": str,
+        "llm_provider": (str, type(None)),
+        "llm_model": (str, type(None)),
+        "llm_base_url": (str, type(None)),
     }
 
     @classmethod
@@ -161,6 +165,9 @@ class AppConfig:
             "feishu_app_secret": self.feishu_app_secret,
             "feishu_receive_id": self.feishu_receive_id,
             "feishu_receive_id_type": self.feishu_receive_id_type,
+            "llm_provider": self.llm_provider,
+            "llm_model": self.llm_model,
+            "llm_base_url": self.llm_base_url,
         }
 
     def __post_init__(self) -> None:

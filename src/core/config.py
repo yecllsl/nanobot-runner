@@ -31,6 +31,9 @@ ENV_KEY_MAPPING: dict[str, str] = {
     "feishu_receive_id_type": "NANOBOT_FEISHU_RECEIVE_ID_TYPE",
     "timezone": "NANOBOT_TIMEZONE",
     "default_year": "NANOBOT_DEFAULT_YEAR",
+    "llm_provider": "NANOBOT_LLM_PROVIDER",
+    "llm_model": "NANOBOT_LLM_MODEL",
+    "llm_base_url": "NANOBOT_LLM_BASE_URL",
 }
 
 
@@ -378,6 +381,73 @@ class ConfigManager:
                     )
 
         return inconsistencies
+
+    def get_llm_config(self) -> dict[str, Any]:
+        """获取LLM配置
+
+        优先级：环境变量 > 配置文件 > 默认值
+
+        Returns:
+            dict[str, Any]: LLM配置字典，包含provider、model、api_key、base_url
+        """
+        config = self.load_config()
+        return {
+            "provider": os.getenv("NANOBOT_LLM_PROVIDER")
+            or config.get("llm_provider", ""),
+            "model": os.getenv("NANOBOT_LLM_MODEL") or config.get("llm_model", ""),
+            "api_key": os.getenv("NANOBOT_LLM_API_KEY"),
+            "base_url": os.getenv("NANOBOT_LLM_BASE_URL") or config.get("llm_base_url"),
+        }
+
+    def has_llm_config(self) -> bool:
+        """检查是否配置了LLM
+
+        Returns:
+            bool: 是否存在LLM配置（至少包含provider和model）
+        """
+        llm = self.get_llm_config()
+        return bool(llm.get("provider") and llm.get("model"))
+
+    def save_llm_config(
+        self,
+        provider: str,
+        model: str,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        """保存LLM配置
+
+        将LLM配置项保存到config.json，API Key保存到.env.local。
+
+        Args:
+            provider: LLM提供商名称
+            model: 模型名称
+            base_url: 自定义API端点URL（可选）
+            api_key: API密钥（可选，保存到.env.local而非config.json）
+        """
+        config = self.load_config()
+        config["llm_provider"] = provider
+        config["llm_model"] = model
+
+        if base_url is not None:
+            config["llm_base_url"] = base_url
+        elif "llm_base_url" in config:
+            del config["llm_base_url"]
+
+        self.save_config(config)
+
+        if api_key is not None:
+            from src.core.env_manager import EnvManager
+
+            env_manager = EnvManager(env_file=self.base_dir / ".env.local")
+            env_vars: dict[str, str] = {
+                "NANOBOT_LLM_API_KEY": api_key,
+                "NANOBOT_LLM_PROVIDER": provider,
+                "NANOBOT_LLM_MODEL": model,
+            }
+            if base_url:
+                env_vars["NANOBOT_LLM_BASE_URL"] = base_url
+            env_manager.save_env_file(env_vars)
 
 
 config = ConfigManager()

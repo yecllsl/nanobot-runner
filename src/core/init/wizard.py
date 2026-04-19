@@ -41,6 +41,7 @@ class InitWizard:
         force: bool = False,
         skip_optional: bool = False,
         workspace_dir: Path | None = None,
+        agent_mode: bool = True,
     ) -> InitResult:
         """运行初始化向导
 
@@ -49,12 +50,16 @@ class InitWizard:
             force: 是否强制覆盖现有配置
             skip_optional: 是否跳过可选配置项
             workspace_dir: 指定 workspace 目录路径
+            agent_mode: 是否配置LLM（True=Agent模式，False=数据模式）
 
         Returns:
             InitResult: 初始化结果
         """
         try:
             target_dir = workspace_dir or self.config.base_dir
+
+            if mode == InitMode.MIGRATE:
+                return self._run_migrate_mode(target_dir, force=force)
 
             if self._is_already_initialized(target_dir) and not force:
                 return InitResult(
@@ -71,7 +76,10 @@ class InitWizard:
 
             self.create_directories(target_dir)
 
-            wizard_result = self.guide_config(skip_optional=skip_optional)
+            wizard_result = self.guide_config(
+                skip_optional=skip_optional,
+                agent_mode=agent_mode,
+            )
             user_config = wizard_result.get("config", {})
             env_vars = wizard_result.get("env_vars", {})
 
@@ -87,16 +95,22 @@ class InitWizard:
 
             written = self.generate_config_files(target_dir, user_config, env_vars)
 
+            if agent_mode and user_config.get("llm_provider"):
+                self._sync_to_nanobot()
+
+            next_steps = [
+                "导入数据: nanobotrun data import <FIT文件路径>",
+                "查看统计: nanobotrun data stats",
+            ]
+            if agent_mode and user_config.get("llm_provider"):
+                next_steps.append("Agent聊天: nanobotrun agent chat")
+
             return InitResult(
                 success=True,
                 config_path=written.get("config"),
                 env_path=written.get("env"),
                 warnings=validation.warnings,
-                next_steps=[
-                    "导入数据: nanobotrun data import <FIT文件路径>",
-                    "查看统计: nanobotrun data stats",
-                    "Agent聊天: nanobotrun agent chat",
-                ],
+                next_steps=next_steps,
             )
 
         except Exception as e:
@@ -105,6 +119,59 @@ class InitWizard:
                 success=False,
                 errors=[str(e)],
             )
+
+    def _run_migrate_mode(
+        self,
+        target_dir: Path,
+        force: bool = False,
+    ) -> InitResult:
+        """运行迁移模式
+
+        从nanobot配置迁移到项目配置。
+
+        Args:
+            target_dir: 目标workspace目录
+            force: 是否强制覆盖
+
+        Returns:
+            InitResult: 迁移结果
+        """
+        from src.core.init.migrate import ConfigMigrator
+
+        if self._is_already_initialized(target_dir) and not force:
+            return InitResult(
+                success=False,
+                errors=["工作区已初始化，使用 --force 强制覆盖"],
+                next_steps=["运行: nanobotrun system init --mode migrate --force"],
+            )
+
+        self.create_directories(target_dir)
+
+        migrator = ConfigMigrator(self.config)
+        result = migrator.migrate_from_nanobot()
+
+        if not result.success:
+            return InitResult(
+                success=False,
+                errors=result.errors,
+                warnings=result.warnings,
+            )
+
+        self._sync_to_nanobot()
+
+        next_steps = [
+            "导入数据: nanobotrun data import <FIT文件路径>",
+            "查看统计: nanobotrun data stats",
+            "Agent聊天: nanobotrun agent chat",
+        ]
+
+        return InitResult(
+            success=True,
+            config_path=result.config_path,
+            env_path=result.env_path,
+            warnings=result.warnings,
+            next_steps=next_steps,
+        )
 
     def detect_environment(self) -> EnvironmentInfo:
         """检测运行环境
@@ -162,18 +229,26 @@ class InitWizard:
 
         logger.info(f"目录结构已创建: {target}")
 
-    def guide_config(self, skip_optional: bool = False) -> dict[str, Any]:
+    def guide_config(
+        self,
+        skip_optional: bool = False,
+        agent_mode: bool = True,
+    ) -> dict[str, Any]:
         """引导用户填写配置
 
         Args:
             skip_optional: 是否跳过可选项
+            agent_mode: 是否配置LLM（True=Agent模式，False=数据模式）
 
         Returns:
             dict[str, Any]: 包含 config 和 env_vars 的字典
         """
         from src.core.init.prompts import InitPrompts
 
-        return InitPrompts.run_full_wizard(skip_optional=skip_optional)
+        return InitPrompts.run_full_wizard(
+            skip_optional=skip_optional,
+            agent_mode=agent_mode,
+        )
 
     def validate_config(self, config: dict[str, Any]) -> ValidationResult:
         """验证配置
@@ -236,3 +311,24 @@ class InitWizard:
         """
         config_file = workspace_dir / "config.json"
         return config_file.exists()
+
+    def _sync_to_nanobot(self) -> None:
+        """同步配置到nanobot
+
+        初始化完成后，将LLM配置同步到~/.nanobot/config.json，
+        确保已安装nanobot的用户可以正常使用。
+        同步失败不影响项目功能，仅记录警告。
+        """
+        try:
+            from src.core.nanobot_config_sync import NanobotConfigSync
+
+            sync = NanobotConfigSync(self.config)
+            result = sync.sync_to_nanobot()
+
+            if result.success:
+                logger.info(f"已同步 {len(result.synced_fields)} 个字段到nanobot配置")
+            else:
+                for error in result.errors:
+                    logger.warning(f"nanobot配置同步失败: {error}")
+        except Exception as e:
+            logger.warning(f"nanobot配置同步异常: {e}")

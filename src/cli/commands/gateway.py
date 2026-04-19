@@ -228,16 +228,9 @@ def start(
         给我一个训练建议
         我的VDOT是多少？
     """
-    from nanobot.agent import AgentLoop
-    from nanobot.bus import MessageBus
-    from nanobot.channels.manager import ChannelManager
-    from nanobot.cli.commands import _make_provider
-    from nanobot.config.loader import load_config
-    from nanobot.cron.service import CronService
-    from nanobot.heartbeat.service import HeartbeatService
-    from nanobot.utils.helpers import sync_workspace_templates
-
     from src.agents.tools import RunnerTools, create_tools
+    from src.core.context import get_context
+    from src.core.provider_adapter import RunnerProviderAdapter
 
     if verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -249,38 +242,52 @@ def start(
         logging.getLogger("nanobot").setLevel(logging.WARNING)
         logging.getLogger("src").setLevel(logging.WARNING)
 
-    config = load_config()
-    provider = _make_provider(config)
-
     context = None
     runner_tools = None
     workspace = None
+    adapter = None
 
     try:
-        from src.core.context import AppContextFactory
-
-        context = AppContextFactory.create()
+        context = get_context()
         workspace = context.config.base_dir
         runner_tools = RunnerTools(context)
+
+        if context.config.has_llm_config():
+            adapter = RunnerProviderAdapter(context.config)
     except Exception:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
         from pathlib import Path
 
         workspace = Path.home() / ".nanobot-runner"
 
+    if not adapter or not adapter.is_available():
+        console.print("[red]LLM配置缺失，Gateway服务需要LLM支持[/red]")
+        console.print("[yellow]请先运行: nanobotrun init[/yellow]")
+        raise typer.Exit(1)
+
+    provider = adapter.get_provider_instance()
+    agent_defaults = adapter.get_agent_defaults()
+
+    from nanobot.agent import AgentLoop
+    from nanobot.bus import MessageBus
+    from nanobot.channels.manager import ChannelManager
+    from nanobot.cron.service import CronService
+    from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.utils.helpers import sync_workspace_templates
+
     sync_workspace_templates(workspace)
 
     bus = MessageBus()
-
-    from nanobot.config.schema import AgentDefaults
-
-    defaults = AgentDefaults()
 
     agent = AgentLoop(
         bus=bus,
         provider=provider,
         workspace=workspace,
-        context_window_tokens=defaults.context_window_tokens,
+        model=agent_defaults.model,
+        max_iterations=agent_defaults.max_tool_iterations,
+        context_window_tokens=agent_defaults.context_window_tokens,
+        context_block_limit=agent_defaults.context_block_limit,
+        max_tool_result_chars=agent_defaults.max_tool_result_chars,
     )
 
     if runner_tools:
@@ -288,7 +295,7 @@ def start(
             agent.tools.register(tool)
         _register_runner_commands(agent, runner_tools)
 
-    channels = ChannelManager(config=config, bus=bus)
+    channels = ChannelManager(config=adapter._get_or_create_nanobot_config(), bus=bus)
 
     cron = CronService(store_path=workspace / "cron.json")
 
@@ -302,15 +309,16 @@ def start(
             OutboundMessage(channel=channel, chat_id=chat_id, content=response)
         )
 
-    hb_cfg = config.gateway.heartbeat
+    hb_interval_s = 300
+    hb_enabled = True
     heartbeat = HeartbeatService(
         workspace=workspace,
         provider=provider,
         model=agent.model,
         on_execute=on_heartbeat_execute,
         on_notify=on_heartbeat_notify,
-        interval_s=hb_cfg.interval_s,
-        enabled=hb_cfg.enabled,
+        interval_s=hb_interval_s,
+        enabled=hb_enabled,
     )
 
     if channels.enabled_channels:
@@ -324,7 +332,7 @@ def start(
     if cron_status["jobs"] > 0:
         console.print(f"[green]✓[/green] 定时任务: {cron_status['jobs']} 个")
 
-    console.print(f"[green]✓[/green] 心跳检测: 每 {hb_cfg.interval_s} 秒")
+    console.print(f"[green]✓[/green] 心跳检测: 每 {hb_interval_s} 秒")
     console.print()
     console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
     console.print("  • /stats - 查看训练统计")

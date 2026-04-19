@@ -1,6 +1,8 @@
 # Agent 相关命令
 # 包含 chat 和 memory 命令
 
+import contextlib
+
 import typer
 
 from src.cli.common import CLIError, console, print_error
@@ -20,14 +22,12 @@ def chat() -> None:
 
 async def _run_chat() -> None:
     """异步聊天循环函数"""
-    from nanobot.agent import AgentLoop
-    from nanobot.bus import MessageBus
-    from nanobot.cli.commands import _make_provider
-    from nanobot.config.loader import load_config
     from rich.prompt import Prompt
 
     from src.agents.tools import RunnerTools, create_tools
     from src.cli.formatter import format_agent_response
+    from src.core.context import get_context
+    from src.core.provider_adapter import RunnerProviderAdapter
 
     console.print("[bold green][Bot] Nanobot Runner Agent[/bold green]")
     console.print("[dim]基于 nanobot 的本地跑步数据助理[/dim]")
@@ -42,23 +42,32 @@ async def _run_chat() -> None:
     console.print()
 
     try:
-        from src.core.context import AppContextFactory
+        context = get_context()
 
-        config = load_config()
-        agent_defaults = config.agents.defaults
+        if not context.config.has_llm_config():
+            console.print("[red]LLM配置缺失，请先运行: nanobotrun init[/red]")
+            return
 
-        # 覆盖默认模型为 glm-4（确保工具调用能力）
-        if agent_defaults.model in ["Qwen/Qwen2.5-7B-Instruct", "glm-4.7-flash"]:
-            agent_defaults.model = "glm-4"
+        adapter = RunnerProviderAdapter(context.config)
 
-        context = AppContextFactory.create()
+        if not adapter.is_available():
+            console.print("[red]LLM Provider不可用，请检查配置[/red]")
+            return
+
+        provider_instance = adapter.get_provider_instance()
+        agent_defaults = adapter.get_agent_defaults()
+        llm_config = adapter.get_llm_config()
+
+        from nanobot.agent import AgentLoop
+        from nanobot.bus import MessageBus
+
         workspace = context.config.base_dir
         runner_tools = RunnerTools(context)
 
         bus = MessageBus()
         agent = AgentLoop(
             bus=bus,
-            provider=_make_provider(config),
+            provider=provider_instance,
             workspace=workspace,
             model=agent_defaults.model,
             max_iterations=agent_defaults.max_tool_iterations,
@@ -71,7 +80,7 @@ async def _run_chat() -> None:
             agent.tools.register(tool)
 
         console.print("[bold green][OK] Agent 已初始化[/bold green]")
-        console.print(f"[dim]模型: {agent_defaults.model}[/dim]")
+        console.print(f"[dim]模型: {llm_config.model}[/dim]")
         console.print()
 
         while True:
@@ -100,6 +109,9 @@ async def _run_chat() -> None:
     except Exception as e:
         console.print(f"[red]Agent初始化失败：{str(e)}[/red]")
         console.print("[yellow]请确保已正确配置本地模型[/yellow]")
+    finally:
+        with contextlib.suppress(Exception):
+            adapter.close()
 
 
 @app.command()

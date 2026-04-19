@@ -115,7 +115,7 @@ class TestInitPrompts:
                 result = InitPrompts.run_full_wizard(skip_optional=True)
                 assert "config" in result
                 assert "env_vars" in result
-                assert result["config"]["version"] == "0.9.4"
+                assert result["config"]["version"] == "0.9.5"
                 assert result["config"]["auto_push_feishu"] is False
 
     def test_run_full_wizard_with_optional(self) -> None:
