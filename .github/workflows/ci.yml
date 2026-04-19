@@ -9,6 +9,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # 代码质量检查
@@ -190,7 +191,7 @@ jobs:
     - name: Upload coverage reports
       uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.xml
+        files: ./coverage.xml
         
   # 构建打包
   build:
