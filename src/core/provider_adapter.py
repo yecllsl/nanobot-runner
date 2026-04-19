@@ -189,15 +189,12 @@ class RunnerProviderAdapter:
         """获取或创建nanobot配置对象
 
         用于ChannelManager等需要nanobot配置对象的场景。
-        优先使用已加载的nanobot配置，否则从项目配置构建。
+        始终从项目配置构建，确保包含飞书通道配置。
 
         Returns:
             Any: nanobot配置对象
         """
         if self._nanobot_config is not None:
-            return self._nanobot_config
-
-        if self._try_load_nanobot_config():
             return self._nanobot_config
 
         return self._build_nanobot_config_from_runner()
