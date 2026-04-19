@@ -206,27 +206,33 @@ class RunnerProviderAdapter:
             Any: nanobot配置对象
         """
         try:
-            from nanobot.config.loader import load_config_from_dict
+            from nanobot.config.loader import Config
+            from nanobot.config.schema import AgentsConfig, ProvidersConfig
 
             llm_dict = self._runner_config.get_llm_config()
-            nanobot_dict = {
-                "providers": {
-                    "default": llm_dict.get("provider", "openai"),
-                    llm_dict.get("provider", "openai"): {
-                        "api_key_env": "NANOBOT_LLM_API_KEY",
-                    },
+            provider_name = llm_dict.get("provider", "openai")
+
+            providers = ProvidersConfig(
+                default=provider_name,
+            )
+            setattr(
+                providers,
+                provider_name,
+                {
+                    "api_key_env": "NANOBOT_LLM_API_KEY",
+                    **(
+                        {"base_url": llm_dict["base_url"]}
+                        if llm_dict.get("base_url")
+                        else {}
+                    ),
                 },
-                "agents": {
-                    "defaults": {
-                        "model": llm_dict.get("model", "gpt-4o-mini"),
-                    },
-                },
-            }
-            if llm_dict.get("base_url"):
-                provider_name = llm_dict.get("provider", "openai")
-                nanobot_dict["providers"][provider_name]["base_url"] = llm_dict[
-                    "base_url"
-                ]
+            )
+
+            agents = AgentsConfig(
+                defaults={"model": llm_dict.get("model", "gpt-4o-mini")},
+            )
+
+            channels: dict[str, Any] = {}
 
             feishu_app_id = os.getenv("NANOBOT_FEISHU_APP_ID")
             feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
@@ -247,19 +253,24 @@ class RunnerProviderAdapter:
                     )
 
             if feishu_app_id and feishu_app_secret:
-                nanobot_dict["channels"] = {
-                    "feishu": {
-                        "enabled": True,
-                        "app_id": feishu_app_id,
-                        "app_secret": feishu_app_secret,
-                        "receive_id": feishu_receive_id or "",
-                        "receive_id_type": os.getenv(
-                            "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
-                        ),
-                    }
+                channels["feishu"] = {
+                    "enabled": True,
+                    "app_id": feishu_app_id,
+                    "app_secret": feishu_app_secret,
+                    "receive_id": feishu_receive_id or "",
+                    "receive_id_type": os.getenv(
+                        "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
+                    ),
                 }
 
-            return load_config_from_dict(nanobot_dict)
+            config = Config(
+                providers=providers,
+                agents=agents,
+                channels=channels,
+            )
+
+            self._nanobot_config = config
+            return config
         except (ImportError, Exception) as e:
             logger.debug(f"从项目配置构建nanobot配置失败: {e}")
             raise LLMError(
