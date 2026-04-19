@@ -107,17 +107,37 @@ class ReportService:
                 start_date=start_date, end_date=end_date
             )
 
-            # 统计本周数据
             total_runs = len(runs)
-            total_distance = sum(run.get("total_distance", 0) for run in runs)
-            total_duration = sum(run.get("total_timer_time", 0) for run in runs)
-            total_tss = sum(run.get("tss", 0) for run in runs)
+            total_distance = 0.0
+            total_duration = 0.0
+            total_tss = 0.0
+            vdot_values: list[float] = []
 
-            # 计算平均 VDOT
-            vdot_values = [run.get("vdot", 0) for run in runs if run.get("vdot")]
+            for run in runs:
+                distance = run.get("session_total_distance") or run.get(
+                    "total_distance", 0
+                )
+                duration = run.get("session_total_timer_time") or run.get(
+                    "total_timer_time", 0
+                )
+                total_distance += distance
+                total_duration += duration
+
+                tss = self.analytics.calculate_tss_for_run(
+                    distance_m=distance,
+                    duration_s=duration,
+                    avg_heart_rate=run.get("session_avg_heart_rate")
+                    or run.get("avg_heart_rate"),
+                )
+                total_tss += tss
+
+                if distance >= 1500 and duration > 0:
+                    vdot = self.analytics.calculate_vdot(distance, duration)
+                    if vdot > 0:
+                        vdot_values.append(vdot)
+
             avg_vdot = sum(vdot_values) / len(vdot_values) if vdot_values else 0
 
-            # 获取训练负荷
             training_load = self.analytics.get_training_load(days=7)
 
             return WeeklyReportData(
@@ -130,8 +150,8 @@ class ReportService:
                 total_tss=round(total_tss, 1),
                 avg_vdot=round(avg_vdot, 1),
                 training_load=training_load,
-                highlights=self._identify_weekly_highlights(runs),
-                concerns=self._identify_weekly_concerns(runs),
+                highlights=self._identify_weekly_highlights(runs, total_distance),
+                concerns=self._identify_weekly_concerns(runs, total_tss),
                 recommendations=self._generate_weekly_recommendations(
                     runs, training_load
                 ),
@@ -156,7 +176,6 @@ class ReportService:
         now = datetime.now()
         start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        # 获取本月训练数据
         end_date = now
         start_date = start_of_month
 
@@ -165,22 +184,43 @@ class ReportService:
                 start_date=start_date, end_date=end_date
             )
 
-            # 统计本月数据
             total_runs = len(runs)
-            total_distance = sum(run.get("total_distance", 0) for run in runs)
-            total_duration = sum(run.get("total_timer_time", 0) for run in runs)
-            total_tss = sum(run.get("tss", 0) for run in runs)
+            total_distance = 0.0
+            total_duration = 0.0
+            total_tss = 0.0
+            vdot_values: list[float] = []
+            max_distance = 0.0
 
-            # 计算平均 VDOT
-            vdot_values = [run.get("vdot", 0) for run in runs if run.get("vdot")]
+            for run in runs:
+                distance = run.get("session_total_distance") or run.get(
+                    "total_distance", 0
+                )
+                duration = run.get("session_total_timer_time") or run.get(
+                    "total_timer_time", 0
+                )
+                total_distance += distance
+                total_duration += duration
+                max_distance = max(max_distance, distance)
+
+                tss = self.analytics.calculate_tss_for_run(
+                    distance_m=distance,
+                    duration_s=duration,
+                    avg_heart_rate=run.get("session_avg_heart_rate")
+                    or run.get("avg_heart_rate"),
+                )
+                total_tss += tss
+
+                if distance >= 1500 and duration > 0:
+                    vdot = self.analytics.calculate_vdot(distance, duration)
+                    if vdot > 0:
+                        vdot_values.append(vdot)
+
             avg_vdot = sum(vdot_values) / len(vdot_values) if vdot_values else 0
 
-            # 计算周均训练量
-            weeks_in_month = (now - start_of_month).days / 7 + 1
+            weeks_in_month = max(1, (now - start_of_month).days / 7)
             avg_weekly_distance = (total_distance / 1000) / weeks_in_month
             avg_weekly_duration = (total_duration / 60) / weeks_in_month
 
-            # 获取训练负荷
             training_load = self.analytics.get_training_load(days=30)
 
             return MonthlyReportData(
@@ -195,8 +235,10 @@ class ReportService:
                 avg_weekly_distance_km=round(avg_weekly_distance, 2),
                 avg_weekly_duration_min=round(avg_weekly_duration, 1),
                 training_load=training_load,
-                highlights=self._identify_monthly_highlights(runs),
-                concerns=self._identify_monthly_concerns(runs),
+                highlights=self._identify_monthly_highlights(
+                    runs, total_distance, max_distance
+                ),
+                concerns=self._identify_monthly_concerns(runs, total_tss),
                 recommendations=self._generate_monthly_recommendations(
                     runs, training_load
                 ),
@@ -208,43 +250,52 @@ class ReportService:
                 error=f"生成失败：{str(e)}",
             )
 
-    def _identify_weekly_highlights(self, runs: list[dict]) -> list[str]:
+    def _identify_weekly_highlights(
+        self, runs: list[dict], total_distance: float
+    ) -> list[str]:
         """识别本周亮点"""
         highlights: list[str] = []
         if not runs:
             return highlights
 
-        # 找出最长距离
-        max_distance_run = max(runs, key=lambda x: x.get("total_distance", 0))
-        max_distance = max_distance_run.get("total_distance", 0) / 1000
+        max_distance = 0.0
+        max_vdot = 0.0
+
+        for run in runs:
+            distance = run.get("session_total_distance") or run.get("total_distance", 0)
+            duration = run.get("session_total_timer_time") or run.get(
+                "total_timer_time", 0
+            )
+            max_distance = max(max_distance, distance)
+
+            if distance >= 1500 and duration > 0:
+                vdot = self.analytics.calculate_vdot(distance, duration)
+                if vdot > 0:
+                    max_vdot = max(max_vdot, vdot)
+
         if max_distance > 0:
-            highlights.append(f"最长距离：{max_distance:.2f} km")
+            highlights.append(f"最长距离：{max_distance / 1000:.2f} km")
 
-        # 找出最高 VDOT
-        vdot_runs = [r for r in runs if r.get("vdot")]
-        if vdot_runs:
-            max_vdot_run = max(vdot_runs, key=lambda x: x.get("vdot", 0))
-            highlights.append(f"最高 VDOT: {max_vdot_run.get('vdot', 0):.1f}")
+        if max_vdot > 0:
+            highlights.append(f"最高 VDOT: {max_vdot:.1f}")
 
-        # 训练频率
         if len(runs) >= 3:
             highlights.append(f"训练频率良好：{len(runs)} 次训练")
 
         return highlights
 
-    def _identify_weekly_concerns(self, runs: list[dict]) -> list[str]:
+    def _identify_weekly_concerns(
+        self, runs: list[dict], total_tss: float
+    ) -> list[str]:
         """识别本周需关注点"""
         concerns = []
         if not runs:
             concerns.append("本周无训练记录")
             return concerns
 
-        # 训练频率过低
         if len(runs) < 2:
             concerns.append("训练频率较低，建议增加训练次数")
 
-        # 检查是否有过度训练
-        total_tss = sum(run.get("tss", 0) for run in runs)
         if total_tss > 400:
             concerns.append(f"本周 TSS 较高 ({total_tss:.0f}), 注意恢复")
 
@@ -275,42 +326,39 @@ class ReportService:
 
         return recommendations
 
-    def _identify_monthly_highlights(self, runs: list[dict]) -> list[str]:
+    def _identify_monthly_highlights(
+        self, runs: list[dict], total_distance: float, max_distance: float
+    ) -> list[str]:
         """识别本月亮点"""
         highlights: list[str] = []
         if not runs:
             return highlights
 
-        # 总跑量
-        total_distance = sum(run.get("total_distance", 0) for run in runs) / 1000
-        if total_distance > 100:
-            highlights.append(f"月跑量突破：{total_distance:.1f} km")
+        total_distance_km = total_distance / 1000
+        if total_distance_km > 100:
+            highlights.append(f"月跑量突破：{total_distance_km:.1f} km")
 
-        # 训练频率
         if len(runs) >= 12:
             highlights.append(f"训练频率优秀：{len(runs)} 次训练")
 
-        # 找出最长距离
-        max_distance_run = max(runs, key=lambda x: x.get("total_distance", 0))
-        max_distance = max_distance_run.get("total_distance", 0) / 1000
-        if max_distance > 20:
-            highlights.append(f"长距离突破：{max_distance:.2f} km")
+        max_distance_km = max_distance / 1000
+        if max_distance_km > 20:
+            highlights.append(f"长距离突破：{max_distance_km:.2f} km")
 
         return highlights
 
-    def _identify_monthly_concerns(self, runs: list[dict]) -> list[str]:
+    def _identify_monthly_concerns(
+        self, runs: list[dict], total_tss: float
+    ) -> list[str]:
         """识别本月需关注点"""
         concerns = []
         if not runs:
             concerns.append("本月无训练记录")
             return concerns
 
-        # 训练频率过低
         if len(runs) < 4:
             concerns.append("训练频率较低，建议增加规律训练")
 
-        # 总 TSS 过高
-        total_tss = sum(run.get("tss", 0) for run in runs)
         if total_tss > 1200:
             concerns.append(f"本月 TSS 较高 ({total_tss:.0f}), 注意恢复和营养")
 

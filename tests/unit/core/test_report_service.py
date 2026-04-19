@@ -79,16 +79,14 @@ class TestReportServiceGenerateReport:
         """测试生成周报"""
         mock_runs = [
             {
-                "total_distance": 10000,
-                "total_timer_time": 3000,
-                "tss": 85,
-                "vdot": 45.5,
+                "session_total_distance": 10000,
+                "session_total_timer_time": 3000,
+                "session_avg_heart_rate": 150,
             },
             {
-                "total_distance": 15000,
-                "total_timer_time": 4500,
-                "tss": 120,
-                "vdot": 46.2,
+                "session_total_distance": 15000,
+                "session_total_timer_time": 4500,
+                "session_avg_heart_rate": 155,
             },
         ]
         mock_service.storage.query_by_date_range.return_value = mock_runs
@@ -97,6 +95,8 @@ class TestReportServiceGenerateReport:
             "ctl": 85.2,
             "tsb": 15.3,
         }
+        mock_service.analytics.calculate_vdot.return_value = 45.5
+        mock_service.analytics.calculate_tss_for_run.return_value = 85.0
 
         result = mock_service.generate_report(ReportType.WEEKLY, age=30)
 
@@ -111,10 +111,9 @@ class TestReportServiceGenerateReport:
         """测试生成月报"""
         mock_runs = [
             {
-                "total_distance": 10000,
-                "total_timer_time": 3000,
-                "tss": 85,
-                "vdot": 45.5,
+                "session_total_distance": 10000,
+                "session_total_timer_time": 3000,
+                "session_avg_heart_rate": 150,
             },
         ]
         mock_service.storage.query_by_date_range.return_value = mock_runs
@@ -123,6 +122,8 @@ class TestReportServiceGenerateReport:
             "ctl": 85.2,
             "tsb": 15.3,
         }
+        mock_service.analytics.calculate_vdot.return_value = 45.5
+        mock_service.analytics.calculate_tss_for_run.return_value = 85.0
 
         result = mock_service.generate_report(ReportType.MONTHLY, age=30)
 
