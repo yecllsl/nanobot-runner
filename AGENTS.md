@@ -310,10 +310,10 @@ uv run nanobotrun report monthly     # 生成月报
 ### 初始化 (v0.9.4新增)
 
 ```bash
-uv run nanobotrun init                 # 交互式初始化
-uv run nanobotrun init --mode migrate  # 迁移模式
-uv run nanobotrun init --mode repair   # 修复模式
-uv run nanobotrun init --auto          # 自动模式
+uv run nanobotrun system init                 # 交互式初始化
+uv run nanobotrun system init --mode migrate  # 迁移模式
+uv run nanobotrun system init --mode repair   # 修复模式
+uv run nanobotrun system init --auto          # 自动模式
 ```
 
 ### 系统管理

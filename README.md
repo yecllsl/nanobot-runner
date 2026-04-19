@@ -111,10 +111,10 @@ uv run nanobotrun analysis hr-drift
 
 ```bash
 # 交互式初始化（推荐新用户使用）
-uv run nanobotrun init
+uv run nanobotrun system init
 
 # 从旧版本迁移
-uv run nanobotrun init --mode migrate
+uv run nanobotrun system init --mode migrate
 
 # 验证配置
 uv run nanobotrun system validate

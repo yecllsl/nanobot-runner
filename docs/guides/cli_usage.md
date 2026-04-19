@@ -204,19 +204,19 @@ uv run nanobotrun report profile
 
 ```bash
 # 全新初始化（交互式）
-uv run nanobotrun init
+uv run nanobotrun system init
 
 # 迁移模式（从旧版本迁移）
-uv run nanobotrun init --mode migrate
+uv run nanobotrun system init --mode migrate
 
 # 修复模式（修复配置问题）
-uv run nanobotrun init --mode repair
+uv run nanobotrun system init --mode repair
 
 # 自动模式（非交互式）
-uv run nanobotrun init --auto
+uv run nanobotrun system init --auto
 
 # 指定工作区目录
-uv run nanobotrun init --workspace /path/to/workspace
+uv run nanobotrun system init --workspace /path/to/workspace
 ```
 
 **初始化流程**:
