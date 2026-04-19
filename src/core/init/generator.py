@@ -1,4 +1,6 @@
 import json
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -8,30 +10,72 @@ from src.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-_AGENTS_MD_TEMPLATE = """# AGENTS.md - Nanobot Runner Agent 配置
+_TEMPLATE_FILES = [
+    "AGENTS.md",
+    "HEARTBEAT.md",
+    "SOUL.md",
+    "TOOLS.md",
+    "USER.md",
+]
 
-> 此文件由初始化向导自动生成
+_MEMORY_FILES = [
+    "MEMORY.md",
+    "history.jsonl",
+]
 
-## 1. LLM 配置
+_TRACKED_FILES = [
+    "MEMORY.md",
+    "history.jsonl",
+    "AGENTS.md",
+    "HEARTBEAT.md",
+    "SOUL.md",
+    "TOOLS.md",
+    "USER.md",
+    "config.json",
+    ".env.local",
+]
 
-- **Provider**: {llm_provider}
-- **Model**: {llm_model}
 
-## 2. 业务配置
+def _get_template_dir() -> Path:
+    """获取模板目录路径
 
-- **数据目录**: {data_dir}
-- **时区**: {timezone}
+    Returns:
+        Path: 模板目录路径
+    """
+    return Path(__file__).parent.parent.parent.parent / "templates"
 
-## 3. 工具配置
 
-- **飞书通知**: {feishu_enabled}
-"""
+def _build_gitignore(tracked_files: list[str]) -> str:
+    """生成 .gitignore 文件内容
+
+    采用白名单模式：先忽略所有文件，然后用 ! 取消忽略需要追踪的文件。
+
+    Args:
+        tracked_files: 需要追踪的文件列表
+
+    Returns:
+        str: .gitignore 文件内容
+    """
+    dirs: set[str] = set()
+    for f in tracked_files:
+        parent = str(Path(f).parent)
+        if parent != ".":
+            dirs.add(parent)
+
+    lines = ["/*"]
+    for d in sorted(dirs):
+        lines.append(f"!{d}/")
+    for f in tracked_files:
+        lines.append(f"!{f}")
+    lines.append("!.gitignore")
+    return "\n".join(lines) + "\n"
 
 
 class ConfigGenerator:
     """配置文件生成器
 
-    根据用户输入生成 config.json、.env.local、AGENTS.md 等配置文件。
+    根据用户输入生成 config.json、.env.local 等配置文件，
+    并从 templates 目录复制模板文件到工作区。
     """
 
     def __init__(self, env_manager: EnvManager | None = None) -> None:
@@ -41,6 +85,7 @@ class ConfigGenerator:
             env_manager: 环境变量管理器（可选）
         """
         self.env_manager = env_manager or EnvManager()
+        self.template_dir = _get_template_dir()
 
     def generate_config_json(self, config: dict[str, Any]) -> str:
         """生成 config.json 文件内容
@@ -94,28 +139,142 @@ class ConfigGenerator:
 
         return "".join(lines)
 
-    def generate_agents_md(self, config: dict[str, Any]) -> str:
-        """生成 AGENTS.md 文件内容
+    def _copy_template_files(self, workspace_dir: Path) -> list[Path]:
+        """复制模板文件到工作区
 
         Args:
-            config: 配置字典
+            workspace_dir: 工作区目录路径
 
         Returns:
-            str: AGENTS.md 文件内容
+            list[Path]: 复制的文件路径列表
         """
-        return _AGENTS_MD_TEMPLATE.format(
-            llm_provider=config.get("llm_provider", "openai"),
-            llm_model=config.get("llm_model", "gpt-4o-mini"),
-            data_dir=config.get("data_dir", ""),
-            timezone=config.get("timezone", "Asia/Shanghai"),
-            feishu_enabled="已启用" if config.get("auto_push_feishu") else "未启用",
-        )
+        copied: list[Path] = []
+
+        for filename in _TEMPLATE_FILES:
+            src = self.template_dir / filename
+            dst = workspace_dir / filename
+            if src.exists():
+                shutil.copy2(src, dst)
+                copied.append(dst)
+                logger.debug(f"已复制模板文件: {filename}")
+
+        return copied
+
+    def _copy_skills_directory(self, workspace_dir: Path) -> list[Path]:
+        """复制 skills 目录到工作区
+
+        Args:
+            workspace_dir: 工作区目录路径
+
+        Returns:
+            list[Path]: 复制的文件路径列表
+        """
+        src_skills = self.template_dir / "skills"
+        dst_skills = workspace_dir / "skills"
+
+        if not src_skills.exists():
+            logger.debug("skills 目录不存在，跳过复制")
+            return []
+
+        copied: list[Path] = []
+
+        for item in src_skills.rglob("*"):
+            if item.is_file():
+                rel_path = item.relative_to(src_skills)
+                dst = dst_skills / rel_path
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, dst)
+                copied.append(dst)
+                logger.debug(f"已复制 skills 文件: {rel_path}")
+
+        return copied
+
+    def _create_memory_files(self, workspace_dir: Path) -> list[Path]:
+        """创建 memory 目录和文件
+
+        Args:
+            workspace_dir: 工作区目录路径
+
+        Returns:
+            list[Path]: 创建的文件路径列表
+        """
+        memory_dir = workspace_dir / "memory"
+        memory_dir.mkdir(parents=True, exist_ok=True)
+
+        created: list[Path] = []
+
+        for filename in _MEMORY_FILES:
+            src = self.template_dir / "memory" / filename
+            dst = memory_dir / filename
+
+            if src.exists():
+                content = src.read_text(encoding="utf-8")
+                if filename == "history.jsonl":
+                    content = content.replace(
+                        "INIT_TIMESTAMP", datetime.now().isoformat()
+                    )
+                dst.write_text(content, encoding="utf-8")
+                created.append(dst)
+                logger.debug(f"已创建 memory 文件: {filename}")
+
+        return created
+
+    def _init_git_repo(self, workspace_dir: Path) -> bool:
+        """初始化 Git 仓库
+
+        使用 dulwich 库初始化 Git 仓库，用于版本控制。
+        创建 .gitignore 文件并提交初始内容。
+
+        Args:
+            workspace_dir: 工作区目录路径
+
+        Returns:
+            bool: 是否成功初始化
+        """
+        try:
+            from dulwich import porcelain
+
+            git_dir = workspace_dir / ".git"
+            if git_dir.exists():
+                logger.debug("Git 仓库已存在，跳过初始化")
+                return False
+
+            porcelain.init(str(workspace_dir))
+
+            gitignore_path = workspace_dir / ".gitignore"
+            gitignore_content = _build_gitignore(_TRACKED_FILES)
+            gitignore_path.write_text(gitignore_content, encoding="utf-8")
+
+            tracked_paths = [".gitignore"]
+            for f in _TRACKED_FILES:
+                file_path = workspace_dir / f
+                if file_path.exists():
+                    tracked_paths.append(f)
+
+            porcelain.add(str(workspace_dir), paths=tracked_paths)
+            porcelain.commit(
+                str(workspace_dir),
+                message=b"init: nanobot-runner workspace",
+                author=b"nanobot-runner <nanobot-runner@local>",
+                committer=b"nanobot-runner <nanobot-runner@local>",
+            )
+
+            logger.info(f"Git 仓库已初始化: {workspace_dir}")
+            return True
+
+        except ImportError:
+            logger.warning("dulwich 未安装，跳过 Git 初始化")
+            return False
+        except Exception as e:
+            logger.warning(f"Git 初始化失败: {e}")
+            return False
 
     def write_config_files(
         self,
         workspace_dir: Path,
         config: dict[str, Any],
         env_vars: dict[str, str] | None = None,
+        init_git: bool = True,
     ) -> dict[str, Path]:
         """写入所有配置文件
 
@@ -123,6 +282,7 @@ class ConfigGenerator:
             workspace_dir: workspace 目录路径
             config: 配置字典
             env_vars: 环境变量字典（可选）
+            init_git: 是否初始化 Git 仓库
 
         Returns:
             dict[str, Path]: 写入的文件路径字典
@@ -144,9 +304,18 @@ class ConfigGenerator:
                 env_path.write_text(self.generate_env_local(env_vars), encoding="utf-8")
                 written["env"] = env_path
 
-            agents_path = workspace_dir / "AGENTS.md"
-            agents_path.write_text(self.generate_agents_md(config), encoding="utf-8")
-            written["agents"] = agents_path
+            for path in self._copy_template_files(workspace_dir):
+                written[path.name] = path
+
+            for path in self._create_memory_files(workspace_dir):
+                written[f"memory/{path.name}"] = path
+
+            for path in self._copy_skills_directory(workspace_dir):
+                rel_path = path.relative_to(workspace_dir)
+                written[str(rel_path)] = path
+
+            if init_git:
+                self._init_git_repo(workspace_dir)
 
             logger.info(f"配置文件已写入: {list(written.keys())}")
             return written

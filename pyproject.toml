@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=2.4.2",
     "questionary>=1.10.0",
     "pydantic-settings>=2.0.0",
+    "dulwich>=0.21.0",
 ]
 
 [project.optional-dependencies]

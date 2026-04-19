@@ -96,21 +96,34 @@ class ConfigManager:
         2. 环境变量 NANOBOT_CONFIG_DIR 下的 config.json
         3. ~/.nanobot-runner/config.json
 
+        当 allow_default=True 且配置文件不存在时，设置 _using_default=True，
+        避免自动创建配置文件（用于初始化向导场景）。
+
         Returns:
             Path: 配置文件路径
         """
         if env_file := os.getenv("NANOBOT_CONFIG_FILE"):
             path = Path(env_file)
-            if path.exists() or not self.allow_default:
+            if path.exists():
                 return path
+            if not self.allow_default:
+                return path
+            self._using_default = True
+            return path
 
         if config_dir := os.getenv("NANOBOT_CONFIG_DIR"):
             path = Path(config_dir) / "config.json"
-            if path.exists() or not self.allow_default:
+            if path.exists():
                 return path
+            if not self.allow_default:
+                return path
+            self._using_default = True
+            return path
 
         default_path = Path.home() / ".nanobot-runner" / "config.json"
-        if default_path.exists() or not self.allow_default:
+        if default_path.exists():
+            return default_path
+        if not self.allow_default:
             return default_path
 
         self._using_default = True
@@ -154,8 +167,12 @@ class ConfigManager:
                 logger.warning(f"迁移定时任务配置失败：{e}")
 
     def _ensure_config(self) -> None:
-        """确保配置文件存在"""
-        if not self.config_file.exists():
+        """确保配置文件存在
+
+        在初始化向导场景下（allow_default=True），不自动创建配置文件，
+        由向导引导用户完成配置后再生成，避免误判为"工作区已初始化"。
+        """
+        if not self.config_file.exists() and not self.allow_default:
             self.save_config(self._get_default_config())
 
     def _invalidate_cache(self) -> None:
@@ -450,4 +467,4 @@ class ConfigManager:
             env_manager.save_env_file(env_vars)
 
 
-config = ConfigManager()
+config = ConfigManager(allow_default=True)

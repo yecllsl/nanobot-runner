@@ -44,6 +44,20 @@ class TestConfigManager:
             assert "auto_push_feishu" in config_data
             assert "feishu_app_id" in config_data
 
+    def test_allow_default_does_not_auto_create_config(self, tmp_path):
+        """测试 allow_default=True 时不自动创建配置文件
+
+        修复：初始化向导场景下，ConfigManager(allow_default=True) 不应
+        自动创建 config.json，否则会导致 _is_already_initialized() 误判。
+        """
+        ConfigManager.reset_cache()
+        with patch.object(Path, "home", return_value=tmp_path):
+            cm = ConfigManager(allow_default=True)
+            # allow_default=True 时不应自动创建配置文件
+            assert not cm.config_file.exists()
+            # 但 base_dir 等属性应正确设置
+            assert cm.base_dir == tmp_path / ".nanobot-runner"
+
     def test_save_config(self, tmp_path):
         """测试保存配置"""
         with patch.object(Path, "home", return_value=tmp_path):

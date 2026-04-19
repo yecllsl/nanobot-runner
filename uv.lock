@@ -1636,6 +1636,7 @@ name = "nanobot-runner"
 version = "0.9.4"
 source = { editable = "." }
 dependencies = [
+    { name = "dulwich" },
     { name = "fitparse" },
     { name = "nanobot-ai" },
     { name = "numpy" },
@@ -1668,6 +1669,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7.0,<2.0.0" },
+    { name = "dulwich", specifier = ">=0.21.0" },
     { name = "fitparse", specifier = ">=1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0,<2.0.0" },
     { name = "nanobot-ai", specifier = ">=0.1.5" },

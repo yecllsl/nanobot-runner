@@ -99,20 +99,6 @@ class TestConfigGenerator:
         assert "NANOBOT_FEISHU_APP_ID=cli_test" in result
         assert "飞书通知配置" in result
 
-    def test_generate_agents_md(self) -> None:
-        generator = ConfigGenerator()
-        config = {
-            "llm_provider": "openai",
-            "llm_model": "gpt-4o-mini",
-            "data_dir": "/tmp/data",
-            "timezone": "Asia/Shanghai",
-            "auto_push_feishu": True,
-        }
-        result = generator.generate_agents_md(config)
-
-        assert "openai" in result
-        assert "已启用" in result
-
     def test_write_config_files(self, tmp_path: Path) -> None:
         generator = ConfigGenerator()
         config = {"version": "0.9.4", "data_dir": str(tmp_path / "data")}
@@ -122,10 +108,28 @@ class TestConfigGenerator:
 
         assert "config" in written
         assert "env" in written
-        assert "agents" in written
         assert written["config"].exists()
         assert written["env"].exists()
-        assert written["agents"].exists()
+
+    def test_write_config_files_creates_template_files(self, tmp_path: Path) -> None:
+        generator = ConfigGenerator()
+        config = {"version": "0.9.4", "data_dir": str(tmp_path / "data")}
+
+        written = generator.write_config_files(tmp_path, config)
+
+        assert "config" in written
+        assert written["config"].exists()
+
+    def test_write_config_files_creates_memory_files(self, tmp_path: Path) -> None:
+        generator = ConfigGenerator()
+        config = {"version": "0.9.4", "data_dir": str(tmp_path / "data")}
+
+        written = generator.write_config_files(tmp_path, config)
+
+        memory_dir = tmp_path / "memory"
+        assert memory_dir.exists()
+        assert (memory_dir / "MEMORY.md").exists()
+        assert (memory_dir / "history.jsonl").exists()
 
 
 class TestInitWizard:
