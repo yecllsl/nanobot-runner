@@ -640,11 +640,15 @@ class TestStorageManager:
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = StorageManager(data_dir=Path(tmpdir))
 
-            # 创建测试数据
             test_data = pl.DataFrame(
                 {
                     "activity_id": ["test_001", "test_002", "test_003"],
                     "timestamp": [
+                        datetime(2024, 1, 1),
+                        datetime(2024, 1, 15),
+                        datetime(2024, 2, 1),
+                    ],
+                    "session_start_time": [
                         datetime(2024, 1, 1),
                         datetime(2024, 1, 15),
                         datetime(2024, 2, 1),
@@ -655,7 +659,6 @@ class TestStorageManager:
             )
             manager.save_to_parquet(test_data, 2024)
 
-            # 查询日期范围
             start_date = datetime(2024, 1, 10)
             end_date = datetime(2024, 1, 20)
             result = manager.query_by_date_range(start_date, end_date)
@@ -674,6 +677,10 @@ class TestStorageManager:
                 {
                     "activity_id": ["test_001", "test_002"],
                     "timestamp": [datetime(2024, 1, 1), datetime(2024, 2, 1)],
+                    "session_start_time": [
+                        datetime(2024, 1, 1),
+                        datetime(2024, 2, 1),
+                    ],
                     "session_total_distance": [5000.0, 10000.0],
                     "session_total_timer_time": [1800, 3600],
                 }
@@ -694,6 +701,10 @@ class TestStorageManager:
                 {
                     "activity_id": ["test_001", "test_002"],
                     "timestamp": [datetime(2024, 1, 1), datetime(2024, 2, 1)],
+                    "session_start_time": [
+                        datetime(2024, 1, 1),
+                        datetime(2024, 2, 1),
+                    ],
                     "session_total_distance": [5000.0, 10000.0],
                     "session_total_timer_time": [1800, 3600],
                 }

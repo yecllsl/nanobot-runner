@@ -805,22 +805,26 @@ class StorageManager:
         end_date: datetime | None = None,
     ) -> list[dict[str, Any]]:
         """
-        按日期范围查询活动数据
+        按日期范围查询活动数据（返回去重后的 session 级别数据）
 
         Args:
             start_date: 开始日期
             end_date: 结束日期
 
         Returns:
-            List[Dict]: 活动数据列表
+            List[Dict]: 活动 session 数据列表（每个 session 一条记录）
         """
         lf = self.read_parquet()
 
         if start_date is not None:
-            lf = lf.filter(pl.col("timestamp") >= start_date)
+            lf = lf.filter(pl.col("session_start_time") >= start_date)
 
         if end_date is not None:
-            lf = lf.filter(pl.col("timestamp") <= end_date)
+            lf = lf.filter(pl.col("session_start_time") <= end_date)
+
+        schema = lf.collect_schema()
+        if "session_start_time" in schema:
+            lf = lf.unique(subset=["session_start_time"], keep="first")
 
         df = lf.collect()
         return df.to_dicts()
