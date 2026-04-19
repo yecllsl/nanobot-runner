@@ -135,13 +135,15 @@ class RunnerProviderAdapter:
         llm_config = self.get_llm_config()
 
         try:
-            from nanobot.providers.factory import create_provider
+            from nanobot.providers.openai_compat_provider import OpenAICompatProvider
+            from nanobot.providers.registry import find_by_name
 
-            self._provider_instance = create_provider(
-                provider=llm_config.provider,
-                model=llm_config.model,
+            spec = find_by_name(llm_config.provider)
+            self._provider_instance = OpenAICompatProvider(
                 api_key=llm_config.api_key,
-                base_url=llm_config.base_url,
+                api_base=llm_config.base_url,
+                default_model=llm_config.model,
+                spec=spec,
             )
             return self._provider_instance
         except ImportError as e:

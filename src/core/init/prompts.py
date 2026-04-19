@@ -181,6 +181,6 @@ class InitPrompts:
             "openai": "gpt-4o-mini",
             "anthropic": "claude-3-5-sonnet-20241022",
             "deepseek": "deepseek-chat",
-            "zhipu": "glm-4-flash",
+            "zhipu": "glm-4.7-flash",
         }
         return defaults.get(provider, "gpt-4o-mini")

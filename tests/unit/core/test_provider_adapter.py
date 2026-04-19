@@ -213,7 +213,9 @@ class TestRunnerProviderAdapter:
 
         adapter = RunnerProviderAdapter(mock_config)
 
-        with patch.dict("sys.modules", {"nanobot.providers.factory": None}):
+        with patch.dict(
+            "sys.modules", {"nanobot.providers.openai_compat_provider": None}
+        ):
             with pytest.raises(LLMError, match="无法导入nanobot模块"):
                 adapter.get_provider_instance()
 
