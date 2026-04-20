@@ -261,6 +261,7 @@ class RunnerProviderAdapter:
                     "receive_id_type": os.getenv(
                         "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
                     ),
+                    "allowFrom": ["*"],
                 }
 
             config = Config(
