@@ -1,6 +1,6 @@
 # AGENTS.md - Nanobot Runner 开发指南
 
-> **版本**: v5.1.0 | **更新日期**: 2026-04-18
+> **版本**: v5.2.0 | **更新日期**: 2026-04-20
 
 ---
 
@@ -49,6 +49,8 @@
 
 **v0.9.4 配置管理扩展**：新增配置管理基础设施。
 
+**v0.9.5 Gateway服务增强**：适配nanobot 0.1.5，修复飞书通道配置，优化报告数据准确性。
+
 ```
 src/
 ├── core/                       # 核心模块
@@ -74,6 +76,8 @@ src/
 │   ├── indexer.py              # SHA256去重索引
 │   ├── analytics.py            # 数据分析引擎
 │   ├── profile.py              # 用户画像管理
+│   ├── provider_adapter.py     # LLM Provider适配器 (v0.9.5新增)
+│   ├── report_service.py       # 报告服务 (v0.9.4新增)
 │   └── exceptions.py           # 自定义异常
 ├── agents/tools.py             # Agent 工具集: BaseTool + RunnerTools
 ├── notify/                     # 飞书通知
@@ -84,7 +88,7 @@ src/
 │   │   ├── data.py             # 数据管理命令
 │   │   ├── analysis.py         # 数据分析命令
 │   │   ├── agent.py            # Agent交互命令
-│   │   ├── report.py           # 报告生成命令
+│   │   ├── report.py           # 报告生成命令 (v0.9.4新增)
 │   │   ├── system.py           # 系统管理命令
 │   │   ├── init.py             # 初始化命令 (v0.9.4新增)
 │   │   └── gateway.py          # Gateway服务命令

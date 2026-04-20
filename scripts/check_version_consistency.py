@@ -38,6 +38,10 @@ def get_readme_version() -> str:
     try:
         with open(readme_path, "r", encoding="utf-8") as f:
             content = f.read()
+            # 匹配 **最新版本**: v0.9.5 格式
+            match = re.search(r"\*\*最新版本\*\*:\s*v(\d+\.\d+\.\d+)", content)
+            if match:
+                return match.group(1)
             # 匹配 **版本**: v0.9.2 格式
             match = re.search(r"\*\*版本\*\*:\s*v(\d+\.\d+\.\d+)", content)
             if match:

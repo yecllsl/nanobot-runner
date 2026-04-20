@@ -7,6 +7,60 @@
 
 ---
 
+## [0.9.5] - 2026-04-20
+
+### 新增功能
+
+#### Gateway服务增强
+- **飞书通道配置**: 支持从.env.local读取飞书配置，自动传递给ChannelManager
+- **nanobot兼容性**: 适配nanobot 0.1.5版本，修复Config构建问题
+- **响应格式化**: Agent响应使用Markdown渲染，提升可读性
+
+#### LLM Provider扩展
+- **智谱AI支持**: 新增zhipu选项，默认模型glm-4-flash
+
+#### 数据查询优化
+- **去重逻辑**: 修复Parquet数据查询时的重复记录问题
+- **日期过滤**: 使用session_start_time替代timestamp进行日期范围过滤
+
+#### 报告生成改进
+- **字段映射**: 修复报告数据字段名不匹配问题
+- **数据准确性**: 修正训练次数、距离、时长、TSS、VDOT计算
+
+#### 初始化增强
+- **Git仓库初始化**: 初始化时自动创建.git目录和.gitignore文件
+- **模板文件**: 自动复制AGENTS.md、HEARTBEAT.md、SOUL.md、TOOLS.md、USER.md等模板
+- **Memory目录**: 自动创建memory/MEMORY.md和memory/history.jsonl
+
+### Bug修复
+
+#### 配置管理
+- **修复**: .env.local未加载问题，在AppContextFactory.create()中添加EnvManager.load_env()调用
+- **修复**: 工作区初始化检测逻辑，防止ConfigManager自动创建config.json
+
+#### 文档一致性
+- **修复**: 统一CLI命令格式，将`uv run nanobotrun init`修正为`uv run nanobotrun system init`
+
+#### 第三方依赖
+- **修复**: nanobot.providers.factory导入错误，改用registry.find_by_name()
+- **修复**: load_config_from_dict函数移除后的兼容性问题
+
+### 测试改进
+
+#### 测试策略更新
+- **新增**: 第三方库兼容性测试
+- **新增**: 真实数据样本验证测试
+- **新增**: 环境配置加载测试
+- **新增**: 通道配置传递测试
+- **新增**: 文档一致性验证脚本
+
+#### 测试成果
+- **测试用例**: 2271个（单元2044 + 集成152 + E2E 75）
+- **测试通过率**: 100%
+- **代码覆盖率**: 84%
+
+---
+
 ## [0.9.4] - 2026-04-18
 
 ### 新增功能
