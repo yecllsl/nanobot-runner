@@ -29,6 +29,7 @@ MANIFEST
 
 # 虚拟环境
 .venv/
+.venv-win/
 venv/
 env/
 ENV/
