@@ -49,6 +49,44 @@ docs/archive/
 
 ## 📋 归档清单
 
+### v0.12.0 (2026-04-25)
+
+**归档内容**（共18个文档）：
+- **需求文档**（2个）：PRD_智能跑步计划、UC_智能跑步计划用例
+- **架构文档**（2个）：智能跑步计划架构设计、智能跑步计划架构评审报告
+- **测试文档**（7个）：测试报告_v0.9.4、测试报告_v0.10.0-v0.12.0、测试报告_v0.12.0、Bug清单、测试策略_v0.10.0-v0.12.0、用户验收测试指南_v0.10.0-v0.12.0、UAT_智能跑步计划测试指南
+- **运维文档**（2个）：流水线执行报告_v0.12.0、版本发布报告_v0.12.0
+- **开发文档**（3个）：开发交付报告_v0.10.0、v0110_开发交付报告、v0120_开发交付报告
+- **规划文档**（1个）：task_list_v0.10.0-v0.12.0
+
+**版本特性**：
+
+**智能跑步计划功能**（三层递进架构）：
+- v0.10.0 数据感知层：训练执行反馈收集、计划完成度跟踪、训练响应分析
+- v0.11.0 智能调整层：LLM驱动计划调整、规则引擎校验、Prompt模板引擎
+- v0.12.0 预测规划层：目标达成预测、长期训练规划、智能训练建议
+
+**核心组件**：
+- PlanExecutionRepository：执行数据仓储，Polars向量化计算
+- TrainingResponseAnalyzer：训练响应分析器
+- PlanAdjustmentValidator：可扩展规则引擎
+- PromptTemplateEngine：Prompt模板管理
+- GoalPredictionEngine：目标达成预测引擎
+- LongTermPlanGenerator：长期规划生成器
+- SmartAdviceEngine：智能建议引擎
+
+**Agent工具扩展**（新增9个工具）：
+- v0.10.0：RecordPlanExecutionTool、GetPlanExecutionStatsTool、AnalyzeTrainingResponseTool
+- v0.11.0：AdjustPlanTool、GetPlanAdjustmentSuggestionsTool
+- v0.12.0：EvaluateGoalAchievementTool、CreateLongTermPlanTool、GetSmartTrainingAdviceTool
+
+**测试覆盖**：
+- 测试用例：2628个（单元2367 + 集成186 + E2E 75）
+- 测试通过率：99.92%
+- 代码覆盖率：84%+
+
+---
+
 ### v0.9.5 (2026-04-20)
 
 **归档内容**（共9个文档）：
@@ -275,5 +313,5 @@ docs/archive/
 
 ---
 
-**最后更新**: 2026-04-20
+**最后更新**: 2026-04-25
 **维护者**: DevOps Team
