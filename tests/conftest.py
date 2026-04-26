@@ -1,6 +1,7 @@
 # 测试辅助函数
 # 用于创建 Mock 对象和测试上下文
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from src.core.context import AppContext
@@ -45,6 +46,10 @@ def create_mock_context(
         config = MagicMock()
         config.data_dir = MagicMock()
         config.index_file = MagicMock()
+        # 使用真实的临时目录作为 cron_store，避免 MagicMock 路径操作失败
+        import tempfile
+
+        config.cron_store = Path(tempfile.mkdtemp()) / "cron"
 
     if indexer is None:
         indexer = MagicMock()
