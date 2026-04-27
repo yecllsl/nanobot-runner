@@ -85,8 +85,13 @@ class ConfigManager:
                 if "data_dir" in config:
                     self.data_dir = Path(config["data_dir"])
                     self.index_file = self.data_dir / "index.json"
+                # 读取 user_id，如果没有则使用默认值
+                self.user_id = config.get("user_id", "default_user")
             except Exception as e:
                 logger.debug(f"读取配置文件失败，使用默认路径: {e}")
+                self.user_id = "default_user"
+        else:
+            self.user_id = "default_user"
 
     def _detect_config_file(self) -> Path:
         """检测配置文件路径

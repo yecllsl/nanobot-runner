@@ -35,7 +35,7 @@ def create_plan(
         engine = TrainingPlanEngine()
 
         plan = engine.generate_plan(
-            user_id="default",
+            user_id=context.config.user_id,
             goal_distance_km=goal_distance_km,
             goal_date=goal_date,
             current_vdot=current_vdot,
