@@ -59,11 +59,11 @@ async def _run_chat() -> None:
     console.print("=" * 60)
     console.print()
     console.print("[bold cyan]可用命令：[/bold cyan]")
-    console.print("  • 查询统计数据（如：我跑了多少次）")
-    console.print("  • 查询跑步记录（如：上周跑了多少）")
-    console.print("  • VDOT分析（如：我的跑力值趋势）")
-    console.print("  • 心率分析（如：心率漂移情况）")
-    console.print("  • 输入 [bold]exit[/bold] 或 [bold]q[/bold] 退出")
+    console.print("  - 查询统计数据（如：我跑了多少次）")
+    console.print("  - 查询跑步记录（如：上周跑了多少）")
+    console.print("  - VDOT分析（如：我的跑力值趋势）")
+    console.print("  - 心率分析（如：心率漂移情况）")
+    console.print("  - 输入 [bold]exit[/bold] 或 [bold]q[/bold] 退出")
     console.print()
 
     try:

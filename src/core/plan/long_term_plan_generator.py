@@ -44,6 +44,7 @@ class LongTermPlanGenerator:
         target_date: str | None = None,
         total_weeks: int = 16,
         fitness_level: str = "intermediate",
+        auto_create_training_plans: bool = True,
     ) -> LongTermPlan:
         """生成长期训练规划
 
@@ -55,6 +56,7 @@ class LongTermPlanGenerator:
             target_date: 目标日期(YYYY-MM-DD)
             total_weeks: 总周数
             fitness_level: 体能水平(beginner/intermediate/advanced/elite)
+            auto_create_training_plans: 是否自动创建关联的TrainingPlan
 
         Returns:
             LongTermPlan: 长期训练规划
@@ -77,6 +79,15 @@ class LongTermPlanGenerator:
             cycles=cycles,
         )
 
+        training_plan_ids: list[str] = []
+        if auto_create_training_plans:
+            training_plan_ids = self._create_training_plans_for_cycles(
+                plan_name=plan_name,
+                cycles=cycles,
+                current_vdot=current_vdot,
+                fitness_level=fitness_level,
+            )
+
         return LongTermPlan(
             plan_name=plan_name,
             target_race=target_race,
@@ -87,6 +98,7 @@ class LongTermPlanGenerator:
             cycles=cycles,
             weekly_volume_range_km=volume_range,
             key_milestones=milestones,
+            training_plan_ids=training_plan_ids,
         )
 
     def _generate_cycles(
@@ -255,3 +267,56 @@ class LongTermPlanGenerator:
             milestones.append(f"目标VDOT达到{target_vdot:.1f}")
 
         return milestones
+
+    def _create_training_plans_for_cycles(
+        self,
+        plan_name: str,
+        cycles: list[TrainingCycle],
+        current_vdot: float,
+        fitness_level: str,
+    ) -> list[str]:
+        """为每个训练周期创建对应的TrainingPlan
+
+        Args:
+            plan_name: 长期规划名称
+            cycles: 训练周期列表
+            current_vdot: 当前VDOT
+            fitness_level: 体能水平
+
+        Returns:
+            list[str]: 创建的TrainingPlan ID列表
+        """
+        from src.core.context import get_context
+        from src.core.training_plan import TrainingPlanEngine
+
+        context = get_context()
+        engine = TrainingPlanEngine()
+        plan_ids: list[str] = []
+
+        for i, cycle in enumerate(cycles):
+            try:
+                plan = engine.generate_plan(
+                    user_id="default",
+                    goal_distance_km=42.195,
+                    goal_date=cycle.end_date,
+                    current_vdot=current_vdot,
+                    current_weekly_distance_km=cycle.weekly_volume_km,
+                )
+
+                plan.metadata = {
+                    "long_term_plan_name": plan_name,
+                    "cycle_type": cycle.cycle_type,
+                    "cycle_index": i,
+                }
+
+                plan_id = context.plan_manager.create_plan(plan)
+                plan_ids.append(plan_id)
+                logger.info(
+                    f"为周期[{cycle.cycle_type}]创建TrainingPlan成功：{plan_id}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"创建TrainingPlan失败：{e}，跳过周期[{cycle.cycle_type}]"
+                )
+
+        return plan_ids

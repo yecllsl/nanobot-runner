@@ -160,7 +160,7 @@ class DataHandler:
         runs = []
         for session in sessions:
             vdot = None
-            if session.distance_m > 0 and session.duration_s > 0:
+            if session.distance_m >= 1500 and session.duration_s > 0:
                 vdot = self.analytics.calculate_vdot(
                     session.distance_m, session.duration_s
                 )

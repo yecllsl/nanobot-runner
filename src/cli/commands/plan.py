@@ -10,6 +10,59 @@ from src.cli.common import CLIError, console, print_error, print_status
 app = typer.Typer(help="训练计划执行反馈命令")
 
 
+@app.command(name="create")
+def create_plan(
+    goal_distance_km: float = typer.Argument(..., help="目标距离（公里）"),
+    goal_date: str = typer.Argument(..., help="目标日期（YYYY-MM-DD）"),
+    current_vdot: float = typer.Option(..., "--vdot", "-v", help="当前VDOT值"),
+    current_weekly_distance_km: float = typer.Option(
+        30.0, "--volume", help="当前周跑量（公里）"
+    ),
+    age: int = typer.Option(30, "--age", "-a", help="年龄"),
+    resting_hr: int = typer.Option(60, "--rhr", help="静息心率"),
+) -> None:
+    """创建训练计划
+
+    示例：
+        nanobotrun plan create 42.195 2026-06-15 --vdot 42.0 --volume 35
+        nanobotrun plan create 21.1 2026-05-01 -v 40.0 --volume 30
+    """
+    from src.core.context import get_context
+    from src.core.training_plan import TrainingPlanEngine
+
+    try:
+        context = get_context()
+        engine = TrainingPlanEngine()
+
+        plan = engine.generate_plan(
+            user_id="default",
+            goal_distance_km=goal_distance_km,
+            goal_date=goal_date,
+            current_vdot=current_vdot,
+            current_weekly_distance_km=current_weekly_distance_km,
+            age=age,
+            resting_hr=resting_hr,
+        )
+
+        plan_id = context.plan_manager.create_plan(plan)
+
+        print_status("[OK] 训练计划创建成功", "success")
+        console.print(f"  计划ID: {plan_id}")
+        console.print(f"  目标: {goal_distance_km}km @ {goal_date}")
+        console.print(f"  总周数: {len(plan.weeks)}")
+        console.print(f"  计划类型: {plan.plan_type.label}")
+        console.print(f"  体能水平: {plan.fitness_level.label}")
+
+        console.print("\n  💡 使用以下命令记录训练反馈：")
+        console.print(
+            f"    nanobotrun plan log {plan_id} <日期> --completion 0.8 --effort 6"
+        )
+
+    except Exception as e:
+        print_error(CLIError.execution_record_failed(f"创建失败：{e}"))
+        raise typer.Exit(1)
+
+
 @app.command(name="log")
 def log_execution(
     plan_id: str = typer.Argument(..., help="训练计划ID"),
@@ -167,7 +220,7 @@ def adjust_plan(
             if violations:
                 console.print("[red]违规项：[/red]")
                 for v in violations:
-                    console.print(f"  • {v}")
+                    console.print(f"  - {v}")
             raise typer.Exit(1)
 
     except typer.Exit:
@@ -301,6 +354,9 @@ def create_long_term_plan(
         "-l",
         help="体能水平(beginner/intermediate/advanced/elite)",
     ),
+    skip_training_plans: bool = typer.Option(
+        False, "--skip-plans", help="跳过自动创建训练计划"
+    ),
 ) -> None:
     """创建长期训练规划（v0.12.0新增）"""
     from src.core.context import get_context
@@ -316,6 +372,7 @@ def create_long_term_plan(
             target_date=target_date,
             total_weeks=total_weeks,
             fitness_level=fitness_level,
+            auto_create_training_plans=not skip_training_plans,
         )
 
         print_status(f"📋 长期训练规划：{plan.plan_name}")
@@ -341,6 +398,18 @@ def create_long_term_plan(
             console.print("\n  🏆 关键里程碑：")
             for milestone in plan.key_milestones:
                 console.print(f"    - {milestone}")
+
+        if plan.training_plan_ids:
+            console.print("\n  📝 关联训练计划：")
+            for i, tp_id in enumerate(plan.training_plan_ids):
+                cycle = plan.cycles[i] if i < len(plan.cycles) else None
+                cycle_type = cycle.cycle_type if cycle else "unknown"
+                console.print(f"    [{cycle_type}] {tp_id}")
+
+            console.print("\n  💡 使用以下命令记录训练反馈：")
+            console.print(
+                "    nanobotrun plan log <plan_id> <日期> --completion 0.8 --effort 6"
+            )
 
     except typer.Exit:
         raise

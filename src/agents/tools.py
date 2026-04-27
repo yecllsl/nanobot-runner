@@ -910,7 +910,7 @@ class RunnerTools:
             pace = duration_min / distance_km if distance_km > 0 else 0
 
             vdot = None
-            if distance > 0 and duration > 0:
+            if distance >= 1500 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
 
             runs.append(
@@ -954,7 +954,7 @@ class RunnerTools:
             distance = float(distance_raw) if distance_raw is not None else 0.0
             duration = float(duration_raw) if duration_raw is not None else 0.0
 
-            if distance > 0 and duration > 0:
+            if distance >= 1500 and duration > 0:
                 vdot = self.analytics.calculate_vdot(distance, duration)
 
                 date_str = "N/A"

@@ -1021,6 +1021,7 @@ class LongTermPlan:
     cycles: list[TrainingCycle]
     weekly_volume_range_km: tuple[float, float]
     key_milestones: list[str]
+    training_plan_ids: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.total_weeks < 4:
@@ -1043,6 +1044,7 @@ class LongTermPlan:
             "weekly_volume_range_km": list(self.weekly_volume_range_km),
             "key_milestones": self.key_milestones,
             "has_target_race": self.has_target_race,
+            "training_plan_ids": self.training_plan_ids,
         }
 
 

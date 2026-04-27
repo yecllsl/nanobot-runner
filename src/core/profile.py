@@ -1113,7 +1113,7 @@ class ProfileEngine:
                 distance = float(distance_raw) if distance_raw is not None else 0.0
                 duration = float(duration_raw) if duration_raw is not None else 0.0
 
-                if distance > 0 and duration > 0:
+                if distance >= 1500 and duration > 0:
                     try:
                         vdot = analytics.calculate_vdot(distance, duration)
                         vdot_values.append(vdot)

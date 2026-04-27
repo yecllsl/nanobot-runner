@@ -411,7 +411,7 @@ def _display_weekly_report(report_data: WeeklyReportData | dict[str, Any]) -> No
     if highlights:
         console.print(
             Panel(
-                "\n".join(f"• {h}" for h in highlights),
+                "\n".join(f"- {h}" for h in highlights),
                 title="本周亮点",
                 border_style="green",
             )
@@ -421,7 +421,7 @@ def _display_weekly_report(report_data: WeeklyReportData | dict[str, Any]) -> No
     if concerns:
         console.print(
             Panel(
-                "\n".join(f"• {c}" for c in concerns),
+                "\n".join(f"- {c}" for c in concerns),
                 title="需要关注",
                 border_style="yellow",
             )
@@ -431,7 +431,7 @@ def _display_weekly_report(report_data: WeeklyReportData | dict[str, Any]) -> No
     if recommendations:
         console.print(
             Panel(
-                "\n".join(f"• {r}" for r in recommendations),
+                "\n".join(f"- {r}" for r in recommendations),
                 title="下周建议",
                 border_style="blue",
             )
@@ -502,7 +502,7 @@ def _display_monthly_report(report_data: MonthlyReportData | dict[str, Any]) -> 
     if highlights:
         console.print(
             Panel(
-                "\n".join(f"• {h}" for h in highlights),
+                "\n".join(f"- {h}" for h in highlights),
                 title="本月亮点",
                 border_style="green",
             )
@@ -512,7 +512,7 @@ def _display_monthly_report(report_data: MonthlyReportData | dict[str, Any]) -> 
     if concerns:
         console.print(
             Panel(
-                "\n".join(f"• {c}" for c in concerns),
+                "\n".join(f"- {c}" for c in concerns),
                 title="需要关注",
                 border_style="yellow",
             )
@@ -522,7 +522,7 @@ def _display_monthly_report(report_data: MonthlyReportData | dict[str, Any]) -> 
     if recommendations:
         console.print(
             Panel(
-                "\n".join(f"• {r}" for r in recommendations),
+                "\n".join(f"- {r}" for r in recommendations),
                 title="下月建议",
                 border_style="blue",
             )

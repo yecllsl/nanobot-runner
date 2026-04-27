@@ -2,6 +2,8 @@
 # 覆盖 LongTermPlanGenerator / SmartAdviceEngine
 
 
+from unittest.mock import MagicMock, patch
+
 from src.core.models import LongTermPlan, SmartTrainingAdvice
 from src.core.plan.long_term_plan_generator import LongTermPlanGenerator
 from src.core.plan.smart_advice_engine import SmartAdviceEngine
@@ -138,6 +140,149 @@ class TestLongTermPlanGenerator:
         )
         assert plan.total_weeks == 4
         assert len(plan.cycles) >= 2
+
+    def test_generate_plan_skip_training_plans(self) -> None:
+        """测试 auto_create_training_plans=False 时跳过创建TrainingPlan"""
+        plan = self.generator.generate_plan(
+            plan_name="测试计划",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=False,
+        )
+        assert plan.training_plan_ids == []
+
+    def test_generate_plan_training_plan_ids_default_empty(self) -> None:
+        """测试默认情况下 training_plan_ids 为空列表（无context时）"""
+        plan = self.generator.generate_plan(
+            plan_name="测试计划",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=False,
+        )
+        assert isinstance(plan.training_plan_ids, list)
+        assert len(plan.training_plan_ids) == 0
+
+    @patch("src.core.context.get_context")
+    @patch("src.core.training_plan.TrainingPlanEngine")
+    def test_create_training_plans_for_cycles_success(
+        self, mock_engine_cls, mock_get_context
+    ) -> None:
+        """测试自动创建TrainingPlan成功"""
+        mock_context = MagicMock()
+        mock_context.config.user_id = "test_user"
+        mock_plan_manager = MagicMock()
+        mock_plan_manager.create_plan.return_value = "plan_test_001"
+        mock_context.plan_manager = mock_plan_manager
+        mock_get_context.return_value = mock_context
+
+        mock_engine = MagicMock()
+        mock_plan = MagicMock()
+        mock_plan.metadata = None
+        mock_engine.generate_plan.return_value = mock_plan
+        mock_engine_cls.return_value = mock_engine
+
+        plan = self.generator.generate_plan(
+            plan_name="测试计划",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=True,
+        )
+
+        assert len(plan.training_plan_ids) == 4
+        assert all(pid == "plan_test_001" for pid in plan.training_plan_ids)
+        assert mock_plan_manager.create_plan.call_count == 4
+
+    @patch("src.core.context.get_context")
+    @patch("src.core.training_plan.TrainingPlanEngine")
+    def test_create_training_plans_partial_failure(
+        self, mock_engine_cls, mock_get_context
+    ) -> None:
+        """测试部分周期创建TrainingPlan失败时降级处理"""
+        mock_context = MagicMock()
+        mock_context.config.user_id = "test_user"
+        mock_plan_manager = MagicMock()
+        mock_plan_manager.create_plan.return_value = "plan_test_001"
+        mock_context.plan_manager = mock_plan_manager
+        mock_get_context.return_value = mock_context
+
+        mock_engine = MagicMock()
+        mock_plan = MagicMock()
+        mock_plan.metadata = None
+        call_count = 0
+
+        def side_effect(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise ValueError("模拟生成失败")
+            return mock_plan
+
+        mock_engine.generate_plan.side_effect = side_effect
+        mock_engine_cls.return_value = mock_engine
+
+        plan = self.generator.generate_plan(
+            plan_name="测试计划",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=True,
+        )
+
+        assert len(plan.training_plan_ids) == 3
+
+    def test_long_term_plan_training_plan_ids_to_dict(self) -> None:
+        """测试 LongTermPlan.to_dict 包含 training_plan_ids"""
+        plan = self.generator.generate_plan(
+            plan_name="测试计划",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=False,
+        )
+        d = plan.to_dict()
+        assert "training_plan_ids" in d
+        assert d["training_plan_ids"] == []
+
+    def test_long_term_plan_with_custom_training_plan_ids(self) -> None:
+        """测试 LongTermPlan 自定义 training_plan_ids"""
+        plan = self.generator.generate_plan(
+            plan_name="测试计划",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=False,
+        )
+        plan.training_plan_ids = ["plan_001", "plan_002"]
+        d = plan.to_dict()
+        assert d["training_plan_ids"] == ["plan_001", "plan_002"]
+
+    @patch("src.core.context.get_context")
+    @patch("src.core.training_plan.TrainingPlanEngine")
+    def test_create_training_plans_metadata_set(
+        self, mock_engine_cls, mock_get_context
+    ) -> None:
+        """测试创建的TrainingPlan metadata包含关联信息"""
+        mock_context = MagicMock()
+        mock_context.config.user_id = "test_user"
+        mock_plan_manager = MagicMock()
+        mock_plan_manager.create_plan.return_value = "plan_test_001"
+        mock_context.plan_manager = mock_plan_manager
+        mock_get_context.return_value = mock_context
+
+        mock_engine = MagicMock()
+        mock_plan = MagicMock()
+        mock_plan.metadata = None
+        mock_engine.generate_plan.return_value = mock_plan
+        mock_engine_cls.return_value = mock_engine
+
+        self.generator.generate_plan(
+            plan_name="春季备赛",
+            current_vdot=42.0,
+            total_weeks=16,
+            auto_create_training_plans=True,
+        )
+
+        assert mock_plan.metadata is not None
+        assert mock_plan.metadata["long_term_plan_name"] == "春季备赛"
+        assert "cycle_type" in mock_plan.metadata
+        assert "cycle_index" in mock_plan.metadata
 
 
 class TestSmartAdviceEngine:
