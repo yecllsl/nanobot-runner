@@ -2,7 +2,7 @@
 # 提供配置数据结构定义和验证机制
 
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar
 
 
 @dataclass
@@ -19,6 +19,7 @@ class AppConfig:
         feishu_app_secret: 飞书应用 App Secret
         feishu_receive_id: 飞书接收者 ID
         feishu_receive_id_type: 飞书接收者 ID 类型
+        tools: 工具生态配置（v0.13.0新增），包含mcp_servers等
     """
 
     version: str
@@ -31,6 +32,7 @@ class AppConfig:
     llm_provider: str | None = None
     llm_model: str | None = None
     llm_base_url: str | None = None
+    tools: dict[str, Any] | None = None
 
     REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
 
@@ -45,6 +47,7 @@ class AppConfig:
         "llm_provider": (str, type(None)),
         "llm_model": (str, type(None)),
         "llm_base_url": (str, type(None)),
+        "tools": (dict, type(None)),
     }
 
     @classmethod
@@ -168,6 +171,7 @@ class AppConfig:
             "llm_provider": self.llm_provider,
             "llm_model": self.llm_model,
             "llm_base_url": self.llm_base_url,
+            "tools": self.tools,
         }
 
     def __post_init__(self) -> None:

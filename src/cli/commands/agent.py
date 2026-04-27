@@ -2,12 +2,37 @@
 # 包含 chat 和 memory 命令
 
 import contextlib
+from typing import Any
 
 import typer
 
 from src.cli.common import CLIError, console, print_error
 
 app = typer.Typer(help="Agent 交互命令")
+
+
+async def _connect_mcp_tools(context: Any, agent: Any) -> dict[str, Any]:
+    """连接MCP服务器工具到Agent
+
+    从config.json读取MCP服务器配置，连接并注册工具。
+
+    Args:
+        context: 应用上下文
+        agent: AgentLoop实例
+
+    Returns:
+        dict[str, Any]: 连接结果
+    """
+    from src.core.tools.mcp_connector import connect_mcp_tools_from_config
+
+    config_path = context.config.config_file
+    try:
+        return await connect_mcp_tools_from_config(config_path, agent.tools)
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).warning(f"连接MCP工具失败: {e}")
+        return {"connected_servers": [], "failed_servers": [], "exit_stacks": {}}
 
 
 @app.command()
@@ -79,8 +104,16 @@ async def _run_chat() -> None:
         for tool in create_tools(runner_tools):
             agent.tools.register(tool)
 
+        mcp_result = await _connect_mcp_tools(context, agent)
+        mcp_connected = mcp_result.get("connected_servers", [])
+        mcp_failed = mcp_result.get("failed_servers", [])
+
         console.print("[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {llm_config.model}[/dim]")
+        if mcp_connected:
+            console.print(f"[dim]MCP工具: {', '.join(mcp_connected)}[/dim]")
+        if mcp_failed:
+            console.print(f"[yellow]MCP连接失败: {', '.join(mcp_failed)}[/yellow]")
         console.print()
 
         while True:

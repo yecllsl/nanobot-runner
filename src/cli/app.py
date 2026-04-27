@@ -10,7 +10,9 @@ from src.cli.commands import (
     gateway_app,
     plan_app,
     report_app,
+    skill_app,
     system_app,
+    tools_app,
 )
 
 app = typer.Typer(
@@ -26,6 +28,8 @@ app.add_typer(report_app, name="report")
 app.add_typer(system_app, name="system")
 app.add_typer(gateway_app, name="gateway")
 app.add_typer(plan_app, name="plan")
+app.add_typer(tools_app, name="tools")
+app.add_typer(skill_app, name="skill")
 
 if __name__ == "__main__":
     app()

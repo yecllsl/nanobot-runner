@@ -8,7 +8,9 @@ from src.cli.commands.gateway import app as gateway_app
 from src.cli.commands.plan import app as plan_app
 from src.cli.commands.report import app as report_app
 from src.cli.commands.report import profile_app
+from src.cli.commands.skill import app as skill_app
 from src.cli.commands.system import app as system_app
+from src.cli.commands.tools import app as tools_app
 
 __all__ = [
     "data_app",
@@ -19,4 +21,6 @@ __all__ = [
     "gateway_app",
     "system_app",
     "plan_app",
+    "tools_app",
+    "skill_app",
 ]

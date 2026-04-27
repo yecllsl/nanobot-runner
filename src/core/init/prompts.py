@@ -149,6 +149,8 @@ class InitPrompts:
             if base_url:
                 config["llm_base_url"] = base_url
 
+            config["tools"] = InitPrompts._default_tools_config()
+
         env_vars = {**llm_env, **feishu_env}
 
         return {"config": config, "env_vars": env_vars}
@@ -184,3 +186,43 @@ class InitPrompts:
             "zhipu": "glm-4.7-flash",
         }
         return defaults.get(provider, "gpt-4o-mini")
+
+    @staticmethod
+    def _default_tools_config() -> dict[str, Any]:
+        """获取默认工具生态配置
+
+        包含四个默认MCP服务器：Chrome DevTools、天气、地图、COROS数据同步。
+
+        Returns:
+            dict[str, Any]: 默认工具配置字典
+        """
+        return {
+            "mcp_servers": {
+                "Chrome DevTools MCP": {
+                    "command": "npx",
+                    "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect"],
+                    "env": {},
+                },
+                "weather": {
+                    "type": "stdio",
+                    "command": "npx",
+                    "args": ["-y", "@dangahagan/weather-mcp"],
+                    "tool_timeout": 30,
+                    "enabled_tools": ["*"],
+                },
+                "osm": {
+                    "type": "stdio",
+                    "command": "uvx",
+                    "args": ["osm-mcp-server"],
+                    "tool_timeout": 30,
+                    "enabled_tools": ["*"],
+                },
+                "coros": {
+                    "type": "stdio",
+                    "command": "npx",
+                    "args": ["-y", "coros-cli", "mcp"],
+                    "tool_timeout": 30,
+                    "enabled_tools": ["*"],
+                },
+            },
+        }

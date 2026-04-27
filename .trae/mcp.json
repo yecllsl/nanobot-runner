@@ -8,6 +8,28 @@
         "--autoConnect"
       ],
       "env": {}
-    }
+    },
+    "weather": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@dangahagan/weather-mcp"],
+        "tool_timeout": 30,
+        "enabled_tools": ["*"]
+      },
+      "osm": {
+        "type": "stdio",
+        "command": "uvx",
+        "args": ["osm-mcp-server"],
+        "tool_timeout": 30,
+        "enabled_tools": ["*"]
+      },
+      "coros": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "coros-cli", "mcp"],
+        "tool_timeout": 30,
+        "enabled_tools": ["*"]
+      }
+
   }
 }

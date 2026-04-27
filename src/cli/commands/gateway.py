@@ -4,6 +4,7 @@
 import asyncio
 import contextlib
 import logging
+from typing import Any
 
 import typer
 
@@ -13,6 +14,35 @@ from src.core.logger import get_logger
 logger = get_logger(__name__)
 
 app = typer.Typer(help="Gateway 服务命令")
+
+
+def _connect_mcp_tools_sync(context: Any, agent: Any) -> dict[str, Any]:
+    """同步方式连接MCP服务器工具到Agent
+
+    在Gateway同步启动流程中调用，通过asyncio.run执行异步连接。
+
+    Args:
+        context: 应用上下文
+        agent: AgentLoop实例
+
+    Returns:
+        dict[str, Any]: MCP连接的exit_stacks映射
+    """
+    from src.core.tools.mcp_connector import connect_mcp_tools_from_config
+
+    config_path = context.config.config_file
+    try:
+        result = asyncio.run(connect_mcp_tools_from_config(config_path, agent.tools))
+        connected = result.get("connected_servers", [])
+        failed = result.get("failed_servers", [])
+        if connected:
+            logger.info(f"MCP工具已连接: {connected}")
+        if failed:
+            logger.warning(f"MCP连接失败: {failed}")
+        return result.get("exit_stacks", {})
+    except Exception as e:
+        logger.warning(f"连接MCP工具失败: {e}")
+        return {}
 
 
 def _format_stats(data: dict) -> str:
@@ -294,6 +324,8 @@ def start(
         for tool in create_tools(runner_tools):
             agent.tools.register(tool)
         _register_runner_commands(agent, runner_tools)
+
+    _connect_mcp_tools_sync(context, agent)
 
     channels = ChannelManager(config=adapter._get_or_create_nanobot_config(), bus=bus)
 

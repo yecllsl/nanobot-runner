@@ -1,6 +1,8 @@
 # Agent 工具集
 # 封装为 nanobot-ai 可识别的工具
 
+from __future__ import annotations
+
 import json
 import logging
 from abc import abstractmethod
@@ -11,6 +13,7 @@ import polars as pl
 from nanobot.agent.tools.base import Tool
 
 from src.core.context import AppContext, AppContextFactory
+from src.core.tools.weather_training_coordinator import TrainingData
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +23,7 @@ class BaseTool(Tool):
 
     concurrency_safe: bool = True
 
-    def __init__(self, runner_tools: "RunnerTools"):
+    def __init__(self, runner_tools: RunnerTools):
         self.runner_tools = runner_tools
 
     @property
@@ -785,6 +788,62 @@ class GetSmartTrainingAdviceTool(BaseTool):
         )
 
 
+class GetWeatherTrainingAdviceTool(BaseTool):
+    """天气+训练协同建议工具 - v0.13.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_weather_training_advice"
+
+    @property
+    def description(self) -> str:
+        return "获取天气+训练综合建议。结合天气数据和训练数据，生成多维度的训练建议。当用户询问'今天适合跑步吗'、'天气对训练的影响'、'综合训练建议'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "temperature": {
+                    "type": "number",
+                    "description": "温度（摄氏度）",
+                },
+                "humidity": {
+                    "type": "number",
+                    "description": "湿度（百分比，0-100）",
+                },
+                "weather": {
+                    "type": "string",
+                    "description": "天气状况（晴/阴/雨/雪等）",
+                },
+                "wind": {
+                    "type": "string",
+                    "description": "风力描述（可选）",
+                },
+                "precipitation": {
+                    "type": "number",
+                    "description": "降水概率（百分比，0-100，可选）",
+                },
+                "uv_index": {
+                    "type": "number",
+                    "description": "紫外线指数（可选）",
+                },
+            },
+            "required": ["temperature", "humidity", "weather"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.get_weather_training_advice,
+            temperature=kwargs.get("temperature", 20.0),
+            humidity=kwargs.get("humidity", 50.0),
+            weather=kwargs.get("weather", "晴"),
+            wind=kwargs.get("wind", "无风"),
+            precipitation=kwargs.get("precipitation", 0.0),
+            uv_index=kwargs.get("uv_index", 0.0),
+        )
+
+
 class RunnerTools:
     """跑步助理工具集（业务逻辑层）"""
 
@@ -1504,6 +1563,132 @@ class RunnerTools:
             logger.error(f"获取训练建议失败：{e}")
             return {"success": False, "error": str(e)}
 
+    def get_weather_training_advice(
+        self,
+        temperature: float = 20.0,
+        humidity: float = 50.0,
+        weather: str = "晴",
+        wind: str = "无风",
+        precipitation: float = 0.0,
+        uv_index: float = 0.0,
+    ) -> dict[str, Any]:
+        """获取天气+训练综合建议 - v0.13.0新增
+
+        结合天气数据和训练数据，生成多维度的训练建议。
+
+        Args:
+            temperature: 温度（摄氏度）
+            humidity: 湿度（百分比）
+            weather: 天气状况
+            wind: 风力描述
+            precipitation: 降水概率
+            uv_index: 紫外线指数
+
+        Returns:
+            dict: 综合建议结果
+        """
+        try:
+            from src.core.tools.weather_training_coordinator import (
+                WeatherData,
+                WeatherTrainingCoordinator,
+            )
+
+            # 创建天气数据
+            weather_data = WeatherData(
+                temperature=temperature,
+                humidity=humidity,
+                weather=weather,
+                wind=wind,
+                precipitation=precipitation,
+                uv_index=uv_index,
+            )
+
+            # 获取训练数据摘要
+            profile = self.profile_storage.load_profile_json()
+            training_data = self._build_training_data_summary(profile)
+
+            # 使用协调器生成建议
+            coordinator = WeatherTrainingCoordinator()
+            advices = coordinator.generate_advice(weather_data, training_data)
+
+            # 分析天气影响
+            weather_impact = coordinator.analyze_weather_impact(weather_data)
+
+            # 格式化建议
+            formatted_advice = coordinator.format_advice_for_display(advices)
+
+            return {
+                "success": True,
+                "data": {
+                    "advices": [
+                        {
+                            "advice_type": a.advice_type,
+                            "content": a.content,
+                            "priority": a.priority,
+                            "reason": a.reason,
+                            "weather_impact": a.weather_impact,
+                            "training_impact": a.training_impact,
+                        }
+                        for a in advices
+                    ],
+                    "total_count": len(advices),
+                    "weather_impact": weather_impact,
+                    "formatted_advice": formatted_advice,
+                },
+            }
+        except Exception as e:
+            logger.error(f"获取天气+训练建议失败：{e}")
+            return {"success": False, "error": str(e)}
+
+    def _build_training_data_summary(self, profile: Any) -> TrainingData:
+        """构建训练数据摘要
+
+        Args:
+            profile: 用户画像数据
+
+        Returns:
+            TrainingData: 训练数据摘要
+        """
+        from src.core.tools.weather_training_coordinator import TrainingData
+
+        # 获取最近一周跑量
+        recent_runs = self.get_recent_runs(limit=7)
+        recent_distance_km = sum(run.get("distance_km", 0) for run in recent_runs)
+
+        # 获取平均VDOT
+        vdot_trend = self.get_vdot_trend(limit=20)
+        avg_vdot = None
+        if vdot_trend:
+            vdot_values: list[float] = [
+                v.get("vdot", 0.0) for v in vdot_trend if v.get("vdot") is not None
+            ]
+            if vdot_values:
+                avg_vdot = sum(vdot_values) / len(vdot_values)
+
+        # 获取训练负荷
+        training_load_data = self.get_training_load(days=42)
+        training_load = training_load_data.get("ctl")
+
+        # 判断恢复状态
+        recovery_status = "良好"
+        if training_load and training_load > 50:
+            recovery_status = "疲劳"
+        elif training_load and training_load > 40:
+            recovery_status = "一般"
+
+        # 获取最近一次跑步日期
+        last_run_date = None
+        if recent_runs:
+            last_run_date = recent_runs[0].get("timestamp", "")[:10]
+
+        return TrainingData(
+            recent_distance_km=recent_distance_km,
+            avg_vdot=avg_vdot,
+            training_load=training_load,
+            recovery_status=recovery_status,
+            last_run_date=last_run_date,
+        )
+
 
 def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
@@ -1526,6 +1711,7 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         EvaluateGoalAchievementTool(runner_tools),
         CreateLongTermPlanTool(runner_tools),
         GetSmartTrainingAdviceTool(runner_tools),
+        GetWeatherTrainingAdviceTool(runner_tools),
     ]
 
 
@@ -1646,6 +1832,17 @@ TOOL_DESCRIPTIONS = {
             "training_consistency": "训练一致性（0-1，可选）",
             "injury_risk": "伤病风险（low/medium/high，可选）",
             "goal_type": "目标类型（5k/10k/half_marathon/marathon，可选）",
+        },
+    },
+    "get_weather_training_advice": {
+        "description": "获取天气+训练综合建议。结合天气数据和训练数据，生成多维度的训练建议。当用户询问'今天适合跑步吗'、'天气对训练的影响'、'综合训练建议'时使用此工具。返回JSON格式：{success: true, data: {advices: [{advice_type, content, priority, reason, weather_impact, training_impact}], total_count, weather_impact, formatted_advice}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "temperature": "温度（摄氏度，必填）",
+            "humidity": "湿度（百分比，0-100，必填）",
+            "weather": "天气状况（晴/阴/雨/雪等，必填）",
+            "wind": "风力描述（可选）",
+            "precipitation": "降水概率（百分比，0-100，可选）",
+            "uv_index": "紫外线指数（可选）",
         },
     },
 }
