@@ -13,6 +13,16 @@
   - [StorageManager](#storagemanager)
   - [FitParser](#fitparser)
   - [ImportService](#importservice)
+  - [智能跑步计划模块](#智能跑步计划模块) (v0.10.0~v0.12.0 新增)
+    - [GoalPredictionEngine](#goalpredictionengine) (v0.12.0)
+    - [LongTermPlanGenerator](#longtermplangenerator) (v0.12.0)
+    - [SmartAdviceEngine](#smartadviceengine) (v0.12.0)
+    - [PlanAdjustmentValidator](#planadjustmentvalidator) (v0.11.0)
+    - [PlanExecutionRepository](#planexecutionrepository) (v0.10.0)
+  - [工具生态模块](#工具生态模块) (v0.13.0 新增)
+    - [ToolManager](#toolmanager) (v0.13.0)
+    - [MCPConfigHelper](#mcpconfighelper) (v0.13.0)
+    - [MCPConnector](#mcpconnector) (v0.13.0)
 - [Agents 模块](#agents-模块)
   - [RunnerTools](#runnertools)
 - [Notify 模块](#notify-模块)
@@ -673,14 +683,243 @@ bot = FeishuBot(webhook_url="https://open.feishu.cn/...")
 
 ---
 
+### 智能跑步计划模块
+
+**v0.10.0~v0.12.0 新增**: 三层架构设计（数据感知层 + 智能调整层 + 预测规划层）
+
+#### GoalPredictionEngine (v0.12.0)
+
+目标达成评估引擎，预测全马/半马完赛时间。
+
+```python
+from src.core.plan.goal_prediction_engine import GoalPredictionEngine
+
+engine = GoalPredictionEngine()
+prediction = engine.predict_goal_achievement(
+    user_id="default",
+    target_distance_km=42.195,
+    target_date="2026-06-15",
+    current_vdot=42.0,
+    training_history=history_data
+)
+```
+
+**返回结果:**
+- `predicted_time`: 预测完赛时间
+- `confidence_interval`: 置信区间
+- `achievement_probability`: 达成概率
+- `risk_factors`: 风险因素列表
+
+#### LongTermPlanGenerator (v0.12.0)
+
+长期周期规划引擎，生成多周期训练计划。
+
+```python
+from src.core.plan.long_term_plan_generator import LongTermPlanGenerator
+
+generator = LongTermPlanGenerator()
+plan = generator.generate_long_term_plan(
+    user_id="default",
+    goal_distance_km=42.195,
+    goal_date="2026-10-15",
+    current_vdot=45.0,
+    current_weekly_distance_km=40.0,
+    cycles=3
+)
+```
+
+**周期类型:**
+- 基础期 (Base): 建立有氧基础
+- 进展期 (Build): 提升专项能力
+- 巅峰期 (Peak): 达到最佳状态
+- 比赛期 (Race): 赛前调整
+- 恢复期 (Recovery): 赛后恢复
+
+#### SmartAdviceEngine (v0.12.0)
+
+智能建议引擎，基于数据分析提供训练建议。
+
+```python
+from src.core.plan.smart_advice_engine import SmartAdviceEngine
+
+engine = SmartAdviceEngine()
+advice = engine.get_training_advice(
+    user_id="default",
+    plan_id="plan_20240101",
+    focus_area="aerobic"  # 可选: aerobic, speed, endurance, recovery
+)
+```
+
+**建议类型:**
+- 训练不足/过量风险
+- 有氧基础薄弱
+- 强度分布不均衡
+- 恢复不足
+
+#### PlanAdjustmentValidator (v0.11.0)
+
+计划调整校验器，规则引擎验证调整合理性。
+
+```python
+from src.core.plan.plan_adjustment_validator import PlanAdjustmentValidator
+
+validator = PlanAdjustmentValidator()
+result = validator.validate_adjustment(
+    plan_id="plan_20240101",
+    adjustment_type="reduce",
+    adjustment_params={"week": 5, "percentage": 20}
+)
+```
+
+**硬性规则:**
+- 周跑量上限保护
+- 周增量不超过10%
+- 连续高强度限制
+
+**软性规则:**
+- 有氧比例建议
+- 长距离比例建议
+- 恢复日安排
+
+#### PlanExecutionRepository (v0.10.0)
+
+计划执行仓储，支持计划完成度跟踪和训练反馈记录。
+
+```python
+from src.core.plan.plan_execution_repository import PlanExecutionRepository
+
+repo = PlanExecutionRepository()
+
+# 记录执行反馈
+repo.record_execution(
+    plan_id="plan_20240101",
+    date="2024-01-15",
+    completion_rate=0.8,
+    effort_score=6,
+    notes="体感良好"
+)
+
+# 获取执行统计
+stats = repo.get_plan_execution_stats("plan_20240101")
+```
+
+### 工具生态模块
+
+**v0.13.0 新增**: 智能技能生态版，支持 MCP 工具管理和外部服务接入。
+
+#### ToolManager (v0.13.0)
+
+工具管理器，统一管理 MCP 服务器的生命周期和配置。
+
+```python
+from src.core.tools.tool_manager import ToolManager
+from pathlib import Path
+
+manager = ToolManager(Path("~/.nanobot-runner/config.json"))
+
+# 列出所有工具
+tools = manager.list_tools()
+
+# 获取工具状态
+status = manager.get_tool_status("weather", "get_forecast")
+
+# 启用/禁用工具
+manager.enable_tool("weather", "get_forecast")
+manager.disable_tool("weather", "get_forecast")
+
+# 服务器管理
+manager.add_server("osm", mcp_server_config)
+manager.remove_server("osm")
+manager.enable_server("osm")
+manager.disable_server("osm")
+```
+
+**核心方法:**
+- `list_tools() -> List[ToolInfo]`: 列出所有可用工具
+- `get_tool_status(server_name, tool_name) -> ToolStatus`: 查询工具状态
+- `enable_tool(server_name, tool_name)`: 启用指定工具
+- `disable_tool(server_name, tool_name)`: 禁用指定工具
+- `discover_tools() -> List[ToolInfo]`: 发现所有已启用的工具
+- `list_servers() -> List[str]`: 列出所有服务器名称
+- `add_server(name, config)`: 添加服务器配置
+- `remove_server(name)`: 移除服务器配置
+- `enable_server(name)`: 启用服务器
+- `disable_server(name)`: 禁用服务器
+
+#### MCPConfigHelper (v0.13.0)
+
+MCP 配置辅助类，提供配置的加载、验证、导入导出功能。
+
+```python
+from src.core.tools.mcp_config_helper import MCPConfigHelper
+
+helper = MCPConfigHelper(Path("~/.nanobot-runner/config.json"))
+
+# 加载配置
+config = helper.load_tools_config()
+
+# 验证配置
+is_valid = helper.validate_mcp_config()
+
+# 添加服务器
+helper.add_mcp_server(
+    name="weather",
+    command="npx",
+    args=["-y", "@h1deya/mcp-server-weather"],
+    transport_type="stdio"
+)
+
+# 导入 Claude Desktop 配置
+helper.import_claude_desktop_config()
+```
+
+**核心方法:**
+- `load_tools_config() -> ToolsConfig`: 从 config.json 加载工具配置
+- `save_tools_config(config)`: 保存工具配置到 config.json
+- `validate_mcp_config() -> bool`: 验证 MCP 配置完整性
+- `list_mcp_tools() -> List[str]`: 列出所有 MCP 工具名称
+- `add_mcp_server(...)`: 添加 MCP 服务器配置
+- `remove_mcp_server(name)`: 移除 MCP 服务器配置
+- `update_mcp_server(name, ...)`: 更新 MCP 服务器配置
+- `import_claude_desktop_config()`: 导入 Claude Desktop 配置
+
+#### MCPConnector (v0.13.0)
+
+MCP 连接器，负责与 MCP 服务器建立连接和工具发现。
+
+```python
+from src.core.tools.mcp_connector import MCPConnector
+
+connector = MCPConnector()
+
+# 连接 MCP 服务器
+tools = await connector.connect_mcp_server(
+    server_name="weather",
+    config=mcp_server_config
+)
+
+# 断开连接
+await connector.disconnect_mcp_server("weather")
+
+# 获取工具模式
+tool_schemas = connector.get_tool_schemas("weather")
+```
+
+**核心方法:**
+- `connect_mcp_server(name, config) -> List[Tool]`: 连接 MCP 服务器
+- `disconnect_mcp_server(name)`: 断开 MCP 服务器连接
+- `get_tool_schemas(server_name) -> List[dict]`: 获取工具 JSON Schema
+- `is_server_connected(name) -> bool`: 检查服务器连接状态
+
 ## 相关文档
 
 - [AnalyticsEngine API](./analytics_engine.md) - 详细 API 文档
 - [StorageManager API](./storage_manager.md) - 存储管理器详细文档
 - [RunnerTools API](./runner_tools.md) - Agent 工具集详细文档
 - [CLI 用户指南](../guides/cli_usage.md) - 命令行使用指南
+- [架构设计说明书](../architecture/架构设计说明书.md) - 智能跑步计划架构设计
 
 ---
 
-*文档版本: v0.9.3*
-*更新时间: 2026-04-15*
+*文档版本: v0.13.0*
+*更新时间: 2026-04-27*

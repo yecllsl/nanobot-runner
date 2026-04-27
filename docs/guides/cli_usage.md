@@ -198,7 +198,166 @@ uv run nanobotrun report generate --type monthly
 uv run nanobotrun report profile
 ```
 
-### 3.6 初始化命令 (init)
+### 3.6 训练计划命令 (plan)
+
+**v0.10.0~v0.12.0 新增**: 智能跑步计划系统，支持计划创建、执行跟踪、调整优化。
+
+#### 创建训练计划
+
+```bash
+# 创建马拉松训练计划
+uv run nanobotrun plan create 42.195 2026-06-15 --vdot 42.0 --volume 35
+
+# 创建半程马拉松计划
+uv run nanobotrun plan create 21.1 2026-05-01 --vdot 40.0 --volume 30 --age 35
+```
+
+#### 记录训练反馈
+
+```bash
+# 记录计划执行反馈
+uv run nanobotrun plan log plan_20240101 2024-01-15 --completion 0.8 --effort 6
+
+# 完整反馈记录
+uv run nanobotrun plan log plan_20240101 2024-01-15 \
+  --completion 1.0 \
+  --effort 4 \
+  --notes "轻松完成" \
+  --distance 10.5 \
+  --duration 65 \
+  --hr 145
+```
+
+#### 查看计划统计
+
+```bash
+# 查看计划执行统计
+uv run nanobotrun plan stats plan_20240101
+```
+
+#### 调整训练计划 (v0.11.0)
+
+```bash
+# 调整计划（减量）
+uv run nanobotrun plan adjust plan_20240101 --action reduce --reason "疲劳恢复"
+
+# 调整特定日期
+uv run nanobotrun plan adjust plan_20240101 --action reschedule --date 2024-01-20
+```
+
+#### 获取调整建议 (v0.11.0)
+
+```bash
+# 获取智能调整建议
+uv run nanobotrun plan suggest plan_20240101
+```
+
+#### 目标达成评估 (v0.12.0)
+
+```bash
+# 评估目标达成概率
+uv run nanobotrun plan evaluate plan_20240101
+
+# 评估特定目标
+uv run nanobotrun plan evaluate plan_20240101 --target-time 3:30:00
+```
+
+#### 长期规划 (v0.12.0)
+
+```bash
+# 生成多周期长期训练计划
+uv run nanobotrun plan long-term 42.195 2026-10-15 \
+  --vdot 45.0 \
+  --volume 40 \
+  --cycles 3
+
+# 指定基础周期周数
+uv run nanobotrun plan long-term 42.195 2026-10-15 \
+  --vdot 45.0 \
+  --base-weeks 8 \
+  --build-weeks 6
+```
+
+#### 智能训练建议 (v0.12.0)
+
+```bash
+# 获取个性化训练建议
+uv run nanobotrun plan advice plan_20240101
+
+# 针对特定方面获取建议
+uv run nanobotrun plan advice plan_20240101 --focus aerobic
+```
+
+### 3.7 工具管理命令 (tools)
+
+**v0.13.0 新增**: 工具管理命令用于管理 MCP 工具服务器的配置。
+
+#### 列出工具
+
+```bash
+# 列出所有已配置的工具
+uv run nanobotrun tools list
+```
+
+#### 添加 MCP 服务器
+
+```bash
+# 添加 STDIO 类型服务器
+uv run nanobotrun tools add weather \
+  --command npx \
+  --args '["-y","@h1deya/mcp-server-weather"]' \
+  --type stdio
+
+# 添加 SSE 类型服务器
+uv run nanobotrun tools add maps \
+  --url http://localhost:3000/sse \
+  --type sse
+
+# 指定启用的工具
+uv run nanobotrun tools add weather \
+  --command npx \
+  --args '["-y","@h1deya/mcp-server-weather"]' \
+  --enabled-tools "get_forecast,get_alerts"
+```
+
+#### 移除 MCP 服务器
+
+```bash
+# 移除服务器
+uv run nanobotrun tools remove weather
+```
+
+#### 启用/禁用工具
+
+```bash
+# 启用服务器
+uv run nanobotrun tools enable weather
+
+# 禁用服务器
+uv run nanobotrun tools disable weather
+
+# 启用特定工具（而非整个服务器）
+uv run nanobotrun tools enable weather --tool get_forecast
+```
+
+#### 导入 Claude Desktop 配置
+
+```bash
+# 从 Claude Desktop 导入配置
+uv run nanobotrun tools import-claude
+
+# 指定 Claude Desktop 配置路径
+uv run nanobotrun tools import-claude --config-path /path/to/claude/config.json
+```
+
+#### 验证工具配置
+
+```bash
+# 验证工具配置
+uv run nanobotrun tools validate
+```
+
+### 3.8 初始化命令 (init)
 
 **v0.9.4 新增**: 初始化命令用于配置工作区和用户设置。
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.9.0",
+  "version": "0.13.0",
   "data_dir": "~/.nanobot-runner/data",
   "timezone": "Asia/Shanghai",
   "default_year": 2024,
@@ -29,5 +29,44 @@
     "cache_ttl": 300,
     "lazy_frame_optimization": true,
     "batch_size": 100
+  },
+  "training_plan": {
+    "max_weekly_increase_percent": 10,
+    "min_aerobic_ratio": 0.8,
+    "max_intensity_days_per_week": 3,
+    "default_plan_weeks": 16
+  },
+  "goal_prediction": {
+    "confidence_level": 0.95,
+    "min_training_weeks": 8,
+    "prediction_model": "vdot_trend"
+  },
+  "tools": {
+    "mcp_servers": {
+      "weather": {
+        "command": "npx",
+        "args": ["-y", "@h1deya/mcp-server-weather"],
+        "transport_type": "stdio",
+        "disabled": false,
+        "timeout": 30,
+        "enabled_tools": ["*"]
+      },
+      "osm": {
+        "command": "uvx",
+        "args": ["mcp-openstreetmap"],
+        "transport_type": "stdio",
+        "disabled": false,
+        "timeout": 30,
+        "enabled_tools": ["*"]
+      },
+      "coros": {
+        "command": "python",
+        "args": ["-m", "coros_mcp_server"],
+        "transport_type": "stdio",
+        "disabled": false,
+        "timeout": 30,
+        "enabled_tools": ["*"]
+      }
+    }
   }
 }

@@ -7,6 +7,48 @@
 
 ---
 
+## [0.13.0] - 2026-04-27
+
+### 新增功能
+
+#### 智能技能生态版 (v0.13.0)
+- **工具生态核心模块**: 新增 MCP 工具管理基础设施
+  - ToolManager: 统一管理 MCP 服务器的启用/禁用/配置
+  - MCPConfigHelper: 配置加载、验证、导入导出
+  - 支持工具自动发现和动态注册
+  - 支持从 Claude Desktop 导入配置
+  
+- **天气 Agent 工具**: 通过 MCP 接入天气服务
+  - 支持自然语言查询天气
+  - 集成到训练计划建议
+  - 自动天气预警
+  
+- **地图 Agent 工具**: 通过 MCP 接入地图服务
+  - 路线规划: 根据距离、爬升偏好规划跑步路线
+  - 路线分析: 分析路线难度、海拔变化
+  
+- **健康数据 Agent 工具**: 通过 MCP 接入 COROS 健康数据
+  - 睡眠数据同步与分析
+  - HRV 数据同步与趋势分析
+  - 综合健康状态评估
+
+#### CLI 工具管理命令
+- `nanobotrun tools list`: 列出所有已配置的工具
+- `nanobotrun tools add`: 添加 MCP 服务器配置
+- `nanobotrun tools remove`: 移除 MCP 服务器配置
+- `nanobotrun tools enable`: 启用工具/服务器
+- `nanobotrun tools disable`: 禁用工具/服务器
+- `nanobotrun tools import-claude`: 导入 Claude Desktop 配置
+- `nanobotrun tools validate`: 验证工具配置
+
+### 测试覆盖
+- 新增单元测试: 102+
+- 工具管理器覆盖率: 95%
+- MCP 配置辅助类覆盖率: 86%
+- 模型层覆盖率: 99%
+
+---
+
 ## [0.12.0] - 2026-04-19
 
 ### 新增功能
