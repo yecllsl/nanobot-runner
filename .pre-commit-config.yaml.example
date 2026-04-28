@@ -1,0 +1,45 @@
+# 预提交检查配置文件示例
+# 将此文件复制为 .pre-commit-config.yaml 并根据需要修改
+
+# 并行执行配置
+parallel_execution: true
+max_workers: 4
+
+# 增量检查配置
+incremental_check: true
+
+# 缓存配置
+cache_enabled: true
+
+# 输出格式: text, json, html
+output_format: "text"
+
+# 各检查项配置
+ruff_format:
+  enabled: true
+  timeout: 300
+  command: null  # 使用默认命令
+
+ruff_lint:
+  enabled: true
+  timeout: 300
+  command: null  # 使用默认命令
+
+mypy:
+  enabled: true
+  timeout: 120
+  command: "uv run mypy src/ --ignore-missing-imports"
+
+bandit:
+  enabled: true
+  timeout: 120
+  command: null  # 使用默认命令
+
+pytest:
+  enabled: true
+  timeout: 300
+  command: "uv run pytest tests/unit/ -v"
+
+schema_check:
+  enabled: true
+  timeout: 60
