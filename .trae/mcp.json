@@ -7,7 +7,8 @@
         "chrome-devtools-mcp@latest",
         "--autoConnect"
       ],
-      "env": {}
+      "env": {},
+      "disabled": true
     },
     "weather": {
         "type": "stdio",

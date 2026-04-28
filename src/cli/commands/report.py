@@ -2,6 +2,7 @@
 # 包含 report 和 profile 命令
 
 
+from pathlib import Path
 from typing import Any, cast
 
 import typer
@@ -10,7 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error, print_status
-from src.core.models import MonthlyReportData, WeeklyReportData
+from src.core.models import MonthlyReportData, ReportType, WeeklyReportData
 
 app = typer.Typer(help="报告和画像命令")
 profile_app = typer.Typer(help="用户画像管理")
@@ -142,6 +143,9 @@ def report(
 def weekly(
     push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
     age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="保存报告到指定目录"
+    ),
 ) -> None:
     """
     生成周报
@@ -149,9 +153,9 @@ def weekly(
     示例:
         nanobotrun report weekly              # 生成周报
         nanobotrun report weekly --push       # 生成并推送到飞书
+        nanobotrun report weekly --output ./reports  # 生成周报并保存到文件
     """
     from src.core.context import get_context
-    from src.core.models import ReportType
 
     try:
         service = get_context().report_service
@@ -180,6 +184,9 @@ def weekly(
             )
         )
 
+        if output:
+            _save_report_to_file(ReportType.WEEKLY, age, output)
+
         if push:
             push_result = service.push_report(result, report_type=ReportType.WEEKLY)
             if push_result.success:
@@ -201,6 +208,9 @@ def weekly(
 def monthly(
     push: bool = typer.Option(False, "--push", "-p", help="推送到飞书"),
     age: int = typer.Option(30, "--age", "-a", help="年龄（用于计算最大心率）"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="保存报告到指定目录"
+    ),
 ) -> None:
     """
     生成月报
@@ -208,9 +218,9 @@ def monthly(
     示例:
         nanobotrun report monthly              # 生成月报
         nanobotrun report monthly --push       # 生成并推送到飞书
+        nanobotrun report monthly --output ./reports  # 生成月报并保存到文件
     """
     from src.core.context import get_context
-    from src.core.models import ReportType
 
     try:
         service = get_context().report_service
@@ -239,6 +249,9 @@ def monthly(
             )
         )
 
+        if output:
+            _save_report_to_file(ReportType.MONTHLY, age, output)
+
         if push:
             push_result = service.push_report(result, report_type=ReportType.MONTHLY)
             if push_result.success:
@@ -254,6 +267,53 @@ def monthly(
             }
         )
         raise typer.Exit(1)
+
+
+def _save_report_to_file(report_type: ReportType, age: int, output_dir: Path) -> None:
+    """使用ReportGenerator生成Markdown报告并保存到文件"""
+    from src.core.context import get_context
+    from src.core.report_generator import ReportGenerator
+
+    try:
+        context = get_context()
+        generator = ReportGenerator(context)
+
+        report_result = generator.generate_report(report_type=report_type, age=age)
+
+        if not report_result.success:
+            print_error(
+                {
+                    "message": f"保存报告失败: {report_result.error}",
+                    "suggestion": "请检查数据文件是否正常",
+                }
+            )
+            return
+
+        save_result = generator.save_report(
+            report_content=report_result.content,
+            report_type=report_type,
+            output_dir=output_dir,
+        )
+
+        if save_result.get("success"):
+            print_status(
+                f"报告已保存至 {save_result.get('file_path', output_dir)}", "success"
+            )
+        else:
+            print_error(
+                {
+                    "message": f"保存报告失败: {save_result.get('error', '未知错误')}",
+                    "suggestion": "请检查输出目录是否有写入权限",
+                }
+            )
+
+    except Exception as e:
+        print_error(
+            {
+                "message": f"保存报告失败: {str(e)}",
+                "suggestion": "请检查输出目录路径是否正确",
+            }
+        )
 
 
 def _display_report(report_data: dict) -> None:
