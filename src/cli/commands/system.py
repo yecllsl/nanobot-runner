@@ -31,7 +31,7 @@ def init(
     引导用户完成首次配置，创建目录结构和配置文件。
     支持首次安装和升级迁移两种场景。
     """
-    from src.core.config import ConfigManager
+    from src.core.config.manager import ConfigManager
     from src.core.init.models import InitMode
     from src.core.init.wizard import InitWizard
 
@@ -107,7 +107,7 @@ def migrate(
 
     从旧版本（v0.8.x 或 v0.9.x）迁移配置和数据到当前版本。
     """
-    from src.core.config import ConfigManager
+    from src.core.config.manager import ConfigManager
     from src.core.migrate.engine import MigrationEngine
 
     config = ConfigManager(allow_default=True)
@@ -168,7 +168,7 @@ def validate(
 
     检查配置文件的格式、完整性、有效性和一致性。
     """
-    from src.core.config import ConfigManager
+    from src.core.config.manager import ConfigManager
     from src.core.validate.validator import ConfigValidator
 
     config = ConfigManager(allow_default=True)

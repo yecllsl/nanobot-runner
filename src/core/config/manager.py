@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from src.core.base.logger import get_logger
-from src.core.config_schema import AppConfig
+from src.core.config.schema import AppConfig
 
 logger = get_logger(__name__)
 
@@ -459,7 +459,7 @@ class ConfigManager:
         self.save_config(config)
 
         if api_key is not None:
-            from src.core.env_manager import EnvManager
+            from src.core.config.env_manager import EnvManager
 
             env_manager = EnvManager(env_file=self.base_dir / ".env.local")
             env_vars: dict[str, str] = {

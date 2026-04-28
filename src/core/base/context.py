@@ -7,8 +7,8 @@ from typing import Any
 
 from src.core.analytics import AnalyticsEngine
 from src.core.base.profile import ProfileEngine, ProfileStorageManager
-from src.core.config import ConfigManager
-from src.core.env_manager import EnvManager
+from src.core.config.env_manager import EnvManager
+from src.core.config.manager import ConfigManager
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.parser import FitParser

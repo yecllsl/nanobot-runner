@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.core.nanobot_config_sync import NanobotConfigSync, SyncResult
+from src.core.config.sync import NanobotConfigSync, SyncResult
 
 
 class TestSyncResult:

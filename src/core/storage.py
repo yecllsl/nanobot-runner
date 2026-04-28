@@ -27,7 +27,7 @@ class StorageManager:
             if config_dir:
                 # 如果设置了环境变量，从配置文件读取 data_dir
                 try:
-                    from src.core.config import ConfigManager
+                    from src.core.config.manager import ConfigManager
 
                     config_manager = ConfigManager()
                     self.data_dir = config_manager.data_dir

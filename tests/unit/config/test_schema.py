@@ -3,7 +3,7 @@
 
 import pytest
 
-from src.core.config_schema import AppConfig
+from src.core.config.schema import AppConfig
 
 
 class TestAppConfigValidate:

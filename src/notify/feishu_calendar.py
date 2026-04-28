@@ -10,7 +10,7 @@ from typing import Any
 import requests
 
 from src.cli.formatter import format_distance
-from src.core.config import ConfigManager
+from src.core.config.manager import ConfigManager
 from src.core.models import CalendarEventResult, DailyPlan, TrainingPlan
 
 logger = logging.getLogger(__name__)

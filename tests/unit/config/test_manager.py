@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.config import ConfigManager, config
+from src.core.config.manager import ConfigManager, config
 
 
 @pytest.fixture(autouse=True)

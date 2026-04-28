@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 import contextlib
 
 from src.core.base.context import AppContextFactory
-from src.core.config import ConfigManager
+from src.core.config.manager import ConfigManager
 from src.core.storage import StorageManager
 
 

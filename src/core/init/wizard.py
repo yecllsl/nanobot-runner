@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from src.core.base.logger import get_logger
-from src.core.config import ConfigManager
-from src.core.env_manager import EnvManager
+from src.core.config.env_manager import EnvManager
+from src.core.config.manager import ConfigManager
 from src.core.init.generator import ConfigGenerator
 from src.core.init.models import EnvironmentInfo, InitMode, InitResult, ValidationResult
 
@@ -320,7 +320,7 @@ class InitWizard:
         同步失败不影响项目功能，仅记录警告。
         """
         try:
-            from src.core.nanobot_config_sync import NanobotConfigSync
+            from src.core.config.sync import NanobotConfigSync
 
             sync = NanobotConfigSync(self.config)
             result = sync.sync_to_nanobot()

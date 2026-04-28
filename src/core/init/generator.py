@@ -6,7 +6,7 @@ from typing import Any
 
 from src.core.base.exceptions import ConfigError
 from src.core.base.logger import get_logger
-from src.core.env_manager import EnvManager
+from src.core.config.env_manager import EnvManager
 
 logger = get_logger(__name__)
 

@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.backup_manager import BackupManager
 from src.core.base.exceptions import StorageError
+from src.core.config.backup_manager import BackupManager
 from src.core.migrate.models import BackupInfo
 
 

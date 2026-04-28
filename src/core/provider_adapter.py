@@ -7,8 +7,8 @@ from typing import Any, Protocol
 
 from src.core.base.exceptions import LLMError
 from src.core.base.logger import get_logger
-from src.core.config import ConfigManager
-from src.core.llm_config import LLMConfig
+from src.core.config.llm_config import LLMConfig
+from src.core.config.manager import ConfigManager
 
 logger = get_logger(__name__)
 

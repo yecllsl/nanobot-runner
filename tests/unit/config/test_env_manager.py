@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.env_manager import EnvManager
+from src.core.config.env_manager import EnvManager
 
 
 class TestEnvManager:

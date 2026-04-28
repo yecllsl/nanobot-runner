@@ -1,8 +1,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from src.core.config.sync import NanobotConfigSync
 from src.core.init.migrate import ConfigMigrator
-from src.core.nanobot_config_sync import NanobotConfigSync
 
 
 class TestMigrationIntegration:
