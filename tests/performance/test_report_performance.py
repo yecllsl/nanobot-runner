@@ -14,7 +14,7 @@ import polars as pl
 import pytest
 
 from src.core.analytics import AnalyticsEngine
-from src.core.report_service import ReportService
+from src.core.report.service import ReportService
 from src.core.storage.parquet_manager import StorageManager
 from tests.conftest import create_mock_context
 

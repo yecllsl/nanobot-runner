@@ -5,7 +5,7 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from src.core.anomaly_data_filter import (
+from src.core.report.anomaly_filter import (
     ANOMALY_FILTER_RULES,
     AnomalyDataFilter,
     AnomalyFilterRule,

@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.anomaly_data_filter import AnomalyDataFilter
 from src.core.base.logger import get_logger
 from src.core.calculators.injury_risk_analyzer import InjuryRiskAnalyzer
 from src.core.calculators.training_history_analyzer import TrainingHistoryAnalyzer
 from src.core.models import FitnessLevel
+from src.core.report.anomaly_filter import AnomalyDataFilter
 from src.core.user_profile_manager import (
     InjuryRiskLevel,
     RunnerProfile,

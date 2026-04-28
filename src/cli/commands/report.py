@@ -272,7 +272,7 @@ def monthly(
 def _save_report_to_file(report_type: ReportType, age: int, output_dir: Path) -> None:
     """使用ReportGenerator生成Markdown报告并保存到文件"""
     from src.core.base.context import get_context
-    from src.core.report_generator import ReportGenerator
+    from src.core.report.generator import ReportGenerator
 
     try:
         context = get_context()

@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 
 from src.core.models import ReportData, ReportType
-from src.core.report_generator import ReportConfig, ReportGenerator, TemplateEngine
+from src.core.report.generator import ReportConfig, ReportGenerator, TemplateEngine
 
 
 class TestTemplateEngine:
@@ -660,7 +660,7 @@ class TestReportGeneratorAdvanced:
         mock_context.storage.read_parquet.return_value = mock_df.lazy()
         mock_context.analytics.calculate_tss_for_run.return_value = 100.0
 
-        from src.core.report_generator import ReportConfig
+        from src.core.report.generator import ReportConfig
 
         config = ReportConfig(
             report_type=ReportType.WEEKLY,

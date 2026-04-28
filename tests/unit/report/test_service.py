@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core.models import DailyReportData, OperationResult, ReportType
-from src.core.report_service import ReportService
+from src.core.report.service import ReportService
 from tests.conftest import create_mock_context
 
 
@@ -224,7 +224,7 @@ class TestReportServicePushReport:
 
         assert result.success is True
 
-    @patch("src.core.report_service.FeishuBot")
+    @patch("src.core.report.service.FeishuBot")
     def test_push_report_no_feishu(self, mock_feishu_bot):
         """测试未配置飞书机器人"""
         context = create_mock_context()

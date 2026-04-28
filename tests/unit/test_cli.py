@@ -729,7 +729,7 @@ class TestSaveReportToFile:
 
         with (
             patch("src.core.base.context.get_context") as mock_get_context,
-            patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
+            patch("src.core.report.generator.ReportGenerator") as mock_generator_cls,
         ):
             mock_context = Mock()
             mock_get_context.return_value = mock_context
@@ -770,7 +770,7 @@ class TestSaveReportToFile:
 
         with (
             patch("src.core.base.context.get_context") as mock_get_context,
-            patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
+            patch("src.core.report.generator.ReportGenerator") as mock_generator_cls,
         ):
             mock_context = Mock()
             mock_get_context.return_value = mock_context
@@ -800,7 +800,7 @@ class TestSaveReportToFile:
 
         with (
             patch("src.core.base.context.get_context") as mock_get_context,
-            patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
+            patch("src.core.report.generator.ReportGenerator") as mock_generator_cls,
         ):
             mock_context = Mock()
             mock_get_context.return_value = mock_context
