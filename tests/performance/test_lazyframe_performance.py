@@ -13,7 +13,7 @@ import polars as pl
 import pytest
 
 from src.core.analytics import AnalyticsEngine
-from src.core.storage import StorageManager
+from src.core.storage.parquet_manager import StorageManager
 
 
 class TestLazyFramePerformance:

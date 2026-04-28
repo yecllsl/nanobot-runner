@@ -26,7 +26,7 @@ import contextlib
 
 from src.core.base.context import AppContextFactory
 from src.core.config.manager import ConfigManager
-from src.core.session_repository import SessionRepository
+from src.core.storage.session_repository import SessionRepository
 
 
 class TestSessionRepositoryE2E:

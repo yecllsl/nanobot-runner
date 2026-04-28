@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from src.core.indexer import IndexManager
+from src.core.storage.indexer import IndexManager
 
 
 class TestIndexManager:

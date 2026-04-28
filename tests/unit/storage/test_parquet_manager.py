@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from src.core.base.exceptions import StorageError, ValidationError
-from src.core.storage import StorageManager
+from src.core.storage.parquet_manager import StorageManager
 
 
 class TestStorageManager:

@@ -10,7 +10,7 @@ import polars as pl
 import pytest
 
 from src.core.base.exceptions import ParseError, ValidationError
-from src.core.parser import FitParser
+from src.core.storage.parser import FitParser
 
 
 class MockFitMessage:

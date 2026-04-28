@@ -157,7 +157,7 @@ def require_storage(func: Callable) -> Callable:
     @wraps(func)
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         if self.storage is None:
-            from src.core.storage import StorageManager
+            from src.core.storage.parquet_manager import StorageManager
 
             self.storage = StorageManager()
         return func(self, *args, **kwargs)

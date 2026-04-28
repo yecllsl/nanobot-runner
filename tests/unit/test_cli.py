@@ -181,7 +181,9 @@ class TestCLIImportFile:
             fit_file = tmpdir_path / "test.fit"
             fit_file.write_text("dummy")
 
-            with patch("src.core.importer.ImportService") as mock_importer_class:
+            with patch(
+                "src.core.storage.importer.ImportService"
+            ) as mock_importer_class:
                 mock_importer = Mock()
                 mock_importer.import_file.return_value = {"status": "added"}
                 mock_importer_class.return_value = mock_importer
@@ -204,7 +206,9 @@ class TestCLIImportFile:
             tmpfile_path = Path(tmpfile.name)
 
         try:
-            with patch("src.core.importer.ImportService") as mock_importer_class:
+            with patch(
+                "src.core.storage.importer.ImportService"
+            ) as mock_importer_class:
                 mock_importer = Mock()
                 mock_importer.import_file.return_value = {"status": "added"}
                 mock_importer_class.return_value = mock_importer
@@ -222,7 +226,9 @@ class TestCLIImportFile:
             tmpfile_path = Path(tmpfile.name)
 
         try:
-            with patch("src.core.importer.ImportService") as mock_importer_class:
+            with patch(
+                "src.core.storage.importer.ImportService"
+            ) as mock_importer_class:
                 mock_importer = Mock()
                 mock_importer.import_file.return_value = {"status": "skipped"}
                 mock_importer_class.return_value = mock_importer
@@ -240,7 +246,9 @@ class TestCLIImportFile:
             tmpfile_path = Path(tmpfile.name)
 
         try:
-            with patch("src.core.importer.ImportService") as mock_importer_class:
+            with patch(
+                "src.core.storage.importer.ImportService"
+            ) as mock_importer_class:
                 mock_importer = Mock()
                 mock_importer.import_file.return_value = {
                     "status": "error",
@@ -260,7 +268,9 @@ class TestCLIImportFile:
             fit_file = tmpdir_path / "test.fit"
             fit_file.write_text("dummy")
 
-            with patch("src.core.importer.ImportService") as mock_importer_class:
+            with patch(
+                "src.core.storage.importer.ImportService"
+            ) as mock_importer_class:
                 mock_importer = Mock()
                 mock_importer.import_file.side_effect = [
                     {"status": "added"},

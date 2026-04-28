@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
-from src.core.session_repository import (
+from src.core.storage.session_repository import (
     SessionDetail,
     SessionRepository,
     SessionSummary,

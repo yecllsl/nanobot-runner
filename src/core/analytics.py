@@ -21,7 +21,7 @@ from src.core.models import (
 )
 
 if TYPE_CHECKING:
-    from src.core.storage import StorageManager
+    from src.core.storage.parquet_manager import StorageManager
 
 # VDOT 计算常量 (Jack Daniels 公式)
 VDOT_COEFFICIENT = 0.000104

@@ -13,7 +13,7 @@ import polars as pl
 from src.core.base.logger import get_logger
 
 if TYPE_CHECKING:
-    from src.core.storage import StorageManager
+    from src.core.storage.parquet_manager import StorageManager
 
 logger = get_logger(__name__)
 

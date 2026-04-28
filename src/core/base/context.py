@@ -9,13 +9,13 @@ from src.core.analytics import AnalyticsEngine
 from src.core.base.profile import ProfileEngine, ProfileStorageManager
 from src.core.config.env_manager import EnvManager
 from src.core.config.manager import ConfigManager
-from src.core.importer import ImportService
-from src.core.indexer import IndexManager
-from src.core.parser import FitParser
 from src.core.plan.plan_manager import PlanManager
 from src.core.report_service import ReportService
-from src.core.session_repository import SessionRepository
-from src.core.storage import StorageManager
+from src.core.storage.importer import ImportService
+from src.core.storage.indexer import IndexManager
+from src.core.storage.parquet_manager import StorageManager
+from src.core.storage.parser import FitParser
+from src.core.storage.session_repository import SessionRepository
 
 
 @dataclass

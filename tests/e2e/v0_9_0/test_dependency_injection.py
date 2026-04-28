@@ -25,7 +25,7 @@ import contextlib
 
 from src.core.base.context import AppContextFactory
 from src.core.config.manager import ConfigManager
-from src.core.storage import StorageManager
+from src.core.storage.parquet_manager import StorageManager
 
 
 class TestDependencyInjectionE2E:

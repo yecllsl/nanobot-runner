@@ -9,7 +9,7 @@ import polars as pl
 from src.core.models import PaceDistributionResult, RunningStats
 
 if TYPE_CHECKING:
-    from src.core.storage import StorageManager
+    from src.core.storage.parquet_manager import StorageManager
 
 
 class StatisticsAggregator:
