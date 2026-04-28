@@ -12,6 +12,7 @@ from src.cli.commands.report import profile_app
 from src.cli.commands.skill import app as skill_app
 from src.cli.commands.system import app as system_app
 from src.cli.commands.tools import app as tools_app
+from src.cli.commands.transparency import app as transparency_app
 
 __all__ = [
     "data_app",
@@ -25,4 +26,5 @@ __all__ = [
     "tools_app",
     "skill_app",
     "preference_app",
+    "transparency_app",
 ]

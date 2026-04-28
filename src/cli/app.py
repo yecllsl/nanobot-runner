@@ -14,6 +14,7 @@ from src.cli.commands import (
     skill_app,
     system_app,
     tools_app,
+    transparency_app,
 )
 
 app = typer.Typer(
@@ -32,6 +33,7 @@ app.add_typer(plan_app, name="plan")
 app.add_typer(tools_app, name="tools")
 app.add_typer(skill_app, name="skill")
 app.add_typer(preference_app, name="preference")
+app.add_typer(transparency_app, name="transparency")
 
 if __name__ == "__main__":
     app()

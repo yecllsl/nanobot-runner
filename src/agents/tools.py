@@ -1949,6 +1949,204 @@ class RunnerTools:
         except Exception as e:
             logger.warning(f"保存偏好到存储失败: {e}")
 
+    def explain_decision(
+        self,
+        decision_id: str | None = None,
+        detail_level: str = "brief",
+    ) -> dict[str, Any]:
+        """解释AI决策过程 - v0.15.0新增
+
+        Args:
+            decision_id: 决策ID（可选）
+            detail_level: 详细程度（brief/detailed）
+
+        Returns:
+            dict: 决策解释
+        """
+        try:
+            from src.core.transparency import DetailLevel
+
+            engine = self._get_transparency_engine()
+            if engine is None:
+                return {
+                    "success": False,
+                    "error": "透明化引擎未初始化",
+                }
+
+            if decision_id is not None:
+                decision = engine.get_decision(decision_id)
+                if decision is None:
+                    return {
+                        "success": False,
+                        "error": f"决策不存在: {decision_id}",
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": "无可用决策记录，请提供decision_id",
+                }
+
+            level = (
+                DetailLevel.DETAILED
+                if detail_level == "detailed"
+                else DetailLevel.BRIEF
+            )
+            explanation = engine.generate_explanation(decision, level)
+
+            return {
+                "success": True,
+                "data": {
+                    "decision_id": explanation.decision_id,
+                    "brief_reasons": explanation.brief_reasons,
+                    "confidence": explanation.confidence_score,
+                    "data_sources": [
+                        {
+                            "name": ds.name,
+                            "type": ds.type.value,
+                            "description": ds.description,
+                            "quality_score": ds.quality_score,
+                        }
+                        for ds in explanation.data_sources
+                    ],
+                    "decision_path": {
+                        "steps": [
+                            {
+                                "name": step.name,
+                                "description": step.description,
+                                "type": step.step_type,
+                            }
+                            for step in explanation.decision_path.steps
+                        ],
+                        "total_duration_ms": explanation.decision_path.total_duration_ms,
+                    },
+                    "detailed_analysis": explanation.detailed_analysis,
+                },
+            }
+        except Exception as e:
+            logger.error(f"解释决策失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def trace_data_sources(
+        self,
+        decision_id: str | None = None,
+    ) -> dict[str, Any]:
+        """追溯数据来源 - v0.15.0新增
+
+        Args:
+            decision_id: 决策ID（可选）
+
+        Returns:
+            dict: 数据来源信息
+        """
+        try:
+            engine = self._get_transparency_engine()
+            if engine is None:
+                return {
+                    "success": False,
+                    "error": "透明化引擎未初始化",
+                }
+
+            if decision_id is not None:
+                sources = engine.trace_data_sources(decision_id)
+                if not sources:
+                    return {
+                        "success": False,
+                        "error": f"决策不存在: {decision_id}",
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": "无可用决策记录，请提供decision_id",
+                }
+
+            return {
+                "success": True,
+                "data": {
+                    "decision_id": decision_id,
+                    "sources": [
+                        {
+                            "name": ds.name,
+                            "type": ds.type.value,
+                            "description": ds.description,
+                            "quality_score": ds.quality_score,
+                        }
+                        for ds in sources
+                    ],
+                },
+            }
+        except Exception as e:
+            logger.error(f"追溯数据来源失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_transparency_insight(
+        self,
+        include_metrics: bool = True,
+        include_recent_decisions: bool = True,
+        recent_limit: int = 5,
+    ) -> dict[str, Any]:
+        """获取透明化洞察 - v0.15.0新增
+
+        Args:
+            include_metrics: 是否包含可观测性指标
+            include_recent_decisions: 是否包含最近决策
+            recent_limit: 最近决策返回数量
+
+        Returns:
+            dict: 透明化洞察信息
+        """
+        try:
+            result: dict[str, Any] = {"success": True, "data": {}}
+
+            if include_metrics:
+                manager = self._get_observability_manager()
+                if manager is not None:
+                    metrics = manager.get_metrics()
+                    result["data"]["metrics"] = metrics.to_dict()
+
+            if include_recent_decisions:
+                trace_logger = self._get_trace_logger()
+                if trace_logger is not None:
+                    recent = trace_logger.get_decision_logs(recent_limit)
+                    result["data"]["recent_decisions"] = [
+                        {
+                            "timestamp": str(e.timestamp),
+                            "message": e.message,
+                            "level": e.level,
+                            "context": e.context,
+                        }
+                        for e in recent
+                    ]
+                    result["data"]["log_stats"] = trace_logger.get_stats()
+
+            return result
+        except Exception as e:
+            logger.error(f"获取透明化洞察失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _get_transparency_engine(self) -> Any:
+        """获取透明化引擎实例"""
+        if not hasattr(self, "_transparency_engine"):
+            from src.core.transparency import TransparencyEngine
+
+            self._transparency_engine: Any = TransparencyEngine()
+        return self._transparency_engine
+
+    def _get_observability_manager(self) -> Any:
+        """获取可观测性管理器实例"""
+        if not hasattr(self, "_observability_manager"):
+            from src.core.transparency import ObservabilityManager
+
+            self._observability_manager: Any = ObservabilityManager()
+        return self._observability_manager
+
+    def _get_trace_logger(self) -> Any:
+        """获取追踪日志记录器实例"""
+        if not hasattr(self, "_trace_logger"):
+            from src.core.transparency import TraceLogger
+
+            self._trace_logger: Any = TraceLogger()
+        return self._trace_logger
+
 
 class DiagnoseSuggestionTool(BaseTool):
     """诊断AI建议质量 - v0.14.0新增"""
@@ -2164,6 +2362,115 @@ class UpdateUserPreferencesTool(BaseTool):
         return self._run_sync(self.runner_tools.update_user_preferences, updates)
 
 
+class ExplainDecisionTool(BaseTool):
+    """解释AI决策过程 - v0.15.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "explain_decision"
+
+    @property
+    def description(self) -> str:
+        return "解释AI决策过程，展示思考过程和决策依据。当用户询问'为什么这么建议'、'你是怎么想的'、'解释一下你的建议'时使用此工具。返回JSON格式：{success: true, data: {decision_id, brief_reasons, confidence, data_sources, decision_path}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "decision_id": {
+                    "type": "string",
+                    "description": "决策ID（可选，不提供则解释最近一次决策）",
+                },
+                "detail_level": {
+                    "type": "string",
+                    "description": "详细程度（brief/detailed，默认brief）",
+                },
+            },
+            "required": [],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        decision_id = kwargs.get("decision_id")
+        detail_level = kwargs.get("detail_level", "brief")
+        return self._run_sync(
+            self.runner_tools.explain_decision, decision_id, detail_level
+        )
+
+
+class TraceDataSourcesTool(BaseTool):
+    """追溯数据来源 - v0.15.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "trace_data_sources"
+
+    @property
+    def description(self) -> str:
+        return "追溯AI决策使用的数据来源，展示决策基于哪些数据做出。当用户询问'你的数据来源是什么'、'这个建议基于什么数据'、'你怎么知道这些'时使用此工具。返回JSON格式：{success: true, data: {decision_id, sources: [{name, type, description, quality_score}]}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "decision_id": {
+                    "type": "string",
+                    "description": "决策ID（可选，不提供则追溯最近一次决策）",
+                },
+            },
+            "required": [],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        decision_id = kwargs.get("decision_id")
+        return self._run_sync(self.runner_tools.trace_data_sources, decision_id)
+
+
+class GetTransparencyInsightTool(BaseTool):
+    """获取透明化洞察 - v0.15.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_transparency_insight"
+
+    @property
+    def description(self) -> str:
+        return "获取AI透明化洞察信息，包括可观测性指标、决策统计、工具可靠性等。当用户询问'AI表现如何'、'你的决策质量怎么样'、'工具调用情况'时使用此工具。返回JSON格式：{success: true, data: {metrics: {total_traces, successful_traces, avg_duration_ms, error_rate, tool_success_rate}, recent_decisions, log_stats}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "include_metrics": {
+                    "type": "boolean",
+                    "description": "是否包含可观测性指标（默认true）",
+                },
+                "include_recent_decisions": {
+                    "type": "boolean",
+                    "description": "是否包含最近决策（默认true）",
+                },
+                "recent_limit": {
+                    "type": "integer",
+                    "description": "最近决策返回数量（默认5）",
+                },
+            },
+            "required": [],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        include_metrics = kwargs.get("include_metrics", True)
+        include_recent_decisions = kwargs.get("include_recent_decisions", True)
+        recent_limit = kwargs.get("recent_limit", 5)
+        return self._run_sync(
+            self.runner_tools.get_transparency_insight,
+            include_metrics,
+            include_recent_decisions,
+            recent_limit,
+        )
+
+
 def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
     return [
@@ -2192,6 +2499,9 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         RecordFeedbackTool(runner_tools),
         GetUserPreferencesTool(runner_tools),
         UpdateUserPreferencesTool(runner_tools),
+        ExplainDecisionTool(runner_tools),
+        TraceDataSourcesTool(runner_tools),
+        GetTransparencyInsightTool(runner_tools),
     ]
 
 
@@ -2363,6 +2673,27 @@ TOOL_DESCRIPTIONS = {
         "description": "直接更新用户偏好设置。当用户明确表达偏好变更时使用此工具，如'我喜欢简洁的回答'、'把训练强度调低'。返回JSON格式：{success: true, data: {updated_preferences}} 或 {success: false, error: 错误信息}",
         "parameters": {
             "updates": "偏好更新键值对，key为偏好字段名，value为新值（必填）",
+        },
+    },
+    "explain_decision": {
+        "description": "解释AI决策过程，展示思考过程和决策依据。当用户询问'为什么这么建议'、'你是怎么想的'、'解释一下你的建议'时使用此工具。返回JSON格式：{success: true, data: {decision_id, brief_reasons, confidence, data_sources, decision_path}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "decision_id": "决策ID（可选，不提供则解释最近一次决策）",
+            "detail_level": "详细程度（brief/detailed，默认brief）",
+        },
+    },
+    "trace_data_sources": {
+        "description": "追溯AI决策使用的数据来源，展示决策基于哪些数据做出。当用户询问'你的数据来源是什么'、'这个建议基于什么数据'、'你怎么知道这些'时使用此工具。返回JSON格式：{success: true, data: {decision_id, sources: [{name, type, description, quality_score}]}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "decision_id": "决策ID（可选，不提供则追溯最近一次决策）",
+        },
+    },
+    "get_transparency_insight": {
+        "description": "获取AI透明化洞察信息，包括可观测性指标、决策统计、工具可靠性等。当用户询问'AI表现如何'、'你的决策质量怎么样'、'工具调用情况'时使用此工具。返回JSON格式：{success: true, data: {metrics: {total_traces, successful_traces, avg_duration_ms, error_rate, tool_success_rate}, recent_decisions, log_stats}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "include_metrics": "是否包含可观测性指标（默认true）",
+            "include_recent_decisions": "是否包含最近决策（默认true）",
+            "recent_limit": "最近决策返回数量（默认5）",
         },
     },
 }
