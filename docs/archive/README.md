@@ -1,6 +1,56 @@
 # 版本文档归档
 
-本目录用于归档各版本的项目文档索引。**注意：实际的归档文件以.zip格式保存在本地，不提交到Git仓库。**
+> ⚠️ **重要说明**：虽然归档目录中的文件以 `.zip` 格式本地保存、不提交到 Git，但**所有文档的 Git 历史记录仍然完整保留**，可通过以下方式追溯。
+
+---
+
+## 🔍 如何查找归档前的文档
+
+### 方法一：查看文档的完整 Git 历史
+
+```bash
+# 查看 docs/archive/ 目录下所有文件的提交历史
+git log --oneline --all -- docs/archive/
+
+# 查看特定文档（如测试报告）的历史
+git log --oneline --all -- "docs/archive/v0.12.0/test/测试报告_v0.12.md"
+
+# 查看某个版本目录的所有提交
+git log --oneline --all --grep="v0.12.0" -- docs/archive/
+```
+
+### 方法二：查看特定版本的文档快照
+
+```bash
+# 查看 v0.12.0 目录在某个提交时的状态
+git show <commit-sha>:docs/archive/v0.12.0/
+
+# 查看特定文件在特定版本的内容
+git show <commit-sha>:docs/archive/v0.12.0/test/测试报告_v0.12.md
+```
+
+### 方法三：恢复已删除的归档文件
+
+```bash
+# 查找删除 v0.12.0 目录的提交
+git log --oneline --all -- "docs/archive/v0.12.0/"
+
+# 恢复特定文件到本地（不恢复目录结构）
+git show <commit-sha>:docs/archive/v0.12.0/test/测试报告_v0.12.md > 恢复的文件.md
+
+# 恢复整个目录
+git checkout <commit-sha> -- docs/archive/v0.12.0/
+```
+
+### 方法四：搜索包含特定关键词的文档
+
+```bash
+# 在 Git 历史中搜索包含特定内容的文档
+git log -p --all -- "docs/archive/*.md" | grep -B5 -A5 "关键词"
+
+# 在归档目录的历史提交中搜索
+git log -S "搜索的关键词" --oneline --all -- docs/archive/
+```
 
 ---
 
