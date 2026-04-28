@@ -61,12 +61,15 @@ class CLIError:
         }
 
 
-def print_error(error_info: dict[str, Any]) -> None:
+def print_error(error_info: dict[str, Any] | str) -> None:
     """打印带恢复建议的错误消息
 
     Args:
-        error_info: 错误信息字典，包含 message 和 suggestion 键
+        error_info: 错误信息字典（包含 message 和 suggestion 键）或字符串
     """
+    if isinstance(error_info, str):
+        console.print(f"[red bold]错误:[/red bold] {error_info}")
+        return
     console.print(f"[red bold]错误:[/red bold] {error_info['message']}")
     console.print(f"[yellow]建议:[/yellow] {error_info['suggestion']}")
 

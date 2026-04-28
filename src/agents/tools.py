@@ -7,7 +7,10 @@ import json
 import logging
 from abc import abstractmethod
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.core.personality import UserPreferences
 
 import polars as pl
 from nanobot.agent.tools.base import Tool
@@ -1689,6 +1692,477 @@ class RunnerTools:
             last_run_date=last_run_date,
         )
 
+    def diagnose_suggestion(
+        self,
+        user_query: str,
+        suggestion_text: str,
+        tools_used: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """验证AI建议质量 - v0.14.0新增
+
+        Args:
+            user_query: 用户原始查询
+            suggestion_text: AI生成的建议文本
+            tools_used: 使用的工具列表
+
+        Returns:
+            dict: 诊断报告
+        """
+        try:
+            from src.core.diagnosis import SelfDiagnosis, SuggestionContext
+
+            diagnosis = SelfDiagnosis()
+            context = SuggestionContext(
+                user_query=user_query,
+                suggestion_text=suggestion_text,
+                tools_used=tools_used or [],
+            )
+            report = diagnosis.validate_suggestion(context)
+
+            return {
+                "success": True,
+                "data": report.to_dict(),
+            }
+        except Exception as e:
+            logger.error(f"建议诊断失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def diagnose_error(self, error_message: str) -> dict[str, Any]:
+        """诊断错误原因 - v0.14.0新增
+
+        Args:
+            error_message: 错误信息
+
+        Returns:
+            dict: 诊断报告
+        """
+        try:
+            from src.core.diagnosis import SelfDiagnosis
+
+            diagnosis = SelfDiagnosis()
+            report = diagnosis.diagnose_error(error_message)
+
+            return {
+                "success": True,
+                "data": report.to_dict(),
+            }
+        except Exception as e:
+            logger.error(f"错误诊断失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_personalized_suggestion(
+        self,
+        suggestion_text: str,
+        suggestion_type: str = "general",
+    ) -> dict[str, Any]:
+        """获取个性化建议 - v0.14.0新增
+
+        Args:
+            suggestion_text: 原始建议文本
+            suggestion_type: 建议类型
+
+        Returns:
+            dict: 个性化建议
+        """
+        try:
+            from src.core.context import get_context
+            from src.core.personality import (
+                PersonalizationEngine,
+                SuggestionType,
+            )
+
+            context = get_context()
+            preferences = self._load_preferences(context)
+
+            engine = PersonalizationEngine(preferences=preferences)
+            st = (
+                SuggestionType(suggestion_type)
+                if suggestion_type
+                else SuggestionType.GENERAL
+            )
+            suggestion = engine.personalize_suggestion(suggestion_text, st)
+
+            return {
+                "success": True,
+                "data": suggestion.to_dict(),
+            }
+        except Exception as e:
+            logger.error(f"获取个性化建议失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def record_feedback(
+        self,
+        feedback_type: str,
+        content: str,
+        preference_category: str = "communication_style",
+        suggestion_id: str = "",
+    ) -> dict[str, Any]:
+        """记录用户反馈 - v0.14.0新增
+
+        Args:
+            feedback_type: 反馈类型
+            content: 反馈内容
+            preference_category: 偏好类别
+            suggestion_id: 关联的建议ID
+
+        Returns:
+            dict: 反馈记录结果
+        """
+        try:
+            from src.core.context import get_context
+            from src.core.personality import (
+                FeedbackLoop,
+                FeedbackType,
+                PreferenceCategory,
+                PreferenceLearner,
+            )
+
+            context = get_context()
+            preferences = self._load_preferences(context)
+
+            learner = PreferenceLearner(preferences=preferences)
+            loop = FeedbackLoop(learner)
+
+            ft = FeedbackType(feedback_type)
+            pc = PreferenceCategory(preference_category)
+
+            feedback = loop.collect_feedback(
+                feedback_type=ft,
+                content=content,
+                suggestion_id=suggestion_id,
+                preference_category=pc,
+            )
+
+            new_preferences = loop.process_feedback(feedback)
+
+            self._save_preferences(context, new_preferences)
+
+            return {
+                "success": True,
+                "data": {
+                    "feedback_id": feedback.id,
+                    "feedback_type": feedback.feedback_type.value,
+                    "preference_updated": True,
+                    "current_preferences": new_preferences.to_dict(),
+                },
+            }
+        except Exception as e:
+            logger.error(f"记录反馈失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_preferences(self) -> dict[str, Any]:
+        """获取用户偏好 - v0.14.0新增
+
+        Returns:
+            dict: 用户偏好
+        """
+        try:
+            from src.core.context import get_context
+
+            context = get_context()
+            preferences = self._load_preferences(context)
+
+            return {
+                "success": True,
+                "data": preferences.to_dict(),
+            }
+        except Exception as e:
+            logger.error(f"获取用户偏好失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_user_preferences(self, updates: dict[str, str]) -> dict[str, Any]:
+        """更新用户偏好 - v0.14.0新增
+
+        Args:
+            updates: 偏好更新键值对
+
+        Returns:
+            dict: 更新结果
+        """
+        try:
+            from src.core.context import get_context
+            from src.core.personality import PreferenceLearner
+
+            context = get_context()
+            preferences = self._load_preferences(context)
+
+            learner = PreferenceLearner(preferences=preferences)
+            new_preferences = learner.update_preference_model(updates)
+
+            self._save_preferences(context, new_preferences)
+
+            return {
+                "success": True,
+                "data": {
+                    "updated_preferences": new_preferences.to_dict(),
+                },
+            }
+        except Exception as e:
+            logger.error(f"更新用户偏好失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _load_preferences(self, context: Any) -> UserPreferences:
+        """从存储加载用户偏好
+
+        Args:
+            context: 应用上下文
+
+        Returns:
+            UserPreferences: 用户偏好
+        """
+        from src.core.personality import UserPreferences
+
+        try:
+            profile = self.profile_storage.load_profile_json()
+            if profile is not None:
+                profile_dict = profile.to_dict() if hasattr(profile, "to_dict") else {}
+                pref_data = profile_dict.get("preferences", {})
+                if pref_data:
+                    return UserPreferences.from_dict(pref_data)
+        except Exception:
+            pass
+
+        return UserPreferences.default()
+
+    def _save_preferences(self, context: Any, preferences: UserPreferences) -> None:
+        """保存用户偏好到存储
+
+        Args:
+            context: 应用上下文
+            preferences: 用户偏好
+        """
+        try:
+            profile = self.profile_storage.load_profile_json()
+            if profile is not None and hasattr(profile, "to_dict"):
+                profile_dict = profile.to_dict()
+            else:
+                profile_dict = {}
+
+            profile_dict["preferences"] = preferences.to_dict()
+
+            # 将 dict 转换回 RunnerProfile 对象以满足类型要求
+            if hasattr(self.profile_storage, "save_profile_json") and hasattr(
+                self.profile_storage, "_dict_to_profile"
+            ):
+                profile_obj = self.profile_storage._dict_to_profile(profile_dict)
+                self.profile_storage.save_profile_json(profile_obj)
+        except Exception as e:
+            logger.warning(f"保存偏好到存储失败: {e}")
+
+
+class DiagnoseSuggestionTool(BaseTool):
+    """诊断AI建议质量 - v0.14.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "diagnose_suggestion"
+
+    @property
+    def description(self) -> str:
+        return "验证AI建议质量，检查建议的完整性、相关性、安全性和可执行性。当AI需要自我检查建议质量、诊断错误原因时使用此工具。返回JSON格式：{success: true, data: {report_id, category, overall_status, pass_count, fail_count, results: [{rule_name, status, message, severity, suggestion_fix}]}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "user_query": {
+                    "type": "string",
+                    "description": "用户原始查询",
+                },
+                "suggestion_text": {
+                    "type": "string",
+                    "description": "AI生成的建议文本",
+                },
+                "tools_used": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "使用的工具列表（可选）",
+                },
+            },
+            "required": ["user_query", "suggestion_text"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        user_query = kwargs.get("user_query", "")
+        suggestion_text = kwargs.get("suggestion_text", "")
+        tools_used = kwargs.get("tools_used", [])
+        return self._run_sync(
+            self.runner_tools.diagnose_suggestion,
+            user_query,
+            suggestion_text,
+            tools_used,
+        )
+
+
+class DiagnoseErrorTool(BaseTool):
+    """诊断错误原因 - v0.14.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "diagnose_error"
+
+    @property
+    def description(self) -> str:
+        return "诊断错误原因，分析错误根因并给出修复建议。当AI遇到执行错误、工具调用失败时使用此工具进行自我诊断。返回JSON格式：{success: true, data: {report_id, category, overall_status, results: [{rule_name, status, message, severity, suggestion_fix}]}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "error_message": {
+                    "type": "string",
+                    "description": "错误信息",
+                },
+            },
+            "required": ["error_message"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        error_message = kwargs.get("error_message", "")
+        return self._run_sync(self.runner_tools.diagnose_error, error_message)
+
+
+class GetPersonalizedSuggestionTool(BaseTool):
+    """获取个性化建议 - v0.14.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_personalized_suggestion"
+
+    @property
+    def description(self) -> str:
+        return "根据用户偏好对建议进行个性化调整。当AI需要根据用户偏好调整建议风格、强度、详细程度时使用此工具。返回JSON格式：{success: true, data: {id, original_text, personalized_text, suggestion_type, confidence, preference_factors}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "suggestion_text": {
+                    "type": "string",
+                    "description": "原始建议文本",
+                },
+                "suggestion_type": {
+                    "type": "string",
+                    "description": "建议类型（training_plan/recovery_advice/pace_guidance/weather_advice/nutrition_tip/injury_prevention/general，默认general）",
+                },
+            },
+            "required": ["suggestion_text"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        suggestion_text = kwargs.get("suggestion_text", "")
+        suggestion_type = kwargs.get("suggestion_type", "general")
+        return self._run_sync(
+            self.runner_tools.get_personalized_suggestion,
+            suggestion_text,
+            suggestion_type,
+        )
+
+
+class RecordFeedbackTool(BaseTool):
+    """记录用户反馈 - v0.14.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "record_feedback"
+
+    @property
+    def description(self) -> str:
+        return "记录用户对AI建议的反馈，用于偏好学习和个性化进化。当用户对建议表达满意、不满或修正意见时使用此工具。返回JSON格式：{success: true, data: {feedback_id, feedback_type, preference_updated, current_preferences}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "feedback_type": {
+                    "type": "string",
+                    "description": "反馈类型（positive/negative/neutral/correction）",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "反馈内容",
+                },
+                "preference_category": {
+                    "type": "string",
+                    "description": "偏好类别（training_time/training_intensity/communication_style/suggestion_frequency/detail_preference/pace_preference/distance_preference/weather_sensitivity，默认communication_style）",
+                },
+                "suggestion_id": {
+                    "type": "string",
+                    "description": "关联的建议ID（可选）",
+                },
+            },
+            "required": ["feedback_type", "content"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        feedback_type = kwargs.get("feedback_type", "neutral")
+        content = kwargs.get("content", "")
+        preference_category = kwargs.get("preference_category", "communication_style")
+        suggestion_id = kwargs.get("suggestion_id", "")
+        return self._run_sync(
+            self.runner_tools.record_feedback,
+            feedback_type,
+            content,
+            preference_category,
+            suggestion_id,
+        )
+
+
+class GetUserPreferencesTool(BaseTool):
+    """获取用户偏好 - v0.14.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_user_preferences"
+
+    @property
+    def description(self) -> str:
+        return "获取当前用户的偏好设置，包括训练时段、强度偏好、沟通风格等。当AI需要了解用户偏好以提供更个性化的建议时使用此工具。返回JSON格式：{success: true, data: {training_time, training_intensity, communication_style, suggestion_frequency, detail_preference, pace_preference, distance_preference, weather_sensitivity, custom_preferences}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {},
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(self.runner_tools.get_user_preferences)
+
+
+class UpdateUserPreferencesTool(BaseTool):
+    """更新用户偏好 - v0.14.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "update_user_preferences"
+
+    @property
+    def description(self) -> str:
+        return "直接更新用户偏好设置。当用户明确表达偏好变更时使用此工具，如'我喜欢简洁的回答'、'把训练强度调低'。返回JSON格式：{success: true, data: {updated_preferences}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "updates": {
+                    "type": "object",
+                    "description": "偏好更新键值对，key为偏好字段名（training_time/training_intensity/communication_style/suggestion_frequency/detail_preference/pace_preference/distance_preference/weather_sensitivity），value为新值",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            "required": ["updates"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        updates = kwargs.get("updates", {})
+        return self._run_sync(self.runner_tools.update_user_preferences, updates)
+
 
 def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
     """创建工具实例列表（供 nanobot-ai 使用）"""
@@ -1712,6 +2186,12 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         CreateLongTermPlanTool(runner_tools),
         GetSmartTrainingAdviceTool(runner_tools),
         GetWeatherTrainingAdviceTool(runner_tools),
+        DiagnoseSuggestionTool(runner_tools),
+        DiagnoseErrorTool(runner_tools),
+        GetPersonalizedSuggestionTool(runner_tools),
+        RecordFeedbackTool(runner_tools),
+        GetUserPreferencesTool(runner_tools),
+        UpdateUserPreferencesTool(runner_tools),
     ]
 
 
@@ -1843,6 +2323,46 @@ TOOL_DESCRIPTIONS = {
             "wind": "风力描述（可选）",
             "precipitation": "降水概率（百分比，0-100，可选）",
             "uv_index": "紫外线指数（可选）",
+        },
+    },
+    "diagnose_suggestion": {
+        "description": "验证AI建议质量，检查建议的完整性、相关性、安全性和可执行性。当AI需要自我检查建议质量时使用此工具。返回JSON格式：{success: true, data: {id, category, overall_status, pass_count, fail_count, results}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "user_query": "用户原始查询（必填）",
+            "suggestion_text": "AI生成的建议文本（必填）",
+            "tools_used": "使用的工具列表（可选）",
+        },
+    },
+    "diagnose_error": {
+        "description": "诊断错误原因，分析错误根因并给出修复建议。当AI遇到执行错误、工具调用失败时使用此工具进行自我诊断。返回JSON格式：{success: true, data: {id, category, overall_status, results}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "error_message": "错误信息（必填）",
+        },
+    },
+    "get_personalized_suggestion": {
+        "description": "根据用户偏好对建议进行个性化调整。当AI需要根据用户偏好调整建议风格、强度、详细程度时使用此工具。返回JSON格式：{success: true, data: {id, original_text, personalized_text, suggestion_type, confidence, preference_factors}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "suggestion_text": "原始建议文本（必填）",
+            "suggestion_type": "建议类型（training_plan/recovery_advice/pace_guidance/weather_advice/nutrition_tip/injury_prevention/general，默认general）",
+        },
+    },
+    "record_feedback": {
+        "description": "记录用户对AI建议的反馈，用于偏好学习和个性化进化。当用户对建议表达满意、不满或修正意见时使用此工具。返回JSON格式：{success: true, data: {feedback_id, feedback_type, preference_updated, current_preferences}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "feedback_type": "反馈类型（positive/negative/neutral/correction，必填）",
+            "content": "反馈内容（必填）",
+            "preference_category": "偏好类别（training_time/training_intensity/communication_style/suggestion_frequency/detail_preference/pace_preference/distance_preference/weather_sensitivity，默认communication_style）",
+            "suggestion_id": "关联的建议ID（可选）",
+        },
+    },
+    "get_user_preferences": {
+        "description": "获取当前用户的偏好设置，包括训练时段、强度偏好、沟通风格等。当AI需要了解用户偏好以提供更个性化的建议时使用此工具。返回JSON格式：{success: true, data: {training_time, training_intensity, communication_style, suggestion_frequency, detail_preference, pace_preference, distance_preference, weather_sensitivity}} 或 {success: false, error: 错误信息}",
+        "parameters": {},
+    },
+    "update_user_preferences": {
+        "description": "直接更新用户偏好设置。当用户明确表达偏好变更时使用此工具，如'我喜欢简洁的回答'、'把训练强度调低'。返回JSON格式：{success: true, data: {updated_preferences}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "updates": "偏好更新键值对，key为偏好字段名，value为新值（必填）",
         },
     },
 }

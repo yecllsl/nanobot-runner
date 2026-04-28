@@ -9,6 +9,7 @@ from src.cli.commands import (
     data_app,
     gateway_app,
     plan_app,
+    preference_app,
     report_app,
     skill_app,
     system_app,
@@ -30,6 +31,7 @@ app.add_typer(gateway_app, name="gateway")
 app.add_typer(plan_app, name="plan")
 app.add_typer(tools_app, name="tools")
 app.add_typer(skill_app, name="skill")
+app.add_typer(preference_app, name="preference")
 
 if __name__ == "__main__":
     app()
