@@ -4,7 +4,7 @@
 from typing import Any
 
 from src.agents.tools import RunnerTools
-from src.core.context import AppContext, AppContextFactory
+from src.core.base.context import AppContext, AppContextFactory
 
 
 class AnalysisHandler:

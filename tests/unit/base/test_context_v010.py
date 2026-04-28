@@ -3,7 +3,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from src.core.context import (
+from src.core.base.context import (
     get_context,
     reset_context,
     set_context,

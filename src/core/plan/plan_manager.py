@@ -7,11 +7,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from src.core.exceptions import NanobotRunnerError
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import PlanStatus, TrainingPlan
 
 if TYPE_CHECKING:
-    from src.core.context import AppContext
+    from src.core.base.context import AppContext
 
 logger = logging.getLogger(__name__)
 

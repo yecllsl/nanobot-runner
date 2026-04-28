@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import ReportData, ReportType
 
 if TYPE_CHECKING:
-    from src.core.context import AppContext
+    from src.core.base.context import AppContext
 
 logger = get_logger(__name__)
 
@@ -949,7 +949,7 @@ def generate_weekly_report(
     Returns:
         Dict[str, Any]: 报告数据
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     context = get_context()
     generator = ReportGenerator(context)
@@ -977,7 +977,7 @@ def generate_monthly_report(
     Returns:
         Dict[str, Any]: 报告数据
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     context = get_context()
     generator = ReportGenerator(context)
@@ -1005,7 +1005,7 @@ def generate_training_cycle_report(
     Returns:
         Dict[str, Any]: 报告数据
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     context = get_context()
     generator = ReportGenerator(context)

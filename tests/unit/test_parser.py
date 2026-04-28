@@ -9,7 +9,7 @@ from unittest.mock import Mock, PropertyMock, patch
 import polars as pl
 import pytest
 
-from src.core.exceptions import ParseError, ValidationError
+from src.core.base.exceptions import ParseError, ValidationError
 from src.core.parser import FitParser
 
 

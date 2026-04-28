@@ -6,8 +6,8 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
-from src.core.exceptions import NanobotRunnerError, ValidationError
-from src.core.result import ToolResult
+from src.core.base.exceptions import NanobotRunnerError, ValidationError
+from src.core.base.result import ToolResult
 
 logger = logging.getLogger(__name__)
 

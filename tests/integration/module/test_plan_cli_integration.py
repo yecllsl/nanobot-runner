@@ -30,7 +30,7 @@ class TestPlanLogCommand:
         result = runner.invoke(app, ["plan", "log", "plan_test"])
         assert result.exit_code != 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_log_success(self, mock_get_context):
         """测试正常记录执行反馈"""
         mock_context = MagicMock()
@@ -61,7 +61,7 @@ class TestPlanLogCommand:
         assert result.exit_code == 0
         assert "OK" in result.output or "记录" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_log_with_notes(self, mock_get_context):
         """测试带备注的记录"""
         mock_context = MagicMock()
@@ -93,7 +93,7 @@ class TestPlanLogCommand:
 
         assert result.exit_code == 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_log_plan_not_found(self, mock_get_context):
         """测试计划不存在"""
         mock_context = MagicMock()
@@ -111,7 +111,7 @@ class TestPlanLogCommand:
 
         assert result.exit_code != 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_log_with_distance_and_duration(self, mock_get_context):
         """测试带实际距离和时长"""
         mock_context = MagicMock()
@@ -158,7 +158,7 @@ class TestPlanStatsCommand:
         result = runner.invoke(app, ["plan", "stats"])
         assert result.exit_code != 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_stats_success(self, mock_get_context):
         """测试正常查询执行统计"""
         mock_context = MagicMock()
@@ -185,7 +185,7 @@ class TestPlanStatsCommand:
         assert "28" in result.output
         assert "20" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_stats_plan_not_found(self, mock_get_context):
         """测试计划不存在"""
         mock_context = MagicMock()

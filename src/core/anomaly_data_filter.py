@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import polars as pl
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
 

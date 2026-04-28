@@ -8,11 +8,11 @@ import polars as pl
 from rich.console import Console
 from rich.progress import Progress, TaskID
 
-from src.core.exceptions import ParseError
-from src.core.logger import get_logger
+from src.core.base.exceptions import ParseError
+from src.core.base.logger import get_logger
 
 if TYPE_CHECKING:
-    from src.core.context import AppContext
+    from src.core.base.context import AppContext
 
 logger = get_logger(__name__)
 

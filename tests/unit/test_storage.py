@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from src.core.exceptions import StorageError, ValidationError
+from src.core.base.exceptions import StorageError, ValidationError
 from src.core.storage import StorageManager
 
 

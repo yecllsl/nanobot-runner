@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 import polars as pl
 from nanobot.agent.tools.base import Tool
 
-from src.core.context import AppContext, AppContextFactory
+from src.core.base.context import AppContext, AppContextFactory
 from src.core.tools.weather_training_coordinator import TrainingData
 
 logger = logging.getLogger(__name__)
@@ -1261,7 +1261,7 @@ class RunnerTools:
             dict: 记录结果
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
 
             context = get_context()
             plan_manager = context.plan_manager
@@ -1290,7 +1290,7 @@ class RunnerTools:
             dict: 执行统计数据
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
 
             context = get_context()
             execution_repo = context.plan_execution_repo
@@ -1310,7 +1310,7 @@ class RunnerTools:
             dict: 训练响应分析结果
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
 
             context = get_context()
             analyzer = context.training_response_analyzer
@@ -1336,7 +1336,7 @@ class RunnerTools:
             dict: 调整结果
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
 
             context = get_context()
             validator = context.plan_adjustment_validator
@@ -1383,7 +1383,7 @@ class RunnerTools:
             dict: 调整建议
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
 
             context = get_context()
             execution_repo = context.plan_execution_repo
@@ -1765,7 +1765,7 @@ class RunnerTools:
             dict: 个性化建议
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
             from src.core.personality import (
                 PersonalizationEngine,
                 SuggestionType,
@@ -1809,7 +1809,7 @@ class RunnerTools:
             dict: 反馈记录结果
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
             from src.core.personality import (
                 FeedbackLoop,
                 FeedbackType,
@@ -1857,7 +1857,7 @@ class RunnerTools:
             dict: 用户偏好
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
 
             context = get_context()
             preferences = self._load_preferences(context)
@@ -1880,7 +1880,7 @@ class RunnerTools:
             dict: 更新结果
         """
         try:
-            from src.core.context import get_context
+            from src.core.base.context import get_context
             from src.core.personality import PreferenceLearner
 
             context = get_context()

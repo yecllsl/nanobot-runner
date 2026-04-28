@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.user_profile_manager import (
     InjuryRiskLevel,
     RunnerProfile,

@@ -10,7 +10,7 @@ app = typer.Typer(help="偏好管理命令")
 
 def _get_preference_learner():
     """获取偏好学习器实例"""
-    from src.core.context import AppContextFactory
+    from src.core.base.context import AppContextFactory
     from src.core.personality import PreferenceLearner, UserPreferences
 
     context = AppContextFactory.create()

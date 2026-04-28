@@ -6,6 +6,7 @@
 
 from datetime import datetime, timedelta
 
+from src.core.base.profile import RunnerProfile
 from src.core.models import (
     DailyPlan,
     TrainingLoad,
@@ -14,7 +15,6 @@ from src.core.models import (
     UserPreferences,
     WeeklySchedule,
 )
-from src.core.profile import RunnerProfile
 
 
 def create_test_user_context() -> UserContext:

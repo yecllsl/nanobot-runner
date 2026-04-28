@@ -7,13 +7,13 @@ from unittest.mock import Mock, patch
 import polars as pl
 import pytest
 
-from src.core.models import FitnessLevel
-from src.core.profile import (
+from src.core.base.profile import (
     AnomalyFilterRule,
     ProfileEngine,
     ProfileStaleStatus,
     RunnerProfile,
 )
+from src.core.models import FitnessLevel
 from src.core.user_profile_manager import InjuryRiskLevel, TrainingPattern
 
 

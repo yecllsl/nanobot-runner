@@ -375,7 +375,7 @@ class TestCLIReport:
 
     def test_report_status_not_configured(self):
         """测试查看未配置的定时推送状态"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.get_schedule_status.return_value = ScheduleStatus(
@@ -391,7 +391,7 @@ class TestCLIReport:
 
     def test_report_status_configured(self):
         """测试查看已配置的定时推送状态"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.get_schedule_status.return_value = ScheduleStatus(
@@ -409,7 +409,7 @@ class TestCLIReport:
 
     def test_report_status_disabled(self):
         """测试查看已禁用的定时推送状态"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.get_schedule_status.return_value = ScheduleStatus(
@@ -427,7 +427,7 @@ class TestCLIReport:
 
     def test_report_schedule_success(self):
         """测试配置定时推送成功"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.schedule_report.return_value = OperationResult(
@@ -443,7 +443,7 @@ class TestCLIReport:
 
     def test_report_schedule_invalid_time(self):
         """测试配置定时推送无效时间"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.schedule_report.return_value = OperationResult(
@@ -458,7 +458,7 @@ class TestCLIReport:
 
     def test_report_enable_success(self):
         """测试启用定时推送成功"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.enable_schedule.return_value = OperationResult(
@@ -473,7 +473,7 @@ class TestCLIReport:
 
     def test_report_disable_success(self):
         """测试禁用定时推送成功"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.enable_schedule.return_value = OperationResult(
@@ -488,7 +488,7 @@ class TestCLIReport:
 
     def test_report_enable_no_job(self):
         """测试启用时没有定时任务"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.enable_schedule.return_value = {
@@ -503,7 +503,7 @@ class TestCLIReport:
 
     def test_report_generate_success(self):
         """测试生成晨报成功"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.run_report_now.return_value = {
@@ -530,7 +530,7 @@ class TestCLIReport:
 
     def test_report_generate_with_push(self):
         """测试生成晨报并推送"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.run_report_now.return_value = {
@@ -552,7 +552,7 @@ class TestCLIReport:
 
     def test_report_generate_with_push_failed(self):
         """测试生成晨报推送失败"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.run_report_now.return_value = {
@@ -574,7 +574,7 @@ class TestCLIReport:
 
     def test_report_generate_error(self):
         """测试生成晨报失败"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.run_report_now.return_value = {
@@ -589,7 +589,7 @@ class TestCLIReport:
 
     def test_report_with_custom_age(self):
         """测试使用自定义年龄生成晨报"""
-        with patch("src.core.context.get_context") as mock_get_context:
+        with patch("src.core.base.context.get_context") as mock_get_context:
             mock_context = Mock()
             mock_service = Mock()
             mock_service.run_report_now.return_value = {
@@ -627,7 +627,7 @@ class TestCLIReport:
         from src.core.models import WeeklyReportData
 
         with (
-            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.base.context.get_context") as mock_get_context,
             patch("src.cli.commands.report._save_report_to_file") as mock_save,
         ):
             mock_context = Mock()
@@ -653,7 +653,7 @@ class TestCLIReport:
         from src.core.models import MonthlyReportData
 
         with (
-            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.base.context.get_context") as mock_get_context,
             patch("src.cli.commands.report._save_report_to_file") as mock_save,
         ):
             mock_context = Mock()
@@ -679,7 +679,7 @@ class TestCLIReport:
         from src.core.models import WeeklyReportData
 
         with (
-            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.base.context.get_context") as mock_get_context,
             patch("src.cli.commands.report._save_report_to_file") as mock_save,
         ):
             mock_context = Mock()
@@ -718,7 +718,7 @@ class TestSaveReportToFile:
         )
 
         with (
-            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.base.context.get_context") as mock_get_context,
             patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
         ):
             mock_context = Mock()
@@ -759,7 +759,7 @@ class TestSaveReportToFile:
         )
 
         with (
-            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.base.context.get_context") as mock_get_context,
             patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
         ):
             mock_context = Mock()
@@ -789,7 +789,7 @@ class TestSaveReportToFile:
         )
 
         with (
-            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.base.context.get_context") as mock_get_context,
             patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
         ):
             mock_context = Mock()
@@ -928,12 +928,14 @@ class TestCLIProfileShow:
 
     def test_profile_show_no_data(self):
         """测试 profile show 无数据"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_storage_instance.load_profile_json.return_value = None
             mock_profile_storage.return_value = mock_storage_instance
 
-            with patch("src.core.profile.ProfileEngine") as mock_engine:
+            with patch("src.core.base.profile.ProfileEngine") as mock_engine:
                 mock_engine_instance = Mock()
                 mock_profile = Mock()
                 mock_profile.total_activities = 0
@@ -946,7 +948,9 @@ class TestCLIProfileShow:
 
     def test_profile_show_with_data(self):
         """测试 profile show 有数据"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_profile = Mock()
             mock_profile.user_id = "test_user"
@@ -993,13 +997,15 @@ class TestCLIProfileShow:
 
             with (
                 patch("src.core.storage.StorageManager"),
-                patch("src.core.profile.ProfileStorageManager") as mock_profile_storage,
+                patch(
+                    "src.core.base.profile.ProfileStorageManager"
+                ) as mock_profile_storage,
             ):
                 mock_storage_instance = Mock()
                 mock_storage_instance.load_profile_json.return_value = None
                 mock_profile_storage.return_value = mock_storage_instance
 
-                with patch("src.core.profile.ProfileEngine") as mock_engine:
+                with patch("src.core.base.profile.ProfileEngine") as mock_engine:
                     mock_engine_instance = Mock()
                     # 创建完整的 Mock profile 对象，包含所有必要的属性
                     mock_profile = Mock()
@@ -1043,7 +1049,9 @@ class TestCLIProfileShow:
 
     def test_profile_show_with_custom_params(self):
         """测试 profile show 使用自定义参数"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_profile = Mock()
             mock_profile.total_activities = 5
@@ -1068,7 +1076,9 @@ class TestCLIProfileShow:
 
     def test_profile_show_exception(self):
         """测试 profile show 异常处理"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_storage_instance.load_profile_json.side_effect = Exception("测试异常")
             mock_profile_storage.return_value = mock_storage_instance
@@ -1156,7 +1166,9 @@ class TestCLIMemory:
 
     def test_memory_show(self):
         """测试 memory show 命令"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_memory_file = MagicMock()
             mock_memory_file.exists.return_value = True
@@ -1169,7 +1181,9 @@ class TestCLIMemory:
 
     def test_memory_show_not_exists(self):
         """测试 memory show 文件不存在"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_memory_file = MagicMock()
             mock_memory_file.exists.return_value = False
@@ -1181,7 +1195,9 @@ class TestCLIMemory:
 
     def test_memory_clear(self):
         """测试 memory clear 命令"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = Mock()
             mock_memory_file = MagicMock()
             mock_memory_file.exists.return_value = True
@@ -1196,7 +1212,9 @@ class TestCLIMemory:
 
     def test_memory_clear_not_exists(self):
         """测试 memory clear 文件不存在"""
-        with patch("src.core.profile.ProfileStorageManager") as mock_profile_storage:
+        with patch(
+            "src.core.base.profile.ProfileStorageManager"
+        ) as mock_profile_storage:
             mock_storage_instance = MagicMock()
             mock_memory_file = MagicMock()
             # 设置文件不存在

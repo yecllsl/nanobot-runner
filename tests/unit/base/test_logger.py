@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 
-from src.core.logger import (
+from src.core.base.logger import (
     JsonFormatter,
     LogConfig,
     TextFormatter,

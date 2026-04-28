@@ -9,7 +9,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.core.exceptions import LLMError, ValidationError
+from src.core.base.exceptions import LLMError, ValidationError
+from src.core.base.profile import RunnerProfile
 from src.core.models import (
     TrainingLoad,
     TrainingPlan,
@@ -17,7 +18,6 @@ from src.core.models import (
     UserPreferences,
 )
 from src.core.plan.plan_generator import PlanGenerator
-from src.core.profile import RunnerProfile
 
 
 class TestPlanGenerator:

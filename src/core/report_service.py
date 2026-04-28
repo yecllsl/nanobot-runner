@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import (
     DailyReportData,
     MonthlyReportData,
@@ -19,7 +19,7 @@ from src.core.models import (
 from src.notify.feishu import FeishuBot
 
 if TYPE_CHECKING:
-    from src.core.context import AppContext
+    from src.core.base.context import AppContext
 
 logger = get_logger(__name__)
 

@@ -34,7 +34,7 @@ class TestPlanCreateCommand:
         result = runner.invoke(app, ["plan", "create", "42.195", "2026-06-15"])
         assert result.exit_code != 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     @patch("src.core.training_plan.TrainingPlanEngine")
     def test_plan_create_success(self, mock_engine_cls, mock_get_context):
         """测试正常创建训练计划"""
@@ -65,7 +65,7 @@ class TestPlanCreateCommand:
         assert "OK" in result.output or "创建成功" in result.output
         assert "plan_test_001" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     @patch("src.core.training_plan.TrainingPlanEngine")
     def test_plan_create_with_options(self, mock_engine_cls, mock_get_context):
         """测试带可选参数创建训练计划"""
@@ -116,7 +116,7 @@ class TestPlanCreateCommand:
             resting_hr=55,
         )
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     @patch("src.core.training_plan.TrainingPlanEngine")
     def test_plan_create_failure(self, mock_engine_cls, mock_get_context):
         """测试创建训练计划失败"""
@@ -147,7 +147,7 @@ class TestPlanLongTermWithSkipPlans:
         assert result.exit_code == 0
         assert "长期" in result.output or "规划" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_long_term_with_skip_plans(self, mock_get_context):
         """测试 --skip-plans 跳过自动创建训练计划"""
         mock_context = MagicMock()
@@ -192,7 +192,7 @@ class TestPlanLongTermWithSkipPlans:
             auto_create_training_plans=False,
         )
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_long_term_with_training_plan_ids(self, mock_get_context):
         """测试输出关联训练计划ID"""
         mock_context = MagicMock()
@@ -284,7 +284,7 @@ class TestPlanLongTermWithSkipPlans:
         assert "plan_taper_004" in result.output
         assert "关联训练计划" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_long_term_without_training_plan_ids(self, mock_get_context):
         """测试无关联训练计划时不输出关联信息"""
         mock_context = MagicMock()

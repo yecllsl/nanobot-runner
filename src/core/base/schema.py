@@ -7,7 +7,7 @@ from typing import Any
 import polars as pl
 import polars.exceptions as ple
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
 

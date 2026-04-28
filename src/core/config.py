@@ -9,8 +9,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from src.core.base.logger import get_logger
 from src.core.config_schema import AppConfig
-from src.core.logger import get_logger
 
 logger = get_logger(__name__)
 

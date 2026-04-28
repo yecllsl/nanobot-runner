@@ -5,7 +5,11 @@ from datetime import datetime
 
 import polars as pl
 
-from src.core.schema import ParquetSchema, create_activity_id, create_schema_dataframe
+from src.core.base.schema import (
+    ParquetSchema,
+    create_activity_id,
+    create_schema_dataframe,
+)
 
 
 class TestParquetSchema:

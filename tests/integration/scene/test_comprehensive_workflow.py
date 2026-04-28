@@ -17,8 +17,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from src.core.analytics import AnalyticsEngine
+from src.core.base.schema import ParquetSchema
 from src.core.indexer import IndexManager
-from src.core.schema import ParquetSchema
 from src.core.storage import StorageManager
 
 
@@ -172,7 +172,7 @@ class TestComprehensiveWorkflow:
         print("\n=== 测试错误处理 ===")
 
         # 测试空数据保存 - 应该抛出 ValidationError
-        from src.core.exceptions import ValidationError
+        from src.core.base.exceptions import ValidationError
 
         empty_df = pl.DataFrame()
         with pytest.raises(ValidationError, match="数据框不能为空"):

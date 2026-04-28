@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import FitnessLevel, InjuryRiskLevel, TrainingPattern
 
 if TYPE_CHECKING:

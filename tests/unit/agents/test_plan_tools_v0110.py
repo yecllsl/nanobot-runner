@@ -91,7 +91,7 @@ class TestAdjustPlanTool:
     @pytest.mark.anyio
     async def test_execute_reduce_volume(self):
         context, mocks = _create_mock_context_with_v0110()
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = AdjustPlanTool(runner_tools)
             result = await tool.execute(
@@ -106,7 +106,7 @@ class TestAdjustPlanTool:
     @pytest.mark.anyio
     async def test_execute_increase_volume(self):
         context, mocks = _create_mock_context_with_v0110()
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = AdjustPlanTool(runner_tools)
             result = await tool.execute(
@@ -125,7 +125,7 @@ class TestAdjustPlanTool:
         mocks["validator"].get_default_adjustment.side_effect = Exception("校验器异常")
         context.set_extension("plan_adjustment_validator", mocks["validator"])
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = AdjustPlanTool(runner_tools)
             result = await tool.execute(
@@ -190,7 +190,7 @@ class TestGetPlanAdjustmentSuggestionsTool:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanAdjustmentSuggestionsTool(runner_tools)
             result = await tool.execute(plan_id="plan_test")
@@ -217,7 +217,7 @@ class TestGetPlanAdjustmentSuggestionsTool:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanAdjustmentSuggestionsTool(runner_tools)
             result = await tool.execute(plan_id="plan_test")
@@ -243,7 +243,7 @@ class TestGetPlanAdjustmentSuggestionsTool:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanAdjustmentSuggestionsTool(runner_tools)
             result = await tool.execute(plan_id="plan_test")
@@ -260,7 +260,7 @@ class TestGetPlanAdjustmentSuggestionsTool:
             "计划不存在"
         )
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanAdjustmentSuggestionsTool(runner_tools)
             result = await tool.execute(plan_id="plan_unknown")
@@ -273,7 +273,7 @@ class TestRunnerToolsPlanAdjustment:
 
     def test_adjust_plan_success(self):
         context, mocks = _create_mock_context_with_v0110()
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.adjust_plan(
                 plan_id="plan_test",
@@ -288,7 +288,7 @@ class TestRunnerToolsPlanAdjustment:
         mocks["validator"].get_default_adjustment.side_effect = Exception("异常")
         context.set_extension("plan_adjustment_validator", mocks["validator"])
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.adjust_plan(
                 plan_id="plan_test",
@@ -311,7 +311,7 @@ class TestRunnerToolsPlanAdjustment:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.get_plan_adjustment_suggestions(plan_id="plan_test")
             assert result["success"] is True
@@ -321,7 +321,7 @@ class TestRunnerToolsPlanAdjustment:
         context, mocks = _create_mock_context_with_v0110()
         mocks["execution_repo"].get_plan_execution_stats.side_effect = Exception("异常")
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.get_plan_adjustment_suggestions(plan_id="plan_test")
             assert "error" in result

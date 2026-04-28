@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 
-from src.core.exceptions import ConfigError
-from src.core.logger import get_logger
+from src.core.base.exceptions import ConfigError
+from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
 

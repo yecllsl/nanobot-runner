@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.user_profile_manager import RunnerProfile
 
 if TYPE_CHECKING:

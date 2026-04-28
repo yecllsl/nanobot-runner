@@ -17,7 +17,7 @@ def _get_config_path() -> Path:
     Returns:
         Path: config.json文件路径
     """
-    from src.core.context import AppContextFactory
+    from src.core.base.context import AppContextFactory
 
     context = AppContextFactory.create()
     return context.config.config_file

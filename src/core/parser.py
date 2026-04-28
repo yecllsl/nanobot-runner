@@ -8,9 +8,9 @@ from typing import Any
 import fitparse
 import polars as pl
 
-from src.core.exceptions import ParseError, ValidationError
-from src.core.logger import get_logger
-from src.core.schema import ParquetSchema
+from src.core.base.exceptions import ParseError, ValidationError
+from src.core.base.logger import get_logger
+from src.core.base.schema import ParquetSchema
 
 logger = get_logger(__name__)
 

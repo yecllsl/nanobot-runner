@@ -51,7 +51,7 @@ async def _run_chat() -> None:
 
     from src.agents.tools import RunnerTools, create_tools
     from src.cli.formatter import format_agent_response
-    from src.core.context import get_context
+    from src.core.base.context import get_context
     from src.core.provider_adapter import RunnerProviderAdapter
 
     console.print("[bold green][Bot] Nanobot Runner Agent[/bold green]")
@@ -162,7 +162,7 @@ def memory(
     Args:
         action: 操作类型 (show/edit/clear)
     """
-    from src.core.context import AppContextFactory
+    from src.core.base.context import AppContextFactory
 
     try:
         context = AppContextFactory.create()

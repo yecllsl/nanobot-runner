@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
-from src.core.exceptions import ParseError
+from src.core.base.exceptions import ParseError
 from src.core.importer import ImportService
 
 

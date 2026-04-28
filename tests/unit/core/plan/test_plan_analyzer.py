@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.core.exceptions import ValidationError
+from src.core.base.exceptions import ValidationError
+from src.core.base.profile import RunnerProfile
 from src.core.models import (
     AnalysisReport,
     DailyPlan,
@@ -19,7 +20,6 @@ from src.core.models import (
     WeeklySchedule,
 )
 from src.core.plan.plan_analyzer import PlanAnalyzer
-from src.core.profile import RunnerProfile
 
 
 class TestPlanAnalyzer:

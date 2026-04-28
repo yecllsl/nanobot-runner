@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from src.core.analytics import AnalyticsEngine
+from src.core.base.profile import ProfileEngine, ProfileStorageManager
 from src.core.config import ConfigManager
 from src.core.env_manager import EnvManager
 from src.core.importer import ImportService
 from src.core.indexer import IndexManager
 from src.core.parser import FitParser
 from src.core.plan.plan_manager import PlanManager
-from src.core.profile import ProfileEngine, ProfileStorageManager
 from src.core.report_service import ReportService
 from src.core.session_repository import SessionRepository
 from src.core.storage import StorageManager

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
-from src.core.profile import (
+from src.core.base.profile import (
     FitnessLevel,
     InjuryRiskLevel,
     ProfileEngine,
@@ -776,7 +776,7 @@ class TestProfileStorageManager:
     @pytest.fixture
     def storage_manager(self, temp_workspace):
         """创建 ProfileStorageManager 实例"""
-        from src.core.profile import ProfileStorageManager
+        from src.core.base.profile import ProfileStorageManager
 
         return ProfileStorageManager(workspace_dir=temp_workspace)
 
@@ -794,7 +794,7 @@ class TestProfileStorageManager:
 
     def test_init_creates_directories(self, temp_workspace):
         """测试初始化时创建目录"""
-        from src.core.profile import ProfileStorageManager
+        from src.core.base.profile import ProfileStorageManager
 
         storage = ProfileStorageManager(workspace_dir=temp_workspace)
 
