@@ -93,6 +93,26 @@ class FitParser:
     def __init__(self) -> None:
         logger.debug("FitParser 初始化")
 
+    def _is_mock_file(self, filepath: Path) -> bool:
+        """检测是否为Mock文本文件（非真实FIT二进制文件）"""
+        try:
+            with open(filepath, "rb") as f:
+                header = f.read(100)
+                if header.startswith(b"#") or header.startswith(b"["):
+                    return True
+                fit_magic = b".FIT"
+                if fit_magic not in header[:12]:
+                    first_chars = header[:50]
+                    try:
+                        text = first_chars.decode("utf-8", errors="ignore")
+                        if text.strip().startswith(("#", "[")):
+                            return True
+                    except Exception:
+                        pass
+            return False
+        except Exception:
+            return False
+
     def parse_file(self, filepath: Path) -> pl.DataFrame | None:
         if not filepath.exists():
             logger.error(f"文件不存在: {filepath}")
@@ -106,6 +126,13 @@ class FitParser:
             raise ValidationError(
                 message=f"文件格式无效，必须是.fit文件: {filepath}",
                 recovery_suggestion="请选择正确的FIT格式文件",
+            )
+
+        if self._is_mock_file(filepath):
+            logger.error(f"文件不是有效的FIT二进制格式: {filepath}")
+            raise ValidationError(
+                message=f"文件不是有效的FIT二进制格式: {filepath}",
+                recovery_suggestion="请使用真实的FIT文件（从运动手表导出），或检查文件是否损坏",
             )
 
         try:
@@ -261,6 +288,13 @@ class FitParser:
                 raise ValidationError(
                     message=f"文件格式无效，必须是.fit文件: {filepath}",
                     recovery_suggestion="请选择正确的FIT格式文件",
+                )
+
+            if self._is_mock_file(filepath):
+                logger.error(f"文件不是有效的FIT二进制格式: {filepath}")
+                raise ValidationError(
+                    message=f"文件不是有效的FIT二进制格式: {filepath}",
+                    recovery_suggestion="请使用真实的FIT文件（从运动手表导出），或检查文件是否损坏",
                 )
 
             fit_file = fitparse.FitFile(str(filepath))

@@ -25,7 +25,7 @@ from urllib.error import URLError, HTTPError
 # Configuration (can be overridden by CLI arguments)
 # ============================================================
 DEFAULT_USER_ID = "445542372294541312"
-DEFAULT_DOWNLOAD_DIR = os.path.expanduser("~/.nanobot-runner/download")
+DEFAULT_DOWNLOAD_DIR = os.path.expanduser("D:/yecll/Downloads/coros/test-fit-files")
 DEFAULT_SPORT_TYPE = 100  # 100 = Running
 DEFAULT_COUNT = 10
 DOWNLOAD_DELAY_MS = 500

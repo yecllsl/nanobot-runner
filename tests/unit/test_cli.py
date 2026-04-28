@@ -603,6 +603,205 @@ class TestCLIReport:
             call_kwargs = mock_service.run_report_now.call_args[1]
             assert call_kwargs.get("age") == 40
 
+    def test_weekly_help_has_output_option(self):
+        """测试weekly命令帮助包含--output选项"""
+        result = runner.invoke(app, ["report", "weekly", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_monthly_help_has_output_option(self):
+        """测试monthly命令帮助包含--output选项"""
+        result = runner.invoke(app, ["report", "monthly", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_weekly_with_output_saves_file(self):
+        """测试weekly命令--output保存报告文件"""
+        from src.core.models import WeeklyReportData
+
+        with (
+            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.cli.commands.report._save_report_to_file") as mock_save,
+        ):
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.generate_report.return_value = WeeklyReportData(
+                date_range="2024-01-01 ~ 2024-01-07",
+                greeting="本周训练总结",
+                total_runs=3,
+                total_distance_km=15.0,
+                total_duration_min=90,
+                total_tss=120.0,
+                avg_vdot=42.0,
+            )
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
+
+            result = runner.invoke(app, ["report", "weekly", "--output", "./reports"])
+            assert result.exit_code == 0
+            mock_save.assert_called_once()
+
+    def test_monthly_with_output_saves_file(self):
+        """测试monthly命令--output保存报告文件"""
+        from src.core.models import MonthlyReportData
+
+        with (
+            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.cli.commands.report._save_report_to_file") as mock_save,
+        ):
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.generate_report.return_value = MonthlyReportData(
+                month="2024-01",
+                greeting="本月训练总结",
+                total_runs=10,
+                total_distance_km=50.0,
+                total_duration_min=300,
+                total_tss=500.0,
+                avg_vdot=42.0,
+            )
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
+
+            result = runner.invoke(app, ["report", "monthly", "--output", "./reports"])
+            assert result.exit_code == 0
+            mock_save.assert_called_once()
+
+    def test_weekly_without_output_no_save(self):
+        """测试weekly命令不带--output不保存文件"""
+        from src.core.models import WeeklyReportData
+
+        with (
+            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.cli.commands.report._save_report_to_file") as mock_save,
+        ):
+            mock_context = Mock()
+            mock_service = Mock()
+            mock_service.generate_report.return_value = WeeklyReportData(
+                date_range="2024-01-01 ~ 2024-01-07",
+                greeting="本周训练总结",
+                total_runs=3,
+                total_distance_km=15.0,
+                total_duration_min=90,
+                total_tss=120.0,
+                avg_vdot=42.0,
+            )
+            mock_context.report_service = mock_service
+            mock_get_context.return_value = mock_context
+
+            result = runner.invoke(app, ["report", "weekly"])
+            assert result.exit_code == 0
+            mock_save.assert_not_called()
+
+
+class TestSaveReportToFile:
+    """测试_save_report_to_file辅助函数"""
+
+    def test_save_report_success(self):
+        """测试保存报告成功"""
+        from src.core.models import ReportData, ReportType
+
+        mock_report_data = ReportData(
+            success=True,
+            report_type="weekly",
+            content="# 周报内容\n这是测试报告",
+            data={"total_runs": 3},
+            message="周报生成成功",
+            generated_at="2024-01-07T12:00:00",
+        )
+
+        with (
+            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
+        ):
+            mock_context = Mock()
+            mock_get_context.return_value = mock_context
+
+            mock_generator = Mock()
+            mock_generator.generate_report.return_value = mock_report_data
+            mock_generator.save_report.return_value = {
+                "success": True,
+                "file_path": "/tmp/reports/weekly_20240107_120000.md",
+                "message": "报告已保存",
+            }
+            mock_generator_cls.return_value = mock_generator
+
+            from src.cli.commands.report import _save_report_to_file
+
+            _save_report_to_file(ReportType.WEEKLY, 30, Path("/tmp/reports"))
+
+            mock_generator.generate_report.assert_called_once_with(
+                report_type=ReportType.WEEKLY, age=30
+            )
+            mock_generator.save_report.assert_called_once_with(
+                report_content="# 周报内容\n这是测试报告",
+                report_type=ReportType.WEEKLY,
+                output_dir=Path("/tmp/reports"),
+            )
+
+    def test_save_report_generate_failed(self):
+        """测试生成报告失败时不保存"""
+        from src.core.models import ReportData, ReportType
+
+        mock_report_data = ReportData(
+            success=False,
+            report_type="weekly",
+            content="",
+            data={},
+            error="数据不足",
+        )
+
+        with (
+            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
+        ):
+            mock_context = Mock()
+            mock_get_context.return_value = mock_context
+
+            mock_generator = Mock()
+            mock_generator.generate_report.return_value = mock_report_data
+            mock_generator_cls.return_value = mock_generator
+
+            from src.cli.commands.report import _save_report_to_file
+
+            _save_report_to_file(ReportType.WEEKLY, 30, Path("/tmp/reports"))
+
+            mock_generator.save_report.assert_not_called()
+
+    def test_save_report_write_failed(self):
+        """测试保存文件失败时输出错误"""
+        from src.core.models import ReportData, ReportType
+
+        mock_report_data = ReportData(
+            success=True,
+            report_type="monthly",
+            content="# 月报内容",
+            data={"total_runs": 10},
+            message="月报生成成功",
+            generated_at="2024-01-31T12:00:00",
+        )
+
+        with (
+            patch("src.core.context.get_context") as mock_get_context,
+            patch("src.core.report_generator.ReportGenerator") as mock_generator_cls,
+        ):
+            mock_context = Mock()
+            mock_get_context.return_value = mock_context
+
+            mock_generator = Mock()
+            mock_generator.generate_report.return_value = mock_report_data
+            mock_generator.save_report.return_value = {
+                "success": False,
+                "error": "权限不足",
+            }
+            mock_generator_cls.return_value = mock_generator
+
+            from src.cli.commands.report import _save_report_to_file
+
+            _save_report_to_file(ReportType.MONTHLY, 30, Path("/readonly"))
+
+            mock_generator.save_report.assert_called_once()
+
 
 class TestDisplayReport:
     """测试晨报显示功能"""
