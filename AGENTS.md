@@ -1,6 +1,6 @@
 # AGENTS.md - Nanobot Runner 开发指南
 
-> **版本**: v5.2.0 | **更新日期**: 2026-04-20
+> **版本**: v5.3.0 | **更新日期**: 2026-04-28
 
 ---
 
@@ -53,6 +53,8 @@
 
 **v0.10.0~v0.12.0 智能跑步计划**：新增三层架构（数据感知层+智能调整层+预测规划层）。
 
+**v0.15.0 AI决策透明化**：新增透明化模块（TransparencyEngine + ObservabilityManager + TraceLogger），支持AI决策过程追踪和可视化展示。
+
 ```
 src/
 ├── core/                       # 核心模块
@@ -81,6 +83,16 @@ src/
 │   ├── provider_adapter.py     # LLM Provider适配器 (v0.9.5新增)
 │   ├── report_service.py       # 报告服务 (v0.9.4新增)
 │   ├── exceptions.py           # 自定义异常
+│   ├── transparency/           # AI决策透明化模块 (v0.15.0新增)
+│   │   ├── __init__.py
+│   │   ├── transparency_engine.py      # 透明化引擎
+│   │   ├── observability_manager.py    # 可观测性管理器
+│   │   ├── trace_logger.py             # 追踪日志器
+│   │   ├── transparency_display.py     # 透明化展示
+│   │   ├── ai_status_dashboard.py      # AI状态仪表盘
+│   │   ├── training_insight_report.py  # 训练洞察报告
+│   │   ├── hook_integration.py         # Hook集成
+│   │   └── models.py                   # 透明化数据模型
 │   └── plan/                   # 智能跑步计划模块 (v0.10.0~v0.12.0新增)
 │       ├── __init__.py
 │       ├── models.py           # 计划数据模型
@@ -154,7 +166,10 @@ AppContext
     ├── plan_modification_dialog_manager: PlanModificationDialogManager  (v0.11.0新增)
     ├── goal_prediction_engine: GoalPredictionEngine        (v0.12.0新增)
     ├── long_term_plan_generator: LongTermPlanGenerator     (v0.12.0新增)
-    └── smart_advice_engine: SmartAdviceEngine              (v0.12.0新增)
+    ├── smart_advice_engine: SmartAdviceEngine              (v0.12.0新增)
+    ├── transparency_engine: TransparencyEngine             (v0.15.0新增)
+    ├── observability_manager: ObservabilityManager         (v0.15.0新增)
+    └── trace_logger: TraceLogger                           (v0.15.0新增)
     ↓
 CLI Handlers / Agent Tools
 ```

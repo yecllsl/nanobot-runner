@@ -187,12 +187,20 @@ uv run nanobotrun agent chat
 
 ### 3.5 报告生成命令 (report)
 
+**v0.15.0 新增**: 支持 `--output` 选项将报告保存为文件。
+
 ```bash
 # 生成周报
 uv run nanobotrun report generate --type weekly
 
 # 生成月报
 uv run nanobotrun report generate --type monthly
+
+# 导出周报到文件 (v0.15.0 新增)
+uv run nanobotrun report generate --type weekly --output weekly_report.md
+
+# 导出月报到文件 (v0.15.0 新增)
+uv run nanobotrun report generate --type monthly --output monthly_report.md
 
 # 查看用户画像
 uv run nanobotrun report profile
@@ -413,7 +421,47 @@ uv run nanobotrun system migrate
 uv run nanobotrun system backup --list
 ```
 
-### 3.8 网关服务命令 (gateway)
+### 3.9 透明化命令 (transparency)
+
+**v0.15.0 新增**: AI 决策透明化命令，用于查看 AI 决策过程和系统状态。
+
+#### 查看决策追踪
+
+```bash
+# 查看最近的 AI 决策追踪日志
+uv run nanobotrun transparency trace
+
+# 查看指定数量的决策记录
+uv run nanobotrun transparency trace --limit 10
+
+# 导出决策追踪到文件
+uv run nanobotrun transparency trace --output trace.md
+```
+
+#### 查看 AI 状态仪表盘
+
+```bash
+# 查看 AI 助手状态仪表盘
+uv run nanobotrun transparency status
+
+# 查看详细状态信息
+uv run nanobotrun transparency status --verbose
+```
+
+#### 生成训练洞察报告
+
+```bash
+# 生成训练洞察报告
+uv run nanobotrun transparency insight
+
+# 指定时间范围
+uv run nanobotrun transparency insight --days 30
+
+# 导出洞察报告到文件
+uv run nanobotrun transparency insight --output insight.md
+```
+
+### 3.10 网关服务命令 (gateway)
 
 ```bash
 # 启动飞书机器人Gateway服务
@@ -426,7 +474,7 @@ uv run nanobotrun gateway start --verbose --logs
 uv run nanobotrun gateway start --port 18790
 ```
 
-### 3.7 网关服务命令 (gateway)
+### 3.10 网关服务命令 (gateway)
 
 ```bash
 # 启动飞书机器人Gateway服务
