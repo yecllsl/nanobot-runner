@@ -1,6 +1,6 @@
 # AGENTS.md - Nanobot Runner 开发指南
 
-> **版本**: v5.3.0 | **更新日期**: 2026-04-28
+> **版本**: v5.4.0 | **更新日期**: 2026-04-29
 
 ---
 
@@ -55,49 +55,61 @@
 
 **v0.15.0 AI决策透明化**：新增透明化模块（TransparencyEngine + ObservabilityManager + TraceLogger），支持AI决策过程追踪和可视化展示。
 
+**v0.16.0 Core模块化重构**：将core层按功能域拆分为base/calculators/config/storage/report/models六大子模块，提升代码可维护性。
+
 ```
 src/
-├── core/                       # 核心模块
-│   ├── context.py              # 应用上下文 (v0.9.0新增)
-│   ├── session_repository.py   # Session仓储层 (v0.9.0新增)
-│   ├── config.py               # 配置管理 (v0.9.4扩展)
-│   ├── env_manager.py          # 环境变量管理 (v0.9.4新增)
-│   ├── workspace/              # 工作区管理 (v0.9.4新增)
-│   │   └── manager.py
-│   ├── migrate/                # 数据迁移 (v0.9.4新增)
-│   │   └── engine.py
-│   ├── backup_manager.py       # 备份管理 (v0.9.4新增)
-│   ├── verify_manager.py       # 数据校验 (v0.9.4新增)
-│   ├── init/                   # 初始化模块 (v0.9.4新增)
-│   │   ├── wizard.py
-│   │   ├── prompts.py
-│   │   ├── generator.py
+├── core/                       # 核心模块 (v0.16.0重构)
+│   ├── base/                   # 基础设施模块
+│   │   ├── exceptions.py       # 异常体系
+│   │   ├── logger.py           # 日志管理
+│   │   ├── decorators.py       # 装饰器
+│   │   ├── result.py           # 结果模型
+│   │   ├── schema.py           # 数据校验模式
+│   │   ├── context.py          # 上下文管理
+│   │   └── profile.py          # 用户档案
+│   ├── calculators/            # 计算器模块
+│   │   ├── vdot_calculator.py
+│   │   ├── race_prediction.py
+│   │   ├── heart_rate_analyzer.py
+│   │   ├── training_load_analyzer.py
+│   │   ├── training_history_analyzer.py
+│   │   ├── injury_risk_analyzer.py
+│   │   └── statistics_aggregator.py
+│   ├── config/                 # 配置模块
+│   │   ├── manager.py          # 配置管理
+│   │   ├── schema.py           # 配置模式
+│   │   ├── llm_config.py       # LLM配置
+│   │   ├── env_manager.py      # 环境变量管理
+│   │   ├── backup_manager.py   # 备份管理
+│   │   └── sync.py             # 配置同步
+│   ├── storage/                # 存储模块
+│   │   ├── parquet_manager.py  # Parquet存储
+│   │   ├── session_repository.py # 会话仓库
+│   │   ├── indexer.py          # 索引管理
+│   │   ├── parser.py           # FIT解析
+│   │   └── importer.py         # 导入服务
+│   ├── report/                 # 报告模块
+│   │   ├── generator.py        # 报告生成
+│   │   ├── service.py          # 报告服务
+│   │   └── anomaly_filter.py   # 异常过滤
+│   ├── models/                 # 模型模块 (v0.16.0拆分)
+│   │   ├── user_profile.py
+│   │   ├── training_plan.py
+│   │   └── analytics.py
+│   ├── transparency/           # AI决策透明化模块 (v0.15.0)
+│   │   ├── transparency_engine.py
+│   │   ├── observability_manager.py
+│   │   ├── trace_logger.py
+│   │   ├── transparency_display.py
+│   │   ├── ai_status_dashboard.py
+│   │   ├── training_insight_report.py
+│   │   ├── hook_integration.py
 │   │   └── models.py
-│   ├── validate/               # 配置验证 (v0.9.4新增)
-│   │   └── validator.py
-│   ├── parser.py               # FIT文件解析
-│   ├── storage.py              # Parquet存储管理
-│   ├── indexer.py              # SHA256去重索引
-│   ├── analytics.py            # 数据分析引擎
-│   ├── profile.py              # 用户画像管理
-│   ├── provider_adapter.py     # LLM Provider适配器 (v0.9.5新增)
-│   ├── report_service.py       # 报告服务 (v0.9.4新增)
-│   ├── exceptions.py           # 自定义异常
-│   ├── transparency/           # AI决策透明化模块 (v0.15.0新增)
-│   │   ├── __init__.py
-│   │   ├── transparency_engine.py      # 透明化引擎
-│   │   ├── observability_manager.py    # 可观测性管理器
-│   │   ├── trace_logger.py             # 追踪日志器
-│   │   ├── transparency_display.py     # 透明化展示
-│   │   ├── ai_status_dashboard.py      # AI状态仪表盘
-│   │   ├── training_insight_report.py  # 训练洞察报告
-│   │   ├── hook_integration.py         # Hook集成
-│   │   └── models.py                   # 透明化数据模型
-│   └── plan/                   # 智能跑步计划模块 (v0.10.0~v0.12.0新增)
-│       ├── __init__.py
-│       ├── models.py           # 计划数据模型
-│       ├── plan_manager.py     # 计划管理器
-│       ├── plan_generator.py   # 计划生成器
+│   ├── plan/                   # 智能跑步计划模块 (v0.10.0~v0.12.0)
+│   │   ├── models.py
+│   │   ├── plan_manager.py
+│   │   └── plan_generator.py
 │       ├── plan_analyzer.py    # 计划分析器
 │       ├── plan_execution_repository.py  # 计划执行仓储 (v0.10.0)
 │       ├── training_response_analyzer.py # 训练响应分析器 (v0.10.0)
