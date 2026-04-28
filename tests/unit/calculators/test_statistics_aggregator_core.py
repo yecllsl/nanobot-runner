@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
-from src.core.statistics_aggregator import StatisticsAggregator
+from src.core.calculators.statistics_aggregator import StatisticsAggregator
 
 
 class TestGetRunningSummary:

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.race_prediction import RacePrediction, RacePredictionEngine
+from src.core.calculators.race_prediction import RacePrediction, RacePredictionEngine
 
 
 @pytest.fixture
@@ -202,7 +202,7 @@ class TestRacePredictionEngine:
         self, prediction_engine: RacePredictionEngine
     ) -> None:
         """测试 VDOT 超出范围时的警告"""
-        with patch("src.core.race_prediction.logger") as mock_logger:
+        with patch("src.core.calculators.race_prediction.logger") as mock_logger:
             prediction_engine.vdot_to_time(10, 10.0)
             mock_logger.warning.assert_called_once()
 

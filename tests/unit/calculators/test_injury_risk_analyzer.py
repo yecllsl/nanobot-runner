@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.core.injury_risk_analyzer import InjuryRiskAnalyzer
+from src.core.calculators.injury_risk_analyzer import InjuryRiskAnalyzer
 from src.core.user_profile_manager import (
     FitnessLevel,
     InjuryRiskLevel,

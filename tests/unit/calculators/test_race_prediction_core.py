@@ -3,7 +3,7 @@
 
 import pytest
 
-from src.core.race_prediction import RacePrediction, RacePredictionEngine
+from src.core.calculators.race_prediction import RacePrediction, RacePredictionEngine
 
 
 class TestRacePredictionDataClass:

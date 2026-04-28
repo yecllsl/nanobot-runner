@@ -3,7 +3,7 @@
 import polars as pl
 import pytest
 
-from src.core.vdot_calculator import VDOTCalculator
+from src.core.calculators.vdot_calculator import VDOTCalculator
 
 
 @pytest.fixture

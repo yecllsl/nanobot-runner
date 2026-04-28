@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from src.core.analytics import AnalyticsEngine
-from src.core.statistics_aggregator import StatisticsAggregator
+from src.core.calculators.statistics_aggregator import StatisticsAggregator
 from tests.conftest import create_mock_context
 
 

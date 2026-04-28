@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
-from src.core.heart_rate_analyzer import HeartRateAnalyzer
+from src.core.calculators.heart_rate_analyzer import HeartRateAnalyzer
 
 
 class TestHeartRateAnalyzer:

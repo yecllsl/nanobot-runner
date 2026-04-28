@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
-from src.core.training_history_analyzer import TrainingHistoryAnalyzer
+from src.core.calculators.training_history_analyzer import TrainingHistoryAnalyzer
 from src.core.user_profile_manager import RunnerProfile
 
 

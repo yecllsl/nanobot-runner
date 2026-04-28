@@ -5,7 +5,10 @@ from datetime import datetime
 
 import pytest
 
-from src.core.injury_risk_analyzer import InjuryRiskAnalyzer, InjuryRiskResult
+from src.core.calculators.injury_risk_analyzer import (
+    InjuryRiskAnalyzer,
+    InjuryRiskResult,
+)
 from src.core.models import InjuryRiskLevel, TrainingPattern
 from src.core.user_profile_manager import RunnerProfile
 

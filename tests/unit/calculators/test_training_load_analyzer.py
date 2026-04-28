@@ -4,7 +4,7 @@
 import polars as pl
 import pytest
 
-from src.core.training_load_analyzer import (
+from src.core.calculators.training_load_analyzer import (
     ATL_TIME_CONSTANT,
     TrainingLoadAnalyzer,
 )
