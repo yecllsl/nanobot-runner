@@ -1,6 +1,7 @@
 # CLI 单元测试
 # 测试命令行界面的功能
 
+import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +14,12 @@ from src.cli.common import CLIError, print_error, print_status
 from src.core.models import OperationResult, ScheduleStatus
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """去除 ANSI 转义码，确保跨平台测试兼容性"""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 class TestCLIError:
@@ -607,13 +614,13 @@ class TestCLIReport:
         """测试weekly命令帮助包含--output选项"""
         result = runner.invoke(app, ["report", "weekly", "--help"])
         assert result.exit_code == 0
-        assert "--output" in result.output
+        assert "--output" in _strip_ansi(result.output)
 
     def test_monthly_help_has_output_option(self):
         """测试monthly命令帮助包含--output选项"""
         result = runner.invoke(app, ["report", "monthly", "--help"])
         assert result.exit_code == 0
-        assert "--output" in result.output
+        assert "--output" in _strip_ansi(result.output)
 
     def test_weekly_with_output_saves_file(self):
         """测试weekly命令--output保存报告文件"""
