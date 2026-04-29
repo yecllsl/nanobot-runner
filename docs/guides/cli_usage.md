@@ -607,6 +607,6 @@ uv run nanobotrun d i /path/to/file.fit
 
 ---
 
-**文档版本**: v0.9.3
-**最后更新**: 2026-04-15
+**文档版本**: v0.16.0
+**最后更新**: 2026-04-29
 **关联文档**: [Agent配置指南](./agent_config_guide.md) | [更新日志](../../CHANGELOG.md)

@@ -9,7 +9,7 @@ from typing import Any
 
 import requests
 
-from src.core.config import ConfigManager
+from src.core.config.manager import ConfigManager
 from src.core.models import OperationResult
 
 logger = logging.getLogger(__name__)

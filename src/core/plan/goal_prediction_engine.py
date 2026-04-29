@@ -7,8 +7,8 @@
 import logging
 from typing import Any
 
+from src.core.calculators.race_prediction import RacePredictionEngine
 from src.core.models import GoalAchievementEvaluation
-from src.core.race_prediction import RacePredictionEngine
 
 logger = logging.getLogger(__name__)
 

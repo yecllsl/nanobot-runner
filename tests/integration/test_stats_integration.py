@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 
 from src.core.analytics import AnalyticsEngine
-from src.core.storage import StorageManager
+from src.core.storage.parquet_manager import StorageManager
 
 
 class TestStatsCommandIntegration:
@@ -179,7 +179,7 @@ class TestStatsAggregationRealData:
     def test_realistic_data_aggregation(self, realistic_run_data, monkeypatch):
         """测试真实数据结构的聚合统计"""
         from src.core.analytics import AnalyticsEngine
-        from src.core.storage import StorageManager
+        from src.core.storage.parquet_manager import StorageManager
 
         storage = StorageManager(realistic_run_data)
         analytics = AnalyticsEngine(storage)

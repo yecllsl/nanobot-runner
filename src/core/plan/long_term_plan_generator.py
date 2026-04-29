@@ -286,7 +286,7 @@ class LongTermPlanGenerator:
         Returns:
             list[str]: 创建的TrainingPlan ID列表
         """
-        from src.core.context import get_context
+        from src.core.base.context import get_context
         from src.core.training_plan import TrainingPlanEngine
 
         context = get_context()

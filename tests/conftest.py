@@ -4,7 +4,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from src.core.context import AppContext
+from src.core.base.context import AppContext
 
 
 def create_mock_context(

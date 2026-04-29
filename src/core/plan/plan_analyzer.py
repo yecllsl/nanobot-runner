@@ -6,8 +6,8 @@
 
 from typing import Any
 
-from src.core.exceptions import ValidationError
-from src.core.logger import get_logger
+from src.core.base.exceptions import ValidationError
+from src.core.base.logger import get_logger
 from src.core.models import AnalysisReport, DimensionResult, TrainingPlan, UserContext
 
 logger = get_logger(__name__)

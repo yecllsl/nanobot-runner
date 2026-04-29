@@ -1,5 +1,5 @@
 {
-  "version": "0.13.0",
+  "version": "0.16.0",
   "data_dir": "~/.nanobot-runner/data",
   "timezone": "Asia/Shanghai",
   "default_year": 2024,

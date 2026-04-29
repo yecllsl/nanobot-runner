@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.config import ConfigManager
-from src.core.env_manager import EnvManager
+from src.core.config.env_manager import EnvManager
+from src.core.config.manager import ConfigManager
 from src.core.init.models import InitMode
 from src.core.init.wizard import InitWizard
 

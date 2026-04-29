@@ -16,7 +16,7 @@ def _get_workspace_and_config() -> tuple[Path, Path]:
     Returns:
         tuple[Path, Path]: (工作空间路径, config.json路径)
     """
-    from src.core.context import AppContextFactory
+    from src.core.base.context import AppContextFactory
 
     context = AppContextFactory.create()
     workspace = context.config.base_dir

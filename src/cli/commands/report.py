@@ -41,7 +41,7 @@ def report(
         nanobotrun report --disable    # 禁用定时推送
         nanobotrun report --status     # 查看定时推送状态
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     try:
         service = get_context().report_service
@@ -155,7 +155,7 @@ def weekly(
         nanobotrun report weekly --push       # 生成并推送到飞书
         nanobotrun report weekly --output ./reports  # 生成周报并保存到文件
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     try:
         service = get_context().report_service
@@ -220,7 +220,7 @@ def monthly(
         nanobotrun report monthly --push       # 生成并推送到飞书
         nanobotrun report monthly --output ./reports  # 生成月报并保存到文件
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     try:
         service = get_context().report_service
@@ -271,8 +271,8 @@ def monthly(
 
 def _save_report_to_file(report_type: ReportType, age: int, output_dir: Path) -> None:
     """使用ReportGenerator生成Markdown报告并保存到文件"""
-    from src.core.context import get_context
-    from src.core.report_generator import ReportGenerator
+    from src.core.base.context import get_context
+    from src.core.report.generator import ReportGenerator
 
     try:
         context = get_context()
@@ -601,7 +601,7 @@ def profile_show(
 
     包含：平均 VDOT、健身水平、训练模式、受伤风险评估等
     """
-    from src.core.context import AppContextFactory
+    from src.core.base.context import AppContextFactory
 
     try:
         context = AppContextFactory.create()

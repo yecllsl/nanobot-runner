@@ -90,7 +90,7 @@ class TestRecordPlanExecutionTool:
             "date": "2026-04-20",
         }
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = RecordPlanExecutionTool(runner_tools)
             result = await tool.execute(
@@ -110,7 +110,7 @@ class TestRecordPlanExecutionTool:
             "计划不存在：plan_unknown"
         )
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = RecordPlanExecutionTool(runner_tools)
             result = await tool.execute(
@@ -128,7 +128,7 @@ class TestRecordPlanExecutionTool:
             "完成度必须在0.0-1.0之间"
         )
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = RecordPlanExecutionTool(runner_tools)
             result = await tool.execute(
@@ -147,7 +147,7 @@ class TestRecordPlanExecutionTool:
             "体感评分必须在1-10之间"
         )
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = RecordPlanExecutionTool(runner_tools)
             result = await tool.execute(
@@ -235,7 +235,7 @@ class TestGetPlanExecutionStatsTool:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanExecutionStatsTool(runner_tools)
             result = await tool.execute(plan_id="plan_test")
@@ -252,7 +252,7 @@ class TestGetPlanExecutionStatsTool:
             "计划不存在：plan_unknown"
         )
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanExecutionStatsTool(runner_tools)
             result = await tool.execute(plan_id="plan_unknown")
@@ -276,7 +276,7 @@ class TestGetPlanExecutionStatsTool:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = GetPlanExecutionStatsTool(runner_tools)
             result = await tool.execute(plan_id="plan_empty")
@@ -358,7 +358,7 @@ class TestAnalyzeTrainingResponseTool:
             "message": "训练响应分析完成",
         }
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = AnalyzeTrainingResponseTool(runner_tools)
             result = await tool.execute(plan_id="plan_test")
@@ -375,7 +375,7 @@ class TestAnalyzeTrainingResponseTool:
             "message": "训练响应分析失败：计划不存在：plan_unknown",
         }
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = AnalyzeTrainingResponseTool(runner_tools)
             result = await tool.execute(plan_id="plan_unknown")
@@ -388,7 +388,7 @@ class TestAnalyzeTrainingResponseTool:
         context, mocks = _create_mock_context_with_extensions()
         mocks["analyzer"].analyze_plan_response.side_effect = Exception("分析失败")
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             tool = AnalyzeTrainingResponseTool(runner_tools)
             result = await tool.execute(plan_id="plan_test")
@@ -435,7 +435,7 @@ class TestRunnerToolsPlanExecution:
             "date": "2026-04-20",
         }
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.record_plan_execution(
                 plan_id="plan_test",
@@ -450,7 +450,7 @@ class TestRunnerToolsPlanExecution:
         context, mocks = _create_mock_context_with_extensions()
         mocks["plan_manager"].record_execution.side_effect = Exception("计划不存在")
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.record_plan_execution(
                 plan_id="plan_unknown",
@@ -474,7 +474,7 @@ class TestRunnerToolsPlanExecution:
         )
         mocks["execution_repo"].get_plan_execution_stats.return_value = mock_stats
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.get_plan_execution_stats(plan_id="plan_test")
 
@@ -487,7 +487,7 @@ class TestRunnerToolsPlanExecution:
             "计划不存在"
         )
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.get_plan_execution_stats(plan_id="plan_unknown")
 
@@ -501,7 +501,7 @@ class TestRunnerToolsPlanExecution:
             "message": "训练响应分析完成",
         }
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.analyze_training_response(plan_id="plan_test")
 
@@ -511,7 +511,7 @@ class TestRunnerToolsPlanExecution:
         context, mocks = _create_mock_context_with_extensions()
         mocks["analyzer"].analyze_plan_response.side_effect = Exception("分析失败")
 
-        with patch("src.core.context.get_context", return_value=context):
+        with patch("src.core.base.context.get_context", return_value=context):
             runner_tools = RunnerTools(context=context)
             result = runner_tools.analyze_training_response(plan_id="plan_test")
 

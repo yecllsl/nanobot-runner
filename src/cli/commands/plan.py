@@ -27,7 +27,7 @@ def create_plan(
         nanobotrun plan create 42.195 2026-06-15 --vdot 42.0 --volume 35
         nanobotrun plan create 21.1 2026-05-01 -v 40.0 --volume 30
     """
-    from src.core.context import get_context
+    from src.core.base.context import get_context
     from src.core.training_plan import TrainingPlanEngine
 
     try:
@@ -87,7 +87,7 @@ def log_execution(
         nanobotrun plan log plan_20240101 2024-01-15 -c 1.0 -e 4 -n "轻松完成"
     """
     try:
-        from src.core.context import get_context
+        from src.core.base.context import get_context
 
         context = get_context()
         plan_manager = context.plan_manager
@@ -135,7 +135,7 @@ def get_stats(
         nanobotrun plan stats plan_20240101
     """
     try:
-        from src.core.context import get_context
+        from src.core.base.context import get_context
 
         context = get_context()
         execution_repo = context.plan_execution_repo
@@ -178,7 +178,7 @@ def adjust_plan(
         nanobotrun plan adjust plan_20240101 "增加间歇跑" --no-confirm
     """
     try:
-        from src.core.context import get_context
+        from src.core.base.context import get_context
 
         context = get_context()
         runner_tools = (
@@ -240,7 +240,7 @@ def get_suggestions(
         nanobotrun plan suggest plan_20240101
     """
     try:
-        from src.core.context import get_context
+        from src.core.base.context import get_context
 
         context = get_context()
         runner_tools = (
@@ -301,7 +301,7 @@ def evaluate_goal(
     weeks: int | None = typer.Option(None, "--weeks", "-w", help="可用训练周数"),
 ) -> None:
     """评估目标达成概率（v0.12.0新增）"""
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     try:
         context = get_context()
@@ -359,7 +359,7 @@ def create_long_term_plan(
     ),
 ) -> None:
     """创建长期训练规划（v0.12.0新增）"""
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     try:
         context = get_context()
@@ -429,7 +429,7 @@ def get_training_advice(
     goal_type: str | None = typer.Option(None, "--goal", "-g", help="目标类型"),
 ) -> None:
     """获取智能训练建议（v0.12.0新增）"""
-    from src.core.context import get_context
+    from src.core.base.context import get_context
 
     try:
         context = get_context()

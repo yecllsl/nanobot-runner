@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from src.core.config import ConfigManager
+from src.core.config.manager import ConfigManager
 from src.core.models import DailyPlan, TrainingPlan
 from src.notify.feishu_calendar import (
     CalendarSyncConfig,

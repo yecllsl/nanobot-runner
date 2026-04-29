@@ -162,7 +162,7 @@ class TestLongTermPlanGenerator:
         assert isinstance(plan.training_plan_ids, list)
         assert len(plan.training_plan_ids) == 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     @patch("src.core.training_plan.TrainingPlanEngine")
     def test_create_training_plans_for_cycles_success(
         self, mock_engine_cls, mock_get_context
@@ -192,7 +192,7 @@ class TestLongTermPlanGenerator:
         assert all(pid == "plan_test_001" for pid in plan.training_plan_ids)
         assert mock_plan_manager.create_plan.call_count == 4
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     @patch("src.core.training_plan.TrainingPlanEngine")
     def test_create_training_plans_partial_failure(
         self, mock_engine_cls, mock_get_context
@@ -253,7 +253,7 @@ class TestLongTermPlanGenerator:
         d = plan.to_dict()
         assert d["training_plan_ids"] == ["plan_001", "plan_002"]
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     @patch("src.core.training_plan.TrainingPlanEngine")
     def test_create_training_plans_metadata_set(
         self, mock_engine_cls, mock_get_context

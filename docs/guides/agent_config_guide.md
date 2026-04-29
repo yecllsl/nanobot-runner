@@ -111,10 +111,11 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 ### 4.1 config.json 结构
 
 **v0.9.4 更新**: 配置结构已扩展，支持更多配置项。
+**v0.16.0 更新**: 配置管理已迁移至 `src.core.config` 模块。
 
 ```json
 {
-  "version": "0.9.4",
+  "version": "0.16.0",
   "data_dir": "~/.nanobot-runner/data",
   "default_year": 2024,
   "timezone": "Asia/Shanghai",
@@ -293,6 +294,6 @@ uv run nanobotrun system restore --backup-id backup_20260418_120000
 
 ---
 
-**文档版本**: v0.9.3  
-**最后更新**: 2026-04-15  
+**文档版本**: v0.16.0  
+**最后更新**: 2026-04-29  
 **关联文档**: [CLI使用指南](./cli_usage.md)

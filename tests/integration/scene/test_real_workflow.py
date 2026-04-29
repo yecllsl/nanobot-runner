@@ -22,9 +22,9 @@ import polars as pl
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from src.core.analytics import AnalyticsEngine
-from src.core.indexer import IndexManager
-from src.core.schema import ParquetSchema
-from src.core.storage import StorageManager
+from src.core.base.schema import ParquetSchema
+from src.core.storage.indexer import IndexManager
+from src.core.storage.parquet_manager import StorageManager
 
 
 class TestRealWorkflow:

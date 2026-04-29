@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.core.config import ConfigManager
-from src.core.exceptions import ConfigError
-from src.core.logger import get_logger
+from src.core.base.exceptions import ConfigError
+from src.core.base.logger import get_logger
+from src.core.config.manager import ConfigManager
 
 logger = get_logger(__name__)
 
@@ -206,7 +206,7 @@ class ConfigMigrator:
 
             env_path = self._runner_config.base_dir / ".env.local"
             if env_vars:
-                from src.core.env_manager import EnvManager
+                from src.core.config.env_manager import EnvManager
 
                 env_manager = EnvManager(env_file=env_path)
                 env_manager.save_env_file(env_vars)

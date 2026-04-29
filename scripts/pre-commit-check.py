@@ -72,7 +72,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
 

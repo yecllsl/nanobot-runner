@@ -293,7 +293,9 @@ class TestToolExecution:
         测试更新记忆工具执行
         """
         with patch("src.core.storage.StorageManager"):
-            with patch("src.core.profile.ProfileStorageManager") as MockProfileStorage:
+            with patch(
+                "src.core.base.profile.ProfileStorageManager"
+            ) as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
                 mock_profile_storage.save_memory_md.return_value = True

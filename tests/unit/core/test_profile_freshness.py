@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, Mock
 import polars as pl
 import pytest
 
-from src.core.profile import (
+from src.core.base.profile import (
     ANOMALY_FILTER_RULES,
     AnomalyFilterRule,
     ProfileEngine,

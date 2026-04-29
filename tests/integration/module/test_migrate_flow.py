@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.backup_manager import BackupManager
-from src.core.config import ConfigManager
+from src.core.config.backup_manager import BackupManager
+from src.core.config.manager import ConfigManager
 from src.core.migrate.engine import MigrationEngine
 from src.core.migrate.models import MigrationResult
 from src.core.verify_manager import VerifyManager

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.config import ConfigManager
+from src.core.config.manager import ConfigManager
 from src.core.workspace.manager import WorkspaceManager
 from src.core.workspace.models import WorkspaceInfo, WorkspaceValidationResult
 

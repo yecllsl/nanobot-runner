@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.config import ConfigManager
+from src.core.config.manager import ConfigManager
 from src.core.validate.models import (
     ConnectivityResult,
     ErrorLevel,

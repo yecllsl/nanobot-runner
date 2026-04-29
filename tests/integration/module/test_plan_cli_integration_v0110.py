@@ -29,7 +29,7 @@ class TestPlanAdjustCommand:
         result = runner.invoke(app, ["plan", "adjust", "plan_test"])
         assert result.exit_code != 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_adjust_success_with_confirm(self, mock_get_context):
         """测试正常调整（需确认）"""
         mock_context = MagicMock()
@@ -57,7 +57,7 @@ class TestPlanAdjustCommand:
             assert result.exit_code == 0
             assert "调整" in result.output or "确认" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_adjust_success_no_confirm(self, mock_get_context):
         """测试正常调整（无需确认）"""
         mock_context = MagicMock()
@@ -84,7 +84,7 @@ class TestPlanAdjustCommand:
             )
             assert result.exit_code == 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_adjust_validation_failed(self, mock_get_context):
         """测试调整校验失败"""
         mock_context = MagicMock()
@@ -120,7 +120,7 @@ class TestPlanSuggestCommand:
         result = runner.invoke(app, ["plan", "suggest"])
         assert result.exit_code != 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_suggest_success(self, mock_get_context):
         """测试正常获取建议"""
         mock_context = MagicMock()
@@ -149,7 +149,7 @@ class TestPlanSuggestCommand:
             assert result.exit_code == 0
             assert "建议" in result.output
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_suggest_no_suggestions(self, mock_get_context):
         """测试无建议情况"""
         mock_context = MagicMock()
@@ -170,7 +170,7 @@ class TestPlanSuggestCommand:
             )
             assert result.exit_code == 0
 
-    @patch("src.core.context.get_context")
+    @patch("src.core.base.context.get_context")
     def test_plan_suggest_error(self, mock_get_context):
         """测试获取建议失败"""
         mock_context = MagicMock()

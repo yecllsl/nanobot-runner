@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.core.models import OperationResult, ReportType
-from src.core.report_service import ReportService
+from src.core.report.service import ReportService
 from tests.conftest import create_mock_context
 
 

@@ -7,7 +7,7 @@
 from datetime import datetime
 from typing import Any
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import TrainingPlan, ValidationResult, Violation
 
 logger = get_logger(__name__)

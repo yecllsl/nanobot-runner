@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.profile import (
+from src.core.base.profile import (
     FitnessLevel,
     InjuryRiskLevel,
     ProfileStorageManager,

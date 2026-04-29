@@ -4,9 +4,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from src.core.importer import ImportService
-from src.core.indexer import IndexManager
-from src.core.storage import StorageManager
+from src.core.storage.importer import ImportService
+from src.core.storage.indexer import IndexManager
+from src.core.storage.parquet_manager import StorageManager
 from tests.conftest import create_mock_context
 
 

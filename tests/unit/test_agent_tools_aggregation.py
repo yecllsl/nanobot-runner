@@ -11,7 +11,7 @@ import pytest
 
 from src.agents.tools import RunnerTools
 from src.core.analytics import AnalyticsEngine
-from src.core.storage import StorageManager
+from src.core.storage.parquet_manager import StorageManager
 from tests.conftest import create_mock_context
 
 

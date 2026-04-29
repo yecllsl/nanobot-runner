@@ -24,8 +24,8 @@ import polars as pl
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.core.config import ConfigManager
-from src.core.context import AppContextFactory
+from src.core.base.context import AppContextFactory
+from src.core.config.manager import ConfigManager
 
 
 class TestPerformanceE2E:

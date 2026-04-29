@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import PlanAdjustment, ValidationResult
 from src.core.plan.plan_adjustment_validator import PlanAdjustmentValidator
 from src.core.plan.prompt_template_engine import PromptTemplateEngine

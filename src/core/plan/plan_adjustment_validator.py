@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import PlanAdjustment, ValidationResult, Violation
 
 logger = get_logger(__name__)

@@ -8,8 +8,8 @@ import json
 from datetime import datetime
 from typing import Any
 
-from src.core.exceptions import LLMError, ValidationError
-from src.core.logger import get_logger
+from src.core.base.exceptions import LLMError, ValidationError
+from src.core.base.logger import get_logger
 from src.core.models import (
     DailyPlan,
     FitnessLevel,

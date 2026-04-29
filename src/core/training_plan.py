@@ -4,7 +4,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import (
     DailyPlan,
     FitnessLevel,

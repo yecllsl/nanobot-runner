@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from src.core.heart_rate_analyzer import HeartRateAnalyzer
+from src.core.calculators.heart_rate_analyzer import HeartRateAnalyzer
+from src.core.calculators.race_prediction import RacePredictionEngine
+from src.core.calculators.statistics_aggregator import StatisticsAggregator
+from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+from src.core.calculators.vdot_calculator import VDOTCalculator
 from src.core.models import (
     DailyReportData,
     HRDriftResult,
@@ -15,13 +19,9 @@ from src.core.models import (
     RunningStats,
     VdotTrendItem,
 )
-from src.core.race_prediction import RacePredictionEngine
-from src.core.statistics_aggregator import StatisticsAggregator
-from src.core.training_load_analyzer import TrainingLoadAnalyzer
-from src.core.vdot_calculator import VDOTCalculator
 
 if TYPE_CHECKING:
-    from src.core.storage import StorageManager
+    from src.core.storage.parquet_manager import StorageManager
 
 # VDOT 计算常量 (Jack Daniels 公式)
 VDOT_COEFFICIENT = 0.000104

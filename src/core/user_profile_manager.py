@@ -9,11 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from src.core.logger import get_logger
+from src.core.base.logger import get_logger
 from src.core.models import FitnessLevel, InjuryRiskLevel, TrainingPattern
 
 if TYPE_CHECKING:
-    from src.core.storage import StorageManager
+    from src.core.storage.parquet_manager import StorageManager
 
 logger = get_logger(__name__)
 

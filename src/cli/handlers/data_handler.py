@@ -8,7 +8,7 @@ from typing import Any
 import polars as pl
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from src.core.context import AppContext, AppContextFactory
+from src.core.base.context import AppContext, AppContextFactory
 
 
 class DataHandler:
