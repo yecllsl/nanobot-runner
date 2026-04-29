@@ -163,7 +163,8 @@ storage.append_activities(activities)
 FIT 文件解析器。
 
 ```python
-from src.core.parser import FitParser
+from src.core.storage import FitParser
+# 或: from src.core.storage.parser import FitParser
 
 parser = FitParser()
 
