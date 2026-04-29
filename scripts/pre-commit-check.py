@@ -138,6 +138,19 @@ if PYDANTIC_AVAILABLE:
         incremental_check: bool = True
         cache_enabled: bool = True
         output_format: str = "text"
+        skip_doc_only_commits: bool = True
+        doc_extensions: list[str] = Field(
+            default_factory=lambda: [
+                ".md",
+                ".txt",
+                ".rst",
+                ".adoc",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".toml",
+            ]
+        )
 
         class Config:
             extra = "allow"
@@ -180,6 +193,17 @@ else:
             self.incremental_check = True
             self.cache_enabled = True
             self.output_format = "text"
+            self.skip_doc_only_commits = True
+            self.doc_extensions = [
+                ".md",
+                ".txt",
+                ".rst",
+                ".adoc",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".toml",
+            ]
 
         @classmethod
         def from_file(cls, _config_path: Path) -> "PreCommitConfig":
@@ -282,6 +306,52 @@ class PreCommitChecker:
             logger.debug(f"获取变更文件失败: {e}")
 
         return []
+
+    def should_skip_checks(self) -> tuple[bool, str]:
+        """
+        判断是否应该跳过检查（如只提交了文档文件）
+
+        Returns:
+            tuple[bool, str]: (是否跳过, 跳过原因)
+        """
+        if not self.config.skip_doc_only_commits:
+            return False, ""
+
+        doc_extensions = set(self.config.doc_extensions)
+
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--name-only", "--cached"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=self.project_root,
+                timeout=10,
+            )
+
+            if result.returncode == 0 and result.stdout.strip():
+                all_files = result.stdout.strip().split("\n")
+                all_files = [f for f in all_files if f]
+
+                if not all_files:
+                    return False, ""
+
+                for file_path in all_files:
+                    ext = Path(file_path).suffix.lower()
+                    if ext not in doc_extensions:
+                        return False, ""
+
+                file_list = ", ".join(all_files[:5])
+                if len(all_files) > 5:
+                    file_list += f" 等 {len(all_files)} 个文件"
+
+                return True, f"暂存区只包含文档/配置文件 ({file_list})，跳过代码检查"
+
+        except Exception as e:
+            logger.debug(f"检查暂存区文件类型失败: {e}")
+
+        return False, ""
 
     def run_command(
         self, command: str, check_name: str, timeout: int | None = None
@@ -738,6 +808,13 @@ class PreCommitChecker:
 
     def run_all_checks(self) -> bool:
         """运行所有检查（根据配置选择串行或并行）"""
+        should_skip, skip_reason = self.should_skip_checks()
+        if should_skip:
+            logger.info(skip_reason)
+            if RICH_AVAILABLE and self.console:
+                self.console.print(f"\n⏭️  {skip_reason}\n", style="bold yellow")
+            return True
+
         if self.config.parallel_execution:
             return self.run_all_checks_parallel()
         else:
