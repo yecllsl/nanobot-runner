@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-2570%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.16.0 - Core模块化重构（base/calculators/config/storage/report/models六大子模块），零功能退化，向后兼容
+> **最新版本**: v0.16.1 - Core模块化重构（base/calculators/config/storage/report/models六大子模块），零功能退化，向后兼容
 
 ## 项目简介
 
@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts
 
 ```bash
 # 指定版本安装
-curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --version v0.16.0
+curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --version v0.16.1
 
 # 指定安装目录
 curl -fsSL https://raw.githubusercontent.com/yecllsl/nanobot-runner/main/scripts/install.sh | bash -s -- --dir ~/my-runner
@@ -484,5 +484,5 @@ uv cache clean && uv sync --reinstall           # Linux/macOS
 
 ---
 
-**版本**: v0.16.0
+**版本**: v0.16.1
 **最后更新**: 2026-04-29
