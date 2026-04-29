@@ -2,7 +2,9 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
+> **文档版本**: v0.16.0 | **更新日期**: 2026-04-29
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
+> **v0.16.0 重要变更**: Core层模块已重构为base/calculators/config/storage/report/models六大子模块，导入路径已更新
 
 ---
 
@@ -48,7 +50,8 @@
 > **v0.9.0 新增**
 
 ```python
-from src.core.context import AppContextFactory
+from src.core.base import AppContextFactory
+# 或: from src.core.base.context import AppContextFactory
 
 # 创建默认上下文
 ctx = AppContextFactory.create()
@@ -66,10 +69,11 @@ ctx = AppContextFactory.create(storage=Mock())
 
 Session 数据仓储层，封装 Session 级别的数据聚合查询，保持 LazyFrame 链式操作。
 
-> **v0.9.0 新增**
+> **v0.9.0 新增** | **v0.16.0 迁移** 从 `src.core.session_repository` 迁移到 `src.core.storage`
 
 ```python
-from src.core.session_repository import SessionRepository
+from src.core.storage import SessionRepository
+# 或: from src.core.storage.session_repository import SessionRepository
 
 repo = SessionRepository(storage)
 
@@ -103,10 +107,12 @@ vdot_sessions = repo.get_sessions_for_vdot(limit=50)
 数据分析引擎，提供跑步数据的统计和分析功能。
 
 ```python
-from src.core.context import AppContextFactory
+from src.core.base import AppContextFactory
+# 或: from src.core.base.context import AppContextFactory
 
 ctx = AppContextFactory.create()
 engine = ctx.analytics
+```
 
 # 跑步摘要统计
 summary = engine.get_running_summary(start_date="2024-01-01", end_date="2024-12-31")
@@ -142,10 +148,12 @@ drift = engine.analyze_hr_drift(records)
 Parquet 存储管理器，负责数据的读写和查询。
 
 ```python
-from src.core.context import AppContextFactory
+from src.core.base import AppContextFactory
+# 或: from src.core.base.context import AppContextFactory
 
 ctx = AppContextFactory.create()
 storage = ctx.storage
+```
 
 # 读取 Parquet（返回 LazyFrame）
 lf = storage.read_parquet(years=[2024, 2025])
@@ -182,10 +190,12 @@ activities = parser.parse_directory("path/to/fit/files/")
 数据导入服务，协调解析、去重和存储。
 
 ```python
-from src.core.context import AppContextFactory
+from src.core.base import AppContextFactory
+# 或: from src.core.base.context import AppContextFactory
 
 ctx = AppContextFactory.create()
 importer = ctx.importer
+```
 
 # 导入单个文件
 result = importer.import_file("path/to/file.fit", force=False)
@@ -206,7 +216,8 @@ Agent 工具集，封装为 nanobot-ai 可识别的工具格式。
 
 ```python
 from src.agents.tools import RunnerTools
-from src.core.context import AppContextFactory
+from src.core.base import AppContextFactory
+# 或: from src.core.base.context import AppContextFactory
 
 ctx = AppContextFactory.create()
 tools = RunnerTools(ctx)

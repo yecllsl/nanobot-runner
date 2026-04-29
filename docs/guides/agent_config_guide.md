@@ -294,6 +294,6 @@ uv run nanobotrun system restore --backup-id backup_20260418_120000
 
 ---
 
-**文档版本**: v0.9.3  
-**最后更新**: 2026-04-15  
+**文档版本**: v0.16.0  
+**最后更新**: 2026-04-29  
 **关联文档**: [CLI使用指南](./cli_usage.md)
