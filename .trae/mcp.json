@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "Chrome DevTools MCP": {
-      "command": "npx",
+      "command": "uvx",
       "args": [
         "-y",
         "chrome-devtools-mcp@latest",
@@ -27,7 +27,11 @@
       "coros": {
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "coros-cli", "mcp"],
+        "args": [
+          "-y",
+          "coros-cli",
+          "mcp"
+        ],
         "tool_timeout": 30,
         "enabled_tools": ["*"]
       }
