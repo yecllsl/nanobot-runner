@@ -394,7 +394,9 @@ class PreCommitChecker:
                 logger.debug("暂存区为空，不跳过检查")
                 return False, ""
 
-            all_files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+            all_files = [
+                f.strip() for f in result.stdout.strip().split("\n") if f.strip()
+            ]
             logger.debug(f"暂存区文件列表: {all_files}")
 
             if not all_files:
