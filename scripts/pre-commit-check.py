@@ -149,6 +149,33 @@ if PYDANTIC_AVAILABLE:
                 ".yaml",
                 ".yml",
                 ".toml",
+                ".xml",
+                ".ini",
+                ".cfg",
+                ".conf",
+                ".lock",
+                ".gitignore",
+                ".dockerignore",
+                ".editorconfig",
+                ".gitattributes",
+                ".svg",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".ico",
+                ".pdf",
+                ".html",
+                ".htm",
+                ".css",
+                ".map",
+                ".license",
+                ".copying",
+                ".authors",
+                ".contributors",
+                ".changes",
+                ".changelog",
+                ".version",
             ]
         )
 
@@ -203,6 +230,33 @@ else:
                 ".yaml",
                 ".yml",
                 ".toml",
+                ".xml",
+                ".ini",
+                ".cfg",
+                ".conf",
+                ".lock",
+                ".gitignore",
+                ".dockerignore",
+                ".editorconfig",
+                ".gitattributes",
+                ".svg",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".ico",
+                ".pdf",
+                ".html",
+                ".htm",
+                ".css",
+                ".map",
+                ".license",
+                ".copying",
+                ".authors",
+                ".contributors",
+                ".changes",
+                ".changelog",
+                ".version",
             ]
 
         @classmethod
@@ -315,9 +369,11 @@ class PreCommitChecker:
             tuple[bool, str]: (是否跳过, 跳过原因)
         """
         if not self.config.skip_doc_only_commits:
+            logger.debug("skip_doc_only_commits 配置已禁用，不跳过检查")
             return False, ""
 
         doc_extensions = set(self.config.doc_extensions)
+        logger.debug(f"文档扩展名列表: {doc_extensions}")
 
         try:
             result = subprocess.run(
@@ -330,28 +386,47 @@ class PreCommitChecker:
                 timeout=10,
             )
 
-            if result.returncode == 0 and result.stdout.strip():
-                all_files = result.stdout.strip().split("\n")
-                all_files = [f for f in all_files if f]
+            if result.returncode != 0:
+                logger.warning(f"Git 命令执行失败: {result.stderr}")
+                return False, ""
 
-                if not all_files:
-                    return False, ""
+            if not result.stdout.strip():
+                logger.debug("暂存区为空，不跳过检查")
+                return False, ""
 
-                for file_path in all_files:
-                    ext = Path(file_path).suffix.lower()
-                    if ext not in doc_extensions:
-                        return False, ""
+            all_files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+            logger.debug(f"暂存区文件列表: {all_files}")
 
-                file_list = ", ".join(all_files[:5])
-                if len(all_files) > 5:
-                    file_list += f" 等 {len(all_files)} 个文件"
+            if not all_files:
+                logger.debug("暂存区文件列表为空，不跳过检查")
+                return False, ""
 
-                return True, f"暂存区只包含文档/配置文件 ({file_list})，跳过代码检查"
+            non_doc_files = []
+            for file_path in all_files:
+                ext = Path(file_path).suffix.lower()
+                logger.debug(f"检查文件: {file_path}, 扩展名: {ext}")
+                if ext not in doc_extensions:
+                    non_doc_files.append(file_path)
+                    logger.debug(f"文件 {file_path} 不是文档类型")
 
+            if non_doc_files:
+                logger.debug(f"发现非文档文件: {non_doc_files}，不跳过检查")
+                return False, ""
+
+            file_list = ", ".join(all_files[:5])
+            if len(all_files) > 5:
+                file_list += f" 等 {len(all_files)} 个文件"
+
+            skip_message = f"暂存区只包含文档/配置文件 ({file_list})，跳过代码检查"
+            logger.info(skip_message)
+            return True, skip_message
+
+        except subprocess.TimeoutExpired:
+            logger.warning("Git 命令执行超时")
+            return False, ""
         except Exception as e:
-            logger.debug(f"检查暂存区文件类型失败: {e}")
-
-        return False, ""
+            logger.warning(f"检查暂存区文件类型失败: {e}")
+            return False, ""
 
     def run_command(
         self, command: str, check_name: str, timeout: int | None = None
