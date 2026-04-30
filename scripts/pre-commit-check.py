@@ -405,8 +405,12 @@ class PreCommitChecker:
 
             non_doc_files = []
             for file_path in all_files:
-                ext = Path(file_path).suffix.lower()
-                logger.debug(f"检查文件: {file_path}, 扩展名: {ext}")
+                # 修复：Git 对含非ASCII字符的路径会用双引号包裹，需去除
+                clean_path = file_path.strip('"')
+                ext = Path(clean_path).suffix.lower()
+                logger.debug(
+                    f"检查文件: {file_path}, 清理后: {clean_path}, 扩展名: {ext}"
+                )
                 if ext not in doc_extensions:
                     non_doc_files.append(file_path)
                     logger.debug(f"文件 {file_path} 不是文档类型")
