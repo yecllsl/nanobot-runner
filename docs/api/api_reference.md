@@ -2,9 +2,9 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
-> **文档版本**: v0.16.0 | **更新日期**: 2026-04-29
+> **文档版本**: v0.17.0 | **更新日期**: 2026-05-03
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
-> **v0.16.0 重要变更**: Core层模块已重构为base/calculators/config/storage/report/models六大子模块，导入路径已更新
+> **v0.17.0 重要变更**: 新增Hook组合系统、Subagent架构、异步用户确认系统、Cron训练提醒、LLM超时控制
 
 ---
 

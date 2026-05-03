@@ -463,8 +463,10 @@ uv run nanobotrun transparency insight --output insight.md
 
 ### 3.10 网关服务命令 (gateway)
 
+**v0.17.0 增强**: Gateway 服务现已集成 Hook 系统、Cron 定时任务和 MCP 工具管理。
+
 ```bash
-# 启动飞书机器人Gateway服务
+# 启动飞书机器人Gateway服务（集成所有功能）
 uv run nanobotrun gateway start
 
 # 启动时显示详细日志
@@ -474,18 +476,11 @@ uv run nanobotrun gateway start --verbose --logs
 uv run nanobotrun gateway start --port 18790
 ```
 
-### 3.10 网关服务命令 (gateway)
-
-```bash
-# 启动飞书机器人Gateway服务
-uv run nanobotrun gateway start
-
-# 启动时显示详细日志
-uv run nanobotrun gateway start --verbose --logs
-
-# 指定端口
-uv run nanobotrun gateway start --port 18790
-```
+**Gateway 功能特性** (v0.17.0):
+- **Hook 系统**: 支持流式输出、进度追踪、错误处理
+- **Cron 定时任务**: 自动训练提醒、天气感知建议
+- **MCP 工具**: 动态工具加载和管理
+- **Subagent 支持**: 子智能体任务委派
 
 ## 4. 输出格式
 
