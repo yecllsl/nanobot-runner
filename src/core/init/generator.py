@@ -45,6 +45,15 @@ def _get_template_dir() -> Path:
     return Path(__file__).parent.parent.parent.parent / "templates"
 
 
+def _get_skills_dir() -> Path:
+    """获取内建技能目录路径
+
+    Returns:
+        Path: 技能目录路径（项目根目录下的 skills/）
+    """
+    return Path(__file__).parent.parent.parent.parent / "skills"
+
+
 def _build_gitignore(tracked_files: list[str]) -> str:
     """生成 .gitignore 文件内容
 
@@ -169,7 +178,7 @@ class ConfigGenerator:
         Returns:
             list[Path]: 复制的文件路径列表
         """
-        src_skills = self.template_dir / "skills"
+        src_skills = _get_skills_dir()
         dst_skills = workspace_dir / "skills"
 
         if not src_skills.exists():

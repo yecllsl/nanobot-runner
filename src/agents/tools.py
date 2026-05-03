@@ -2147,6 +2147,678 @@ class RunnerTools:
             self._trace_logger: Any = TraceLogger()
         return self._trace_logger
 
+    def spawn_subagent(
+        self,
+        subagent_type: str,
+        user_request: str,
+        date_range: str = "",
+        report_type: str = "",
+    ) -> dict[str, Any]:
+        """调用Subagent执行专项任务
+
+        实现"主Agent预查询 + 数据上下文传入"模式：
+        1. 根据subagent_type预查询相关数据
+        2. 将数据序列化并嵌入task参数
+        3. 调用SpawnTool执行Subagent
+        4. 返回Subagent执行结果或降级处理结果
+
+        Args:
+            subagent_type: Subagent类型 (data_analyst/report_writer)
+            user_request: 用户原始请求
+            date_range: 日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）
+            report_type: 报告类型（可选，仅report_writer使用）
+
+        Returns:
+            dict: 包含success/data或error/fallback_result的字典
+        """
+        try:
+            # 1. 预查询数据
+            context_data = self._prepare_subagent_context(
+                subagent_type=subagent_type,
+                user_request=user_request,
+                date_range=date_range,
+                report_type=report_type,
+            )
+
+            # 2. 组装task参数（数据上下文格式）
+            task = self._build_subagent_task(
+                user_request=user_request,
+                context_data=context_data,
+            )
+
+            # 3. 检查数据上下文大小
+            context_size = len(task)
+            if context_size > SpawnSubagentTool.MAX_CONTEXT_LENGTH:
+                logger.warning(
+                    f"Subagent数据上下文过大({context_size}字符)，进行截断处理"
+                )
+                task = self._truncate_context(task)
+                context_size = len(task)
+
+            # 4. 调用Subagent（通过SpawnTool）
+            # 注意：SpawnTool由nanobot-ai底座自动注册，这里构建调用参数
+            subagent_result = self._invoke_subagent(
+                subagent_type=subagent_type,
+                task=task,
+            )
+
+            return {
+                "success": True,
+                "data": {
+                    "subagent_type": subagent_type,
+                    "result": subagent_result,
+                    "context_size": context_size,
+                    "task_preview": task[:200] + "..." if len(task) > 200 else task,
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Subagent调用失败: {e}", exc_info=True)
+            # 降级处理：返回预查询数据，让主Agent直接处理
+            fallback_result = self._prepare_fallback_response(
+                subagent_type=subagent_type,
+                user_request=user_request,
+                date_range=date_range,
+                report_type=report_type,
+            )
+            return {
+                "success": False,
+                "error": f"Subagent调用失败: {str(e)}",
+                "fallback_result": fallback_result,
+            }
+
+    def _prepare_subagent_context(
+        self,
+        subagent_type: str,
+        user_request: str,
+        date_range: str = "",
+        report_type: str = "",
+    ) -> dict[str, Any]:
+        """预查询Subagent所需数据
+
+        根据Subagent类型预查询相关数据：
+        - data_analyst: VDOT趋势、训练负荷、心率漂移、最近跑步记录
+        - report_writer: 跑步统计、日期范围查询、VDOT趋势
+
+        Args:
+            subagent_type: Subagent类型
+            user_request: 用户请求
+            date_range: 日期范围
+            report_type: 报告类型
+
+        Returns:
+            dict: 预查询数据字典
+        """
+        context: dict[str, Any] = {}
+
+        try:
+            if subagent_type == "data_analyst":
+                # 数据分析Subagent：预查询VDOT趋势、训练负荷、心率漂移
+                context["vdot_trend"] = self.get_vdot_trend(limit=20)
+                context["training_load"] = self.get_training_load(days=42)
+                context["hr_drift"] = self.get_hr_drift_analysis()
+                context["recent_runs"] = self.get_recent_runs(limit=10)
+                context["user_request"] = user_request
+
+            elif subagent_type == "report_writer":
+                # 报告撰写Subagent：预查询跑步统计、日期范围数据
+                if date_range:
+                    # 解析日期范围
+                    dates = date_range.split(" ~ ")
+                    if len(dates) == 2:
+                        context["runs_in_range"] = self.query_by_date_range(
+                            dates[0], dates[1]
+                        )
+                    else:
+                        context["recent_runs"] = self.get_recent_runs(limit=30)
+                else:
+                    context["recent_runs"] = self.get_recent_runs(limit=30)
+
+                context["running_stats"] = self.get_running_stats()
+                context["vdot_trend"] = self.get_vdot_trend(limit=20)
+                context["training_load"] = self.get_training_load(days=42)
+                context["report_type"] = report_type or "summary"
+                context["user_request"] = user_request
+
+            else:
+                logger.warning(f"未知的Subagent类型: {subagent_type}")
+                context["user_request"] = user_request
+                context["error"] = f"不支持的Subagent类型: {subagent_type}"
+
+        except Exception as e:
+            logger.error(f"预查询Subagent数据失败: {e}")
+            context["user_request"] = user_request
+            context["error"] = f"数据预查询失败: {str(e)}"
+
+        return context
+
+    def _build_subagent_task(
+        self,
+        user_request: str,
+        context_data: dict[str, Any],
+    ) -> str:
+        """组装Subagent的task参数
+
+        数据上下文格式:
+        {user_request}\n---数据上下文---\n{serialized_data}\n---数据上下文结束---
+
+        Args:
+            user_request: 用户请求
+            context_data: 预查询数据
+
+        Returns:
+            str: 组装后的task参数字符串
+        """
+        # 序列化数据上下文
+        serialized_data = json.dumps(
+            context_data,
+            ensure_ascii=False,
+            default=str,
+            indent=2,
+        )
+
+        # 组装task参数
+        task = (
+            f"{user_request}"
+            f"{SpawnSubagentTool.CONTEXT_SEPARATOR}"
+            f"{serialized_data}"
+            f"{SpawnSubagentTool.CONTEXT_END}"
+        )
+
+        return task
+
+    def _truncate_context(self, task: str) -> str:
+        """截断数据上下文至最大长度
+
+        当数据上下文超过MAX_CONTEXT_LENGTH时，保留用户请求部分，
+        截断数据上下文部分。
+
+        Args:
+            task: 原始task参数
+
+        Returns:
+            str: 截断后的task参数
+        """
+        # 分离用户请求和数据上下文
+        parts = task.split(SpawnSubagentTool.CONTEXT_SEPARATOR)
+        if len(parts) != 2:
+            # 格式异常，直接截断
+            return task[: SpawnSubagentTool.MAX_CONTEXT_LENGTH - 3] + "..."
+
+        user_request = parts[0]
+        data_context = parts[1]
+
+        # 计算固定开销（分隔符 + 结束标记 + "..."）
+        fixed_overhead = (
+            len(SpawnSubagentTool.CONTEXT_SEPARATOR)
+            + len(SpawnSubagentTool.CONTEXT_END)
+            + 3  # "..."长度
+        )
+
+        # 计算可用空间
+        available_space = (
+            SpawnSubagentTool.MAX_CONTEXT_LENGTH - len(user_request) - fixed_overhead
+        )
+
+        if available_space <= 0:
+            # 用户请求本身已超限，截断用户请求
+            # 计算错误消息长度
+            error_msg = '{"error": "数据上下文被截断，仅保留用户请求"}'
+            max_request_len = (
+                SpawnSubagentTool.MAX_CONTEXT_LENGTH - fixed_overhead - len(error_msg)
+            )
+            return (
+                f"{user_request[:max_request_len]}..."
+                f"{SpawnSubagentTool.CONTEXT_SEPARATOR}"
+                f"{error_msg}"
+                f"{SpawnSubagentTool.CONTEXT_END}"
+            )
+
+        # 截断数据上下文
+        truncated_data = data_context[:available_space] + "..."
+
+        return (
+            f"{user_request}"
+            f"{SpawnSubagentTool.CONTEXT_SEPARATOR}"
+            f"{truncated_data}"
+            f"{SpawnSubagentTool.CONTEXT_END}"
+        )
+
+    def _invoke_subagent(
+        self,
+        subagent_type: str,
+        task: str,
+    ) -> dict[str, Any]:
+        """调用Subagent执行
+
+        通过nanobot-ai底座的SpawnTool调用Subagent。
+        由于SpawnTool由AgentLoop自动管理，这里构建调用规范并返回预期结果格式。
+
+        Args:
+            subagent_type: Subagent类型
+            task: 任务描述（包含数据上下文）
+
+        Returns:
+            dict: Subagent执行结果
+        """
+        # 验证Subagent类型
+        valid_types = ["data_analyst", "report_writer"]
+        if subagent_type not in valid_types:
+            return {
+                "subagent_type": subagent_type,
+                "task": task,
+                "label": subagent_type,
+                "status": "error",
+                "error": f"不支持的Subagent类型: {subagent_type}，支持的类型: {', '.join(valid_types)}",
+                "note": (
+                    f"Subagent类型 '{subagent_type}' 无效。"
+                    f"请使用以下类型之一: {', '.join(valid_types)}"
+                ),
+            }
+
+        # 构建Subagent调用规范
+        # 注意：实际调用由AgentLoop的SpawnTool处理，这里返回调用参数供Agent使用
+        return {
+            "subagent_type": subagent_type,
+            "task": task,
+            "label": subagent_type,
+            "status": "ready_to_spawn",
+            "note": (
+                "Subagent调用参数已准备就绪。"
+                "实际调用由AgentLoop通过SpawnTool执行，"
+                "结果将通过MessageBus注入主Agent会话。"
+            ),
+        }
+
+    def _prepare_fallback_response(
+        self,
+        subagent_type: str,
+        user_request: str,
+        date_range: str = "",
+        report_type: str = "",
+    ) -> dict[str, Any]:
+        """准备降级响应
+
+        当Subagent调用失败时，返回预查询数据让主Agent直接处理。
+
+        Args:
+            subagent_type: Subagent类型
+            user_request: 用户请求
+            date_range: 日期范围
+            report_type: 报告类型
+
+        Returns:
+            dict: 降级响应数据
+        """
+        try:
+            fallback_data = self._prepare_subagent_context(
+                subagent_type=subagent_type,
+                user_request=user_request,
+                date_range=date_range,
+                report_type=report_type,
+            )
+            return {
+                "type": "fallback",
+                "subagent_type": subagent_type,
+                "data": fallback_data,
+                "message": "Subagent调用失败，已返回预查询数据供主Agent处理",
+            }
+        except Exception as e:
+            logger.error(f"降级响应准备失败: {e}")
+            return {
+                "type": "fallback",
+                "subagent_type": subagent_type,
+                "error": f"无法准备降级数据: {str(e)}",
+                "message": "Subagent调用失败且无法获取预查询数据",
+            }
+
+    def ask_user_confirm(
+        self,
+        scenario: str,
+        prompt_id: str,
+        context_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """创建异步用户确认提示 - v0.17.0新增（实验性功能）
+
+        Agent通过此工具输出结构化选项+确认提示，用户在下一轮对话中确认。
+        不支持同步阻塞模式（底座不支持）。
+
+        支持场景：
+        - training_plan: 训练计划确认
+        - rpe_feedback: RPE体感评分
+        - injury_risk: 伤病风险调整建议
+
+        Args:
+            scenario: 确认场景类型
+            prompt_id: 提示ID（plan_id或session_id）
+            context_data: 场景相关数据
+
+        Returns:
+            dict: 包含确认提示的结果
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            manager = context.ask_user_confirm_manager
+
+            if scenario == "training_plan":
+                plan_summary = context_data or {}
+                prompt = manager.create_plan_confirm_prompt(prompt_id, plan_summary)
+                return {
+                    "success": True,
+                    "prompt": prompt.to_dict(),
+                    "agent_prompt": prompt.to_agent_prompt(),
+                    "requires_user_response": True,
+                    "note": "实验性功能：请在下轮对话中回复选项编号确认",
+                }
+
+            elif scenario == "rpe_feedback":
+                session_summary = context_data or {}
+                prompt = manager.create_rpe_prompt(prompt_id, session_summary)
+                return {
+                    "success": True,
+                    "prompt": prompt.to_dict(),
+                    "agent_prompt": prompt.to_agent_prompt(),
+                    "requires_user_response": True,
+                    "note": "实验性功能：请回复1-10分评分",
+                }
+
+            elif scenario == "injury_risk":
+                risk_level = (
+                    context_data.get("risk_level", "medium")
+                    if context_data
+                    else "medium"
+                )
+                suggestions = (
+                    context_data.get("suggestions", []) if context_data else []
+                )
+                prompt = manager.create_injury_risk_prompt(
+                    prompt_id, risk_level, suggestions
+                )
+                return {
+                    "success": True,
+                    "prompt": prompt.to_dict(),
+                    "agent_prompt": prompt.to_agent_prompt(),
+                    "requires_user_response": True,
+                    "note": "实验性功能：请在下轮对话中回复选项确认",
+                }
+
+            else:
+                return {
+                    "success": False,
+                    "error": f"不支持的确认场景: {scenario}",
+                    "supported_scenarios": [
+                        "training_plan",
+                        "rpe_feedback",
+                        "injury_risk",
+                    ],
+                }
+
+        except Exception as e:
+            logger.error(f"创建确认提示失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def parse_user_confirm_response(
+        self,
+        prompt_id: str,
+        user_input: str,
+    ) -> dict[str, Any]:
+        """解析用户确认响应 - v0.17.0新增（实验性功能）
+
+        解析用户对确认提示的响应，返回结构化结果。
+
+        Args:
+            prompt_id: 提示ID
+            user_input: 用户输入
+
+        Returns:
+            dict: 解析结果
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            manager = context.ask_user_confirm_manager
+
+            result = manager.parse_user_response(prompt_id, user_input)
+
+            return {
+                "success": True,
+                "confirmed": result.is_confirmed,
+                "status": result.status.value,
+                "selected_key": result.selected_key,
+                "selected_label": (
+                    result.selected_option.label if result.selected_option else None
+                ),
+                "raw_input": result.raw_input,
+                "result": result.to_dict(),
+            }
+
+        except Exception as e:
+            logger.error(f"解析用户响应失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def ask_rpe_in_cli(
+        self, session_summary: dict[str, Any] | None = None
+    ) -> int | None:
+        """在CLI中询问RPE评分 - v0.17.0新增
+
+        Args:
+            session_summary: 会话摘要
+
+        Returns:
+            int | None: RPE评分（1-10），取消返回None
+        """
+        try:
+            from src.core.plan.ask_user_confirm import CLIConfirmHelper
+
+            return CLIConfirmHelper.ask_rpe_in_cli(session_summary)
+        except Exception as e:
+            logger.error(f"CLI RPE询问失败: {e}")
+            return None
+
+
+class AskUserConfirmTool(BaseTool):
+    """异步用户确认工具 - v0.17.0新增（实验性功能）
+
+    实现ask_user异步确认模式。Agent通过此工具输出结构化选项+确认提示，
+    用户在下一轮对话中确认。不支持同步阻塞模式。
+
+    使用场景：
+    1. 训练计划确认 - 输出结构化选项 + 确认提示
+    2. RPE 反馈 - 输出 1-10 分选择提示
+    3. 伤病风险调整 - 输出调整建议 + 确认提示
+
+    使用方式：
+    1. Agent调用此工具创建确认提示
+    2. 将agent_prompt展示给用户
+    3. 用户在下轮对话中回复选项编号
+    4. Agent调用parse_user_confirm解析用户响应
+    """
+
+    @property
+    def name(self) -> str:
+        return "ask_user_confirm"
+
+    @property
+    def description(self) -> str:
+        return (
+            "异步用户确认工具（实验性功能）。当需要用户确认训练计划、RPE评分、"
+            "伤病风险调整建议时使用此工具。工具会生成结构化选项，用户在下轮对话中"
+            "回复选项编号确认。支持场景: training_plan(训练计划确认)/rpe_feedback(体感评分)/"
+            "injury_risk(伤病风险调整)。返回JSON格式: {success: true, prompt: 提示结构, "
+            "agent_prompt: 展示给用户的文本, requires_user_response: true} 或 "
+            "{success: false, error: 错误信息}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "scenario": {
+                    "type": "string",
+                    "description": "确认场景: training_plan(训练计划确认) / rpe_feedback(体感评分) / injury_risk(伤病风险调整)",
+                    "enum": ["training_plan", "rpe_feedback", "injury_risk"],
+                },
+                "prompt_id": {
+                    "type": "string",
+                    "description": "提示ID（plan_id或session_id）",
+                },
+                "context_data": {
+                    "type": "object",
+                    "description": "场景相关数据（可选）。training_plan需要{goal, weeks, weekly_volume_km}；rpe_feedback需要{distance_km, duration_min}；injury_risk需要{risk_level, suggestions}",
+                },
+            },
+            "required": ["scenario", "prompt_id"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        scenario = kwargs.get("scenario", "")
+        prompt_id = kwargs.get("prompt_id", "")
+        context_data = kwargs.get("context_data")
+        return self._run_sync(
+            self.runner_tools.ask_user_confirm,
+            scenario=scenario,
+            prompt_id=prompt_id,
+            context_data=context_data,
+        )
+
+
+class ParseUserConfirmTool(BaseTool):
+    """解析用户确认响应工具 - v0.17.0新增（实验性功能）"""
+
+    @property
+    def name(self) -> str:
+        return "parse_user_confirm"
+
+    @property
+    def description(self) -> str:
+        return (
+            "解析用户对确认提示的响应（实验性功能）。在ask_user_confirm之后使用，"
+            "解析用户回复的选项编号或选项名称。返回JSON格式: "
+            "{success: true, confirmed: 是否确认, status: 状态, selected_key: 选项key, "
+            "selected_label: 选项标签, raw_input: 原始输入} 或 "
+            "{success: false, error: 错误信息}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "prompt_id": {
+                    "type": "string",
+                    "description": "提示ID（与ask_user_confirm中的prompt_id一致）",
+                },
+                "user_input": {
+                    "type": "string",
+                    "description": "用户的回复内容",
+                },
+            },
+            "required": ["prompt_id", "user_input"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        prompt_id = kwargs.get("prompt_id", "")
+        user_input = kwargs.get("user_input", "")
+        return self._run_sync(
+            self.runner_tools.parse_user_confirm_response,
+            prompt_id=prompt_id,
+            user_input=user_input,
+        )
+
+
+class SpawnSubagentTool(BaseTool):
+    """调用Subagent工具 - v0.17.0新增
+
+    实现"主Agent预查询 + 数据上下文传入"模式：
+    1. 主Agent识别子任务类型（数据分析/报告撰写）
+    2. 通过RunnerTools预查询相关数据
+    3. 将序列化数据嵌入task参数传入Subagent
+    4. Subagent基于传入数据进行分析和报告生成
+
+    支持的Subagent:
+    - data_analyst: 数据分析专家，解释VDOT趋势、训练负荷、心率漂移等
+    - report_writer: 报告撰写专家，生成周报/月报/训练总结
+
+    数据上下文格式:
+    {user_request}\n---数据上下文---\n{serialized_data}\n---数据上下文结束---
+
+    数据上下文大小控制: task参数总长度 ≤ 8000字符
+    """
+
+    # 数据上下文最大长度限制
+    MAX_CONTEXT_LENGTH: int = 8000
+    # 数据上下文分隔符
+    CONTEXT_SEPARATOR: str = "\n---数据上下文---\n"
+    CONTEXT_END: str = "\n---数据上下文结束---"
+
+    @property
+    def name(self) -> str:
+        return "spawn_subagent"
+
+    @property
+    def description(self) -> str:
+        return (
+            "调用Subagent执行专项任务。支持数据分析(data_analyst)和报告撰写(report_writer)两种Subagent。"
+            "主Agent会自动预查询相关数据并传入Subagent。当用户需要深度数据分析、生成训练周报/月报时使用此工具。"
+            "返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "subagent_type": {
+                    "type": "string",
+                    "description": "Subagent类型: data_analyst(数据分析) / report_writer(报告撰写)",
+                    "enum": ["data_analyst", "report_writer"],
+                },
+                "user_request": {
+                    "type": "string",
+                    "description": "用户的原始请求描述",
+                },
+                "date_range": {
+                    "type": "string",
+                    "description": "日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）",
+                },
+                "report_type": {
+                    "type": "string",
+                    "description": "报告类型（可选，仅report_writer使用）：weekly/monthly/summary",
+                    "enum": ["weekly", "monthly", "summary"],
+                },
+            },
+            "required": ["subagent_type", "user_request"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        """执行Subagent调用
+
+        Args:
+            subagent_type: Subagent类型
+            user_request: 用户请求
+            date_range: 日期范围（可选）
+            report_type: 报告类型（可选）
+
+        Returns:
+            JSON字符串，包含Subagent执行结果或降级处理结果
+        """
+        subagent_type = kwargs.get("subagent_type", "")
+        user_request = kwargs.get("user_request", "")
+        date_range = kwargs.get("date_range", "")
+        report_type = kwargs.get("report_type", "")
+
+        return self._run_sync(
+            self.runner_tools.spawn_subagent,
+            subagent_type=subagent_type,
+            user_request=user_request,
+            date_range=date_range,
+            report_type=report_type,
+        )
+
 
 class DiagnoseSuggestionTool(BaseTool):
     """诊断AI建议质量 - v0.14.0新增"""
@@ -2493,6 +3165,9 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         CreateLongTermPlanTool(runner_tools),
         GetSmartTrainingAdviceTool(runner_tools),
         GetWeatherTrainingAdviceTool(runner_tools),
+        SpawnSubagentTool(runner_tools),
+        AskUserConfirmTool(runner_tools),
+        ParseUserConfirmTool(runner_tools),
         DiagnoseSuggestionTool(runner_tools),
         DiagnoseErrorTool(runner_tools),
         GetPersonalizedSuggestionTool(runner_tools),
@@ -2633,6 +3308,30 @@ TOOL_DESCRIPTIONS = {
             "wind": "风力描述（可选）",
             "precipitation": "降水概率（百分比，0-100，可选）",
             "uv_index": "紫外线指数（可选）",
+        },
+    },
+    "spawn_subagent": {
+        "description": "调用Subagent执行专项任务。支持数据分析(data_analyst)和报告撰写(report_writer)两种Subagent。主Agent会自动预查询相关数据并传入Subagent。当用户需要深度数据分析、生成训练周报/月报时使用此工具。返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}",
+        "parameters": {
+            "subagent_type": "Subagent类型: data_analyst(数据分析) / report_writer(报告撰写)",
+            "user_request": "用户的原始请求描述",
+            "date_range": "日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）",
+            "report_type": "报告类型（可选，仅report_writer使用）：weekly/monthly/summary",
+        },
+    },
+    "ask_user_confirm": {
+        "description": "异步用户确认工具（实验性功能）。当需要用户确认训练计划、RPE评分、伤病风险调整建议时使用此工具。工具会生成结构化选项，用户在下轮对话中回复选项编号确认。返回JSON格式: {success: true, prompt: 提示结构, agent_prompt: 展示给用户的文本, requires_user_response: true} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "scenario": "确认场景: training_plan(训练计划确认) / rpe_feedback(体感评分) / injury_risk(伤病风险调整)",
+            "prompt_id": "提示ID（plan_id或session_id）",
+            "context_data": "场景相关数据（可选）。training_plan需要{goal, weeks, weekly_volume_km}；rpe_feedback需要{distance_km, duration_min}；injury_risk需要{risk_level, suggestions}",
+        },
+    },
+    "parse_user_confirm": {
+        "description": "解析用户对确认提示的响应（实验性功能）。在ask_user_confirm之后使用，解析用户回复的选项编号或选项名称。返回JSON格式: {success: true, confirmed: 是否确认, status: 状态, selected_key: 选项key, selected_label: 选项标签, raw_input: 原始输入} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "prompt_id": "提示ID（与ask_user_confirm中的prompt_id一致）",
+            "user_input": "用户的回复内容",
         },
     },
     "diagnose_suggestion": {

@@ -6,6 +6,7 @@ import typer
 from src.cli.commands import (
     agent_app,
     analysis_app,
+    cron_app,
     data_app,
     gateway_app,
     plan_app,
@@ -34,6 +35,7 @@ app.add_typer(tools_app, name="tools")
 app.add_typer(skill_app, name="skill")
 app.add_typer(preference_app, name="preference")
 app.add_typer(transparency_app, name="transparency")
+app.add_typer(cron_app, name="cron")
 
 if __name__ == "__main__":
     app()

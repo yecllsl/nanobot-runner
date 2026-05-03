@@ -301,7 +301,6 @@ def start(
     from nanobot.agent import AgentLoop
     from nanobot.bus import MessageBus
     from nanobot.channels.manager import ChannelManager
-    from nanobot.cron.service import CronService
     from nanobot.heartbeat.service import HeartbeatService
     from nanobot.utils.helpers import sync_workspace_templates
 
@@ -329,7 +328,23 @@ def start(
 
     channels = ChannelManager(config=adapter._get_or_create_nanobot_config(), bus=bus)
 
-    cron = CronService(store_path=workspace / "cron.json")
+    # v0.17.0: 使用 GatewayIntegration 集成 Cron + Hook
+    from src.core.plan.gateway_integration import GatewayIntegration
+
+    integration = GatewayIntegration(
+        workspace=workspace,
+        bus=bus,
+        console=console,
+        data_dir=context.config.data_dir if context else None,
+    )
+
+    # 设置Cron服务（包含训练提醒）
+    cron = integration.setup_cron_service(auto_register_reminder=True)
+
+    # 设置流式输出Hook
+    streaming_hook = integration.setup_streaming_hook()
+    if streaming_hook and hasattr(agent, "hooks"):
+        agent.hooks.register(streaming_hook)
 
     def on_heartbeat_execute():
         console.print("[dim]心跳检测执行中...[/dim]")
@@ -360,9 +375,19 @@ def start(
     else:
         console.print("[yellow]警告: 未启用任何通道[/yellow]")
 
-    cron_status = cron.status()
-    if cron_status["jobs"] > 0:
-        console.print(f"[green]✓[/green] 定时任务: {cron_status['jobs']} 个")
+    # v0.17.0: 显示Cron和提醒状态
+    cron_status_info = integration.get_cron_status()
+    if cron_status_info.get("enabled"):
+        console.print(
+            f"[green]✓[/green] 定时任务: {cron_status_info.get('jobs_count', 0)} 个"
+        )
+        if cron_status_info.get("reminder_job"):
+            reminder = cron_status_info["reminder_job"]
+            console.print(f"[green]✓[/green] 训练提醒: {reminder['cron']}")
+        elif cron_status_info.get("reminder_enabled"):
+            console.print("[yellow]! 训练提醒已启用但未注册任务[/yellow]")
+    else:
+        console.print("[yellow]! Cron服务未启用[/yellow]")
 
     console.print(f"[green]✓[/green] 心跳检测: 每 {hb_interval_s} 秒")
     console.print()
@@ -389,7 +414,7 @@ def start(
         finally:
             await agent.close_mcp()
             heartbeat.stop()
-            cron.stop()
+            integration.shutdown()  # v0.17.0: 使用集成器关闭
             agent.stop()
             await channels.stop_all()
 

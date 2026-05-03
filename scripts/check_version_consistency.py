@@ -15,9 +15,8 @@
 
 import re
 import sys
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 
 def get_pyproject_version() -> str:
@@ -36,7 +35,7 @@ def get_readme_version() -> str:
     """从 README.md 获取版本号"""
     readme_path = Path(__file__).parent.parent / "README.md"
     try:
-        with open(readme_path, "r", encoding="utf-8") as f:
+        with open(readme_path, encoding="utf-8") as f:
             content = f.read()
             # 匹配 **最新版本**: v0.9.5 格式
             match = re.search(r"\*\*最新版本\*\*:\s*v(\d+\.\d+\.\d+)", content)
@@ -59,7 +58,7 @@ def get_changelog_version() -> str:
     """从 CHANGELOG.md 获取最新版本号"""
     changelog_path = Path(__file__).parent.parent / "CHANGELOG.md"
     try:
-        with open(changelog_path, "r", encoding="utf-8") as f:
+        with open(changelog_path, encoding="utf-8") as f:
             content = f.read()
             match = re.search(r"##\s*\[(\d+\.\d+\.\d+)\]", content)
             if match:

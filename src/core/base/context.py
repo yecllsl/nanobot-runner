@@ -167,6 +167,55 @@ class AppContext:
             self.set_extension("smart_advice_engine", engine)
         return engine
 
+    @property
+    def training_reminder_manager(self) -> Any:
+        """获取训练提醒管理器（v0.17.0新增）"""
+        from src.core.plan.training_reminder_manager import TrainingReminderManager
+
+        manager = self.get_extension("training_reminder_manager")
+        if manager is None:
+            manager = TrainingReminderManager(data_dir=self.config.data_dir)
+            self.set_extension("training_reminder_manager", manager)
+        return manager
+
+    @property
+    def cron_callback_handler(self) -> Any:
+        """获取Cron回调处理器（v0.17.0新增）"""
+        from src.core.plan.cron_callback import CronCallbackHandler
+
+        handler = self.get_extension("cron_callback_handler")
+        if handler is None:
+            handler = CronCallbackHandler(
+                reminder_manager=self.training_reminder_manager,
+            )
+            self.set_extension("cron_callback_handler", handler)
+        return handler
+
+    @property
+    def gateway_integration(self) -> Any:
+        """获取Gateway集成器（v0.17.0新增）"""
+        from src.core.plan.gateway_integration import GatewayIntegration
+
+        integration = self.get_extension("gateway_integration")
+        if integration is None:
+            integration = GatewayIntegration(
+                workspace=self.config.base_dir,
+                data_dir=self.config.data_dir,
+            )
+            self.set_extension("gateway_integration", integration)
+        return integration
+
+    @property
+    def ask_user_confirm_manager(self) -> Any:
+        """获取异步确认管理器（v0.17.0新增，实验性功能）"""
+        from src.core.plan.ask_user_confirm import AskUserConfirmManager
+
+        manager = self.get_extension("ask_user_confirm_manager")
+        if manager is None:
+            manager = AskUserConfirmManager()
+            self.set_extension("ask_user_confirm_manager", manager)
+        return manager
+
 
 class AppContextFactory:
     """

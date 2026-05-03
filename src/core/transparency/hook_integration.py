@@ -73,10 +73,23 @@ class ObservabilityHook(AgentHook):
     async def on_stream(self, context: AgentHookContext, delta: str) -> None:
         """流式输出时触发
 
+        记录流式事件到ObservabilityManager，事件类型为stream_delta，
+        包含delta内容和迭代序号。
+
         Args:
             context: Hook上下文
             delta: 流式输出片段
         """
+        if self._current_trace_id is not None:
+            self.manager.record_event(
+                self._current_trace_id,
+                "stream_delta",
+                {
+                    "iteration": self._iteration_count,
+                    "delta_length": len(delta),
+                    "delta_preview": delta[:100] if delta else "",
+                },
+            )
 
     async def before_execute_tools(self, context: AgentHookContext) -> None:
         """工具执行前记录

@@ -70,14 +70,14 @@ class TestPlanGenerator:
         plan = self.generator.generate(
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
             plan_type="race_preparation",
         )
 
         assert isinstance(plan, TrainingPlan)
         assert plan.goal_distance_km == 21.0975
-        assert plan.goal_date == "2026-05-01"
+        assert plan.goal_date == "2026-12-01"
         assert plan.target_time == "2:00:00"
         assert len(plan.weeks) > 0
 
@@ -87,14 +87,14 @@ class TestPlanGenerator:
             self.generator.generate(
                 user_context=self.user_context,
                 goal_distance_km=0,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
             )
 
         with pytest.raises(ValidationError):
             self.generator.generate(
                 user_context=self.user_context,
                 goal_distance_km=-5,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
             )
 
     def test_generate_plan_with_invalid_date(self):
@@ -123,7 +123,7 @@ class TestPlanGenerator:
             self.generator.generate(
                 user_context=self.user_context,
                 goal_distance_km=21.0975,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
             )
 
     def test_generate_plan_retry_mechanism(self):
@@ -137,7 +137,7 @@ class TestPlanGenerator:
         plan = self.generator.generate(
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
         )
 
         assert isinstance(plan, TrainingPlan)
@@ -151,7 +151,7 @@ class TestPlanGenerator:
             self.generator.generate(
                 user_context=self.user_context,
                 goal_distance_km=21.0975,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
             )
 
     def test_build_prompt(self):
@@ -159,13 +159,13 @@ class TestPlanGenerator:
         prompt = self.generator._build_prompt(
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
             plan_type="race_preparation",
         )
 
         assert "21.0975" in prompt
-        assert "2026-05-01" in prompt
+        assert "2026-12-01" in prompt
         assert "2:00:00" in prompt
         assert "30" in prompt
 
@@ -177,7 +177,7 @@ class TestPlanGenerator:
             llm_response=json.dumps(mock_response),
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
         )
 
@@ -195,7 +195,7 @@ class TestPlanGenerator:
                 llm_response=json.dumps(invalid_response),
                 user_context=self.user_context,
                 goal_distance_km=21.0975,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
                 target_time="2:00:00",
             )
 
@@ -206,7 +206,7 @@ class TestPlanGenerator:
                 llm_response="invalid json",
                 user_context=self.user_context,
                 goal_distance_km=21.0975,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
                 target_time="2:00:00",
             )
 
@@ -226,22 +226,22 @@ class TestPlanGenerator:
             "user_id": "test_user",
             "status": "active",
             "plan_type": "race_preparation",
-            "start_date": "2026-04-20",
-            "end_date": "2026-05-03",
+            "start_date": "2026-11-20",
+            "end_date": "2026-12-03",
             "goal_distance_km": 21.0975,
-            "goal_date": "2026-05-01",
+            "goal_date": "2026-12-01",
             "target_time": "2:00:00",
             "calendar_event_ids": {},
-            "created_at": "2026-04-20 10:00:00",
-            "updated_at": "2026-04-20 10:00:00",
+            "created_at": "2026-11-20 10:00:00",
+            "updated_at": "2026-11-20 10:00:00",
             "weeks": [
                 {
                     "week_number": 1,
-                    "start_date": "2026-04-20",
-                    "end_date": "2026-04-26",
+                    "start_date": "2026-11-20",
+                    "end_date": "2026-11-26",
                     "daily_plans": [
                         {
-                            "date": "2026-04-20",
+                            "date": "2026-11-20",
                             "workout_type": "easy_run",
                             "distance_km": 8.0,
                             "duration_min": 48,
@@ -250,7 +250,7 @@ class TestPlanGenerator:
                             "notes": "轻松跑",
                         },
                         {
-                            "date": "2026-04-22",
+                            "date": "2026-11-22",
                             "workout_type": "tempo_run",
                             "distance_km": 10.0,
                             "duration_min": 55,
@@ -259,7 +259,7 @@ class TestPlanGenerator:
                             "notes": "节奏跑",
                         },
                         {
-                            "date": "2026-04-24",
+                            "date": "2026-11-24",
                             "workout_type": "easy_run",
                             "distance_km": 8.0,
                             "duration_min": 48,
@@ -268,7 +268,7 @@ class TestPlanGenerator:
                             "notes": "轻松跑",
                         },
                         {
-                            "date": "2026-04-26",
+                            "date": "2026-11-26",
                             "workout_type": "long_run",
                             "distance_km": 16.0,
                             "duration_min": 100,
@@ -284,11 +284,11 @@ class TestPlanGenerator:
                 },
                 {
                     "week_number": 2,
-                    "start_date": "2026-04-27",
-                    "end_date": "2026-05-03",
+                    "start_date": "2026-11-27",
+                    "end_date": "2026-12-03",
                     "daily_plans": [
                         {
-                            "date": "2026-04-27",
+                            "date": "2026-11-27",
                             "workout_type": "easy_run",
                             "distance_km": 8.0,
                             "duration_min": 48,
@@ -297,7 +297,7 @@ class TestPlanGenerator:
                             "notes": "轻松跑",
                         },
                         {
-                            "date": "2026-04-29",
+                            "date": "2026-11-29",
                             "workout_type": "interval",
                             "distance_km": 10.0,
                             "duration_min": 50,
@@ -306,7 +306,7 @@ class TestPlanGenerator:
                             "notes": "间歇训练",
                         },
                         {
-                            "date": "2026-05-01",
+                            "date": "2026-12-01",
                             "workout_type": "rest",
                             "distance_km": 0,
                             "duration_min": 0,
@@ -372,7 +372,7 @@ class TestPlanGeneratorExtended:
             generator.generate(
                 user_context=self.user_context,
                 goal_distance_km=21.0975,
-                goal_date="2026-05-01",
+                goal_date="2026-12-01",
             )
 
     def test_parse_llm_response_with_json_block(self):
@@ -384,7 +384,7 @@ class TestPlanGeneratorExtended:
             llm_response=llm_response,
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
         )
 
@@ -400,7 +400,7 @@ class TestPlanGeneratorExtended:
             llm_response=llm_response,
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
         )
 
@@ -417,7 +417,7 @@ class TestPlanGeneratorExtended:
         plan = self.generator.generate(
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
         )
 
@@ -432,7 +432,7 @@ class TestPlanGeneratorExtended:
         plan = self.generator.generate(
             user_context=self.user_context,
             goal_distance_km=21.0975,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             target_time="2:00:00",
         )
 
@@ -446,22 +446,22 @@ class TestPlanGeneratorExtended:
             "user_id": "test_user",
             "status": "active",
             "plan_type": "race_preparation",
-            "start_date": "2026-04-20",
-            "end_date": "2026-05-03",
+            "start_date": "2026-11-20",
+            "end_date": "2026-12-03",
             "goal_distance_km": 21.0975,
-            "goal_date": "2026-05-01",
+            "goal_date": "2026-12-01",
             "target_time": "2:00:00",
             "calendar_event_ids": {},
-            "created_at": "2026-04-20 10:00:00",
-            "updated_at": "2026-04-20 10:00:00",
+            "created_at": "2026-11-20 10:00:00",
+            "updated_at": "2026-11-20 10:00:00",
             "weeks": [
                 {
                     "week_number": 1,
-                    "start_date": "2026-04-20",
-                    "end_date": "2026-04-26",
+                    "start_date": "2026-11-20",
+                    "end_date": "2026-11-26",
                     "daily_plans": [
                         {
-                            "date": "2026-04-20",
+                            "date": "2026-11-20",
                             "workout_type": "easy_run",
                             "distance_km": 8.0,
                             "duration_min": 48,

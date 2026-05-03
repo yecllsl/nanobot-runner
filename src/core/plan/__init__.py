@@ -4,6 +4,7 @@
 包含训练计划生成、校验、分析、日历同步、计划管理等核心功能
 """
 
+from src.core.plan.cron_callback import CronCallbackHandler
 from src.core.plan.hard_validator import HardValidator
 from src.core.plan.plan_adjustment_validator import (
     PlanAdjustmentValidator,
@@ -27,6 +28,12 @@ from src.core.plan.prompt_template_engine import (
     PromptTemplateEngine,
     TemplateNotFoundError,
 )
+from src.core.plan.training_reminder_manager import (
+    ReminderRecord,
+    ReminderSchedule,
+    ReminderStatus,
+    TrainingReminderManager,
+)
 from src.core.plan.training_response_analyzer import TrainingResponseAnalyzer
 
 __all__ = [
@@ -37,6 +44,10 @@ __all__ = [
     "PlanStatus",
     "PlanExecutionRepository",
     "PlanExecutionRepositoryError",
+    "TrainingReminderManager",
+    "ReminderStatus",
+    "ReminderRecord",
+    "ReminderSchedule",
     "TrainingResponseAnalyzer",
     "PlanAdjustmentValidator",
     "ValidationRule",
@@ -47,4 +58,5 @@ __all__ = [
     "DialogTurn",
     "PromptTemplateEngine",
     "TemplateNotFoundError",
+    "CronCallbackHandler",
 ]

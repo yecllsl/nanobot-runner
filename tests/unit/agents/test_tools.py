@@ -1,5 +1,6 @@
 # Agent工具集单元测试
 
+import json
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ from src.agents.tools import (
     QueryByDateRangeTool,
     QueryByDistanceTool,
     RunnerTools,
+    SpawnSubagentTool,
     UpdateMemoryTool,
     create_tools,
 )
@@ -532,7 +534,7 @@ class TestCreateTools:
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 28
+            assert len(tools) == 31
 
     def test_create_tools_contains_all_tools(self):
         """测试包含所有工具"""
@@ -551,6 +553,7 @@ class TestCreateTools:
                 "query_by_distance",
                 "update_memory",
                 "get_weather_training_advice",
+                "spawn_subagent",
                 "diagnose_suggestion",
                 "diagnose_error",
                 "get_personalized_suggestion",
@@ -1000,6 +1003,417 @@ class TestRunnerTools:
                 assert "[训练]" in result["note"]
 
 
+class TestSpawnSubagentTool:
+    """SpawnSubagentTool 测试"""
+
+    def test_name(self):
+        """测试工具名称"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+            tool = SpawnSubagentTool(runner_tools)
+            assert tool.name == "spawn_subagent"
+
+    def test_description(self):
+        """测试工具描述包含关键信息"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+            tool = SpawnSubagentTool(runner_tools)
+            assert "Subagent" in tool.description
+            assert (
+                "data_analyst" in tool.description
+                or "report_writer" in tool.description
+            )
+
+    def test_parameters(self):
+        """测试参数定义"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+            tool = SpawnSubagentTool(runner_tools)
+            assert tool.parameters["type"] == "object"
+            assert "subagent_type" in tool.parameters["properties"]
+            assert "user_request" in tool.parameters["properties"]
+            assert "date_range" in tool.parameters["properties"]
+            assert "report_type" in tool.parameters["properties"]
+            assert "subagent_type" in tool.parameters["required"]
+            assert "user_request" in tool.parameters["required"]
+
+    def test_subagent_type_enum(self):
+        """测试Subagent类型枚举值"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+            tool = SpawnSubagentTool(runner_tools)
+            subagent_schema = tool.parameters["properties"]["subagent_type"]
+            assert "enum" in subagent_schema
+            assert "data_analyst" in subagent_schema["enum"]
+            assert "report_writer" in subagent_schema["enum"]
+
+    @pytest.mark.anyio
+    async def test_execute_data_analyst(self):
+        """测试执行数据分析Subagent"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            tool = SpawnSubagentTool(runner_tools)
+
+            result = await tool.execute(
+                subagent_type="data_analyst",
+                user_request="分析我的VDOT趋势",
+            )
+
+            result_dict = json.loads(result)
+            assert result_dict["success"] is True
+            assert result_dict["data"]["subagent_type"] == "data_analyst"
+            assert "context_size" in result_dict["data"]
+            assert (
+                result_dict["data"]["context_size"]
+                <= SpawnSubagentTool.MAX_CONTEXT_LENGTH
+            )
+
+    @pytest.mark.anyio
+    async def test_execute_report_writer(self):
+        """测试执行报告撰写Subagent"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            tool = SpawnSubagentTool(runner_tools)
+
+            result = await tool.execute(
+                subagent_type="report_writer",
+                user_request="生成本周训练报告",
+                report_type="weekly",
+            )
+
+            result_dict = json.loads(result)
+            assert result_dict["success"] is True
+            assert result_dict["data"]["subagent_type"] == "report_writer"
+
+    @pytest.mark.anyio
+    async def test_execute_with_date_range(self):
+        """测试带日期范围的Subagent调用"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            tool = SpawnSubagentTool(runner_tools)
+
+            result = await tool.execute(
+                subagent_type="report_writer",
+                user_request="生成月度训练报告",
+                date_range="2024-01-01 ~ 2024-01-31",
+                report_type="monthly",
+            )
+
+            result_dict = json.loads(result)
+            assert result_dict["success"] is True
+
+    @pytest.mark.anyio
+    async def test_execute_invalid_subagent_type(self):
+        """测试无效的Subagent类型"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+            tool = SpawnSubagentTool(runner_tools)
+
+            result = await tool.execute(
+                subagent_type="invalid_type",
+                user_request="测试请求",
+            )
+
+            result_dict = json.loads(result)
+            assert result_dict["success"] is True
+            assert result_dict["data"]["result"]["status"] == "error"
+            assert "不支持的Subagent类型" in result_dict["data"]["result"]["error"]
+
+    @pytest.mark.anyio
+    async def test_context_size_limit(self):
+        """测试数据上下文大小限制"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+
+            # 模拟大量数据，触发截断
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            large_data = [
+                {
+                    "timestamp": f"2024-01-{i:02d}",
+                    "distance": 5000.0 + i * 100,
+                    "duration": 1200.0 + i * 10,
+                }
+                for i in range(1, 100)
+            ]
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = large_data
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            tool = SpawnSubagentTool(runner_tools)
+
+            result = await tool.execute(
+                subagent_type="data_analyst",
+                user_request="分析我的VDOT趋势",
+            )
+
+            result_dict = json.loads(result)
+            assert result_dict["success"] is True
+            assert (
+                result_dict["data"]["context_size"]
+                <= SpawnSubagentTool.MAX_CONTEXT_LENGTH
+            )
+
+
+class TestRunnerToolsSpawnSubagent:
+    """RunnerTools.spawn_subagent 方法测试"""
+
+    def test_prepare_subagent_context_data_analyst(self):
+        """测试数据分析Subagent上下文准备"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            context = runner_tools._prepare_subagent_context(
+                subagent_type="data_analyst",
+                user_request="分析VDOT趋势",
+            )
+
+            assert "vdot_trend" in context
+            assert "training_load" in context
+            assert "hr_drift" in context
+            assert "recent_runs" in context
+            assert context["user_request"] == "分析VDOT趋势"
+
+    def test_prepare_subagent_context_report_writer(self):
+        """测试报告撰写Subagent上下文准备"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            context = runner_tools._prepare_subagent_context(
+                subagent_type="report_writer",
+                user_request="生成周报",
+                report_type="weekly",
+            )
+
+            assert "running_stats" in context
+            assert "vdot_trend" in context
+            assert "training_load" in context
+            assert context["report_type"] == "weekly"
+            assert context["user_request"] == "生成周报"
+
+    def test_prepare_subagent_context_report_writer_with_date_range(self):
+        """测试报告撰写Subagent带日期范围"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.filter.return_value.select.return_value.sort.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            context = runner_tools._prepare_subagent_context(
+                subagent_type="report_writer",
+                user_request="生成月度报告",
+                date_range="2024-01-01 ~ 2024-01-31",
+            )
+
+            assert "runs_in_range" in context
+
+    def test_build_subagent_task(self):
+        """测试Subagent任务构建"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+            context_data = {"vdot_trend": [1, 2, 3], "user_request": "分析"}
+
+            task = runner_tools._build_subagent_task(
+                user_request="分析VDOT趋势",
+                context_data=context_data,
+            )
+
+            assert "分析VDOT趋势" in task
+            assert SpawnSubagentTool.CONTEXT_SEPARATOR in task
+            assert SpawnSubagentTool.CONTEXT_END in task
+            assert "vdot_trend" in task
+
+    def test_truncate_context(self):
+        """测试数据上下文截断"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+
+            # 构建一个超长task
+            long_data = "x" * (SpawnSubagentTool.MAX_CONTEXT_LENGTH + 1000)
+            task = f"请求{SpawnSubagentTool.CONTEXT_SEPARATOR}{long_data}{SpawnSubagentTool.CONTEXT_END}"
+
+            truncated = runner_tools._truncate_context(task)
+
+            assert len(truncated) <= SpawnSubagentTool.MAX_CONTEXT_LENGTH
+            assert "请求" in truncated
+            assert SpawnSubagentTool.CONTEXT_SEPARATOR in truncated
+
+    def test_truncate_context_user_request_too_long(self):
+        """测试用户请求本身超长时的截断"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+
+            # 用户请求本身超过限制
+            long_request = "x" * SpawnSubagentTool.MAX_CONTEXT_LENGTH
+            task = f"{long_request}{SpawnSubagentTool.CONTEXT_SEPARATOR}data{SpawnSubagentTool.CONTEXT_END}"
+
+            truncated = runner_tools._truncate_context(task)
+
+            assert len(truncated) <= SpawnSubagentTool.MAX_CONTEXT_LENGTH
+            assert "..." in truncated
+
+    def test_invoke_subagent(self):
+        """测试Subagent调用参数构建"""
+        with patch("src.core.storage.StorageManager"):
+            runner_tools = RunnerTools()
+
+            result = runner_tools._invoke_subagent(
+                subagent_type="data_analyst",
+                task="分析任务",
+            )
+
+            assert result["subagent_type"] == "data_analyst"
+            assert result["task"] == "分析任务"
+            assert result["label"] == "data_analyst"
+            assert result["status"] == "ready_to_spawn"
+
+    def test_prepare_fallback_response(self):
+        """测试降级响应准备"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            fallback = runner_tools._prepare_fallback_response(
+                subagent_type="data_analyst",
+                user_request="分析VDOT趋势",
+            )
+
+            assert fallback["type"] == "fallback"
+            assert fallback["subagent_type"] == "data_analyst"
+            assert "data" in fallback
+            assert "message" in fallback
+
+    def test_spawn_subagent_success(self):
+        """测试完整的Subagent调用成功流程"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            result = runner_tools.spawn_subagent(
+                subagent_type="data_analyst",
+                user_request="分析我的VDOT趋势",
+            )
+
+            assert result["success"] is True
+            assert result["data"]["subagent_type"] == "data_analyst"
+            assert "result" in result["data"]
+            assert "context_size" in result["data"]
+            assert (
+                result["data"]["context_size"] <= SpawnSubagentTool.MAX_CONTEXT_LENGTH
+            )
+
+    def test_spawn_subagent_with_data_error(self):
+        """测试Subagent调用时数据查询失败的处理"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            # 模拟数据查询异常
+            mock_lf.sort.side_effect = Exception("数据库错误")
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+            result = runner_tools.spawn_subagent(
+                subagent_type="data_analyst",
+                user_request="分析我的VDOT趋势",
+            )
+
+            # _prepare_subagent_context 内部捕获异常，继续执行
+            assert result["success"] is True
+            assert result["data"]["subagent_type"] == "data_analyst"
+            # 结果中应包含错误信息
+            assert "error" in result["data"]["result"]["task"] or "error" in str(result)
+
+    def test_spawn_subagent_fallback(self):
+        """测试Subagent调用降级处理 - _invoke_subagent失败"""
+        with patch("src.core.storage.StorageManager") as MockStorage:
+            mock_storage = MagicMock()
+            MockStorage.return_value = mock_storage
+            mock_lf = MagicMock()
+            mock_storage.read_parquet.return_value = mock_lf
+            mock_lf.sort.return_value.limit.return_value.collect.return_value.iter_rows.return_value = []
+
+            runner_tools = RunnerTools(
+                context=create_mock_context(storage=mock_storage)
+            )
+
+            # 模拟 _invoke_subagent 抛出异常
+            with patch.object(
+                runner_tools,
+                "_invoke_subagent",
+                side_effect=Exception("Subagent调用失败"),
+            ):
+                result = runner_tools.spawn_subagent(
+                    subagent_type="data_analyst",
+                    user_request="分析我的VDOT趋势",
+                )
+
+                assert result["success"] is False
+                assert "error" in result
+                assert "fallback_result" in result
+
+
 class TestToolDescriptions:
     """工具描述测试"""
 
@@ -1015,6 +1429,7 @@ class TestToolDescriptions:
             "query_by_date_range",
             "query_by_distance",
             "update_memory",
+            "spawn_subagent",
         ]
 
         for tool_name in expected_tools:

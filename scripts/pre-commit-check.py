@@ -56,7 +56,7 @@ except ImportError:
     QUESTIONARY_AVAILABLE = False
 
 try:
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel, ConfigDict, Field
 
     PYDANTIC_AVAILABLE = True
 except ImportError:
@@ -179,8 +179,7 @@ if PYDANTIC_AVAILABLE:
             ]
         )
 
-        class Config:
-            extra = "allow"
+        model_config = ConfigDict(extra="allow")
 
         @classmethod
         def from_file(cls, config_path: Path) -> "PreCommitConfig":
@@ -521,7 +520,7 @@ class PreCommitChecker:
                 if cached:
                     return cached
         else:
-            command = "uv run ruff format --check src/ tests/"
+            command = "uv run ruff format --check src/ tests/ scripts/ skills/"
 
         result = self.run_command(
             command, "ruff format 代码格式化检查", self.config.ruff_format.timeout
@@ -558,7 +557,7 @@ class PreCommitChecker:
                 if cached:
                     return cached
         else:
-            command = "uv run ruff check src/ tests/"
+            command = "uv run ruff check src/ tests/ scripts/ skills/"
 
         result = self.run_command(
             command, "ruff check 代码质量检查", self.config.ruff_lint.timeout
@@ -978,9 +977,11 @@ class PreCommitChecker:
             for result in self.results:
                 if result.status == CheckStatus.FAILED:
                     if "ruff format" in result.name.lower():
-                        suggestion = "  - 执行: uv run ruff format src/ tests/"
+                        suggestion = (
+                            "  - 执行: uv run ruff format src/ tests/ scripts/ skills/"
+                        )
                     elif "ruff check" in result.name.lower():
-                        suggestion = "  - 执行: uv run ruff check --fix src/ tests/"
+                        suggestion = "  - 执行: uv run ruff check --fix src/ tests/ scripts/ skills/"
                     elif "mypy" in result.name.lower():
                         suggestion = (
                             "  - 执行: uv run mypy src/ --ignore-missing-imports"
@@ -1143,9 +1144,13 @@ class PreCommitChecker:
         for result in self.results:
             if result.status == CheckStatus.FAILED:
                 if "ruff format" in result.name.lower():
-                    fix_commands.append("uv run ruff format src/ tests/")
+                    fix_commands.append(
+                        "uv run ruff format src/ tests/ scripts/ skills/"
+                    )
                 elif "ruff check" in result.name.lower():
-                    fix_commands.append("uv run ruff check --fix src/ tests/")
+                    fix_commands.append(
+                        "uv run ruff check --fix src/ tests/ scripts/ skills/"
+                    )
                 elif "mypy" in result.name.lower():
                     fix_commands.append("uv run mypy src/ --ignore-missing-imports")
                 elif "pytest" in result.name.lower():
