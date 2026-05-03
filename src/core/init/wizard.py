@@ -151,6 +151,17 @@ class InitWizard:
         result = migrator.migrate_from_nanobot()
 
         if not result.success:
+            # 如果迁移失败是因为nanobot配置文件不存在，且用户使用了--force
+            # 则回退到FRESH模式重新初始化
+            if any("nanobot配置文件不存在" in err for err in result.errors) and force:
+                logger.warning("nanobot配置不存在，回退到全新初始化模式")
+                return self.run(
+                    mode=InitMode.FRESH,
+                    force=force,
+                    skip_optional=True,
+                    workspace_dir=target_dir,
+                    agent_mode=False,
+                )
             return InitResult(
                 success=False,
                 errors=result.errors,

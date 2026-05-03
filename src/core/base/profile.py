@@ -60,12 +60,12 @@ class ProfileStorageManager:
             logger.error(f"创建画像存储目录失败：{e}")
             raise RuntimeError(f"无法创建画像存储目录：{e}") from e
 
-    def save_profile_json(self, profile: RunnerProfile) -> bool:
+    def save_profile_json(self, profile: RunnerProfile | dict[str, Any]) -> bool:
         """
         保存画像到 profile.json
 
         Args:
-            profile: RunnerProfile 对象
+            profile: RunnerProfile 对象或字典
 
         Returns:
             bool: 保存是否成功
@@ -74,13 +74,19 @@ class ProfileStorageManager:
             RuntimeError: 当保存失败时
         """
         try:
-            profile_data = profile.to_dict()
+            if isinstance(profile, dict):
+                profile_data = profile.copy()
+                user_id = profile_data.get("user_id", "default_user")
+            else:
+                profile_data = profile.to_dict()
+                user_id = profile.user_id
+
             profile_data["updated_at"] = datetime.now().isoformat()
 
             with open(self.profile_json_path, "w", encoding="utf-8") as f:
                 json.dump(profile_data, f, indent=2, ensure_ascii=False)
 
-            logger.info(f"画像已保存到 profile.json: {profile.user_id}")
+            logger.info(f"画像已保存到 profile.json: {user_id}")
 
             return True
         except Exception as e:
