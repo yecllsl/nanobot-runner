@@ -107,14 +107,6 @@ description: 执行单人开发模式的版本发布，确保Tag创建成功、C
 1. **版本号管理**（⚠️ 最容易出错）：
    - **必须保持一致的文件**：pyproject.toml、README.md、CHANGELOG.md
    - **更新顺序**：pyproject.toml → CHANGELOG.md → README.md
-   - **验证时机**：
-     - 发布前必须执行版本号一致性检查
-     - 版本号更新后推送main分支前再次验证
-     - 创建Tag前最后一次验证
-   - **常见错误**：
-     - ❌ 只更新pyproject.toml，忘记更新README.md
-     - ❌ 更新了CHANGELOG.md但版本号格式不正确
-     - ❌ README.md中版本号格式错误（如缺少v前缀）
    - **自动检查**：使用 `scripts/check_version_consistency.py` 脚本
 
 2. **发布时机**：
