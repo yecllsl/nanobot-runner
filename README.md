@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-2570%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.17.0 - Hook组合系统+Subagent架构+异步用户确认+Cron训练提醒，全面增强AI底座能力
+> **最新版本**: v0.18.0 - 数据导出与可视化模块，支持CSV/JSON/Parquet格式导出与多维度数据可视化
 
 ## 项目简介
 
