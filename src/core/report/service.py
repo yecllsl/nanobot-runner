@@ -16,9 +16,12 @@ from src.core.models import (
     ScheduleStatus,
     WeeklyReportData,
 )
+from src.core.visualization.models import ChartConfig, ChartData, DataSeries
 from src.notify.feishu import FeishuBot
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
     from src.core.base.context import AppContext
 
 logger = get_logger(__name__)
@@ -564,6 +567,363 @@ class ReportService:
                 lines.append(f"- {r}")
 
         return "\n".join(lines)
+
+    def _generate_report_with_charts(
+        self,
+        report_data: DailyReportData | WeeklyReportData | MonthlyReportData,
+        report_type: ReportType,
+        console: "Console",
+    ) -> None:
+        """
+        生成带图表的报告输出
+
+        先输出文字报告（复用现有逻辑），再追加图表。
+        仅对 WeeklyReportData/MonthlyReportData 渲染图表，DailyReportData 跳过。
+        图表渲染失败时静默降级，不抛出异常。
+
+        Args:
+            report_data: 报告数据
+            report_type: 报告类型
+            console: Rich Console 实例
+        """
+        # 输出文字报告
+        report_dict = report_data.to_dict()
+        if report_type == ReportType.DAILY:
+            content = self._format_report_content(report_dict)
+        elif report_type == ReportType.WEEKLY:
+            content = self._format_weekly_report_content(report_dict)
+        elif report_type == ReportType.MONTHLY:
+            content = self._format_monthly_report_content(report_dict)
+        else:
+            content = str(report_dict)
+
+        console.print(content)
+
+        # 日报跳过图表渲染
+        if report_type == ReportType.DAILY:
+            return
+
+        # 周报/月报追加图表
+        try:
+            if isinstance(report_data, WeeklyReportData | MonthlyReportData):
+                self._render_and_append_charts(report_data, console)
+        except Exception as e:
+            logger.warning(f"图表渲染失败，已静默降级：{e}")
+
+    def _render_and_append_charts(
+        self,
+        report_data: WeeklyReportData | MonthlyReportData,
+        console: "Console",
+    ) -> None:
+        """
+        根据报告类型渲染对应图表
+
+        周报：VDOT趋势小图 + 训练负荷状态图
+        月报：跑量趋势小图 + 心率区间分布图
+
+        Args:
+            report_data: 周报或月报数据
+            console: Rich Console 实例
+        """
+        from src.core.visualization.plotext_renderer import PlotextRenderer
+
+        renderer = PlotextRenderer()
+        config = ChartConfig(width=80, height=12, show_legend=True, theme="default")
+
+        if isinstance(report_data, WeeklyReportData):
+            # 周报：VDOT趋势 + 训练负荷
+            vdot_chart = self._build_vdot_chart(report_data)
+            if vdot_chart.series and any(s.values for s in vdot_chart.series):
+                try:
+                    chart_str = renderer.render_line_chart(vdot_chart, config)
+                    console.print("\n[bold]VDOT 趋势[/bold]")
+                    console.print(chart_str)
+                except Exception as e:
+                    logger.warning(f"VDOT图表渲染失败：{e}")
+
+            load_chart = self._build_load_chart(report_data)
+            if load_chart.series and any(s.values for s in load_chart.series):
+                try:
+                    chart_str = renderer.render_multi_line_chart(load_chart, config)
+                    console.print("\n[bold]训练负荷状态[/bold]")
+                    console.print(chart_str)
+                except Exception as e:
+                    logger.warning(f"训练负荷图表渲染失败：{e}")
+
+        elif isinstance(report_data, MonthlyReportData):
+            # 月报：跑量趋势 + 心率区间
+            volume_chart = self._build_volume_chart(report_data)
+            if volume_chart.series and any(s.values for s in volume_chart.series):
+                try:
+                    chart_str = renderer.render_bar_chart(volume_chart, config)
+                    console.print("\n[bold]跑量趋势[/bold]")
+                    console.print(chart_str)
+                except Exception as e:
+                    logger.warning(f"跑量图表渲染失败：{e}")
+
+            hr_chart = self._build_hr_zones_chart(report_data)
+            if hr_chart.series and any(s.values for s in hr_chart.series):
+                try:
+                    chart_str = renderer.render_stacked_bar_chart(hr_chart, config)
+                    console.print("\n[bold]心率区间分布[/bold]")
+                    console.print(chart_str)
+                except Exception as e:
+                    logger.warning(f"心率区间图表渲染失败：{e}")
+
+    def _build_vdot_chart(
+        self, report_data: WeeklyReportData | MonthlyReportData
+    ) -> ChartData:
+        """
+        从报告数据构建VDOT趋势ChartData
+
+        通过查询报告时间范围内的原始数据，提取每次有效跑步的VDOT值。
+
+        Args:
+            report_data: 报告数据
+
+        Returns:
+            ChartData: VDOT趋势图表数据
+        """
+        now = datetime.now()
+        if isinstance(report_data, WeeklyReportData):
+            start_date = now - timedelta(days=now.weekday())
+            start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+        else:
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+
+        try:
+            runs = self.storage.query_by_date_range(
+                start_date=start_date, end_date=end_date
+            )
+            labels: list[str] = []
+            values: list[float] = []
+
+            for run in runs:
+                distance = run.get("session_total_distance") or run.get(
+                    "total_distance", 0
+                )
+                duration = run.get("session_total_timer_time") or run.get(
+                    "total_timer_time", 0
+                )
+                if distance >= 1500 and duration > 0:
+                    vdot = self.analytics.calculate_vdot(distance, duration)
+                    if vdot > 0:
+                        start_time = run.get("session_start_time")
+                        if start_time:
+                            if isinstance(start_time, datetime):
+                                labels.append(start_time.strftime("%m-%d"))
+                            else:
+                                labels.append(str(start_time)[:5])
+                        else:
+                            labels.append(f"R{len(labels) + 1}")
+                        values.append(round(vdot, 1))
+
+            return ChartData(
+                title="VDOT 趋势",
+                x_label="日期",
+                y_label="VDOT",
+                series=[
+                    DataSeries(name="VDOT", labels=labels, values=values, color="blue")
+                ],
+            )
+        except Exception as e:
+            logger.warning(f"构建VDOT图表数据失败：{e}")
+            return ChartData(title="VDOT 趋势", x_label="", y_label="", series=[])
+
+    def _build_load_chart(
+        self, report_data: WeeklyReportData | MonthlyReportData
+    ) -> ChartData:
+        """
+        从报告数据构建训练负荷ChartData
+
+        调用 analytics.get_training_load_trend 获取 CTL/ATL/TSB 趋势。
+
+        Args:
+            report_data: 报告数据
+
+        Returns:
+            ChartData: 训练负荷图表数据
+        """
+        days = 7 if isinstance(report_data, WeeklyReportData) else 30
+        try:
+            trend_result = self.analytics.get_training_load_trend(days=days)
+            trend_data = (
+                trend_result.get("trend_data", [])
+                if isinstance(trend_result, dict)
+                else []
+            )
+
+            if not trend_data:
+                return ChartData(title="训练负荷", x_label="", y_label="", series=[])
+
+            labels = [item.get("date", "") for item in trend_data]
+            ctl_values = [item.get("ctl", 0.0) for item in trend_data]
+            atl_values = [item.get("atl", 0.0) for item in trend_data]
+            tsb_values = [item.get("tsb", 0.0) for item in trend_data]
+
+            return ChartData(
+                title="训练负荷状态",
+                x_label="日期",
+                y_label="负荷",
+                series=[
+                    DataSeries(
+                        name="CTL", labels=labels, values=ctl_values, color="blue"
+                    ),
+                    DataSeries(
+                        name="ATL", labels=labels, values=atl_values, color="red"
+                    ),
+                    DataSeries(
+                        name="TSB", labels=labels, values=tsb_values, color="green"
+                    ),
+                ],
+            )
+        except Exception as e:
+            logger.warning(f"构建训练负荷图表数据失败：{e}")
+            return ChartData(title="训练负荷", x_label="", y_label="", series=[])
+
+    def _build_volume_chart(self, report_data: MonthlyReportData) -> ChartData:
+        """
+        从报告数据构建跑量趋势ChartData
+
+        按日聚合距离，构建柱状图数据。
+
+        Args:
+            report_data: 月报数据
+
+        Returns:
+            ChartData: 跑量趋势图表数据
+        """
+        now = datetime.now()
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date = now
+
+        try:
+            runs = self.storage.query_by_date_range(
+                start_date=start_date, end_date=end_date
+            )
+            from collections import defaultdict
+
+            daily_distance: dict[str, float] = defaultdict(float)
+            for run in runs:
+                distance = run.get("session_total_distance") or run.get(
+                    "total_distance", 0
+                )
+                start_time = run.get("session_start_time")
+                if start_time:
+                    if isinstance(start_time, datetime):
+                        day_key = start_time.strftime("%m-%d")
+                    else:
+                        day_key = str(start_time)[:10]
+                else:
+                    continue
+                daily_distance[day_key] += distance / 1000  # 转换为km
+
+            sorted_days = sorted(daily_distance.keys())
+            labels = sorted_days
+            values = [round(daily_distance[d], 2) for d in sorted_days]
+
+            return ChartData(
+                title="跑量趋势",
+                x_label="日期",
+                y_label="距离 (km)",
+                series=[
+                    DataSeries(name="跑量", labels=labels, values=values, color="cyan")
+                ],
+            )
+        except Exception as e:
+            logger.warning(f"构建跑量图表数据失败：{e}")
+            return ChartData(title="跑量趋势", x_label="", y_label="", series=[])
+
+    def _build_hr_zones_chart(self, report_data: MonthlyReportData) -> ChartData:
+        """
+        从报告数据构建心率区间ChartData
+
+        使用简单区间模型统计各区间时间占比。
+
+        Args:
+            report_data: 月报数据
+
+        Returns:
+            ChartData: 心率区间分布图表数据
+        """
+        now = datetime.now()
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date = now
+
+        try:
+            runs = self.storage.query_by_date_range(
+                start_date=start_date, end_date=end_date
+            )
+            zone_times: dict[str, float] = {
+                "Z1": 0.0,
+                "Z2": 0.0,
+                "Z3": 0.0,
+                "Z4": 0.0,
+                "Z5": 0.0,
+            }
+            zone_colors = {
+                "Z1": "blue",
+                "Z2": "green",
+                "Z3": "yellow",
+                "Z4": "orange",
+                "Z5": "red",
+            }
+
+            for run in runs:
+                avg_hr = run.get("session_avg_heart_rate") or run.get(
+                    "avg_heart_rate", 0
+                )
+                duration = run.get("session_total_timer_time") or run.get(
+                    "total_timer_time", 0
+                )
+                if avg_hr <= 0 or duration <= 0:
+                    continue
+
+                # 使用简单的心率区间模型（基于最大心率估算）
+                max_hr_est = 220 - 30  # 默认年龄30岁估算最大心率
+                hr_percent = avg_hr / max_hr_est
+
+                if hr_percent < 0.6:
+                    zone = "Z1"
+                elif hr_percent < 0.7:
+                    zone = "Z2"
+                elif hr_percent < 0.8:
+                    zone = "Z3"
+                elif hr_percent < 0.9:
+                    zone = "Z4"
+                else:
+                    zone = "Z5"
+
+                zone_times[zone] += duration / 60  # 转换为分钟
+
+            if sum(zone_times.values()) == 0:
+                return ChartData(
+                    title="心率区间分布", x_label="", y_label="", series=[]
+                )
+
+            labels = list(zone_times.keys())
+            series = [
+                DataSeries(
+                    name=zone,
+                    labels=labels,
+                    values=[zone_times[zone]],
+                    color=zone_colors.get(zone),
+                )
+                for zone in labels
+                if zone_times[zone] > 0
+            ]
+
+            return ChartData(
+                title="心率区间分布",
+                x_label="区间",
+                y_label="时间 (分钟)",
+                series=series,
+            )
+        except Exception as e:
+            logger.warning(f"构建心率区间图表数据失败：{e}")
+            return ChartData(title="心率区间分布", x_label="", y_label="", series=[])
 
     def _get_job_name(self, report_type: ReportType) -> str:
         """获取任务名称"""

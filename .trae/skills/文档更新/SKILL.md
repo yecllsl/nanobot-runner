@@ -1,8 +1,7 @@
-***
-
-name: 文档更新
-description: 更新用户文档和全局文档，确保文档与版本内容一致
-------------------------------------
+---
+name: "文档更新"
+description: "更新用户文档和全局文档，确保文档与版本内容一致。Invoke when user triggers document update or after version changes."
+---
 
 # 角色
 

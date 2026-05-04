@@ -1,6 +1,6 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.6.0 | **更新日期**: 2026-05-03
+> **版本**: v5.7.0 | **更新日期**: 2026-05-04
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -58,7 +58,9 @@ src/
 │   ├── report/                 # 报告模块
 │   ├── models/                 # 模型模块
 │   ├── transparency/           # AI决策透明化模块
-│   └── plan/                   # 智能跑步计划模块
+│   ├── plan/                   # 智能跑步计划模块
+│   ├── export/                 # 数据导出模块
+│   └── visualization/          # 数据可视化模块
 ├── agents/tools.py             # Agent 工具集
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块
@@ -170,6 +172,20 @@ uv run nanobotrun data stats [--year YYYY]
 uv run nanobotrun analysis vdot
 uv run nanobotrun analysis load
 uv run nanobotrun analysis hr-drift
+```
+
+### 数据可视化
+
+```bash
+uv run nanobotrun viz vdot [--days 7/30/90/365]
+uv run nanobotrun viz load [--days 30/90/180]
+uv run nanobotrun viz hr-zones --start YYYY-MM-DD --end YYYY-MM-DD [--age 30]
+```
+
+### 数据导出
+
+```bash
+uv run nanobotrun export sessions --format csv/json/parquet [--start YYYY-MM-DD] [--end YYYY-MM-DD]
 ```
 
 ### 报告与计划

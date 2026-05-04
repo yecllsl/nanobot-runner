@@ -8,6 +8,7 @@ from src.cli.commands import (
     analysis_app,
     cron_app,
     data_app,
+    export_app,
     gateway_app,
     plan_app,
     preference_app,
@@ -16,6 +17,7 @@ from src.cli.commands import (
     system_app,
     tools_app,
     transparency_app,
+    viz_app,
 )
 
 app = typer.Typer(
@@ -26,6 +28,8 @@ app = typer.Typer(
 
 app.add_typer(data_app, name="data")
 app.add_typer(analysis_app, name="analysis")
+app.add_typer(viz_app, name="viz")
+app.add_typer(export_app, name="export")
 app.add_typer(agent_app, name="agent")
 app.add_typer(report_app, name="report")
 app.add_typer(system_app, name="system")

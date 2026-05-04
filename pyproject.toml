@@ -1,6 +1,6 @@
 [project]
 name = "nanobot-runner"
-version = "0.17.0"
+version = "0.18.0"
 description = "Nanobot Runner - 桌面端私人AI跑步助理"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "dulwich>=0.21.0",
     "pyyaml>=6.0.0",
+    "plotext>=5.0.0",
 ]
 
 [project.optional-dependencies]

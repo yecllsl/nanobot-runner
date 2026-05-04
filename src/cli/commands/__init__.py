@@ -5,6 +5,7 @@ from src.cli.commands.agent import app as agent_app
 from src.cli.commands.analysis import app as analysis_app
 from src.cli.commands.cron import app as cron_app
 from src.cli.commands.data import app as data_app
+from src.cli.commands.export import app as export_app
 from src.cli.commands.gateway import app as gateway_app
 from src.cli.commands.plan import app as plan_app
 from src.cli.commands.preference import app as preference_app
@@ -14,10 +15,13 @@ from src.cli.commands.skill import app as skill_app
 from src.cli.commands.system import app as system_app
 from src.cli.commands.tools import app as tools_app
 from src.cli.commands.transparency import app as transparency_app
+from src.cli.commands.viz import app as viz_app
 
 __all__ = [
     "data_app",
     "analysis_app",
+    "viz_app",
+    "export_app",
     "agent_app",
     "report_app",
     "profile_app",

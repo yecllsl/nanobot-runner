@@ -216,6 +216,28 @@ class AppContext:
             self.set_extension("ask_user_confirm_manager", manager)
         return manager
 
+    @property
+    def chart_renderer(self) -> Any:
+        """获取图表渲染器（v0.18.0新增）"""
+        from src.core.visualization.plotext_renderer import PlotextRenderer
+
+        renderer = self.get_extension("chart_renderer")
+        if renderer is None:
+            renderer = PlotextRenderer()
+            self.set_extension("chart_renderer", renderer)
+        return renderer
+
+    @property
+    def export_engine(self) -> Any:
+        """获取导出引擎（v0.18.0新增）"""
+        from src.core.export.engine import ExportEngine
+
+        engine = self.get_extension("export_engine")
+        if engine is None:
+            engine = ExportEngine(storage=self.storage, analytics=self.analytics)
+            self.set_extension("export_engine", engine)
+        return engine
+
 
 class AppContextFactory:
     """
