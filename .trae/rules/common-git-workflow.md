@@ -1,6 +1,5 @@
 ---
 alwaysApply: false
-description: 通用 Git 工作流程指南   
 ---
 # Git 工作流程
 
