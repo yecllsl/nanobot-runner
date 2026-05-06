@@ -238,6 +238,41 @@ class AppContext:
             self.set_extension("export_engine", engine)
         return engine
 
+    @property
+    def body_signal_engine(self) -> Any:
+        """获取身体信号引擎（v0.19.0新增）"""
+        from src.core.body_signal.body_signal_engine import BodySignalEngine
+        from src.core.body_signal.fatigue_assessor import FatigueAssessor
+        from src.core.body_signal.hrv_analyzer import HRVAnalyzer
+        from src.core.body_signal.recovery_monitor import RecoveryMonitor
+        from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+        from src.core.config.body_signal_config import BodySignalConfig
+
+        engine = self.get_extension("body_signal_engine")
+        if engine is None:
+            config = BodySignalConfig()
+            training_load_analyzer = TrainingLoadAnalyzer()
+            hrv_analyzer = HRVAnalyzer(session_repo=self.session_repo, config=config)
+            fatigue_assessor = FatigueAssessor(
+                session_repo=self.session_repo,
+                training_load_analyzer=training_load_analyzer,
+                config=config,
+            )
+            recovery_monitor = RecoveryMonitor(
+                session_repo=self.session_repo,
+                training_load_analyzer=training_load_analyzer,
+                hrv_analyzer=hrv_analyzer,
+                config=config,
+            )
+            engine = BodySignalEngine(
+                hrv_analyzer=hrv_analyzer,
+                fatigue_assessor=fatigue_assessor,
+                recovery_monitor=recovery_monitor,
+                advice_engine=self.smart_advice_engine,
+                config=config,
+            )
+            self.set_extension("body_signal_engine", engine)
+        return engine
 
 class AppContextFactory:
     """

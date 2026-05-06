@@ -17,7 +17,7 @@ class HardValidator:
     """
     硬性规则校验器
 
-    实现PRD中定义的6条硬性校验规则
+    实现REQ中定义的6条硬性校验规则
     """
 
     RULE_WEEKLY_INCREASE = "weekly_increase_limit"
