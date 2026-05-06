@@ -1,25 +1,31 @@
 ---
 alwaysApply: true
-description: 业务规则、审查维度、智能体协作核心约束。与 AGENTS.md 配合使用。
+description: 项目总规则、协同黄金法则、实施层级、规则分类索引
 ---
-# Project Rules
-## 业务规则
-**计算**: VDOT(Powers,距离>=1500m) | TSS(时长×IF²×100) | 心率漂移(相关性<-0.7)
-**存储**: Parquet按年分片 | SHA256去重
-## 审查维度
-**必检**: 功能正确性 | 边界处理 | Polars LazyFrame | 类型注解 | 单元测试
-## 输出格式
-**CLI**: 时长HH:MM:SS | 配速M'SS"/km
-**Agent**: JSON含success/data/message或error/details
-## 质量门禁
-**覆盖率**: core≥80% | agents≥70% | cli≥60%
-**禁止**: ❌硬编码敏感信息 | ❌print调试 | ❌测试未通过合并
-**Commit**: `<type>(<scope>): <subject>`
-## 智能体协作
-**角色**: 架构师→开发→评审→测试→修复→回归→运维
-**准入**: 开发(需求确认) | 测试(覆盖率≥80%+评审) | 发布(Bug清零+CICD)
-**交付物**: `角色_指令_版本.md` → docs/
-## 规范文档
-- 执行指令: `.trae/指令手册.md`
-- 协作流程: `.trae/协作链路.md`
-- 详细指南: `AGENTS.md`
+# 项目总规则
+
+## 协同黄金法则
+1. **Rules先行** — 任何操作前先检查规则约束
+2. **Skills指导** — 根据任务类型激活对应技能
+3. **Subagents执行** — 复杂任务分解给专业代理
+4. **Rules验证** — 执行结果必须通过规则检查
+
+## 实施层级
+| 层级 | 实施位置 | 示例 |
+|------|----------|------|
+| 输入层 | 请求入口 | 过滤恶意输入、权限验证 |
+| 执行层 | Agent行为 | 禁止危险命令、限制文件访问 |
+| 输出层 | 结果检查 | 敏感信息脱敏、格式验证 |
+| 审计层 | 日志记录 | 操作追踪、合规审计 |
+
+## 规则分类索引
+- `security-rules.md` — 安全规则（输入验证/敏感数据/访问控制）
+- `compliance-rules.md` — 合规规则（代码审计/许可证/数据隐私）
+- `quality-rules.md` — 质量规则（测试覆盖/代码规范/文档完整）
+- `process-rules.md` — 流程规则（分支策略/审批流程/变更记录）
+
+## 业务核心约束
+- 计算：VDOT(Powers,距离≥1500m) | TSS(时长×IF²×100)
+- 存储：Parquet按年分片 | SHA256去重
+- 输出：时长HH:MM:SS | 配速M'SS"/km
+- Agent输出：JSON含success/data/message
