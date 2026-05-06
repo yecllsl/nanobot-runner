@@ -19,6 +19,7 @@ from src.core.models.analytics import (
     WeatherInfo,
     WeeklyReportData,
 )
+from src.core.models.recovery import RecoveryStatus
 from src.core.models.training_plan import (
     DailyPlan,
     GoalAchievementEvaluation,
@@ -96,4 +97,5 @@ __all__ = [
     "OperationResult",
     "WeeklyReportData",
     "MonthlyReportData",
+    "RecoveryStatus",
 ]

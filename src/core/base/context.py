@@ -274,6 +274,7 @@ class AppContext:
             self.set_extension("body_signal_engine", engine)
         return engine
 
+
 class AppContextFactory:
     """
     应用上下文工厂
