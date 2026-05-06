@@ -1,10 +1,14 @@
 # CLI 使用指南
 
+> **文档版本**: v0.19.0 | **更新日期**: 2026-05-06
+> **当前基线**: v0.18.0 | **规划版本**: v0.19.0
+
 ## 1. 概述
 
 Nanobot Runner 提供命令行界面（CLI），用于导入跑步数据、查看统计信息和与 Agent 交互。
 
 **v0.9.0 架构变更**: CLI 已按领域拆分为独立模块，命令采用分组结构（如 `nanobotrun data import`）。
+**v0.19.0 新增**: 身体信号分析命令（`analysis hrv/fatigue/recovery` 和 `status`）。
 
 ## 2. 安装与配置
 
@@ -163,7 +167,88 @@ uv run nanobotrun analysis hr-drift
 uv run nanobotrun analysis hr-drift --run-id <activity_id>
 ```
 
-### 3.4 Agent 交互命令 (agent)
+#### 心率变异分析 (v0.19.0)
+
+```bash
+# 查看HRV分析（最近30天）
+uv run nanobotrun analysis hrv
+
+# 查看指定时间范围
+uv run nanobotrun analysis hrv --days 7
+uv run nanobotrun analysis hrv --days 90
+
+# 心率恢复分析
+uv run nanobotrun analysis hr-recovery
+
+# 分析指定跑步记录的心率恢复
+uv run nanobotrun analysis hr-recovery --run-id <activity_id>
+```
+
+**输出示例**:
+```
+📊 HRV分析（最近30天）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+静息心率趋势: 52 → 50 bpm (↓ 改善)
+估算RMSSD: 45.2 ms
+估算SDNN: 52.8 ms
+心率恢复(1分钟): 28%
+心率恢复(3分钟): 55%
+状态评估: 恢复良好，适合中等强度训练
+```
+
+#### 疲劳度与恢复评估 (v0.19.0)
+
+```bash
+# 查看当前疲劳度评分
+uv run nanobotrun analysis fatigue
+
+# 查看恢复状态
+uv run nanobotrun analysis recovery
+
+# 查看详细恢复指标
+uv run nanobotrun analysis recovery --detailed
+```
+
+**输出示例**:
+```
+😴 疲劳度评估
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+综合疲劳度: 45/100 (中等)
+恢复状态: 🟡 适度训练
+ATL: 65 (近期负荷)
+CTL: 58 (体能基础)
+TSB: -7 (轻微疲劳)
+
+💡 建议: 今天适合轻松跑或休息，避免高强度训练
+```
+
+### 3.4 身体状态命令 (status) (v0.19.0)
+
+**v0.19.0 新增**: 快速查看身体状态和训练建议。
+
+```bash
+# 查看今日身体状态
+uv run nanobotrun status today
+
+# 查看本周身体状态摘要
+uv run nanobotrun status weekly
+
+# 查看指定日期状态
+uv run nanobotrun status --date 2024-01-15
+```
+
+**输出示例**:
+```
+📋 今日身体状态 (2024-01-15)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+静息心率: 52 bpm (正常)
+恢复状态: 🟢 良好
+疲劳度: 35/100 (轻度)
+
+💡 训练建议: 今天状态不错，可以进行间歇训练或节奏跑
+```
+
+### 3.5 Agent 交互命令 (agent)
 
 ```bash
 # 启动交互式对话
@@ -185,7 +270,7 @@ uv run nanobotrun agent chat
 - 变化: +0.4 (↑ 改善中)
 ```
 
-### 3.5 报告生成命令 (report)
+### 3.6 报告生成命令 (report)
 
 **v0.15.0 新增**: 支持 `--output` 选项将报告保存为文件。
 
@@ -206,7 +291,7 @@ uv run nanobotrun report generate --type monthly --output monthly_report.md
 uv run nanobotrun report profile
 ```
 
-### 3.6 训练计划命令 (plan)
+### 3.7 训练计划命令 (plan)
 
 **v0.10.0~v0.12.0 新增**: 智能跑步计划系统，支持计划创建、执行跟踪、调整优化。
 
@@ -296,7 +381,7 @@ uv run nanobotrun plan advice plan_20240101
 uv run nanobotrun plan advice plan_20240101 --focus aerobic
 ```
 
-### 3.7 工具管理命令 (tools)
+### 3.8 工具管理命令 (tools)
 
 **v0.13.0 新增**: 工具管理命令用于管理 MCP 工具服务器的配置。
 
@@ -365,7 +450,7 @@ uv run nanobotrun tools import-claude --config-path /path/to/claude/config.json
 uv run nanobotrun tools validate
 ```
 
-### 3.8 初始化命令 (init)
+### 3.9 初始化命令 (init)
 
 **v0.9.4 新增**: 初始化命令用于配置工作区和用户设置。
 
@@ -393,7 +478,7 @@ uv run nanobotrun system init --workspace /path/to/workspace
 4. 配置飞书集成（可选）
 5. 验证配置有效性
 
-### 3.7 系统管理命令 (system)
+### 3.10 系统管理命令 (system)
 
 ```bash
 # 查看版本信息
@@ -421,7 +506,7 @@ uv run nanobotrun system migrate
 uv run nanobotrun system backup --list
 ```
 
-### 3.9 透明化命令 (transparency)
+### 3.11 透明化命令 (transparency)
 
 **v0.15.0 新增**: AI 决策透明化命令，用于查看 AI 决策过程和系统状态。
 
@@ -461,7 +546,7 @@ uv run nanobotrun transparency insight --days 30
 uv run nanobotrun transparency insight --output insight.md
 ```
 
-### 3.10 网关服务命令 (gateway)
+### 3.12 网关服务命令 (gateway)
 
 **v0.17.0 增强**: Gateway 服务现已集成 Hook 系统、Cron 定时任务和 MCP 工具管理。
 

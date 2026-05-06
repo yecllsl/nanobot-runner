@@ -2,9 +2,11 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
-> **文档版本**: v0.17.0 | **更新日期**: 2026-05-03
+> **文档版本**: v0.19.0 | **更新日期**: 2026-05-06
+> **当前基线**: v0.18.0 | **规划版本**: v0.19.0
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
-> **v0.17.0 重要变更**: 新增Hook组合系统、Subagent架构、异步用户确认系统、Cron训练提醒、LLM超时控制
+> **v0.18.0 重要变更**: 新增数据可视化模块(terminal charts)、数据导出模块(multi-format export)
+> **v0.19.0 规划变更**: 新增身体信号分析模块(HRV/疲劳度/恢复评估)
 
 ---
 
@@ -432,4 +434,126 @@ config = helper.load_tools_config()
 
 # 验证配置
 is_valid = helper.validate_mcp_config()
+```
+
+---
+
+## 身体信号分析模块 (v0.19.0)
+
+**v0.19.0 新增**: 身体信号分析模块，提供心率变异(HRV)、疲劳度、恢复状态等深度分析能力。
+
+### HRVAnalyzer
+
+心率变异分析引擎，基于现有心率数据提供HRV相关指标分析。
+
+```python
+from src.core.analysis.hrv import HRVAnalyzer
+
+analyzer = HRVAnalyzer()
+
+# 分析HRV趋势
+result = analyzer.analyze_hrv_trend(days=30)
+
+# 分析单次跑步的心率恢复
+recovery = analyzer.analyze_hr_recovery(activity_id="activity_123")
+
+# 获取静息心率趋势
+resting_hr = analyzer.get_resting_hr_trend(days=30)
+```
+
+**数据类**:
+
+```python
+@dataclass(frozen=True)
+class HRVAnalysisResult:
+    resting_hr_trend: list[RestingHRPoint]  # 静息心率趋势
+    hr_recovery_1min: float | None           # 1分钟恢复率(%)
+    hr_recovery_3min: float | None           # 3分钟恢复率(%)
+    estimated_rmssd: float | None            # 估算RMSSD(ms)
+    estimated_sdnn: float | None             # 估算SDNN(ms)
+    drift_alert: bool                        # 漂移预警
+    assessment: str                          # 综合评估
+
+@dataclass(frozen=True)
+class RestingHRPoint:
+    date: str
+    resting_hr: float
+    deviation_pct: float  # 与30天均值偏差百分比
+```
+
+---
+
+### FatigueAnalyzer
+
+疲劳度评估引擎，综合训练负荷、心率指标、主观感受量化疲劳状态。
+
+```python
+from src.core.analysis.fatigue import FatigueAnalyzer
+
+analyzer = FatigueAnalyzer()
+
+# 计算综合疲劳度评分
+score = analyzer.calculate_fatigue_score()
+
+# 获取恢复状态
+recovery = analyzer.get_recovery_status()
+
+# 分析连续训练日
+consecutive = analyzer.analyze_consecutive_training(days=7)
+
+# 评估休息日效果
+rest_effect = analyzer.evaluate_rest_day_effect(rest_date="2024-01-14")
+```
+
+**数据类**:
+
+```python
+@dataclass(frozen=True)
+class FatigueAssessment:
+    score: int                    # 0-100分
+    level: str                    # 轻度/中等/重度
+    status: str                   # 绿/黄/红
+    components: dict              # 各维度得分
+    recommendation: str           # 训练建议
+
+@dataclass(frozen=True)
+class RecoveryStatus:
+    status: str                   # 绿/黄/红
+    tsb: float                    # 训练压力平衡
+    atl: float                    # 急性训练负荷
+    ctl: float                    # 慢性训练负荷
+    readiness_score: int          # 准备度评分
+```
+
+---
+
+### BodySignalInterpreter
+
+身体信号解读引擎，提供异常预警和智能建议。
+
+```python
+from src.core.analysis.body_signals import BodySignalInterpreter
+
+interpreter = BodySignalInterpreter()
+
+# 检查异常信号
+alerts = interpreter.check_abnormal_signals()
+
+# 生成训练建议
+advice = interpreter.generate_training_advice()
+
+# 获取身体信号摘要
+summary = interpreter.get_body_signal_summary(period="daily")
+```
+
+**Agent工具扩展** (v0.19.0):
+
+| 工具名称 | 说明 |
+|---------|------|
+| `get_hrv_analysis` | 获取HRV分析报告 |
+| `get_hr_recovery` | 获取心率恢复分析 |
+| `get_fatigue_assessment` | 获取疲劳度评估 |
+| `get_recovery_status` | 获取恢复状态 |
+| `check_body_signals` | 检查身体异常信号 |
+| `get_training_readiness` | 获取训练准备度评估 |
 ```

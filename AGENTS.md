@@ -1,6 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.7.0 | **更新日期**: 2026-05-04
+> **版本**: v5.9.0 | **更新日期**: 2026-05-06
+> **当前基线**: v0.19.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -59,8 +60,12 @@ src/
 │   ├── models/                 # 模型模块
 │   ├── transparency/           # AI决策透明化模块
 │   ├── plan/                   # 智能跑步计划模块
-│   ├── export/                 # 数据导出模块
-│   └── visualization/          # 数据可视化模块
+│   ├── export/                 # 数据导出模块 (v0.18.0)
+│   ├── visualization/          # 数据可视化模块 (v0.18.0)
+│   └── analysis/               # 身体信号分析模块 (v0.19.0)
+│       ├── hrv.py              # 心率变异分析
+│       ├── fatigue.py          # 疲劳度评估
+│       └── body_signals.py     # 身体信号解读
 ├── agents/tools.py             # Agent 工具集
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块
@@ -172,6 +177,12 @@ uv run nanobotrun data stats [--year YYYY]
 uv run nanobotrun analysis vdot
 uv run nanobotrun analysis load
 uv run nanobotrun analysis hr-drift
+
+# v0.19.0 - 身体信号分析
+uv run nanobotrun analysis hrv [--days 7/30/90]
+uv run nanobotrun analysis hr-recovery
+uv run nanobotrun analysis fatigue
+uv run nanobotrun analysis recovery
 ```
 
 ### 数据可视化
@@ -195,6 +206,13 @@ uv run nanobotrun report weekly
 uv run nanobotrun report monthly
 uv run nanobotrun plan create --goal "全马破4" --race-date 2024-12-01
 uv run nanobotrun plan status --plan-id <plan_id>
+```
+
+### 身体状态查看 (v0.19.0)
+
+```bash
+uv run nanobotrun status today      # 今日身体状态
+uv run nanobotrun status weekly     # 本周身体状态摘要
 ```
 
 ### 系统管理
