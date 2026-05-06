@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import typer
 
-from src.cli.common import CLIError, console, print_error
+from src.cli.common import CLIError, console, print_error, print_status
 from src.cli.handlers.viz_handler import VizHandler
 from src.core.base.context import get_context
 
@@ -45,6 +46,9 @@ def vdot(
         "-d",
         help="统计天数",
     ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="导出图表到文件（纯文本）"
+    ),
 ) -> None:
     """渲染 VDOT 趋势图表
 
@@ -53,9 +57,11 @@ def vdot(
     示例:
         nanobotrun viz vdot
         nanobotrun viz vdot --days 90
+        nanobotrun viz vdot --days 30 --output vdot_chart.txt
 
     Args:
         days: 统计天数（7/30/90/365，默认 30）
+        output: 导出文件路径（可选）
     """
     days = _validate_days(days, VDOT_DAYS_CHOICES)
 
@@ -70,6 +76,11 @@ def vdot(
         result = handler.handle_vdot(days)
         console.print(result)
 
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result, encoding="utf-8")
+            print_status(f"图表已导出到: {output}", "success")
+
     except Exception as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
@@ -83,6 +94,9 @@ def training_load(
         "-d",
         help="统计天数",
     ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="导出图表到文件（纯文本）"
+    ),
 ) -> None:
     """渲染训练负荷趋势图表
 
@@ -91,9 +105,11 @@ def training_load(
     示例:
         nanobotrun viz load
         nanobotrun viz load --days 180
+        nanobotrun viz load --days 90 --output load_chart.txt
 
     Args:
         days: 统计天数（30/90/180，默认 90）
+        output: 导出文件路径（可选）
     """
     days = _validate_days(days, LOAD_DAYS_CHOICES)
 
@@ -107,6 +123,11 @@ def training_load(
         console.print(f"[bold]训练负荷趋势图表[/bold] (最近 {days} 天)")
         result = handler.handle_load(days)
         console.print(result)
+
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result, encoding="utf-8")
+            print_status(f"图表已导出到: {output}", "success")
 
     except Exception as e:
         print_error(CLIError.storage_error(str(e)))
@@ -135,6 +156,9 @@ def hr_zones(
         "-a",
         help="年龄，用于计算最大心率",
     ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="导出图表到文件（纯文本）"
+    ),
 ) -> None:
     """渲染心率区间分布图表
 
@@ -142,11 +166,13 @@ def hr_zones(
 
     示例:
         nanobotrun viz hr-zones --start 2024-01-01 --end 2024-01-31 --age 30
+        nanobotrun viz hr-zones -s 2024-01-01 -e 2024-01-31 -o hr_zones.txt
 
     Args:
         start: 开始日期
         end: 结束日期
         age: 年龄（默认 30）
+        output: 导出文件路径（可选）
     """
     # 验证年龄范围
     if age <= 0 or age > 120:
@@ -181,6 +207,11 @@ def hr_zones(
         )
         result = handler.handle_hr_zones(start, end, age)
         console.print(result)
+
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result, encoding="utf-8")
+            print_status(f"图表已导出到: {output}", "success")
 
     except Exception as e:
         print_error(CLIError.storage_error(str(e)))

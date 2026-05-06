@@ -193,17 +193,25 @@ class VizHandler:
     ) -> ChartData:
         """将 VDOT 趋势数据转换为图表数据
 
+        按日期聚合去重：同一天多条记录取平均VDOT。
+
         Args:
             trend_data: VDOT 趋势数据列表
 
         Returns:
             ChartData 实例（单 series）
         """
-        labels = [item.date for item in trend_data]
-        values = [item.vdot for item in trend_data]
+        from collections import defaultdict
+
+        daily_vdot: dict[str, list[float]] = defaultdict(list)
+        for item in trend_data:
+            daily_vdot[item.date].append(item.vdot)
+
+        labels = sorted(daily_vdot.keys())
+        values = [sum(daily_vdot[d]) / len(daily_vdot[d]) for d in labels]
 
         return ChartData(
-            title=f"VDOT 趋势 (最近 {len(trend_data)} 天)",
+            title=f"VDOT 趋势 (最近 {len(labels)} 天)",
             x_label="日期",
             y_label="VDOT",
             series=[

@@ -1,6 +1,6 @@
 # UAT 详细测试用例
 
-本文档包含 Nanobot Runner v0.17.0 用户验收测试的完整详细用例。
+本文档包含 Nanobot Runner v0.18.0 用户验收测试的完整详细用例。
 
 **快速导航**：
 - [数据导入与查询](UAT_data_import.md) - UAT-001 ~ UAT-008
@@ -12,5 +12,7 @@
 - [AI 透明化](UAT_transparency.md) - UAT-048 ~ UAT-051
 - [偏好管理](UAT_preference.md) - UAT-052 ~ UAT-055
 - [技能管理](UAT_skill.md) - UAT-056 ~ UAT-060
+- [数据可视化](UAT_visualization.md) - UAT-061 ~ UAT-065
+- [数据导出](UAT_export.md) - UAT-066 ~ UAT-070
 
 **返回精简版指南**: [../用户验收测试指南.md](../用户验收测试指南.md)

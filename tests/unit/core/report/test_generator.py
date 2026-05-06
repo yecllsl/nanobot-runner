@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
-from src.core.models import ReportData, ReportType
+from src.core.models import ReportData, ReportType, VdotTrendItem
 from src.core.report.generator import ReportConfig, ReportGenerator, TemplateEngine
 
 
@@ -352,6 +352,42 @@ class TestFormatMethods:
         vdot_trend = [
             {"date": "2024-01-01", "vdot": 40.5},
             {"date": "2024-01-07", "vdot": 41.2},
+        ]
+
+        result = generator._format_vdot_trend(vdot_trend)
+
+        assert "2024-01-01" in result
+        assert "40.5" in result
+        assert "2024-01-07" in result
+        assert "41.2" in result
+
+    def test_format_vdot_trend_with_vdot_trend_item(self, generator):
+        """测试格式化 VdotTrendItem 对象（BUG-001 修复验证）"""
+        vdot_trend = [
+            VdotTrendItem(
+                date="2024-01-01", vdot=40.5, distance=5000.0, duration=1800.0
+            ),
+            VdotTrendItem(
+                date="2024-01-07", vdot=41.2, distance=8000.0, duration=2880.0
+            ),
+        ]
+
+        result = generator._format_vdot_trend(vdot_trend)
+
+        assert "2024-01-01" in result
+        assert "40.5" in result
+        assert "2024-01-07" in result
+        assert "41.2" in result
+        assert "5.0km" in result
+        assert "8.0km" in result
+
+    def test_format_vdot_trend_mixed_types(self, generator):
+        """测试格式化混合类型（VdotTrendItem + dict）的 VDOT 趋势数据"""
+        vdot_trend = [
+            VdotTrendItem(
+                date="2024-01-01", vdot=40.5, distance=5000.0, duration=1800.0
+            ),
+            {"date": "2024-01-07", "vdot": 41.2, "distance": 8000.0},
         ]
 
         result = generator._format_vdot_trend(vdot_trend)
