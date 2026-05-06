@@ -1,7 +1,7 @@
 # PlotextRenderer 单元测试
 # 测试各图表渲染方法、空数据、极值标注、终端宽度自适应等场景
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import plotext as _plt
 import pytest
@@ -10,6 +10,7 @@ from src.core.visualization.models import ChartConfig, ChartData, DataSeries
 from src.core.visualization.plotext_renderer import (
     PlotextRenderer,
     _annotate_extremes,
+    _ensure_utf8_output,
     _fallback_stacked_bar_as_table,
     _get_terminal_height,
     _get_terminal_width,
@@ -350,3 +351,34 @@ class TestTerminalWidthAdaptive:
         config = ChartConfig(width=90, show_legend=False)
         result = renderer.render_bar_chart(data, config)
         assert isinstance(result, str)
+
+
+class TestEnsureUtf8Output:
+    """测试 UTF-8 编码设置（BUG-003 修复验证）"""
+
+    def test_ensure_utf8_output_no_exception(self):
+        """测试调用 _ensure_utf8_output 不抛异常"""
+        _ensure_utf8_output()
+
+    @patch("src.core.visualization.plotext_renderer.sys")
+    def test_ensure_utf8_output_windows(self, mock_sys):
+        """测试 Windows 平台调用 reconfigure"""
+        mock_sys.platform = "win32"
+        mock_stdout = Mock()
+        mock_sys.stdout = mock_stdout
+        mock_sys.stdout.reconfigure = Mock()
+
+        from src.core.visualization.plotext_renderer import _ensure_utf8_output as _func
+
+        _func()
+
+    @patch("src.core.visualization.plotext_renderer.sys")
+    def test_ensure_utf8_output_non_windows(self, mock_sys):
+        """测试非 Windows 平台跳过 reconfigure"""
+        mock_sys.platform = "linux"
+        mock_stdout = Mock()
+        mock_sys.stdout = mock_stdout
+
+        from src.core.visualization.plotext_renderer import _ensure_utf8_output as _func
+
+        _func()

@@ -3,13 +3,23 @@
 
 from __future__ import annotations
 
+import contextlib
 import shutil
+import sys
 from typing import TYPE_CHECKING
 
 from rich.table import Table
 
 from src.core.base.exceptions import NanobotRunnerError
 from src.core.visualization.models import ChartConfig, ChartData
+
+
+def _ensure_utf8_output() -> None:
+    """确保 stdout 使用 UTF-8 编码，解决 Windows 终端中文乱码问题"""
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+        with contextlib.suppress(OSError, ValueError):
+            sys.stdout.reconfigure(encoding="utf-8")
+
 
 if TYPE_CHECKING:
     pass
@@ -140,6 +150,8 @@ class PlotextRenderer:
         Returns:
             终端可显示的图表字符串
         """
+        _ensure_utf8_output()
+
         if not _has_data(data):
             return "暂无数据"
 
@@ -181,6 +193,8 @@ class PlotextRenderer:
         Returns:
             终端可显示的图表字符串
         """
+        _ensure_utf8_output()
+
         if not _has_data(data):
             return "暂无数据"
 
@@ -218,6 +232,8 @@ class PlotextRenderer:
         Returns:
             终端可显示的图表字符串
         """
+        _ensure_utf8_output()
+
         if not _has_data(data):
             return "暂无数据"
 
@@ -255,6 +271,8 @@ class PlotextRenderer:
         Returns:
             终端可显示的图表字符串或 Rich Table 文本
         """
+        _ensure_utf8_output()
+
         if not _has_data(data):
             return "暂无数据"
 

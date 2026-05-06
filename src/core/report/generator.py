@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from src.core.base.logger import get_logger
-from src.core.models import ReportData, ReportType
+from src.core.models import ReportData, ReportType, VdotTrendItem
 
 if TYPE_CHECKING:
     from src.core.base.context import AppContext
@@ -709,12 +709,14 @@ class ReportGenerator:
 
         return "\n".join(lines) if lines else "暂无有效心率数据"
 
-    def _format_vdot_trend(self, vdot_trend: list[dict[str, Any]]) -> str:
+    def _format_vdot_trend(
+        self, vdot_trend: list[VdotTrendItem | dict[str, Any]]
+    ) -> str:
         """
         格式化 VDOT 趋势数据
 
         Args:
-            vdot_trend: VDOT 趋势数据列表
+            vdot_trend: VDOT 趋势数据列表（VdotTrendItem 或 dict）
 
         Returns:
             str: 格式化后的文本
@@ -723,10 +725,15 @@ class ReportGenerator:
             return "暂无 VDOT 趋势数据"
 
         lines = []
-        for item in vdot_trend[-7:]:  # 只显示最近 7 次
-            date = item.get("date", "")
-            vdot = item.get("vdot", 0.0)
-            distance = item.get("distance", 0.0) / 1000  # 转换为公里
+        for item in vdot_trend[-7:]:
+            if isinstance(item, VdotTrendItem):
+                date = item.date
+                vdot = item.vdot
+                distance = item.distance / 1000
+            else:
+                date = item.get("date", "")
+                vdot = item.get("vdot", 0.0)
+                distance = item.get("distance", 0.0) / 1000
 
             lines.append(f"- {date}: VDOT {vdot:.1f} ({distance:.1f}km)")
 
