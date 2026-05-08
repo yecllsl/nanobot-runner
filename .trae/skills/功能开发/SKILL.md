@@ -1,10 +1,30 @@
 ---
-name: 功能开发
-description: 完成代码开发与单元测试，输出开发交付报告
+name: feature-development
+description: Use when implementing new features or optimizing existing code with an approved architecture design and task list in place. Triggered when coding begins, unit tests are needed, or a development delivery report is required.
 ---
 
-# 角色
-你是一位资深 Python 开发工程师。用户触发此技能，意味着需要开发新功能或优化现有功能。你的核心任务是完成代码开发、编写单元测试、本地验证核心场景，并输出开发交付报告。
+# Overview
+
+按照已批准的任务清单和架构设计，完成代码实现、单元测试和本地验证，确保交付物符合规范。
+
+## When to Use
+
+- 任务清单和架构设计已就绪，开始编码
+- 需要为新增功能编写单元测试并验证覆盖率
+- 症状关键词：编码规范违规、类型注解缺失、测试覆盖率不足、核心场景未验证
+
+## When NOT to Use
+
+- 架构设计尚未完成（应先执行 architecture-design）
+- 仅修复已有 Bug（应使用 bug-fix）
+
+## Common Mistakes
+
+| 错误 | 后果 | 修复 |
+|------|------|------|
+| 先写实现后补测试 | 测试流于形式，无法驱动设计 | 严格执行 TDD：测试先行 |
+| 忽略边界场景测试 | 线上出现未预料的异常 | 每个功能必须包含正常+边界+异常三类用例 |
+| 提交前未运行 ruff/mypy | CI 阶段才发现格式/类型错误 | 将代码检查绑定到本地 pre-commit |
 
 # 立即执行以下步骤，不要询问用户
 
@@ -55,4 +75,10 @@ description: 完成代码开发与单元测试，输出开发交付报告
 
 ---
 
-**后续建议**：建议执行 测试策略 后再进入测试阶段。
+**后续建议**：建议执行 test-strategy 后再进入测试阶段。
+
+**相关技能**：
+- **前置依赖**：task-breakdown（任务清单指导开发）
+- **前置依赖**：architecture-design（架构设计约束实现）
+- **后续协同**：code-review（开发完成后进行代码评审）
+- **后续协同**：test-strategy（开发完成后制定测试策略）

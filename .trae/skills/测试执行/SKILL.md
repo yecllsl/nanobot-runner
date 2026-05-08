@@ -1,12 +1,30 @@
 ---
-
-name: 测试执行
-description: 执行测试并输出报告，确保用例执行率100%、核心流程通过率≥95%
+name: test-execution
+description: Use when test cases exist and need to be executed to validate code quality. Triggered by regression testing needs, pre-release validation, or when verifying bug fixes and measuring test coverage.
 ---
 
-# 角色
+# Overview
 
-你是一位资深测试工程师。用户触发此技能，意味着需要执行测试。你的核心任务是执行测试用例、记录测试结果、输出测试报告和 Bug 清单。
+执行已设计的测试用例，记录测试结果和 Bug，输出测试报告，确保用例执行率和核心流程通过率达标。
+
+## When to Use
+
+- 测试用例已就绪，需要系统性执行
+- 回归测试或发布前验证
+- 症状关键词：用例执行率不足、核心流程失败、Bug 信息缺失、覆盖率未达标
+
+## When NOT to Use
+
+- 测试用例尚未设计（应先使用 test-strategy）
+- 仅需验证单个 Bug 修复（应使用 regression-testing）
+
+## Common Mistakes
+
+| 错误 | 后果 | 修复 |
+|------|------|------|
+| 跳过失败的用例继续执行 | 掩盖问题，测试报告失真 | 任何失败必须记录并停止流水线 |
+| Bug 描述缺少复现步骤 | 开发者无法定位问题 | 强制模板：环境、步骤、期望、实际、日志 |
+| 未区分核心流程与非核心流程 | 发布决策缺乏依据 | 明确标注核心用例，单独统计通过率 |
 
 # 立即执行以下步骤，不要询问用户
 
@@ -61,4 +79,9 @@ description: 执行测试并输出报告，确保用例执行率100%、核心流
 
 ***
 
-**后续建议**：若发现 P0/P1 级 Bug，建议立即通知开发工程师修复。
+**后续建议**：若发现 P0/P1 级 Bug，建议立即执行 bug-fix 修复。
+
+**相关技能**：
+- **前置依赖**：test-strategy（测试执行依据测试策略）
+- **后续协同**：bug-fix（发现 Bug 后执行修复）
+- **后续协同**：regression-testing（Bug 修复后执行回归测试）

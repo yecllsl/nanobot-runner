@@ -1,12 +1,30 @@
 ---
-
-name: 单人自动化发布
-description: 执行单人开发模式的版本发布，确保Tag创建成功、CI检查通过、线上服务正常
+name: solo-auto-release
+description: Use when a version is ready for release in a single-developer workflow. Triggered after regression tests pass, when creating Git tags, triggering CI/CD pipelines, or verifying production deployment.
 ---
 
-# 角色
+# Overview
 
-你是一位资深 DevOps 工程师，专注于单人开发模式的自动化发布。用户触发此技能，意味着需要发布新版本。你的核心任务是验证前置条件、确保代码已合并到main分支、创建版本Tag、推送GitHub触发CI/CD、验证线上服务，并输出发布报告。
+在单人开发模式下，完成从版本号更新、Tag 创建、CI/CD 触发到发布报告输出的完整发布流程。
+
+## When to Use
+
+- 回归测试通过，准备发布新版本
+- 需要创建 Git Tag 并触发 GitHub Actions Release
+- 症状关键词：版本号不一致、Tag 创建失败、CI 未通过、发布包缺失
+
+## When NOT to Use
+
+- 回归测试未通过或存在未修复的 P0/P1 Bug
+- 多人协作需要复杂的分支合并策略
+
+## Common Mistakes
+
+| 错误 | 后果 | 修复 |
+|------|------|------|
+| 未推送 main 分支就直接创建 Tag | Tag 指向旧代码，发布包不完整 | 严格遵循：推送 main → CI 通过 → 创建 Tag |
+| 版本号在不同文件中不一致 | 用户困惑，发布信息混乱 | 使用 check_version_consistency.py 强制检查 |
+| Tag 已存在时强制覆盖 | 历史版本丢失 | 先删除远程和本地 Tag，再重新创建 |
 
 # 立即执行以下步骤，不要询问用户
 
@@ -105,52 +123,34 @@ description: 执行单人开发模式的版本发布，确保Tag创建成功、C
 ## 关键注意事项
 
 1. **版本号管理**（⚠️ 最容易出错）：
-   - **必须保持一致的文件**：pyproject.toml、README.md、CHANGELOG.md
-   - **更新顺序**：pyproject.toml → CHANGELOG.md → README.md
-   - **自动检查**：使用 `scripts/check_version_consistency.py` 脚本
+   - **必须保持一致的文件**：pyproject.toml → README.md → CHANGELOG.md
+   - **自动检查**：`uv run python scripts/check_version_consistency.py`
 
 2. **发布时机**：
-   - **关键**：版本号更新后必须先推送main分支，等待CI通过后再创建标签
-   - 确保所有代码已合并到main分支后再创建标签
-   - 禁止在PR合并前推送标签（会导致发布包不完整）
-   - 验证pyproject.toml中的版本号与标签一致
+   - **正确流程**：推送 main → CI 通过 → 创建 Tag → 推送 Tag → Release
+   - **禁止**：在 PR 合并前推送标签（会导致发布包不完整）
 
-3. **CI验证顺序**：
-   - 正确流程：推送main → CI通过 → 创建Tag → 推送Tag → Release
-   - 错误流程：创建Tag → 推送Tag（跳过main推送验证）
+3. **发布失败处理**：
+   - 版本号不一致 → 更新后重新发布
+   - CI 未通过 → 修复后重新推送 main
+   - Tag 已存在 → `git push origin --delete v{版本号}` 后重建
 
-4. **单人开发模式优势**：
-   - 简化流程：跳过release分支和develop分支同步
-   - 快速迭代：feature分支直接合并到main
-   - 自动化质量保障：依赖CI检查作为质量门禁
-
-5. **发布失败处理**：
-   - 若发布失败，检查GitHub Actions日志定位问题
-   - 常见失败原因：
-     - 版本号不一致 → 更新版本号后重新发布
-     - CI检查未通过 → 修复问题后重新推送main
-     - Tag已存在 → 删除远程和本地Tag后重新创建
-   - 删除Tag命令：
-     ```bash
-     git push origin --delete v{版本号}  # 删除远程Tag
-     git tag -d v{版本号}                # 删除本地Tag
-     ```
-
-6. **紧急回滚**：
-   - 若发布后发现严重问题，立即创建hotfix分支
-   - 修复后发布新版本（修订版本号递增）
-   - 更新文档说明推荐使用修复版本
+4. **紧急回滚**：
+   - 创建 hotfix 分支 → 修复 → 发布修订版本 → 更新文档推荐修复版本
 
 ***
 
 **后续建议**：
+---
 
-1. 更新CHANGELOG.md记录版本变更
-2. 通知用户版本更新内容
-3. 归档回归报告和发布报告
+**后续建议**：更新 CHANGELOG.md，通知用户版本内容，归档回归报告和发布报告。
+
+**相关技能**：
+- **前置依赖**：regression-testing（必须通过回归测试后方可发布）
+- **前置依赖**：cicd-verification（CI 流水线必须通过）
+- **后续协同**：document-archive（发布成功后归档版本文档）
 
 **参考文档**：
-
 - [分支管理与发布流程规范](../../docs/devops/分支管理与发布流程规范.md)
 - [发布检查清单](../../docs/devops/release_checklist.md)
 
