@@ -534,7 +534,7 @@ class TestCreateTools:
             tools = create_tools(runner_tools)
 
             assert isinstance(tools, list)
-            assert len(tools) == 31
+            assert len(tools) == 37
 
     def test_create_tools_contains_all_tools(self):
         """测试包含所有工具"""
@@ -560,6 +560,12 @@ class TestCreateTools:
                 "record_feedback",
                 "get_user_preferences",
                 "update_user_preferences",
+                "get_hrv_analysis",
+                "get_hr_recovery",
+                "get_fatigue_score",
+                "get_recovery_status",
+                "get_body_signal_summary",
+                "compare_training_periods",
             ]
 
             tool_names = [t.name for t in tools]

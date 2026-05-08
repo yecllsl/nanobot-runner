@@ -2618,6 +2618,169 @@ class RunnerTools:
             logger.error(f"CLI RPE询问失败: {e}")
             return None
 
+    def _get_session_repo(self):
+        """获取SessionRepository实例"""
+        from src.core.storage.session_repository import SessionRepository
+
+        return SessionRepository(self.storage)
+
+    def get_hrv_analysis(self, days: int = 30) -> dict[str, Any]:
+        """获取HRV分析结果 - v0.19.0新增"""
+        try:
+            from src.core.body_signal.hrv_analyzer import HRVAnalyzer
+
+            hrv_analyzer = HRVAnalyzer(session_repo=self._get_session_repo())
+            hrv_result = hrv_analyzer.analyze_hrv(days=days)
+            hrv_metrics = hrv_analyzer.estimate_hrv_metrics()
+
+            result = hrv_result.to_dict()
+            result["estimated_hrv_metrics"] = hrv_metrics
+            return {"success": True, "data": result}
+        except Exception as e:
+            logger.error(f"HRV分析失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_hr_recovery(self) -> dict[str, Any]:
+        """获取心率恢复分析 - v0.19.0新增"""
+        try:
+            from src.core.body_signal.hrv_analyzer import HRVAnalyzer
+
+            hrv_analyzer = HRVAnalyzer(session_repo=self._get_session_repo())
+            recovery_result = hrv_analyzer.analyze_hr_recovery()
+            return {"success": True, "data": recovery_result.to_dict()}
+        except Exception as e:
+            logger.error(f"心率恢复分析失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_fatigue_score(self, rpe: int | None = None) -> dict[str, Any]:
+        """获取疲劳度评估 - v0.19.0新增"""
+        try:
+            from src.core.body_signal.fatigue_assessor import FatigueAssessor
+            from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+
+            training_load_analyzer = TrainingLoadAnalyzer()
+            fatigue_assessor = FatigueAssessor(
+                session_repo=self._get_session_repo(),
+                training_load_analyzer=training_load_analyzer,
+            )
+            fatigue_result = fatigue_assessor.assess_fatigue(rpe=rpe)
+            return {"success": True, "data": fatigue_result.to_dict()}
+        except Exception as e:
+            logger.error(f"疲劳度评估失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_recovery_status(self) -> dict[str, Any]:
+        """获取恢复状态 - v0.19.0新增"""
+        try:
+            from src.core.body_signal.hrv_analyzer import HRVAnalyzer
+            from src.core.body_signal.recovery_monitor import RecoveryMonitor
+            from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+
+            training_load_analyzer = TrainingLoadAnalyzer()
+            hrv_analyzer = HRVAnalyzer(session_repo=self._get_session_repo())
+            recovery_monitor = RecoveryMonitor(
+                session_repo=self._get_session_repo(),
+                training_load_analyzer=training_load_analyzer,
+                hrv_analyzer=hrv_analyzer,
+            )
+            recovery_result = recovery_monitor.get_recovery_status()
+            return {"success": True, "data": recovery_result.to_dict()}
+        except Exception as e:
+            logger.error(f"恢复状态获取失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_body_signal_summary(self, period: str = "daily") -> dict[str, Any]:
+        """获取身体信号综合摘要 - v0.19.0新增"""
+        try:
+            from src.core.body_signal import BodySignalEngine
+            from src.core.body_signal.fatigue_assessor import FatigueAssessor
+            from src.core.body_signal.hrv_analyzer import HRVAnalyzer
+            from src.core.body_signal.recovery_monitor import RecoveryMonitor
+            from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+
+            training_load_analyzer = TrainingLoadAnalyzer()
+            hrv_analyzer = HRVAnalyzer(session_repo=self._get_session_repo())
+            fatigue_assessor = FatigueAssessor(
+                session_repo=self._get_session_repo(),
+                training_load_analyzer=training_load_analyzer,
+            )
+            recovery_monitor = RecoveryMonitor(
+                session_repo=self._get_session_repo(),
+                training_load_analyzer=training_load_analyzer,
+                hrv_analyzer=hrv_analyzer,
+            )
+            engine = BodySignalEngine(
+                hrv_analyzer=hrv_analyzer,
+                fatigue_assessor=fatigue_assessor,
+                recovery_monitor=recovery_monitor,
+            )
+
+            if period == "weekly":
+                summary = engine.get_weekly_summary()
+            else:
+                summary = engine.get_daily_summary()
+
+            return {"success": True, "data": summary.to_dict()}
+        except Exception as e:
+            logger.error(f"身体信号摘要获取失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def compare_training_periods(
+        self, period1_days: int = 7, period2_days: int = 7
+    ) -> dict[str, Any]:
+        """对比两个训练周期的身体信号变化 - v0.19.0新增"""
+        try:
+            from src.core.body_signal.hrv_analyzer import HRVAnalyzer
+            from src.core.body_signal.recovery_monitor import RecoveryMonitor
+            from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+
+            training_load_analyzer = TrainingLoadAnalyzer()
+            hrv_analyzer = HRVAnalyzer(session_repo=self._get_session_repo())
+            recovery_monitor = RecoveryMonitor(
+                session_repo=self._get_session_repo(),
+                training_load_analyzer=training_load_analyzer,
+                hrv_analyzer=hrv_analyzer,
+            )
+
+            trend1 = recovery_monitor.get_recovery_trend(days=period1_days)
+            trend2 = recovery_monitor.get_recovery_trend(
+                days=period2_days + period1_days
+            )
+            trend2 = trend2[:-period1_days] if len(trend2) > period1_days else []
+
+            avg_tsb1 = sum(p.tsb for p in trend1) / len(trend1) if trend1 else 0.0
+            avg_tsb2 = sum(p.tsb for p in trend2) / len(trend2) if trend2 else 0.0
+
+            hrv1 = hrv_analyzer.analyze_hrv(days=period1_days)
+            hrv2 = hrv_analyzer.analyze_hrv(days=period2_days + period1_days)
+
+            return {
+                "success": True,
+                "data": {
+                    "period1_days": period1_days,
+                    "period2_days": period2_days,
+                    "period1": {
+                        "avg_tsb": round(avg_tsb1, 2),
+                        "data_points": len(trend1),
+                        "hrv_data_quality": hrv1.data_quality.value,
+                    },
+                    "period2": {
+                        "avg_tsb": round(avg_tsb2, 2),
+                        "data_points": len(trend2),
+                        "hrv_data_quality": hrv2.data_quality.value,
+                    },
+                    "tsb_change": round(avg_tsb1 - avg_tsb2, 2),
+                    "comparison_summary": (
+                        "近期恢复状态改善"
+                        if avg_tsb1 > avg_tsb2
+                        else "近期恢复状态下降"
+                    ),
+                },
+            }
+        except Exception as e:
+            logger.error(f"训练周期对比失败: {e}")
+            return {"success": False, "error": str(e)}
+
 
 class AskUserConfirmTool(BaseTool):
     """异步用户确认工具 - v0.17.0新增（实验性功能）
@@ -2727,6 +2890,168 @@ class ParseUserConfirmTool(BaseTool):
             self.runner_tools.parse_user_confirm_response,
             prompt_id=prompt_id,
             user_input=user_input,
+        )
+
+
+class GetHrvAnalysisTool(BaseTool):
+    """获取HRV分析工具 - v0.19.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_hrv_analysis"
+
+    @property
+    def description(self) -> str:
+        return "获取HRV（心率变异）分析结果，包括静息心率趋势和估算的HRV指标（RMSSD/SDNN）。当用户询问'HRV是多少'、'心率变异分析'、'静息心率趋势'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": "分析天数（默认30天）",
+                    "default": 30,
+                }
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        days = kwargs.get("days", 30)
+        return self._run_sync(self.runner_tools.get_hrv_analysis, days)
+
+
+class GetHrRecoveryTool(BaseTool):
+    """获取心率恢复分析工具 - v0.19.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_hr_recovery"
+
+    @property
+    def description(self) -> str:
+        return "获取心率恢复分析结果，评估训练后心率下降速率和心脏恢复能力。当用户询问'心率恢复'、'恢复能力'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {}}
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(self.runner_tools.get_hr_recovery)
+
+
+class GetFatigueScoreTool(BaseTool):
+    """获取疲劳度评估工具 - v0.19.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_fatigue_score"
+
+    @property
+    def description(self) -> str:
+        return "获取疲劳度评估结果，综合训练负荷、心率偏差、连续训练天数等维度计算疲劳度分数。当用户询问'我累不累'、'疲劳度'、'身体状态'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "rpe": {
+                    "type": "integer",
+                    "description": "主观疲劳度 (1-10)，可选",
+                }
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        rpe = kwargs.get("rpe")
+        return self._run_sync(self.runner_tools.get_fatigue_score, rpe)
+
+
+class GetRecoveryStatusTool(BaseTool):
+    """获取恢复状态工具 - v0.19.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_recovery_status"
+
+    @property
+    def description(self) -> str:
+        return "获取恢复状态评估，包括TSB变化、休息日效果和恢复趋势。当用户询问'恢复得怎么样'、'今天能训练吗'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {}}
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(self.runner_tools.get_recovery_status)
+
+
+class GetBodySignalSummaryTool(BaseTool):
+    """获取身体信号综合摘要工具 - v0.19.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_body_signal_summary"
+
+    @property
+    def description(self) -> str:
+        return "获取身体信号综合摘要，整合HRV、疲劳度和恢复状态三个维度生成每日或每周摘要。当用户询问'今天状态怎么样'、'身体信号'、'综合状态'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "period": {
+                    "type": "string",
+                    "description": "周期类型（daily/weekly，默认daily）",
+                    "enum": ["daily", "weekly"],
+                    "default": "daily",
+                }
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        period = kwargs.get("period", "daily")
+        return self._run_sync(self.runner_tools.get_body_signal_summary, period)
+
+
+class CompareTrainingPeriodsTool(BaseTool):
+    """对比训练周期工具 - v0.19.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "compare_training_periods"
+
+    @property
+    def description(self) -> str:
+        return "对比两个训练周期的身体信号变化，分析恢复状态趋势。当用户询问'最近状态有没有变好'、'对比上周'、'训练趋势'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "period1_days": {
+                    "type": "integer",
+                    "description": "近期周期天数（默认7天）",
+                    "default": 7,
+                },
+                "period2_days": {
+                    "type": "integer",
+                    "description": "对比周期天数（默认7天）",
+                    "default": 7,
+                },
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        period1_days = kwargs.get("period1_days", 7)
+        period2_days = kwargs.get("period2_days", 7)
+        return self._run_sync(
+            self.runner_tools.compare_training_periods, period1_days, period2_days
         )
 
 
@@ -3177,6 +3502,12 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         ExplainDecisionTool(runner_tools),
         TraceDataSourcesTool(runner_tools),
         GetTransparencyInsightTool(runner_tools),
+        GetHrvAnalysisTool(runner_tools),
+        GetHrRecoveryTool(runner_tools),
+        GetFatigueScoreTool(runner_tools),
+        GetRecoveryStatusTool(runner_tools),
+        GetBodySignalSummaryTool(runner_tools),
+        CompareTrainingPeriodsTool(runner_tools),
     ]
 
 
@@ -3393,6 +3724,33 @@ TOOL_DESCRIPTIONS = {
             "include_metrics": "是否包含可观测性指标（默认true）",
             "include_recent_decisions": "是否包含最近决策（默认true）",
             "recent_limit": "最近决策返回数量（默认5）",
+        },
+    },
+    "get_hrv_analysis": {
+        "description": "获取HRV（心率变异）分析结果，包括静息心率趋势和估算的HRV指标（RMSSD/SDNN）。当用户询问'HRV是多少'、'心率变异分析'时使用此工具。返回JSON格式：{success: true, data: {resting_hr_trend: [{date, resting_hr, deviation_pct}], data_quality, data_source, estimated_hrv_metrics: {estimated_rmssd, estimated_sdnn, data_source}}} 或 {success: false, error: 错误信息}",
+        "parameters": {"days": "分析天数（默认30天）"},
+    },
+    "get_hr_recovery": {
+        "description": "获取心率恢复分析结果，评估训练后心率下降速率和心脏恢复能力。当用户询问'心率恢复'、'恢复能力'时使用此工具。返回JSON格式：{success: true, data: {hr_end, hr_recovery_1min, data_quality}} 或 {success: false, error: 错误信息}",
+        "parameters": {},
+    },
+    "get_fatigue_score": {
+        "description": "获取疲劳度评估结果，综合训练负荷、心率偏差、连续训练天数等维度计算疲劳度分数。当用户询问'我累不累'、'疲劳度'时使用此工具。返回JSON格式：{success: true, data: {fatigue_score, recovery_status, consecutive_hard_days, breakdown: {atl_component, hr_deviation_component, consecutive_component, subjective_component}, recommendation, data_quality}} 或 {success: false, error: 错误信息}",
+        "parameters": {"rpe": "主观疲劳度 (1-10，可选)"},
+    },
+    "get_recovery_status": {
+        "description": "获取恢复状态评估，包括TSB变化、休息日效果和恢复趋势。当用户询问'恢复得怎么样'、'今天能训练吗'时使用此工具。返回JSON格式：{success: true, data: {recovery_status, rest_day_effect: {resting_hr_change_pct, tsb_change, effect_level, message}, recovery_trend: [{date, tsb, ctl}], data_quality}} 或 {success: false, error: 错误信息}",
+        "parameters": {},
+    },
+    "get_body_signal_summary": {
+        "description": "获取身体信号综合摘要，整合HRV、疲劳度和恢复状态三个维度生成每日或每周摘要。当用户询问'今天状态怎么样'、'身体信号'、'综合状态'时使用此工具。返回JSON格式：{success: true, data: {recovery_status, fatigue_score, data_quality, daily_summary, training_advice, alerts: [{alert_type, severity, message, details}]}} 或 {success: false, error: 错误信息}",
+        "parameters": {"period": "周期类型（daily/weekly，默认daily）"},
+    },
+    "compare_training_periods": {
+        "description": "对比两个训练周期的身体信号变化，分析恢复状态趋势。当用户询问'最近状态有没有变好'、'对比上周'、'训练趋势'时使用此工具。返回JSON格式：{success: true, data: {period1: {avg_tsb, data_points, hrv_data_quality}, period2: {avg_tsb, data_points, hrv_data_quality}, tsb_change, comparison_summary}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "period1_days": "近期周期天数（默认7天）",
+            "period2_days": "对比周期天数（默认7天）",
         },
     },
 }
