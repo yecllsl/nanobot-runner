@@ -2781,6 +2781,81 @@ class RunnerTools:
             logger.error(f"训练周期对比失败: {e}")
             return {"success": False, "error": str(e)}
 
+    def predict_vdot_trend(self, days: int = 30) -> dict[str, Any]:
+        """VDOT趋势预测 - v0.20.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.predict_vdot_trend(days=days)
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"VDOT趋势预测失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def predict_race_result(
+        self, distance_km: float, race_date: str | None = None
+    ) -> dict[str, Any]:
+        """比赛成绩预测 - v0.20.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.predict_race_result(
+                distance_km=distance_km, race_date=race_date
+            )
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"比赛成绩预测失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def predict_injury_risk(self, days: int = 21) -> dict[str, Any]:
+        """伤病风险预测 - v0.20.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.predict_injury_risk(days=days)
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"伤病风险预测失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def predict_training_response(
+        self, session_type: str, duration_min: int, intensity: str
+    ) -> dict[str, Any]:
+        """训练响应预测 - v0.20.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.predict_training_response(
+                session_type=session_type,
+                duration_min=duration_min,
+                intensity=intensity,
+            )
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"训练响应预测失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def check_prediction_status(self) -> dict[str, Any]:
+        """预测数据充足度评估 - v0.20.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.check_prediction_status()
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"预测状态检查失败: {e}")
+            return {"success": False, "error": str(e)}
+
 
 class AskUserConfirmTool(BaseTool):
     """异步用户确认工具 - v0.17.0新增（实验性功能）
@@ -3053,6 +3128,165 @@ class CompareTrainingPeriodsTool(BaseTool):
         return self._run_sync(
             self.runner_tools.compare_training_periods, period1_days, period2_days
         )
+
+
+class PredictVdotTrendTool(BaseTool):
+    """VDOT趋势预测工具 - v0.20.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "predict_vdot_trend"
+
+    @property
+    def description(self) -> str:
+        return "预测VDOT（跑力值）趋势，基于训练数据预测未来VDOT变化。当用户询问'VDOT会怎么变'、'跑力趋势预测'、'未来VDOT'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": "预测天数（默认30天）",
+                    "default": 30,
+                }
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        days = kwargs.get("days", 30)
+        return self._run_sync(self.runner_tools.predict_vdot_trend, days)
+
+
+class PredictRaceResultTool(BaseTool):
+    """比赛成绩预测工具 - v0.20.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "predict_race_result"
+
+    @property
+    def description(self) -> str:
+        return "预测比赛完赛时间，基于个人化Riegel公式预测不同距离的比赛成绩。当用户询问'全马能跑多少'、'比赛预测'、'完赛时间预测'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "distance_km": {
+                    "type": "number",
+                    "description": "比赛距离（公里），如5/10/21.0975/42.195",
+                },
+                "race_date": {
+                    "type": "string",
+                    "description": "比赛日期（YYYY-MM-DD，可选）",
+                },
+            },
+            "required": ["distance_km"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        distance_km = kwargs.get("distance_km", 42.195)
+        race_date = kwargs.get("race_date")
+        return self._run_sync(
+            self.runner_tools.predict_race_result, distance_km, race_date
+        )
+
+
+class PredictInjuryRiskTool(BaseTool):
+    """伤病风险预测工具 - v0.20.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "predict_injury_risk"
+
+    @property
+    def description(self) -> str:
+        return "预测伤病风险，综合急性/慢性负荷比、训练单调性、身体信号等评估受伤概率。当用户询问'会不会受伤'、'伤病风险'、'训练安全吗'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "description": "预测天数（默认21天）",
+                    "default": 21,
+                }
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        days = kwargs.get("days", 21)
+        return self._run_sync(self.runner_tools.predict_injury_risk, days)
+
+
+class PredictTrainingResponseTool(BaseTool):
+    """训练响应预测工具 - v0.20.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "predict_training_response"
+
+    @property
+    def description(self) -> str:
+        return "预测单次训练的响应效果，包括VDOT影响、疲劳影响、恢复时间和伤病风险增量。当用户询问'这次训练效果如何'、'跑完会怎样'、'训练影响预测'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "session_type": {
+                    "type": "string",
+                    "description": "训练类型（easy/threshold/interval/recovery）",
+                    "enum": ["easy", "threshold", "interval", "recovery"],
+                },
+                "duration_min": {
+                    "type": "integer",
+                    "description": "训练时长（分钟）",
+                },
+                "intensity": {
+                    "type": "string",
+                    "description": "强度（low/moderate/high）",
+                    "enum": ["low", "moderate", "high"],
+                },
+            },
+            "required": ["session_type", "duration_min", "intensity"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        session_type = kwargs.get("session_type", "easy")
+        duration_min = kwargs.get("duration_min", 60)
+        intensity = kwargs.get("intensity", "moderate")
+        return self._run_sync(
+            self.runner_tools.predict_training_response,
+            session_type,
+            duration_min,
+            intensity,
+        )
+
+
+class CheckPredictionStatusTool(BaseTool):
+    """预测数据充足度评估工具 - v0.20.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "check_prediction_status"
+
+    @property
+    def description(self) -> str:
+        return "检查预测功能的数据充足度，评估各预测类型是否具备足够数据支撑ML增强预测。当用户询问'预测准不准'、'数据够不够预测'时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {}}
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(self.runner_tools.check_prediction_status)
 
 
 class SpawnSubagentTool(BaseTool):
@@ -3508,6 +3742,11 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         GetRecoveryStatusTool(runner_tools),
         GetBodySignalSummaryTool(runner_tools),
         CompareTrainingPeriodsTool(runner_tools),
+        PredictVdotTrendTool(runner_tools),
+        PredictRaceResultTool(runner_tools),
+        PredictInjuryRiskTool(runner_tools),
+        PredictTrainingResponseTool(runner_tools),
+        CheckPredictionStatusTool(runner_tools),
     ]
 
 
@@ -3752,5 +3991,32 @@ TOOL_DESCRIPTIONS = {
             "period1_days": "近期周期天数（默认7天）",
             "period2_days": "对比周期天数（默认7天）",
         },
+    },
+    "predict_vdot_trend": {
+        "description": "预测VDOT（跑力值）趋势，基于训练数据预测未来VDOT变化。当用户询问'VDOT会怎么变'、'跑力趋势预测'、'未来VDOT'时使用此工具。返回JSON格式：{success: true, data: {current_vdot, predicted_vdot, prediction_days, confidence_interval, confidence, trend_slope, key_factors, data_quality, prediction_type}} 或 {success: false, error: 错误信息}",
+        "parameters": {"days": "预测天数（默认30天）"},
+    },
+    "predict_race_result": {
+        "description": "预测比赛完赛时间，基于个人化Riegel公式预测不同距离的比赛成绩。当用户询问'全马能跑多少'、'比赛预测'、'完赛时间预测'时使用此工具。返回JSON格式：{success: true, data: {distance_km, predicted_time, predicted_time_seconds, confidence, best_case, worst_case, predicted_vdot, prediction_type}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "distance_km": "比赛距离（公里），如5/10/21.0975/42.195（必填）",
+            "race_date": "比赛日期（YYYY-MM-DD，可选）",
+        },
+    },
+    "predict_injury_risk": {
+        "description": "预测伤病风险，综合急性/慢性负荷比、训练单调性、身体信号等评估受伤概率。当用户询问'会不会受伤'、'伤病风险'、'训练安全吗'时使用此工具。返回JSON格式：{success: true, data: {risk_score, risk_level, risk_timeline, top_risk_factors, recommendations, data_quality, prediction_type}} 或 {success: false, error: 错误信息}",
+        "parameters": {"days": "预测天数（默认21天）"},
+    },
+    "predict_training_response": {
+        "description": "预测单次训练的响应效果，包括VDOT影响、疲劳影响、恢复时间和伤病风险增量。当用户询问'这次训练效果如何'、'跑完会怎样'、'训练影响预测'时使用此工具。返回JSON格式：{success: true, data: {session_type, duration_min, intensity, predicted_vdot_impact, predicted_fatigue_impact, predicted_recovery_hours, predicted_injury_risk_delta, banister_fitness_delta, banister_fatigue_delta, prediction_type}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "session_type": "训练类型（easy/threshold/interval/recovery，必填）",
+            "duration_min": "训练时长（分钟，必填）",
+            "intensity": "强度（low/moderate/high，必填）",
+        },
+    },
+    "check_prediction_status": {
+        "description": "检查预测功能的数据充足度，评估各预测类型是否具备足够数据支撑ML增强预测。当用户询问'预测准不准'、'数据够不够预测'时使用此工具。返回JSON格式：{success: true, data: {vdot_status, race_status, injury_status, overall_ready_count, advice}} 或 {success: false, error: 错误信息}",
+        "parameters": {},
     },
 }

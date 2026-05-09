@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import polars as pl
 
 from src.core.base.logger import get_logger
+from src.core.body_signal.exceptions import (
+    BodySignalError,
+)
 from src.core.body_signal.models import (
     DataQuality,
     HRDriftResult,
     HRRecoveryResult,
     HRVAnalysisResult,
     HRVDataSource,
+    HRVMetricsResult,
     RestingHRPoint,
 )
 from src.core.config.body_signal_config import BodySignalConfig
@@ -92,15 +96,19 @@ class HRVAnalyzer:
                     pl.col("timestamp").dt.date().alias("date")
                 )
 
-            daily_resting = filtered.group_by("date").agg(
-                pl.col("heart_rate")
-                .sort()
-                .head((pl.len() * 0.1).cast(pl.Int64).clip(1))
-                .mean()
-                .alias("resting_hr")
+            daily_resting = (
+                filtered.group_by("date")
+                .agg(
+                    pl.col("heart_rate")
+                    .sort()
+                    .head((pl.len() * 0.1).cast(pl.Int64).clip(1))
+                    .mean()
+                    .alias("resting_hr")
+                )
+                .sort("date")
             )
 
-            df = daily_resting.sort("date").collect()
+            df = daily_resting.collect()
 
             if df.is_empty():
                 return []
@@ -109,7 +117,7 @@ class HRVAnalyzer:
             dates = df["date"].to_list()
             resting_hrs = df["resting_hr"].to_list()
 
-            if len(trend) == 1 and len(dates) == 1:
+            if len(resting_hrs) == 1:
                 trend.append(
                     RestingHRPoint(
                         date=str(dates[0]),
@@ -134,14 +142,15 @@ class HRVAnalyzer:
 
             return trend
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"获取静息心率趋势失败: {e}")
             return []
 
     def analyze_hr_recovery(self) -> HRRecoveryResult:
         """分析心率恢复
 
-        检测训练后心率下降速率，评估心脏恢复能力。
+        检测最近一次训练后的心率下降速率，评估心脏恢复能力。
+        取最近一次训练的心率数据，计算峰值心率和结束心率的差值。
 
         Returns:
             HRRecoveryResult: 心率恢复分析结果
@@ -150,30 +159,57 @@ class HRVAnalyzer:
             lf = self.session_repo.storage.read_parquet()
             columns = lf.columns
 
-            if "heart_rate" not in columns:
+            if "heart_rate" not in columns or "session_start_time" not in columns:
                 return HRRecoveryResult(hr_end=0.0, data_quality=DataQuality.EMPTY)
 
-            df = lf.filter(pl.col("heart_rate").is_not_null()).collect()
+            recent_session = (
+                lf.filter(
+                    pl.col("heart_rate").is_not_null()
+                    & pl.col("session_start_time").is_not_null()
+                )
+                .sort("session_start_time", descending=True)
+                .head(1)
+                .select("session_start_time")
+                .collect()
+            )
 
-            if df.is_empty() or df.height < 2:
+            if recent_session.is_empty():
                 return HRRecoveryResult(hr_end=0.0, data_quality=DataQuality.EMPTY)
 
-            heart_rates = df["heart_rate"].to_list()
+            latest_session_time = recent_session["session_start_time"][0]
+
+            session_df = lf.filter(
+                (pl.col("session_start_time") == latest_session_time)
+                & (pl.col("heart_rate").is_not_null())
+            ).collect()
+
+            if session_df.height < 2:
+                return HRRecoveryResult(hr_end=0.0, data_quality=DataQuality.EMPTY)
+
+            heart_rates = session_df["heart_rate"].to_list()
+            hr_peak = float(max(heart_rates))
             hr_end = float(heart_rates[-1])
+            hr_recovery_1min = None
+
+            if len(heart_rates) > 60:
+                hr_at_1min = float(heart_rates[-60])
+                hr_recovery_1min = round(hr_peak - hr_at_1min, 2)
 
             return HRRecoveryResult(
                 hr_end=hr_end,
+                hr_recovery_1min=hr_recovery_1min,
                 data_quality=DataQuality.SUFFICIENT,
             )
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"心率恢复分析失败: {e}")
             return HRRecoveryResult(hr_end=0.0, data_quality=DataQuality.EMPTY)
 
     def check_hr_drift(self) -> HRDriftResult:
         """检测心率漂移
 
-        在恒定配速下检测心率随时间的上升趋势。
+        在最近一次训练中检测心率随时间的上升趋势。
+        将训练分为前后两半，比较后半段与前半段的平均心率差异。
 
         Returns:
             HRDriftResult: 心率漂移检测结果
@@ -182,37 +218,65 @@ class HRVAnalyzer:
             lf = self.session_repo.storage.read_parquet()
             columns = lf.columns
 
-            if "heart_rate" not in columns:
+            if "heart_rate" not in columns or "session_start_time" not in columns:
                 return HRDriftResult(drift_rate=0.0, data_quality=DataQuality.EMPTY)
 
-            df = lf.filter(pl.col("heart_rate").is_not_null()).collect()
+            recent_session = (
+                lf.filter(
+                    pl.col("heart_rate").is_not_null()
+                    & pl.col("session_start_time").is_not_null()
+                )
+                .sort("session_start_time", descending=True)
+                .head(1)
+                .select("session_start_time")
+                .collect()
+            )
 
-            if df.is_empty() or df.height < 2:
+            if recent_session.is_empty():
                 return HRDriftResult(drift_rate=0.0, data_quality=DataQuality.EMPTY)
 
-            heart_rates = df["heart_rate"].to_list()
-            hr_start = float(heart_rates[0])
-            hr_end = float(heart_rates[-1])
+            latest_session_time = recent_session["session_start_time"][0]
 
-            drift_rate = (hr_end - hr_start) / hr_start * 100.0 if hr_start > 0 else 0.0
+            session_df = lf.filter(
+                (pl.col("session_start_time") == latest_session_time)
+                & (pl.col("heart_rate").is_not_null())
+            ).collect()
+
+            if session_df.height < 10:
+                return HRDriftResult(
+                    drift_rate=0.0, data_quality=DataQuality.INSUFFICIENT
+                )
+
+            heart_rates = session_df["heart_rate"].to_list()
+            midpoint = len(heart_rates) // 2
+            first_half_avg = sum(float(h) for h in heart_rates[:midpoint]) / midpoint
+            second_half_avg = sum(float(h) for h in heart_rates[midpoint:]) / (
+                len(heart_rates) - midpoint
+            )
+
+            drift_rate = (
+                (second_half_avg - first_half_avg) / first_half_avg * 100.0
+                if first_half_avg > 0
+                else 0.0
+            )
 
             return HRDriftResult(
                 drift_rate=round(max(0.0, drift_rate), 2),
                 data_quality=DataQuality.SUFFICIENT,
             )
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"心率漂移检测失败: {e}")
             return HRDriftResult(drift_rate=0.0, data_quality=DataQuality.EMPTY)
 
-    def estimate_hrv_metrics(self) -> dict[str, Any]:
+    def estimate_hrv_metrics(self) -> HRVMetricsResult:
         """估算HRV指标
 
         根据是否有RR间期数据，选择不同的估算方式。
         无RR间期数据时使用心率估算，有RR间期数据时计算RMSSD/SDNN。
 
         Returns:
-            dict: 包含estimated_rmssd、estimated_sdnn、data_source的字典
+            HRVMetricsResult: HRV指标估算结果
         """
         try:
             lf = self.session_repo.storage.read_parquet()
@@ -236,25 +300,25 @@ class HRVAnalyzer:
                     )
                     sdnn = math.sqrt(variance)
 
-                    return {
-                        "estimated_rmssd": round(rmssd, 2),
-                        "estimated_sdnn": round(sdnn, 2),
-                        "data_source": HRVDataSource.RR_INTERVAL.value,
-                    }
+                    return HRVMetricsResult(
+                        estimated_rmssd=round(rmssd, 2),
+                        estimated_sdnn=round(sdnn, 2),
+                        data_source=HRVDataSource.RR_INTERVAL,
+                    )
 
-            return {
-                "estimated_rmssd": None,
-                "estimated_sdnn": None,
-                "data_source": HRVDataSource.HR_ESTIMATE.value,
-            }
+            return HRVMetricsResult(
+                estimated_rmssd=None,
+                estimated_sdnn=None,
+                data_source=HRVDataSource.HR_ESTIMATE,
+            )
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"HRV指标估算失败: {e}")
-            return {
-                "estimated_rmssd": None,
-                "estimated_sdnn": None,
-                "data_source": HRVDataSource.HR_ESTIMATE.value,
-            }
+            return HRVMetricsResult(
+                estimated_rmssd=None,
+                estimated_sdnn=None,
+                data_source=HRVDataSource.HR_ESTIMATE,
+            )
 
     def _evaluate_data_quality(
         self, trend: list[RestingHRPoint], requested_days: int

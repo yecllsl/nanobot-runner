@@ -195,6 +195,22 @@ class HRDriftResult:
 
 
 @dataclass
+class HRVMetricsResult:
+    """HRV指标估算结果"""
+
+    estimated_rmssd: float | None
+    estimated_sdnn: float | None
+    data_source: HRVDataSource
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "estimated_rmssd": self.estimated_rmssd,
+            "estimated_sdnn": self.estimated_sdnn,
+            "data_source": self.data_source.value,
+        }
+
+
+@dataclass
 class BodySignalSummary:
     """身体信号摘要"""
 

@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from src.core.body_signal.hrv_analyzer import HRVAnalyzer
-from src.core.body_signal.models import DataQuality, HRVDataSource
+from src.core.body_signal.models import DataQuality, HRVDataSource, HRVMetricsResult
 from src.core.config.body_signal_config import BodySignalConfig
 
 
@@ -66,8 +66,8 @@ class TestHRVAnalyzer:
         """测试空数据分析"""
         lf = pl.DataFrame(
             {
-                "timestamp": [],
-                "heart_rate": [],
+                "timestamp": pl.Series([], dtype=pl.Datetime),
+                "heart_rate": pl.Series([], dtype=pl.Int32),
             }
         ).lazy()
         mock_session_repo.storage.read_parquet.return_value = lf
@@ -209,9 +209,10 @@ class TestHRVAnalyzer:
         analyzer = HRVAnalyzer(mock_session_repo)
         result = analyzer.estimate_hrv_metrics()
 
-        assert result["estimated_rmssd"] is None
-        assert result["estimated_sdnn"] is None
-        assert result["data_source"] == HRVDataSource.HR_ESTIMATE.value
+        assert isinstance(result, HRVMetricsResult)
+        assert result.estimated_rmssd is None
+        assert result.estimated_sdnn is None
+        assert result.data_source == HRVDataSource.HR_ESTIMATE
 
     def test_estimate_hrv_metrics_with_rr(self, mock_session_repo):
         """测试有RR间期数据时计算RMSSD/SDNN"""
@@ -227,9 +228,10 @@ class TestHRVAnalyzer:
         analyzer = HRVAnalyzer(mock_session_repo)
         result = analyzer.estimate_hrv_metrics()
 
-        assert result["estimated_rmssd"] is not None
-        assert result["estimated_sdnn"] is not None
-        assert result["data_source"] == HRVDataSource.RR_INTERVAL.value
+        assert isinstance(result, HRVMetricsResult)
+        assert result.estimated_rmssd is not None
+        assert result.estimated_sdnn is not None
+        assert result.data_source == HRVDataSource.RR_INTERVAL
 
     def test_evaluate_data_quality_empty(self, mock_session_repo):
         """测试空数据质量评估"""

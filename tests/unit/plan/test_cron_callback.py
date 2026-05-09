@@ -262,9 +262,9 @@ class TestHandleTrainingReminder:
             reminder_manager = TrainingReminderManager(data_dir=data_dir)
             handler = CronCallbackHandler(reminder_manager=reminder_manager)
 
-            # 设置免打扰时段为过去
-            reminder_manager.schedule.do_not_disturb_start = "22:00"
-            reminder_manager.schedule.do_not_disturb_end = "23:00"
+            # 设置免打扰时段为凌晨，避免与测试运行时间冲突
+            reminder_manager.schedule.do_not_disturb_start = "00:00"
+            reminder_manager.schedule.do_not_disturb_end = "00:01"
 
             mock_plan = MagicMock()
 

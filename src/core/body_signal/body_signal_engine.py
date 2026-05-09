@@ -4,6 +4,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from src.core.base.logger import get_logger
+from src.core.body_signal.exceptions import BodySignalError
 from src.core.body_signal.models import (
     BodySignalAlert,
     BodySignalSummary,
@@ -56,35 +57,7 @@ class BodySignalEngine:
         if self._daily_cache is not None and self._cache_date == today:
             return self._daily_cache
 
-        hrv_result = self.hrv_analyzer.analyze_hrv(days=30)
-        fatigue_result = self.fatigue_assessor.assess_fatigue()
-        recovery_result = self.recovery_monitor.get_recovery_status()
-
-        merged_status = self._merge_recovery_status(
-            fatigue_result.recovery_status, recovery_result.recovery_status
-        )
-        merged_quality = self._merge_data_quality(
-            hrv_result.data_quality, fatigue_result.data_quality
-        )
-
-        alerts = self.check_alerts()
-
-        daily_summary = (
-            f"今日状态: {self._status_to_emoji(merged_status)} {merged_status.value}"
-        )
-        training_advice = self._generate_training_advice(
-            merged_status, fatigue_result.fatigue_score, alerts
-        )
-
-        summary = BodySignalSummary(
-            recovery_status=merged_status,
-            fatigue_score=fatigue_result.fatigue_score,
-            data_quality=merged_quality,
-            daily_summary=daily_summary,
-            training_advice=training_advice,
-            alerts=alerts,
-        )
-
+        summary = self._build_summary(prefix="今日")
         self._daily_cache = summary
         self._cache_date = today
 
@@ -95,6 +68,19 @@ class BodySignalEngine:
 
         Returns:
             BodySignalSummary: 身体信号周摘要
+        """
+        return self._build_summary(prefix="本周")
+
+    def _build_summary(self, prefix: str = "今日") -> BodySignalSummary:
+        """构建身体信号摘要
+
+        整合HRV分析、疲劳度评估和恢复状态，生成统一格式的摘要。
+
+        Args:
+            prefix: 摘要前缀（"今日"或"本周"）
+
+        Returns:
+            BodySignalSummary: 身体信号摘要
         """
         hrv_result = self.hrv_analyzer.analyze_hrv(days=30)
         fatigue_result = self.fatigue_assessor.assess_fatigue()
@@ -109,9 +95,7 @@ class BodySignalEngine:
 
         alerts = self.check_alerts()
 
-        daily_summary = (
-            f"本周状态: {self._status_to_emoji(merged_status)} {merged_status.value}"
-        )
+        daily_summary = f"{prefix}状态: {self._status_to_emoji(merged_status)} {merged_status.value}"
         training_advice = self._generate_training_advice(
             merged_status, fatigue_result.fatigue_score, alerts
         )
@@ -148,7 +132,7 @@ class BodySignalEngine:
                             details={"deviation_pct": latest.deviation_pct},
                         )
                     )
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"心率预警检查失败: {e}")
 
         try:
@@ -163,7 +147,7 @@ class BodySignalEngine:
                         details={"overtraining_days": overtraining_days},
                     )
                 )
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"过度训练预警检查失败: {e}")
 
         return alerts

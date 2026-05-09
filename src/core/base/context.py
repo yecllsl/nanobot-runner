@@ -274,6 +274,68 @@ class AppContext:
             self.set_extension("body_signal_engine", engine)
         return engine
 
+    @property
+    def prediction_engine(self) -> Any:
+        """获取预测引擎（v0.20.0新增）"""
+        from src.core.prediction.baselines.banister_ir import BanisterIRModel
+        from src.core.prediction.baselines.logistic_injury import LogisticInjuryModel
+        from src.core.prediction.baselines.rule_based_injury import (
+            RuleBasedInjuryBaseline,
+        )
+        from src.core.prediction.data_assessor import DataAssessor
+        from src.core.prediction.feature_engine import FeatureEngine
+        from src.core.prediction.injury_predictor import InjuryPredictor
+        from src.core.prediction.model_manager import ModelManager
+        from src.core.prediction.prediction_engine import PredictionEngine
+        from src.core.prediction.race_predictor import RacePredictor
+        from src.core.prediction.training_response_predictor import (
+            TrainingResponsePredictor,
+        )
+        from src.core.prediction.vdot_predictor import VDOTPredictor
+
+        engine = self.get_extension("prediction_engine")
+        if engine is None:
+            data_assessor = DataAssessor(session_repo=self.session_repo)
+            feature_engine = FeatureEngine(session_repo=self.session_repo)
+            model_manager = ModelManager()
+
+            banister_model = BanisterIRModel()
+            rule_baseline = RuleBasedInjuryBaseline()
+            logistic_model = LogisticInjuryModel()
+
+            vdot_predictor = VDOTPredictor(
+                feature_engine=feature_engine,
+                data_assessor=data_assessor,
+                model_manager=model_manager,
+                banister_model=banister_model,
+            )
+            race_predictor = RacePredictor(
+                feature_engine=feature_engine,
+                data_assessor=data_assessor,
+                model_manager=model_manager,
+            )
+            injury_predictor = InjuryPredictor(
+                feature_engine=feature_engine,
+                data_assessor=data_assessor,
+                model_manager=model_manager,
+                rule_baseline=rule_baseline,
+                logistic_model=logistic_model,
+            )
+            training_response_predictor = TrainingResponsePredictor(
+                banister_model=banister_model,
+            )
+
+            engine = PredictionEngine(
+                vdot_predictor=vdot_predictor,
+                race_predictor=race_predictor,
+                injury_predictor=injury_predictor,
+                training_response_predictor=training_response_predictor,
+                data_assessor=data_assessor,
+                model_manager=model_manager,
+            )
+            self.set_extension("prediction_engine", engine)
+        return engine
+
 
 class AppContextFactory:
     """

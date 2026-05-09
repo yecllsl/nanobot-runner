@@ -6,6 +6,7 @@ from src.core.body_signal.models import (
     BodySignalSummary,
     DataQuality,
     HRVDataSource,
+    HRVMetricsResult,
     RecoveryPoint,
     RestingHRPoint,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "DataQuality",
     "FatigueAssessor",
     "HRVAnalyzer",
+    "HRVMetricsResult",
     "HRVDataSource",
     "RecoveryMonitor",
     "RecoveryPoint",

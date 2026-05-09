@@ -201,9 +201,9 @@ class TestOnReminderTrigger:
             data_dir = Path(tmpdir)
             manager = TrainingReminderManager(data_dir=data_dir)
 
-            # 设置免打扰时段为过去，避免触发
-            manager.schedule.do_not_disturb_start = "22:00"
-            manager.schedule.do_not_disturb_end = "23:00"
+            # 设置免打扰时段为凌晨，避免与测试运行时间冲突
+            manager.schedule.do_not_disturb_start = "00:00"
+            manager.schedule.do_not_disturb_end = "00:01"
 
             # 模拟有训练计划
             mock_plan = MagicMock()
@@ -228,9 +228,9 @@ class TestOnReminderTrigger:
             data_dir = Path(tmpdir)
             manager = TrainingReminderManager(data_dir=data_dir)
 
-            # 设置免打扰时段为过去
-            manager.schedule.do_not_disturb_start = "22:00"
-            manager.schedule.do_not_disturb_end = "23:00"
+            # 设置免打扰时段为凌晨，避免与测试运行时间冲突
+            manager.schedule.do_not_disturb_start = "00:00"
+            manager.schedule.do_not_disturb_end = "00:01"
 
             mock_plan = MagicMock()
 
@@ -255,9 +255,9 @@ class TestOnReminderTrigger:
             data_dir = Path(tmpdir)
             manager = TrainingReminderManager(data_dir=data_dir)
 
-            # 设置免打扰时段为过去
-            manager.schedule.do_not_disturb_start = "22:00"
-            manager.schedule.do_not_disturb_end = "23:00"
+            # 设置免打扰时段为凌晨，避免与测试运行时间冲突
+            manager.schedule.do_not_disturb_start = "00:00"
+            manager.schedule.do_not_disturb_end = "00:01"
 
             mock_plan = MagicMock()
 

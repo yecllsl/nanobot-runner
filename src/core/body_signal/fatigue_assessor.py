@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from src.core.base.logger import get_logger
+from src.core.body_signal.exceptions import BodySignalError
 from src.core.body_signal.models import (
     DataQuality,
     FatigueBreakdown,
@@ -77,7 +78,7 @@ class FatigueAssessor:
 
         consecutive_hard_days = self.get_consecutive_hard_days()
 
-        atl_component = self._calc_atl_component(atl, tsb)
+        atl_component = self._calc_atl_component(atl)
         hr_deviation_component = 0.0
         consecutive_component = self._calc_consecutive_component(consecutive_hard_days)
         subjective_component = self._calc_subjective_component(rpe) if rpe else 0.0
@@ -161,7 +162,7 @@ class FatigueAssessor:
 
             return consecutive
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"统计连续高强度训练天数失败: {e}")
             return 0
 
@@ -198,10 +199,10 @@ class FatigueAssessor:
             "subjective": 0.0,
         }
 
-    def _calc_atl_component(self, atl: float, tsb: float) -> float:
+    def _calc_atl_component(self, atl: float) -> float:
         """计算ATL维度疲劳度贡献
 
-        基于ATL值和TSB计算训练负荷维度的疲劳度。
+        基于ATL值分段计算训练负荷维度的疲劳度。
         """
         if atl <= 30:
             return atl

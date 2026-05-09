@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from src.core.base.logger import get_logger
+from src.core.body_signal.exceptions import BodySignalError
 from src.core.body_signal.models import (
     DataQuality,
     RecoveryPoint,
@@ -134,7 +135,7 @@ class RecoveryMonitor:
                 message="休息效果不明显",
             )
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"检查休息日效果失败: {e}")
             return RestDayEffect(
                 resting_hr_change_pct=0.0,
@@ -146,7 +147,8 @@ class RecoveryMonitor:
     def get_recovery_trend(self, days: int = 7) -> list[RecoveryPoint]:
         """获取恢复趋势
 
-        读取指定天数的训练数据，计算每天的TSB和CTL。
+        读取指定天数及更早的训练数据，使用增量EWMA计算每天的TSB和CTL。
+        为确保CTL（42天EWMA）的准确性，额外读取45天的历史数据。
 
         Args:
             days: 查询天数
@@ -163,19 +165,39 @@ class RecoveryMonitor:
 
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
+            lookback_start = end_date - timedelta(days=days + 45)
 
             filtered = lf.filter(
-                (pl.col("session_start_time") >= start_date)
+                (pl.col("session_start_time") >= lookback_start)
                 & (pl.col("session_start_time") <= end_date)
             )
 
-            df = filtered.collect()
+            session_cols = ["session_start_time"]
+            if "session_total_distance" in columns:
+                session_cols.append("session_total_distance")
+            if "session_total_timer_time" in columns:
+                session_cols.append("session_total_timer_time")
+            if "session_avg_heart_rate" in columns:
+                session_cols.append("session_avg_heart_rate")
 
-            if df.is_empty():
+            session_df = (
+                filtered.group_by("session_start_time")
+                .agg(
+                    [
+                        pl.col(c).first()
+                        for c in session_cols
+                        if c != "session_start_time"
+                    ]
+                )
+                .sort("session_start_time")
+                .collect()
+            )
+
+            if session_df.is_empty():
                 return []
 
-            trend: list[RecoveryPoint] = []
-            for row in df.iter_rows(named=True):
+            daily_tss: dict[str, float] = {}
+            for row in session_df.iter_rows(named=True):
                 session_time = row.get("session_start_time")
                 if session_time is None:
                     continue
@@ -186,18 +208,38 @@ class RecoveryMonitor:
                     else str(session_time)
                 )
 
-                load_data = (
-                    self.training_load_analyzer.calculate_training_load_from_dataframe(
-                        pl.DataFrame()
-                    )
-                )
-                tsb = float(load_data.get("tsb", 0.0))
-                ctl = float(load_data.get("ctl", 0.0))
+                distance = float(row.get("session_total_distance", 0) or 0)
+                duration = float(row.get("session_total_timer_time", 0) or 0)
+                avg_hr = row.get("session_avg_heart_rate")
 
-                trend.append(RecoveryPoint(date=date_str, tsb=tsb, ctl=ctl))
+                tss = self.training_load_analyzer.calculate_tss_for_run(
+                    distance_m=distance,
+                    duration_s=duration,
+                    avg_heart_rate=avg_hr if isinstance(avg_hr, (int, float)) else None,
+                )
+                daily_tss[date_str] = daily_tss.get(date_str, 0.0) + tss
+
+            self.training_load_analyzer.reset_incremental_state()
+
+            trend: list[RecoveryPoint] = []
+            start_date_str = start_date.strftime("%Y-%m-%d")
+
+            for date_str in sorted(daily_tss.keys()):
+                total_tss = daily_tss[date_str]
+                result = self.training_load_analyzer.update_atl_ctl_incremental(
+                    total_tss
+                )
+                atl = result["atl"]
+                ctl = result["ctl"]
+                tsb = round(ctl - atl, 2)
+
+                if date_str >= start_date_str:
+                    trend.append(
+                        RecoveryPoint(date=date_str, tsb=tsb, ctl=round(ctl, 2))
+                    )
 
             return trend
 
-        except Exception as e:
+        except BodySignalError as e:
             logger.warning(f"获取恢复趋势失败: {e}")
             return []
