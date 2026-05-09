@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.10.0 | **更新日期**: 2026-05-09
-> **当前基线**: v0.19.0
+> **版本**: v5.11.0 | **更新日期**: 2026-05-09
+> **当前基线**: v0.20.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -38,6 +38,10 @@
 | **CLI框架** | Typer + Rich | Latest |
 | **数据存储** | Apache Parquet | via pyarrow |
 | **计算引擎** | Polars | 0.20+ |
+| **ML框架** | scikit-learn | 1.5+ |
+| **科学计算** | scipy | 1.10+ |
+| **模型解释** | shap | 0.48+ |
+| **模型序列化** | joblib | 1.3+ |
 | **数据解析** | fitparse | Latest |
 | **包管理** | uv | Latest |
 
@@ -62,10 +66,16 @@ src/
 │   ├── plan/                   # 智能跑步计划模块
 │   ├── export/                 # 数据导出模块 (v0.18.0)
 │   ├── visualization/          # 数据可视化模块 (v0.18.0)
-│   └── analysis/               # 身体信号分析模块 (v0.19.0)
-│       ├── hrv.py              # 心率变异分析
-│       ├── fatigue.py          # 疲劳度评估
-│       └── body_signals.py     # 身体信号解读
+│   ├── analysis/               # 身体信号分析模块 (v0.19.0)
+│   │   ├── hrv.py              # 心率变异分析
+│   │   ├── fatigue.py          # 疲劳度评估
+│   │   └── body_signals.py     # 身体信号解读
+│   └── prediction/             # ML预测模块 (v0.20.0)
+│       ├── models.py           # 预测数据模型
+│       ├── vdot_predictor.py   # VDOT趋势预测
+│       ├── race_predictor.py   # 比赛成绩预测
+│       ├── injury_predictor.py # 伤病风险预测
+│       └── model_manager.py    # 模型生命周期管理
 ├── agents/tools.py             # Agent 工具集
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块

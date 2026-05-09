@@ -9,6 +9,80 @@
 
 ---
 
+## [0.20.0] - 2026-05-09
+
+### 版本主题
+**ML增强预测** - 为数据充足用户提供更精准的未来洞察，数据不足时自动降级
+
+### 新增功能
+
+#### ML-VDOT趋势预测引擎
+- **三层降级架构**: ML增强 → 参数化基线(Banister IR) → 基础预测(线性回归)
+- **数据充足度评估**: 自动评估历史数据是否满足ML训练要求(18个月+/500+条记录)
+- **特征工程**: 时序特征、负荷特征、身体信号特征提取
+- **SHAP可解释性**: 提供预测结果的关键影响因素分析
+- **置信区间**: 提供预测值的置信区间范围
+- **CLI命令**: `nanobotrun predict vdot --days 30`
+
+#### 个人化比赛成绩预测
+- **Riegel公式个性化**: 基于个人历史比赛数据校准Riegel指数
+- **配速策略生成**: 为预测比赛生成分段配速策略
+- **最佳/最差情况**: 提供比赛成绩的乐观/悲观预测
+- **赛前调整建议**: 基于当前状态给出赛前训练调整建议
+- **CLI命令**: `nanobotrun predict race --distance 42.195`
+
+#### ML伤病风险预测
+- **多维度风险评估**: 急性负荷风险、慢性累积风险、身体信号风险
+- **时间轴预测**: 未来21天伤病风险概率曲线
+- **风险因素分析**: 识别主要风险因素及贡献度
+- **三级预警**: 高/中/低风险分级预警
+- **预防措施建议**: 基于风险类型给出针对性预防建议
+- **CLI命令**: `nanobotrun predict injury --days 21`
+
+#### 模型管理与校准
+- **自动模型训练**: 数据充足时自动触发模型训练
+- **模型版本管理**: 跟踪模型版本、训练时间、验证误差
+- **模型性能监控**: 监控预测准确度，触发重新训练
+- **人工校准接口**: 支持用户反馈校准预测结果
+- **CLI命令**: `nanobotrun predict model status/train/calibrate`
+
+#### 训练响应预测
+- **负荷-响应关系**: 预测特定训练负荷下的身体响应
+- **What-If推演**: 模拟不同训练方案的效果
+- **个性化因子**: 基于个人历史响应模式个性化预测
+
+### 架构改进
+- 新增 `src/core/prediction/` 模块：预测引擎核心模块
+  - `models.py`: 所有frozen dataclass数据模型
+  - `config.py`: PredictionConfig配置类
+  - `feature_engine.py`: 特征工程模块
+  - `data_assessor.py`: 数据充足度评估
+  - `vdot_predictor.py`: VDOT趋势预测引擎
+  - `race_predictor.py`: 比赛成绩预测
+  - `injury_predictor.py`: 伤病风险预测
+  - `training_response_predictor.py`: 训练响应预测
+  - `model_manager.py`: 模型生命周期管理
+  - `prediction_engine.py`: 预测引擎编排层
+  - `baselines/`: 基线模型(Banister IR、规则/逻辑回归伤病模型)
+- 新增 `src/cli/commands/prediction.py`: predict命令组CLI
+- 新增 `src/cli/handlers/prediction_handler.py`: 预测业务逻辑调用层
+- 更新 `src/core/base/context.py`: 新增prediction_engine等延迟属性
+- 更新 `src/agents/tools.py`: 新增7个Agent预测工具
+
+### 技术栈更新
+- 新增依赖: `scikit-learn>=1.5.0` (ML模型)
+- 新增依赖: `scipy>=1.10.0` (科学计算)
+- 新增依赖: `shap>=0.48.0` (模型可解释性)
+- 新增依赖: `joblib>=1.3.0` (模型序列化)
+
+### 质量门禁
+- 新增预测模块完整单元测试覆盖
+- 所有预测器通过基准测试验证
+- 代码变更经过审查，无破坏性变更
+- 文档更新完整，版本号一致
+
+---
+
 ## [0.19.0] - 2026-05-06
 
 ### 版本主题
