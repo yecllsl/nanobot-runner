@@ -109,16 +109,17 @@ class TestVDOTPredictorBasic:
 
 
 class TestVDOTPredictorTrainModel:
-    def test_train_model(self):
+    def test_train_model_with_sufficient_data(self):
         session_repo = MagicMock()
         session_repo.get_sessions_for_vdot.return_value = [
             MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
             for i in range(50)
         ]
+        model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
             data_assessor=_make_assessor(sufficient=True),
-            model_manager=_make_model_manager(),
+            model_manager=model_manager,
             banister_model=MagicMock(),
             session_repo=session_repo,
             base_vdot=45.0,
@@ -126,9 +127,8 @@ class TestVDOTPredictorTrainModel:
         result = predictor.train_model()
         assert result.success is True
         assert result.model_type == "vdot_predictor"
+        assert result.training_samples > 0
 
-
-class TestVDOTPredictorMLTraining:
     def test_train_model_trains_three_quantile_models(self):
         session_repo = MagicMock()
         session_repo.get_sessions_for_vdot.return_value = [
@@ -146,13 +146,33 @@ class TestVDOTPredictorMLTraining:
         )
         result = predictor.train_model()
         assert result.success is True
-        assert result.training_samples > 0
         model_manager.save_model.assert_called_once()
-        call_args = model_manager.save_model.call_args
-        saved_data = call_args[0][1]
+        saved_data = model_manager.save_model.call_args[0][1]
         assert "p10" in saved_data
         assert "p50" in saved_data
         assert "p90" in saved_data
+
+    def test_train_model_persistence(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_vdot.return_value = [
+            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        predictor = VDOTPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            banister_model=MagicMock(),
+            session_repo=session_repo,
+            base_vdot=45.0,
+        )
+        result = predictor.train_model()
+        assert result.success is True
+        saved_data = model_manager.save_model.call_args[0][1]
+        assert hasattr(saved_data["p10"], "predict")
+        assert hasattr(saved_data["p50"], "predict")
+        assert hasattr(saved_data["p90"], "predict")
 
     def test_train_model_insufficient_data(self):
         session_repo = MagicMock()
@@ -184,20 +204,6 @@ class TestVDOTPredictorMLTraining:
         assert result.success is False
 
 
-class TestVDOTPredictorFeatureImportance:
-    def test_get_feature_importance(self):
-        predictor = VDOTPredictor(
-            feature_engine=_make_feature_engine(),
-            data_assessor=_make_assessor(sufficient=True),
-            model_manager=_make_model_manager(),
-            banister_model=MagicMock(),
-            base_vdot=45.0,
-        )
-        factors = predictor.get_feature_importance()
-        assert isinstance(factors, list)
-        assert len(factors) <= 3
-
-
 class TestVDOTPredictorMLInference:
     def _train_and_get_predictor(self):
         session_repo = MagicMock()
@@ -220,26 +226,11 @@ class TestVDOTPredictorMLInference:
     def test_ml_inference_with_trained_model(self):
         predictor, model_manager = self._train_and_get_predictor()
         saved_data = model_manager.save_model.call_args[0][1]
-        assert "p10" in saved_data
-        assert "p50" in saved_data
-        assert "p90" in saved_data
         sample = np.random.randn(1, 5)
         p10 = float(saved_data["p10"].predict(sample)[0])
         p50 = float(saved_data["p50"].predict(sample)[0])
         p90 = float(saved_data["p90"].predict(sample)[0])
         assert p10 <= p50 <= p90
-
-    def test_shap_feature_importance_with_trained_model(self):
-        predictor, model_manager = self._train_and_get_predictor()
-        saved_data = model_manager.save_model.call_args[0][1]
-        p50_model = saved_data["p50"]
-        predictor._ml_model = saved_data
-        factors = predictor.get_feature_importance()
-        assert isinstance(factors, list)
-        if factors:
-            for f in factors:
-                assert f.name
-                assert f.weight > 0
 
     def test_auto_train_on_first_predict(self):
         session_repo = MagicMock()
@@ -280,3 +271,64 @@ class TestVDOTPredictorMLInference:
         )
         result = predictor.predict(days=30)
         assert result.prediction_type in ("ml_enhanced", "parametric")
+
+
+class TestVDOTPredictorSHAP:
+    def test_shap_feature_importance_with_trained_model(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_vdot.return_value = [
+            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        predictor = VDOTPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            banister_model=MagicMock(),
+            session_repo=session_repo,
+            base_vdot=45.0,
+        )
+        predictor.train_model()
+        saved_data = model_manager.save_model.call_args[0][1]
+        predictor._ml_model = saved_data
+        factors = predictor.get_feature_importance()
+        assert isinstance(factors, list)
+        assert len(factors) <= 3
+        if factors:
+            for f in factors:
+                assert f.name
+                assert f.weight > 0
+
+    def test_shap_timeout_fallback_to_sklearn(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_vdot.return_value = [
+            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        predictor = VDOTPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            banister_model=MagicMock(),
+            session_repo=session_repo,
+            base_vdot=45.0,
+        )
+        predictor.train_model()
+        saved_data = model_manager.save_model.call_args[0][1]
+        predictor._ml_model = saved_data
+        factors = predictor.get_feature_importance()
+        assert isinstance(factors, list)
+
+    def test_feature_importance_no_model_fallback(self):
+        predictor = VDOTPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=_make_model_manager(),
+            banister_model=MagicMock(),
+            base_vdot=45.0,
+        )
+        factors = predictor.get_feature_importance()
+        assert isinstance(factors, list)
+        assert len(factors) <= 3

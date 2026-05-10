@@ -92,8 +92,9 @@ class InjuryPredictor:
     def report_injury(
         self, injury_type: str, severity: str, date: str
     ) -> InjuryReportResult:
-        """伤病报告提交"""
+        """伤病报告提交 — 写入本地标签文件供训练使用"""
         injury_id = f"inj_{date.replace('-', '')}_{uuid.uuid4().hex[:3]}"
+        self._save_injury_label(injury_id, injury_type, severity, date)
         return InjuryReportResult(
             injury_id=injury_id,
             injury_type=injury_type,
@@ -103,6 +104,29 @@ class InjuryPredictor:
             created_at=datetime.now().isoformat(),
             success=True,
         )
+
+    def _save_injury_label(
+        self, injury_id: str, injury_type: str, severity: str, date: str
+    ) -> None:
+        """持久化伤病标签到本地JSON文件"""
+        try:
+            labels_path = Path(self._injury_labels_dir)
+            labels_path.mkdir(parents=True, exist_ok=True)
+            label_file = labels_path / f"{injury_id}.json"
+            label_data = {
+                "injury_id": injury_id,
+                "injury_type": injury_type,
+                "severity": severity,
+                "date": date,
+                "label_type": "confirmed",
+                "created_at": datetime.now().isoformat(),
+            }
+            label_file.write_text(
+                json.dumps(label_data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.warning(f"保存伤病标签失败: {e}")
 
     def train_model(self) -> ModelTrainingResult:
         """训练伤病风险预测模型 — LR+GBDT集成"""

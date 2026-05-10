@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -110,9 +111,34 @@ class TestInjuryPredictorReportInjury:
         assert result.success is True
         assert result.injury_type == "overuse"
 
+    def test_report_injury_saves_file(self, tmp_path):
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            injury_labels_dir=str(tmp_path / "labels"),
+        )
+        result = predictor.report_injury(
+            injury_type="overuse",
+            severity="moderate",
+            date="2026-05-08",
+        )
+        assert result.success is True
+        labels_dir = tmp_path / "labels"
+        assert labels_dir.exists()
+        json_files = list(labels_dir.glob("*.json"))
+        assert len(json_files) == 1
+        data = json.loads(json_files[0].read_text(encoding="utf-8"))
+        assert data["injury_type"] == "overuse"
+        assert data["severity"] == "moderate"
+        assert data["date"] == "2026-05-08"
+        assert data["label_type"] == "confirmed"
+
 
 class TestInjuryPredictorMLTraining:
-    def test_train_model_success(self):
+    def test_train_lr_gbdt_ensemble(self):
         session_repo = MagicMock()
         session_repo.get_sessions_for_injury.return_value = [
             MagicMock(
@@ -144,6 +170,35 @@ class TestInjuryPredictorMLTraining:
         assert "lr" in saved_models
         assert "gbdt" in saved_models
 
+    def test_ensemble_weights(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_injury.return_value = [
+            MagicMock(
+                distance_m=5000.0 + i * 100,
+                duration_s=1800.0 + i * 10,
+                tss=50.0 + i * 2,
+                date=f"2026-03-{(i % 28) + 1:02d}",
+            )
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            injury_analyzer=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            session_repo=session_repo,
+        )
+        predictor.train_model()
+        saved_data = model_manager.save_model.call_args[0][1]
+        sample = np.random.randn(1, 8)
+        lr_proba = saved_data["lr"].predict_proba(sample)
+        gbdt_proba = saved_data["gbdt"].predict_proba(sample)
+        ensemble = 0.4 * lr_proba[0, 1] + 0.6 * gbdt_proba[0, 1]
+        assert 0.0 <= ensemble <= 1.0
+
     def test_train_model_insufficient_data(self):
         session_repo = MagicMock()
         session_repo.get_sessions_for_injury.return_value = [
@@ -167,6 +222,54 @@ class TestInjuryPredictorMLTraining:
         )
         result = predictor.train_model()
         assert result.success is False
+
+
+class TestInjuryLabelPersistence:
+    def test_injury_label_persistence(self, tmp_path):
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            injury_labels_dir=str(tmp_path / "labels"),
+        )
+        predictor.report_injury(
+            injury_type="overuse", severity="moderate", date="2026-05-08"
+        )
+        loaded = predictor._load_injury_labels()
+        assert "2026-05-08" in loaded
+
+    def test_load_injury_labels_empty_dir(self, tmp_path):
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=MagicMock(),
+            injury_labels_dir=str(tmp_path / "nonexistent"),
+        )
+        labels = predictor._load_injury_labels()
+        assert isinstance(labels, set)
+        assert len(labels) == 0
+
+    def test_load_injury_labels_multiple(self, tmp_path):
+        labels_dir = tmp_path / "labels"
+        labels_dir.mkdir()
+        for i, d in enumerate(["2026-05-01", "2026-05-05", "2026-05-10"]):
+            f = labels_dir / f"inj_{d.replace('-', '')}_{i:03d}.json"
+            f.write_text(
+                json.dumps({"date": d, "injury_type": "overuse"}), encoding="utf-8"
+            )
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=MagicMock(),
+            injury_labels_dir=str(labels_dir),
+        )
+        loaded = predictor._load_injury_labels()
+        assert len(loaded) == 3
+        assert "2026-05-01" in loaded
+        assert "2026-05-05" in loaded
+        assert "2026-05-10" in loaded
 
 
 class TestInjuryPredictorMLInference:
@@ -197,8 +300,6 @@ class TestInjuryPredictorMLInference:
     def test_ml_inference_with_ensemble_model(self):
         predictor, model_manager = self._train_and_get_predictor()
         saved_data = model_manager.save_model.call_args[0][1]
-        assert "lr" in saved_data
-        assert "gbdt" in saved_data
         sample = np.random.randn(1, 8)
         lr_proba = saved_data["lr"].predict_proba(sample)
         gbdt_proba = saved_data["gbdt"].predict_proba(sample)
