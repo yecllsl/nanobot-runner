@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import numpy as np
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_SUFFICIENT = 400
 SESSION_PARAMETRIC = 200
+MIN_TRAINING_SAMPLES = 30
 
 
 class VDOTPredictor:
@@ -78,16 +80,98 @@ class VDOTPredictor:
         return 0
 
     def train_model(self) -> ModelTrainingResult:
-        """训练VDOT预测模型"""
+        """训练VDOT预测模型 — 3个分位数GBDT(p10/p50/p90)"""
+        start_time = time.time()
         try:
+            if self._session_repo is None:
+                return ModelTrainingResult(
+                    model_type="vdot_predictor",
+                    version="v1",
+                    training_samples=0,
+                    validation_error=0.0,
+                    training_duration_seconds=0.0,
+                    success=False,
+                    message="session_repo未注入，无法获取训练数据",
+                )
+
+            vdot_sessions = self._session_repo.get_sessions_for_vdot(limit=540)
+            if len(vdot_sessions) < MIN_TRAINING_SAMPLES:
+                return ModelTrainingResult(
+                    model_type="vdot_predictor",
+                    version="v1",
+                    training_samples=len(vdot_sessions),
+                    validation_error=0.0,
+                    training_duration_seconds=time.time() - start_time,
+                    success=False,
+                    message=f"训练数据不足: {len(vdot_sessions)}条 < {MIN_TRAINING_SAMPLES}条最低要求",
+                )
+
+            X, y = self._build_training_data(vdot_sessions)
+            if len(y) < MIN_TRAINING_SAMPLES:
+                return ModelTrainingResult(
+                    model_type="vdot_predictor",
+                    version="v1",
+                    training_samples=len(y),
+                    validation_error=0.0,
+                    training_duration_seconds=time.time() - start_time,
+                    success=False,
+                    message=f"有效VDOT样本不足: {len(y)}条",
+                )
+
+            from sklearn.ensemble import GradientBoostingRegressor
+
+            quantiles = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
+            models: dict[str, Any] = {}
+            val_error = 0.0
+
+            for name, alpha in quantiles.items():
+                model = GradientBoostingRegressor(
+                    loss="quantile",
+                    alpha=alpha,
+                    n_estimators=100,
+                    max_depth=5,
+                    learning_rate=0.1,
+                    min_samples_leaf=10,
+                    random_state=42,
+                )
+                model.fit(X, y)
+                models[name] = model
+                y_pred_p50 = (
+                    models["p50"].predict(X) if "p50" in models else model.predict(X)
+                )
+                if name == "p50":
+                    val_error = float(np.mean((y - y_pred_p50) ** 2))
+
+            sklearn_version = ""
+            try:
+                import sklearn
+
+                sklearn_version = sklearn.__version__
+            except (ImportError, AttributeError):
+                pass
+
+            metadata = {
+                "version": "v1",
+                "training_samples": len(y),
+                "validation_error": round(val_error, 6),
+                "sklearn_version": sklearn_version,
+                "quantiles": list(quantiles.keys()),
+                "feature_count": X.shape[1],
+                "trained_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+
+            if self._model_manager is not None:
+                self._model_manager.save_model("vdot_predictor", models, metadata)
+
+            duration = time.time() - start_time
             return ModelTrainingResult(
                 model_type="vdot_predictor",
                 version="v1",
-                training_samples=0,
-                validation_error=0.0,
-                training_duration_seconds=0.0,
+                training_samples=len(y),
+                validation_error=round(val_error, 6),
+                training_duration_seconds=round(duration, 3),
                 success=True,
-                message="VDOT预测模型训练完成（占位）",
+                message=f"VDOT预测模型训练完成: {len(y)}条样本, 3个分位数GBDT",
             )
         except Exception as e:
             logger.error(f"VDOT模型训练失败: {e}")
@@ -96,10 +180,51 @@ class VDOTPredictor:
                 version="v1",
                 training_samples=0,
                 validation_error=0.0,
-                training_duration_seconds=0.0,
+                training_duration_seconds=time.time() - start_time,
                 success=False,
                 message=f"训练失败: {e}",
             )
+
+    def _build_training_data(
+        self, vdot_sessions: list[Any]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """从VDOT历史记录构建训练数据
+
+        每个session生成一个特征向量+VDOT标签。
+        特征: [distance_km, duration_min, avg_hr, day_of_week, month]
+        标签: VDOT值
+        """
+        from src.core.calculators.vdot_calculator import VDOTCalculator
+
+        calculator = VDOTCalculator()
+        features_list: list[list[float]] = []
+        labels_list: list[float] = []
+
+        for i, session in enumerate(vdot_sessions):
+            dist_m = getattr(session, "distance_m", 0) or 0
+            dur_s = getattr(session, "duration_s", 0) or 0
+            avg_hr = getattr(session, "avg_heart_rate", None)
+
+            if dist_m < 1500 or dur_s <= 0:
+                continue
+
+            vdot = calculator.calculate_vdot(dist_m, dur_s)
+            if vdot <= 0:
+                continue
+
+            dist_km = dist_m / 1000.0
+            dur_min = dur_s / 60.0
+            hr_val = float(avg_hr) if isinstance(avg_hr, (int, float)) else 0.0
+            day_of_week = float(i % 7)
+            month = float(i % 12)
+
+            features_list.append([dist_km, dur_min, hr_val, day_of_week, month])
+            labels_list.append(vdot)
+
+        if not features_list:
+            return np.array([]).reshape(0, 5), np.array([])
+
+        return np.array(features_list), np.array(labels_list)
 
     def get_feature_importance(self) -> list[VDOTFactor]:
         """获取Top3特征重要性"""
