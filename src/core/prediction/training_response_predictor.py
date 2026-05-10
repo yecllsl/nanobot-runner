@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from src.core.prediction.baselines.banister_ir import BanisterIRModel
 from src.core.prediction.models import TrainingResponse
@@ -45,9 +46,13 @@ class TrainingResponsePredictor:
         self,
         banister_model: BanisterIRModel | None = None,
         base_vdot: float = 45.0,
+        training_load_analyzer: Any = None,
+        session_repo: Any = None,
     ) -> None:
         self._banister_model = banister_model or BanisterIRModel()
         self._base_vdot = base_vdot
+        self._training_load_analyzer = training_load_analyzer
+        self._session_repo = session_repo
 
     def predict(
         self,
@@ -55,13 +60,27 @@ class TrainingResponsePredictor:
         duration_min: int,
         intensity: str,
     ) -> TrainingResponse:
-        """预测训练响应"""
+        """预测训练响应 — 含赛前状态修正"""
         tss = self._estimate_tss(session_type, duration_min, intensity)
         recovery_hours = self._estimate_recovery(session_type, intensity, tss)
         vdot_impact = self._estimate_vdot_impact(tss)
         fatigue_impact = self._estimate_fatigue_impact(tss, intensity)
         injury_risk_delta = self._estimate_injury_risk_delta(intensity, tss)
         fitness_delta, fatigue_delta = self._estimate_banister_deltas(tss)
+
+        tsb = self._get_current_tsb()
+        if tsb < -10:
+            vdot_impact *= 0.85
+            fatigue_impact *= 1.15
+            injury_risk_delta *= 1.2
+        elif tsb > 10:
+            vdot_impact *= 1.05
+            fatigue_impact *= 0.9
+
+        recent_tss = self._get_recent_tss_7d()
+        if recent_tss > 600:
+            fatigue_impact *= 1.1
+            injury_risk_delta *= 1.15
 
         return TrainingResponse(
             session_type=session_type,
@@ -118,3 +137,26 @@ class TrainingResponsePredictor:
             np.sum(stress * np.exp(-np.arange(1) / self._banister_model.tau_fatigue))
         )
         return fitness_delta, fatigue_delta
+
+    def _get_current_tsb(self) -> float:
+        """获取当前TSB(训练压力平衡)"""
+        if self._training_load_analyzer is not None:
+            try:
+                ctl = self._training_load_analyzer.get_ctl()
+                atl = self._training_load_analyzer.get_atl()
+                if isinstance(ctl, (int, float)) and isinstance(atl, (int, float)):
+                    return float(ctl) - float(atl)
+            except Exception:
+                pass
+        return 0.0
+
+    def _get_recent_tss_7d(self) -> float:
+        """获取近7天TSS总量"""
+        if self._session_repo is not None:
+            try:
+                sessions = self._session_repo.get_recent_sessions(days=7)
+                if sessions:
+                    return sum(float(getattr(s, "tss", 0) or 0) for s in sessions)
+            except Exception:
+                pass
+        return 0.0
