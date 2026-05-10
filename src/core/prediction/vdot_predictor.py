@@ -227,8 +227,34 @@ class VDOTPredictor:
         return np.array(features_list), np.array(labels_list)
 
     def get_feature_importance(self) -> list[VDOTFactor]:
-        """获取Top3特征重要性"""
+        """获取Top3特征重要性 — SHAP > sklearn feature_importances_ > 固定权重"""
         try:
+            if self._ml_model is not None and isinstance(self._ml_model, dict):
+                p50_model = self._ml_model.get("p50")
+                if p50_model is not None:
+                    names = (
+                        self._feature_engine.get_feature_names("vdot")
+                        if self._feature_engine
+                        else [f"f{i}" for i in range(12)]
+                    )
+                    importances = self._extract_importances(p50_model, names)
+                    if importances:
+                        return importances[:3]
+
+            if self._model_manager is not None:
+                model = self._model_manager.load_model("vdot_predictor")
+                if model is not None and isinstance(model, dict):
+                    p50_model = model.get("p50")
+                    if p50_model is not None:
+                        names = (
+                            self._feature_engine.get_feature_names("vdot")
+                            if self._feature_engine
+                            else [f"f{i}" for i in range(12)]
+                        )
+                        importances = self._extract_importances(p50_model, names)
+                        if importances:
+                            return importances[:3]
+
             if self._feature_engine:
                 names = self._feature_engine.get_feature_names("vdot")
                 top_names = names[:3]
@@ -246,12 +272,73 @@ class VDOTPredictor:
             logger.warning(f"特征重要性分析失败: {e}")
         return []
 
-    def _predict_ml_enhanced(self, days: int) -> VDOTPrediction:
-        """ML增强预测
+    def _extract_importances(
+        self, model: Any, feature_names: list[str]
+    ) -> list[VDOTFactor]:
+        """从模型提取特征重要性 — SHAP > sklearn feature_importances_"""
+        try:
+            import shap
 
-        检查是否有已训练的ML模型，无模型时降级到参数化预测，
-        避免返回硬编码假数据并标注为ml_enhanced。
-        """
+            explainer = shap.TreeExplainer(model)
+            n_features = len(feature_names)
+            dummy = np.zeros((1, model.n_features_in_))
+            if dummy.shape[1] < n_features:
+                dummy = np.zeros((1, n_features))
+            shap_values = explainer.shap_values(dummy)
+            if isinstance(shap_values, np.ndarray) and shap_values.ndim >= 2:
+                mean_abs = np.abs(shap_values[0])
+            else:
+                mean_abs = np.abs(np.array(shap_values))
+            total = mean_abs.sum()
+            normalized = mean_abs / total if total > 0 else mean_abs
+            pairs = list(
+                zip(feature_names[: len(normalized)], normalized[: len(feature_names)])
+            )
+            pairs.sort(key=lambda x: x[1], reverse=True)
+            return [
+                VDOTFactor(
+                    name=name,
+                    weight=round(float(weight), 4),
+                    direction="positive",
+                    value=0.0,
+                )
+                for name, weight in pairs
+                if weight > 0
+            ]
+        except ImportError:
+            logger.debug("shap未安装，降级到sklearn feature_importances_")
+        except Exception as e:
+            logger.debug(f"SHAP计算失败，降级: {e}")
+
+        try:
+            if hasattr(model, "feature_importances_"):
+                importances = model.feature_importances_
+                total = importances.sum()
+                normalized = importances / total if total > 0 else importances
+                pairs = list(
+                    zip(
+                        feature_names[: len(normalized)],
+                        normalized[: len(feature_names)],
+                    )
+                )
+                pairs.sort(key=lambda x: x[1], reverse=True)
+                return [
+                    VDOTFactor(
+                        name=name,
+                        weight=round(float(weight), 4),
+                        direction="positive",
+                        value=0.0,
+                    )
+                    for name, weight in pairs
+                    if weight > 0
+                ]
+        except Exception as e:
+            logger.debug(f"sklearn feature_importances_提取失败: {e}")
+
+        return []
+
+    def _predict_ml_enhanced(self, days: int) -> VDOTPrediction:
+        """ML增强预测 — 冷启动自动训练+推理+降级"""
         if self._model_manager is not None:
             model_status = self._model_manager.get_model_status("vdot_predictor")
             if model_status.is_available:
@@ -260,30 +347,88 @@ class VDOTPredictor:
                     try:
                         return self._run_ml_inference(model, days)
                     except Exception as e:
-                        logger.warning(f"ML推理失败，降级到参数化: {e}")
-                        return self._predict_parametric(days)
+                        logger.warning(f"ML推理失败，尝试重训: {e}")
+                        train_result = self.train_model()
+                        if train_result.success:
+                            retrained = self._model_manager.load_model("vdot_predictor")
+                            if retrained is not None:
+                                try:
+                                    return self._run_ml_inference(retrained, days)
+                                except Exception as e2:
+                                    logger.warning(f"重训后推理仍失败: {e2}")
 
-        logger.info("无已训练ML模型，降级到参数化预测")
+        logger.info("无已训练ML模型，尝试自动训练")
+        train_result = self.train_model()
+        if train_result.success and self._model_manager is not None:
+            model = self._model_manager.load_model("vdot_predictor")
+            if model is not None:
+                try:
+                    return self._run_ml_inference(model, days)
+                except Exception as e:
+                    logger.warning(f"自动训练后推理失败: {e}")
+
+        logger.info("ML训练/推理失败，降级到参数化预测")
         return self._predict_parametric(days)
 
     def _run_ml_inference(self, model: Any, days: int) -> VDOTPrediction:
-        """执行ML模型推理（待v0.21.0实现真实训练后启用）"""
+        """执行ML模型推理 — 3个分位数模型获取p10/p50/p90"""
         matrix = self._feature_engine.extract_vdot_features(days=days)
         features = matrix.features.flatten()
 
-        predicted = float(model.predict(features.reshape(1, -1))[0])
-        std_dev = 0.3 + 0.01 * days
+        if (
+            isinstance(model, dict)
+            and "p10" in model
+            and "p50" in model
+            and "p90" in model
+        ):
+            p10 = float(model["p10"].predict(features.reshape(1, -1))[0])
+            p50 = float(model["p50"].predict(features.reshape(1, -1))[0])
+            p90 = float(model["p90"].predict(features.reshape(1, -1))[0])
+            predicted = p50
+            ci_lower = p10
+            ci_upper = p90
+            ci_width = p90 - p10
+            if ci_width < 1.0:
+                confidence = 0.95
+            elif ci_width < 2.0:
+                confidence = 0.85
+            else:
+                confidence = 0.70
+            quantile_models = True
+        else:
+            predicted = float(model.predict(features.reshape(1, -1))[0])
+            std_dev = 0.3 + 0.01 * days
+            ci_lower = round(predicted - 1.96 * std_dev, 2)
+            ci_upper = round(predicted + 1.96 * std_dev, 2)
+            confidence = min(0.95, 0.85 + 0.001 * days)
+            quantile_models = False
+
+        trend_slope = 0.0
+        if self._session_repo is not None:
+            try:
+                sessions = self._session_repo.get_sessions_for_vdot(limit=10)
+                if len(sessions) >= 2:
+                    from src.core.calculators.vdot_calculator import VDOTCalculator
+
+                    calc = VDOTCalculator()
+                    recent = []
+                    for s in sessions[:5]:
+                        d = getattr(s, "distance_m", 0) or 0
+                        t = getattr(s, "duration_s", 0) or 0
+                        if d >= 1500 and t > 0:
+                            recent.append(calc.calculate_vdot(d, t))
+                    if len(recent) >= 2:
+                        trend_slope = (recent[0] - recent[-1]) / len(recent)
+            except Exception:
+                pass
 
         return VDOTPrediction(
             current_vdot=self._base_vdot,
             predicted_vdot=round(predicted, 2),
             prediction_days=days,
-            confidence_interval=(
-                round(predicted - 1.96 * std_dev, 2),
-                round(predicted + 1.96 * std_dev, 2),
-            ),
-            confidence=min(0.95, 0.85 + 0.001 * days),
-            trend_slope=0.05,
+            confidence_interval=(round(ci_lower, 2), round(ci_upper, 2)),
+            confidence=confidence,
+            trend_slope=round(trend_slope, 4),
             key_factors=self.get_feature_importance(),
             data_quality=DataQuality.SUFFICIENT,
             prediction_type="ml_enhanced",
@@ -292,14 +437,18 @@ class VDOTPredictor:
                 training_samples=0,
                 feature_count=len(matrix.feature_names),
                 shap_available=False,
-                quantile_models=False,
+                quantile_models=quantile_models,
             ),
         )
 
     def _predict_parametric(self, days: int) -> VDOTPrediction:
-        """参数化Banister IR预测"""
+        """参数化Banister IR预测 — 使用真实TSS序列"""
         try:
-            training_stress = np.full(30, 50.0)
+            tss_series = self._get_tss_series()
+            if tss_series and len(tss_series) > 0:
+                training_stress = np.array(tss_series, dtype=float)
+            else:
+                training_stress = np.full(30, 50.0)
             predicted = self._banister_model.predict(
                 training_stress, base_vdot=self._base_vdot, days_ahead=days
             )
@@ -342,3 +491,28 @@ class VDOTPredictor:
             prediction_type="basic",
             model_info=None,
         )
+
+    def _get_tss_series(self, days: int = 42) -> list[float]:
+        """从session_repo获取TSS序列"""
+        if self._session_repo is None:
+            return []
+        try:
+            sessions = self._session_repo.get_recent_sessions(days=days)
+            if not sessions:
+                return []
+            tss_map: dict[str, float] = {}
+            for s in sessions:
+                s_date = getattr(s, "date", None) or getattr(s, "timestamp", None)
+                if s_date is None:
+                    continue
+                date_str = str(s_date)[:10]
+                tss = getattr(s, "tss", None)
+                if isinstance(tss, (int, float)):
+                    tss_map[date_str] = tss_map.get(date_str, 0.0) + float(tss)
+            if not tss_map:
+                return []
+            sorted_dates = sorted(tss_map.keys())
+            return [tss_map[d] for d in sorted_dates]
+        except Exception as e:
+            logger.debug(f"TSS序列获取失败: {e}")
+            return []
