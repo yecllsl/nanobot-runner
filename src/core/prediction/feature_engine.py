@@ -107,16 +107,12 @@ class FeatureEngine:
                         ),
                         math.sin(2 * math.pi * month / 12),
                         math.cos(2 * math.pi * month / 12),
-                        self._safe_float(
-                            "ctl_value", lambda: self._load_analyzer.calculate_ctl()
-                        ),
-                        self._safe_float(
-                            "tsb_value", lambda: self._load_analyzer.calculate_tsb()
-                        ),
+                        self._safe_float("ctl_value", self._get_ctl_value),
+                        self._safe_float("tsb_value", self._get_tsb_value),
                         self._safe_float("atl_ctl_ratio", self._get_atl_ctl_ratio),
                         self._safe_float(
                             "load_ramp_rate",
-                            lambda: self._load_analyzer.get_load_ramp_rate(),
+                            self._get_load_ramp_rate,
                         ),
                         self._safe_float(
                             "high_intensity_pct", self._get_high_intensity_pct
@@ -126,11 +122,11 @@ class FeatureEngine:
                         ),
                         self._safe_float(
                             "fatigue_score",
-                            lambda: self._body_signal_engine.get_fatigue_score(),
+                            self._get_fatigue_score,
                         ),
                         self._safe_float(
                             "resting_hr_deviation",
-                            lambda: self._hrv_analyzer.get_resting_hr_deviation(),
+                            self._get_resting_hr_deviation,
                         ),
                     ]
                 ]
@@ -217,17 +213,18 @@ class FeatureEngine:
                     [
                         self._safe_float(
                             "current_vdot",
-                            lambda: self._vdot_calculator.calculate_vdot(),
+                            self._get_current_vdot,
                         ),
                         self._safe_float("riegel_exponent", lambda: 1.06),
                         self._safe_float("correction_factor", lambda: 1.0),
                         self._safe_float(
                             "pre_race_fatigue",
-                            lambda: (
-                                self._body_signal_engine.get_fatigue_score() / 100.0
-                            ),
+                            self._get_pre_race_fatigue,
                         ),
-                        self._safe_float("pre_race_recovery", lambda: 0.0),
+                        self._safe_float(
+                            "pre_race_recovery",
+                            self._get_pre_race_recovery,
+                        ),
                     ]
                 ]
             )
@@ -328,8 +325,8 @@ class FeatureEngine:
     def _get_atl_ctl_ratio(self) -> float:
         if self._load_analyzer is None:
             return 0.0
-        atl = self._safe_float("atl", lambda: self._load_analyzer.calculate_atl())
-        ctl = self._safe_float("ctl", lambda: self._load_analyzer.calculate_ctl())
+        atl = self._get_atl_value()
+        ctl = self._get_ctl_value()
         if ctl <= 0:
             return 0.0
         return atl / ctl
@@ -436,6 +433,123 @@ class FeatureEngine:
             return 0.0
         deviation = self._safe_float(
             "resting_hr_deviation",
-            lambda: self._hrv_analyzer.get_resting_hr_deviation(),
+            self._get_resting_hr_deviation,
         )
         return abs(deviation)
+
+    def _get_tss_series(self, days: int = 42) -> list[float]:
+        if self._repo is None:
+            return []
+        sessions = self._repo.get_recent_sessions(days=days)
+        if not sessions:
+            return []
+        tss_map: dict[str, float] = {}
+        for s in sessions:
+            s_date = getattr(s, "date", None)
+            if s_date is None:
+                continue
+            date_str = str(s_date)[:10]
+            tss = getattr(s, "tss", None)
+            if isinstance(tss, (int, float)):
+                tss_map[date_str] = tss_map.get(date_str, 0.0) + float(tss)
+        if not tss_map:
+            return []
+        sorted_dates = sorted(tss_map.keys())
+        return [tss_map[d] for d in sorted_dates]
+
+    def _get_ctl_value(self) -> float:
+        if self._load_analyzer is None:
+            return 0.0
+        tss_series = self._get_tss_series(days=42)
+        if not tss_series:
+            return 0.0
+        return float(self._load_analyzer.calculate_ctl(tss_series))
+
+    def _get_atl_value(self) -> float:
+        if self._load_analyzer is None:
+            return 0.0
+        tss_series = self._get_tss_series(days=42)
+        if not tss_series:
+            return 0.0
+        return float(self._load_analyzer.calculate_atl(tss_series))
+
+    def _get_tsb_value(self) -> float:
+        ctl = self._get_ctl_value()
+        atl = self._get_atl_value()
+        return ctl - atl
+
+    def _get_load_ramp_rate(self) -> float:
+        if self._load_analyzer is None:
+            return 0.0
+        if hasattr(self._load_analyzer, "get_load_ramp_rate"):
+            try:
+                return float(self._load_analyzer.get_load_ramp_rate())
+            except TypeError:
+                tss_series = self._get_tss_series(days=42)
+                if not tss_series:
+                    return 0.0
+                return float(self._load_analyzer.get_load_ramp_rate(tss_series))
+        return 0.0
+
+    def _get_fatigue_score(self) -> float:
+        if self._body_signal_engine is None:
+            return 0.0
+        if hasattr(self._body_signal_engine, "get_fatigue_score"):
+            return float(self._body_signal_engine.get_fatigue_score())
+        if hasattr(self._body_signal_engine, "fatigue_assessor"):
+            try:
+                result = self._body_signal_engine.fatigue_assessor.assess_fatigue()
+                if isinstance(result, dict):
+                    return float(result.get("fatigue_score", 0.0))
+                if isinstance(result, (int, float)):
+                    return float(result)
+            except Exception as e:
+                logger.debug(f"fatigue_score提取失败: {e}")
+        return 0.0
+
+    def _get_resting_hr_deviation(self) -> float:
+        if self._hrv_analyzer is None:
+            return 0.0
+        if hasattr(self._hrv_analyzer, "get_resting_hr_deviation"):
+            return float(self._hrv_analyzer.get_resting_hr_deviation())
+        return 0.0
+
+    def _get_current_vdot(self) -> float:
+        if self._vdot_calculator is None:
+            return 0.0
+        if self._repo is None:
+            return 0.0
+        sessions = self._repo.get_recent_sessions(days=30)
+        if not sessions:
+            return 0.0
+        best_vdot = 0.0
+        for s in sessions:
+            dist = getattr(s, "distance_km", None) or getattr(s, "distance", None)
+            dur = getattr(s, "duration_s", None) or getattr(s, "total_timer_time", None)
+            if isinstance(dist, (int, float)) and isinstance(dur, (int, float)):
+                dist_m = float(dist) * 1000.0
+                time_s = float(dur)
+                if dist_m >= 1500 and time_s > 0:
+                    vdot = self._vdot_calculator.calculate_vdot(dist_m, time_s)
+                    if vdot > best_vdot:
+                        best_vdot = vdot
+        return best_vdot
+
+    def _get_pre_race_fatigue(self) -> float:
+        score = self._get_fatigue_score()
+        return score / 100.0
+
+    def _get_pre_race_recovery(self) -> float:
+        if self._body_signal_engine is None:
+            return 0.0
+        if hasattr(self._body_signal_engine, "recovery_monitor"):
+            try:
+                status = self._body_signal_engine.recovery_monitor.get_recovery_status()
+                if isinstance(status, dict):
+                    level = status.get("recovery_level", "moderate")
+                    return {"good": 0.8, "moderate": 0.5, "poor": 0.2}.get(level, 0.5)
+                if isinstance(status, str):
+                    return {"good": 0.8, "moderate": 0.5, "poor": 0.2}.get(status, 0.5)
+            except Exception as e:
+                logger.debug(f"pre_race_recovery提取失败: {e}")
+        return 0.0
