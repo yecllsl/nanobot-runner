@@ -33,12 +33,16 @@ class RacePredictor:
         feature_engine: Any = None,
         data_assessor: Any = None,
         model_manager: Any = None,
+        race_engine: Any = None,
+        body_signal_engine: Any = None,
         current_vdot: float = 45.0,
         race_records: list[dict[str, Any]] | None = None,
     ) -> None:
         self._feature_engine = feature_engine
         self._data_assessor = data_assessor
         self._model_manager = model_manager
+        self._race_engine = race_engine
+        self._body_signal_engine = body_signal_engine
         self._current_vdot = current_vdot
         self._race_records = race_records or []
         self._riegel_exponent = RIEGEL_STANDARD_EXPONENT

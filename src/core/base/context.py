@@ -275,6 +275,50 @@ class AppContext:
         return engine
 
     @property
+    def training_load_analyzer(self) -> Any:
+        """获取训练负荷分析器（v0.20.1新增）"""
+        from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+
+        analyzer = self.get_extension("training_load_analyzer")
+        if analyzer is None:
+            analyzer = TrainingLoadAnalyzer()
+            self.set_extension("training_load_analyzer", analyzer)
+        return analyzer
+
+    @property
+    def vdot_calculator(self) -> Any:
+        """获取VDOT计算器（v0.20.1新增）"""
+        from src.core.calculators.vdot_calculator import VDOTCalculator
+
+        calculator = self.get_extension("vdot_calculator")
+        if calculator is None:
+            calculator = VDOTCalculator()
+            self.set_extension("vdot_calculator", calculator)
+        return calculator
+
+    @property
+    def race_prediction_engine(self) -> Any:
+        """获取比赛预测引擎（v0.20.1新增）"""
+        from src.core.calculators.race_prediction import RacePredictionEngine
+
+        engine = self.get_extension("race_prediction_engine")
+        if engine is None:
+            engine = RacePredictionEngine()
+            self.set_extension("race_prediction_engine", engine)
+        return engine
+
+    @property
+    def injury_risk_analyzer(self) -> Any:
+        """获取伤病风险分析器（v0.20.1新增）"""
+        from src.core.calculators.injury_risk_analyzer import InjuryRiskAnalyzer
+
+        analyzer = self.get_extension("injury_risk_analyzer")
+        if analyzer is None:
+            analyzer = InjuryRiskAnalyzer()
+            self.set_extension("injury_risk_analyzer", analyzer)
+        return analyzer
+
+    @property
     def prediction_engine(self) -> Any:
         """获取预测引擎（v0.20.0新增）"""
         from src.core.prediction.baselines.banister_ir import BanisterIRModel
@@ -296,7 +340,13 @@ class AppContext:
         engine = self.get_extension("prediction_engine")
         if engine is None:
             data_assessor = DataAssessor(session_repo=self.session_repo)
-            feature_engine = FeatureEngine(session_repo=self.session_repo)
+            feature_engine = FeatureEngine(
+                session_repo=self.session_repo,
+                training_load_analyzer=self.training_load_analyzer,
+                hrv_analyzer=self.body_signal_engine.hrv_analyzer,
+                body_signal_engine=self.body_signal_engine,
+                vdot_calculator=self.vdot_calculator,
+            )
             model_manager = ModelManager()
 
             banister_model = BanisterIRModel()
@@ -307,19 +357,25 @@ class AppContext:
                 feature_engine=feature_engine,
                 data_assessor=data_assessor,
                 model_manager=model_manager,
+                race_engine=self.race_prediction_engine,
                 banister_model=banister_model,
+                session_repo=self.session_repo,
             )
             race_predictor = RacePredictor(
                 feature_engine=feature_engine,
                 data_assessor=data_assessor,
                 model_manager=model_manager,
+                race_engine=self.race_prediction_engine,
+                body_signal_engine=self.body_signal_engine,
             )
             injury_predictor = InjuryPredictor(
                 feature_engine=feature_engine,
                 data_assessor=data_assessor,
                 model_manager=model_manager,
+                injury_analyzer=self.injury_risk_analyzer,
                 rule_baseline=rule_baseline,
                 logistic_model=logistic_model,
+                session_repo=self.session_repo,
             )
             training_response_predictor = TrainingResponsePredictor(
                 banister_model=banister_model,

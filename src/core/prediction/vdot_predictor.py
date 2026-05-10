@@ -31,13 +31,17 @@ class VDOTPredictor:
         feature_engine: Any = None,
         data_assessor: Any = None,
         model_manager: Any = None,
+        race_engine: Any = None,
         banister_model: BanisterIRModel | None = None,
+        session_repo: Any = None,
         base_vdot: float = 45.0,
     ) -> None:
         self._feature_engine = feature_engine
         self._data_assessor = data_assessor
         self._model_manager = model_manager
+        self._race_engine = race_engine
         self._banister_model = banister_model or BanisterIRModel()
+        self._session_repo = session_repo
         self._base_vdot = base_vdot
         self._ml_model: Any = None
 

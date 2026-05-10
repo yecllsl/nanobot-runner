@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from src.core.prediction.models import (
@@ -33,14 +34,22 @@ class InjuryPredictor:
         feature_engine: Any = None,
         data_assessor: Any = None,
         model_manager: Any = None,
+        injury_analyzer: Any = None,
         rule_baseline: Any = None,
         logistic_model: Any = None,
+        session_repo: Any = None,
+        injury_labels_dir: str | None = None,
     ) -> None:
         self._feature_engine = feature_engine
         self._data_assessor = data_assessor
         self._model_manager = model_manager
+        self._injury_analyzer = injury_analyzer
         self._rule_baseline = rule_baseline
         self._logistic_model = logistic_model
+        self._session_repo = session_repo
+        self._injury_labels_dir = injury_labels_dir or str(
+            Path.home() / ".nanobot-runner" / "injury_labels"
+        )
 
     def predict(self, days: int = 21) -> InjuryRiskPrediction:
         """三层降级伤病风险预测
