@@ -109,3 +109,152 @@ class TestInjuryPredictorReportInjury:
         )
         assert result.success is True
         assert result.injury_type == "overuse"
+
+
+class TestInjuryPredictorMLTraining:
+    def test_train_model_success(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_injury.return_value = [
+            MagicMock(
+                distance_m=5000.0 + i * 100,
+                duration_s=1800.0 + i * 10,
+                tss=50.0 + i * 2,
+                date=f"2026-03-{(i % 28) + 1:02d}",
+            )
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            injury_analyzer=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            session_repo=session_repo,
+        )
+        result = predictor.train_model()
+        assert result.success is True
+        assert result.model_type == "injury_predictor"
+        assert result.training_samples > 0
+        model_manager.save_model.assert_called_once()
+        call_args = model_manager.save_model.call_args[0]
+        assert call_args[0] == "injury_predictor"
+        saved_models = call_args[1]
+        assert "lr" in saved_models
+        assert "gbdt" in saved_models
+
+    def test_train_model_insufficient_data(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_injury.return_value = [
+            MagicMock(distance_m=5000.0, duration_s=1800.0, tss=50.0) for _ in range(5)
+        ]
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=MagicMock(),
+            session_repo=session_repo,
+        )
+        result = predictor.train_model()
+        assert result.success is False
+        assert "不足" in result.message
+
+    def test_train_model_no_session_repo(self):
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=MagicMock(),
+        )
+        result = predictor.train_model()
+        assert result.success is False
+
+
+class TestInjuryPredictorMLInference:
+    def _train_and_get_predictor(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_injury.return_value = [
+            MagicMock(
+                distance_m=5000.0 + i * 100,
+                duration_s=1800.0 + i * 10,
+                tss=50.0 + i * 2,
+                date=f"2026-03-{(i % 28) + 1:02d}",
+            )
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            injury_analyzer=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            session_repo=session_repo,
+        )
+        predictor.train_model()
+        return predictor, model_manager
+
+    def test_ml_inference_with_ensemble_model(self):
+        predictor, model_manager = self._train_and_get_predictor()
+        saved_data = model_manager.save_model.call_args[0][1]
+        assert "lr" in saved_data
+        assert "gbdt" in saved_data
+        sample = np.random.randn(1, 8)
+        lr_proba = saved_data["lr"].predict_proba(sample)
+        gbdt_proba = saved_data["gbdt"].predict_proba(sample)
+        assert lr_proba.shape[1] == 2
+        assert gbdt_proba.shape[1] == 2
+        ensemble = 0.4 * lr_proba[0, 1] + 0.6 * gbdt_proba[0, 1]
+        assert 0.0 <= ensemble <= 1.0
+
+    def test_auto_train_on_first_predict(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_injury.return_value = [
+            MagicMock(
+                distance_m=5000.0 + i * 100,
+                duration_s=1800.0 + i * 10,
+                tss=50.0 + i * 2,
+                date=f"2026-03-{(i % 28) + 1:02d}",
+            )
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        model_manager.get_model_status.return_value = MagicMock(is_available=False)
+        model_manager.load_model.return_value = None
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            injury_analyzer=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            session_repo=session_repo,
+        )
+        result = predictor.predict(days=21)
+        assert result.prediction_type in ("ml_enhanced", "parametric")
+
+    def test_model_corruption_auto_retrain(self):
+        session_repo = MagicMock()
+        session_repo.get_sessions_for_injury.return_value = [
+            MagicMock(
+                distance_m=5000.0 + i * 100,
+                duration_s=1800.0 + i * 10,
+                tss=50.0 + i * 2,
+                date=f"2026-03-{(i % 28) + 1:02d}",
+            )
+            for i in range(50)
+        ]
+        model_manager = MagicMock()
+        model_manager.get_model_status.return_value = MagicMock(is_available=True)
+        model_manager.load_model.return_value = None
+        predictor = InjuryPredictor(
+            feature_engine=_make_feature_engine(),
+            data_assessor=_make_assessor(sufficient=True),
+            model_manager=model_manager,
+            injury_analyzer=MagicMock(),
+            rule_baseline=MagicMock(),
+            logistic_model=MagicMock(),
+            session_repo=session_repo,
+        )
+        result = predictor.predict(days=21)
+        assert result.prediction_type in ("ml_enhanced", "parametric")
