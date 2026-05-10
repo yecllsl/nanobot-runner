@@ -2856,6 +2856,38 @@ class RunnerTools:
             logger.error(f"预测状态检查失败: {e}")
             return {"success": False, "error": str(e)}
 
+    def report_injury(
+        self, injury_type: str, severity: str, date: str
+    ) -> dict[str, Any]:
+        """伤病报告提交 - v0.20.1新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.report_injury(
+                injury_type=injury_type,
+                severity=severity,
+                date=date,
+            )
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"伤病报告提交失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def manage_prediction_model(self, action: str, model_type: str) -> dict[str, Any]:
+        """预测模型管理 - v0.20.1新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.prediction_engine
+            result = engine.manage_model(action=action, model_type=model_type)
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"模型管理失败: {e}")
+            return {"success": False, "error": str(e)}
+
 
 class AskUserConfirmTool(BaseTool):
     """异步用户确认工具 - v0.17.0新增（实验性功能）
@@ -3287,6 +3319,87 @@ class CheckPredictionStatusTool(BaseTool):
 
     async def execute(self, **kwargs: Any) -> str:
         return self._run_sync(self.runner_tools.check_prediction_status)
+
+
+class ReportInjuryTool(BaseTool):
+    """伤病报告提交工具 - v0.20.1新增"""
+
+    @property
+    def name(self) -> str:
+        return "report_injury"
+
+    @property
+    def description(self) -> str:
+        return "提交伤病报告，记录伤病类型、严重程度和日期，用于ML模型训练标签。当用户报告受伤、疼痛、不适时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "injury_type": {
+                    "type": "string",
+                    "description": "伤病类型（overuse/acute/chronic/other）",
+                    "enum": ["overuse", "acute", "chronic", "other"],
+                },
+                "severity": {
+                    "type": "string",
+                    "description": "严重程度（mild/moderate/severe）",
+                    "enum": ["mild", "moderate", "severe"],
+                },
+                "date": {
+                    "type": "string",
+                    "description": "伤病日期（YYYY-MM-DD）",
+                },
+            },
+            "required": ["injury_type", "severity", "date"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        injury_type = kwargs.get("injury_type", "other")
+        severity = kwargs.get("severity", "mild")
+        date = kwargs.get("date", "")
+        return self._run_sync(
+            self.runner_tools.report_injury, injury_type, severity, date
+        )
+
+
+class ManagePredictionModelTool(BaseTool):
+    """预测模型管理工具 - v0.20.1新增"""
+
+    @property
+    def name(self) -> str:
+        return "manage_prediction_model"
+
+    @property
+    def description(self) -> str:
+        return "管理预测模型，支持训练(train)、查看状态(status)、回滚(rollback)操作。当用户需要重新训练模型、查看模型状态或回滚模型版本时使用此工具。"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "操作类型",
+                    "enum": ["train", "status", "rollback"],
+                },
+                "model_type": {
+                    "type": "string",
+                    "description": "模型类型",
+                    "enum": ["vdot_predictor", "injury_predictor"],
+                },
+            },
+            "required": ["action", "model_type"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        action = kwargs.get("action", "status")
+        model_type = kwargs.get("model_type", "vdot_predictor")
+        return self._run_sync(
+            self.runner_tools.manage_prediction_model, action, model_type
+        )
 
 
 class SpawnSubagentTool(BaseTool):
@@ -3747,6 +3860,8 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         PredictInjuryRiskTool(runner_tools),
         PredictTrainingResponseTool(runner_tools),
         CheckPredictionStatusTool(runner_tools),
+        ReportInjuryTool(runner_tools),
+        ManagePredictionModelTool(runner_tools),
     ]
 
 
@@ -4018,5 +4133,20 @@ TOOL_DESCRIPTIONS = {
     "check_prediction_status": {
         "description": "检查预测功能的数据充足度，评估各预测类型是否具备足够数据支撑ML增强预测。当用户询问'预测准不准'、'数据够不够预测'时使用此工具。返回JSON格式：{success: true, data: {vdot_status, race_status, injury_status, overall_ready_count, advice}} 或 {success: false, error: 错误信息}",
         "parameters": {},
+    },
+    "report_injury": {
+        "description": "提交伤病报告，记录伤病类型、严重程度和日期，用于ML模型训练标签。当用户报告受伤、疼痛、不适时使用此工具。返回JSON格式：{success: true, data: {injury_id, injury_type, severity, date, label_type, created_at}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "injury_type": "伤病类型（overuse/acute/chronic/other，必填）",
+            "severity": "严重程度（mild/moderate/severe，必填）",
+            "date": "伤病日期（YYYY-MM-DD，必填）",
+        },
+    },
+    "manage_prediction_model": {
+        "description": "管理预测模型，支持训练(train)、查看状态(status)、回滚(rollback)操作。当用户需要重新训练模型、查看模型状态或回滚模型版本时使用此工具。返回JSON格式：{success: true, data: {action, model_type, success, message}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "action": "操作类型（train/status/rollback，必填）",
+            "model_type": "模型类型（vdot_predictor/injury_predictor，必填）",
+        },
     },
 }
