@@ -33,12 +33,16 @@ class RacePredictor:
         feature_engine: Any = None,
         data_assessor: Any = None,
         model_manager: Any = None,
+        race_engine: Any = None,
+        body_signal_engine: Any = None,
         current_vdot: float = 45.0,
         race_records: list[dict[str, Any]] | None = None,
     ) -> None:
         self._feature_engine = feature_engine
         self._data_assessor = data_assessor
         self._model_manager = model_manager
+        self._race_engine = race_engine
+        self._body_signal_engine = body_signal_engine
         self._current_vdot = current_vdot
         self._race_records = race_records or []
         self._riegel_exponent = RIEGEL_STANDARD_EXPONENT
@@ -166,11 +170,50 @@ class RacePredictor:
         return ref_time
 
     def _classify_runner_type(self) -> str:
-        """分类跑者类型"""
+        """分类跑者类型 — 基于比赛记录的短距离/长距离表现比"""
+        if len(self._race_records) < 3:
+            return "balanced"
+        try:
+            short_times: list[float] = []
+            long_times: list[float] = []
+            for r in self._race_records:
+                d = r.get("distance_km", 0)
+                t = r.get("time_seconds", 0)
+                if d <= 10:
+                    short_times.append(t / d if d > 0 else 0)
+                elif d >= 21:
+                    long_times.append(t / d if d > 0 else 0)
+            if short_times and long_times:
+                avg_short = sum(short_times) / len(short_times)
+                avg_long = sum(long_times) / len(long_times)
+                ratio = avg_long / avg_short if avg_short > 0 else 1.0
+                if ratio < 1.05:
+                    return "endurance"
+                elif ratio > 1.12:
+                    return "speed"
+                else:
+                    return "balanced"
+        except Exception as e:
+            logger.debug(f"选手类型判断失败: {e}")
         return "balanced"
 
     def _estimate_correction_factor(self) -> float:
-        """估算修正因子"""
+        """估算修正因子 — 基于历史比赛与Riegel预测的偏差"""
+        if len(self._race_records) < 3:
+            return 1.0
+        try:
+            ref_time = self._estimate_ref_time()
+            ratios: list[float] = []
+            for r in self._race_records:
+                d = r.get("distance_km", 0)
+                actual = r.get("time_seconds", 0)
+                if d > 0 and actual > 0:
+                    predicted = ref_time * (d / 5.0) ** self._riegel_exponent
+                    ratios.append(actual / predicted)
+            if ratios:
+                return round(sum(ratios) / len(ratios), 3)
+        except Exception as e:
+            logger.debug(f"修正因子估算失败: {e}")
         return 1.0
 
     def _generate_pace_strategy(

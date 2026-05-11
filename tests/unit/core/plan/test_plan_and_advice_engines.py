@@ -21,6 +21,7 @@ class TestLongTermPlanGenerator:
             current_vdot=42.0,
             target_vdot=48.0,
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         assert isinstance(plan, LongTermPlan)
         assert plan.plan_name == "半马备赛"
@@ -35,6 +36,7 @@ class TestLongTermPlanGenerator:
             target_race="北京马拉松",
             target_date="2026-10-15",
             total_weeks=20,
+            auto_create_training_plans=False,
         )
         assert plan.target_race == "北京马拉松"
         assert plan.target_date == "2026-10-15"
@@ -45,6 +47,7 @@ class TestLongTermPlanGenerator:
             plan_name="测试计划",
             current_vdot=40.0,
             total_weeks=12,
+            auto_create_training_plans=False,
         )
         cycle_types = [c.cycle_type for c in plan.cycles]
         assert "base" in cycle_types
@@ -58,6 +61,7 @@ class TestLongTermPlanGenerator:
             current_vdot=42.0,
             fitness_level="intermediate",
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         low, high = plan.weekly_volume_range_km
         assert low > 0
@@ -69,6 +73,7 @@ class TestLongTermPlanGenerator:
             current_vdot=42.0,
             target_vdot=48.0,
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         assert len(plan.key_milestones) > 0
 
@@ -78,6 +83,7 @@ class TestLongTermPlanGenerator:
             current_vdot=30.0,
             fitness_level="beginner",
             total_weeks=12,
+            auto_create_training_plans=False,
         )
         low, high = plan.weekly_volume_range_km
         assert low < 35
@@ -88,6 +94,7 @@ class TestLongTermPlanGenerator:
             current_vdot=55.0,
             fitness_level="advanced",
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         low, high = plan.weekly_volume_range_km
         assert low >= 40
@@ -98,6 +105,7 @@ class TestLongTermPlanGenerator:
             current_vdot=42.0,
             target_vdot=48.0,
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         base_cycle = next(c for c in plan.cycles if c.cycle_type == "base")
         assert "VDOT" in base_cycle.goal
@@ -108,6 +116,7 @@ class TestLongTermPlanGenerator:
             current_vdot=42.0,
             target_vdot=None,
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         base_cycle = next(c for c in plan.cycles if c.cycle_type == "base")
         assert "有氧基础" in base_cycle.goal
@@ -117,6 +126,7 @@ class TestLongTermPlanGenerator:
             plan_name="测试计划",
             current_vdot=42.0,
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         for cycle in plan.cycles:
             assert len(cycle.key_workouts) > 0
@@ -127,6 +137,7 @@ class TestLongTermPlanGenerator:
             current_vdot=42.0,
             target_vdot=48.0,
             total_weeks=16,
+            auto_create_training_plans=False,
         )
         d = plan.to_dict()
         assert d["plan_name"] == "测试计划"
@@ -137,6 +148,7 @@ class TestLongTermPlanGenerator:
             plan_name="短计划",
             current_vdot=42.0,
             total_weeks=4,
+            auto_create_training_plans=False,
         )
         assert plan.total_weeks == 4
         assert len(plan.cycles) >= 2

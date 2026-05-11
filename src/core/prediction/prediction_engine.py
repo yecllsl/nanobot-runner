@@ -116,7 +116,7 @@ class PredictionEngine:
         action: str,
         model_type: str,
     ) -> ModelManagementResult:
-        """模型管理"""
+        """模型管理 — train/status/rollback"""
         if action == "status":
             status = self._model_manager.get_model_status(model_type)
             return ModelManagementResult(
@@ -127,28 +127,80 @@ class PredictionEngine:
                 details={"is_available": status.is_available},
             )
         elif action == "train":
-            if model_type == "vdot_predictor":
-                train_result = self._vdot_predictor.train_model()
-                return ModelManagementResult(
-                    action=action,
-                    model_type=model_type,
-                    success=train_result.success,
-                    message=train_result.message,
-                    details={},
-                )
-            return ModelManagementResult(
-                action=action,
-                model_type=model_type,
-                success=False,
-                message=f"暂不支持训练{model_type}",
-                details={},
-            )
+            return self._train_model(model_type)
+        elif action == "rollback":
+            return self._rollback_model(model_type)
         else:
             return ModelManagementResult(
                 action=action,
                 model_type=model_type,
                 success=False,
                 message=f"未知操作: {action}",
+                details={},
+            )
+
+    def _train_model(self, model_type: str) -> ModelManagementResult:
+        """执行模型训练"""
+        if model_type == "vdot_predictor":
+            train_result = self._vdot_predictor.train_model()
+            return ModelManagementResult(
+                action="train",
+                model_type=model_type,
+                success=train_result.success,
+                message=train_result.message,
+                details={},
+            )
+        elif model_type == "injury_predictor":
+            train_result = self._injury_predictor.train_model()
+            return ModelManagementResult(
+                action="train",
+                model_type=model_type,
+                success=train_result.success,
+                message=train_result.message,
+                details={},
+            )
+        return ModelManagementResult(
+            action="train",
+            model_type=model_type,
+            success=False,
+            message=f"暂不支持训练{model_type}",
+            details={},
+        )
+
+    def _rollback_model(self, model_type: str) -> ModelManagementResult:
+        """回滚模型到上一版本"""
+        if self._model_manager is None:
+            return ModelManagementResult(
+                action="rollback",
+                model_type=model_type,
+                success=False,
+                message="model_manager未注入",
+                details={},
+            )
+        try:
+            rollback_result = self._model_manager.rollback(model_type)
+            if rollback_result:
+                self.invalidate_cache()
+                return ModelManagementResult(
+                    action="rollback",
+                    model_type=model_type,
+                    success=True,
+                    message=f"{model_type}已回滚到上一版本",
+                    details={},
+                )
+            return ModelManagementResult(
+                action="rollback",
+                model_type=model_type,
+                success=False,
+                message=f"{model_type}无可回滚版本",
+                details={},
+            )
+        except Exception as e:
+            return ModelManagementResult(
+                action="rollback",
+                model_type=model_type,
+                success=False,
+                message=f"回滚失败: {e}",
                 details={},
             )
 

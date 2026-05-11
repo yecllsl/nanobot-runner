@@ -72,7 +72,8 @@ class PredictionConfig:
             raise ValueError(f"vdot_min_months必须≥6，当前为{self.vdot_min_months}")
         if self.risk_warning_threshold <= 0.0 or self.risk_warning_threshold > 1.0:
             raise ValueError(
-                f"risk_warning_threshold必须在(0, 1]范围内，当前为{self.risk_warning_threshold}"
+                f"risk_warning_threshold必须在(0, 1]范围内，"
+                f"当前为{self.risk_warning_threshold}"
             )
 
     def to_dict(self) -> dict[str, Any]:

@@ -109,7 +109,7 @@ class TestLLMTimeoutController:
         def slow_sync_func():
             import time
 
-            time.sleep(10.0)
+            time.sleep(2.0)
             return "should not reach"
 
         result = await controller.call_with_timeout(slow_sync_func)

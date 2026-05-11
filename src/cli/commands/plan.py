@@ -402,8 +402,8 @@ def create_long_term_plan(
         if plan.training_plan_ids:
             console.print("\n  📝 关联训练计划：")
             for i, tp_id in enumerate(plan.training_plan_ids):
-                cycle = plan.cycles[i] if i < len(plan.cycles) else None
-                cycle_type = cycle.cycle_type if cycle else "unknown"
+                matched_cycle = plan.cycles[i] if i < len(plan.cycles) else None
+                cycle_type = matched_cycle.cycle_type if matched_cycle else "unknown"
                 console.print(f"    [{cycle_type}] {tp_id}")
 
             console.print("\n  💡 使用以下命令记录训练反馈：")
