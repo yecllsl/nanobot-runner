@@ -1,3 +1,4 @@
+from src.core.twin.digital_twin_engine import DigitalTwinEngine
 from src.core.twin.models import (
     BodySignalDimension,
     DataQuality,
@@ -16,10 +17,13 @@ from src.core.twin.models import (
     TwinEngineError,
     WeeklyPlanSpec,
 )
+from src.core.twin.state_vector_builder import StateVectorBuilder
+from src.core.twin.whatif_simulator import WhatIfSimulator
 
 __all__ = [
     "BodySignalDimension",
     "DataQuality",
+    "DigitalTwinEngine",
     "FitnessDimension",
     "HypotheticalPlan",
     "IntensityDistribution",
@@ -30,8 +34,10 @@ __all__ = [
     "RunnerStateVector",
     "SimulationResult",
     "SimulationWeekSnapshot",
+    "StateVectorBuilder",
     "StateVectorCache",
     "TrainingPatternDimension",
     "TwinEngineError",
     "WeeklyPlanSpec",
+    "WhatIfSimulator",
 ]
