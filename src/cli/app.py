@@ -19,6 +19,7 @@ from src.cli.commands import (
     system_app,
     tools_app,
     transparency_app,
+    twin_app,
     viz_app,
 )
 
@@ -44,6 +45,7 @@ app.add_typer(transparency_app, name="transparency")
 app.add_typer(cron_app, name="cron")
 app.add_typer(status_app, name="status")
 app.add_typer(prediction_app, name="predict")
+app.add_typer(twin_app, name="twin")
 
 if __name__ == "__main__":
     app()
