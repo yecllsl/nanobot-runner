@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from src.core.plan.training_reminder_manager import TrainingReminderManager
     from src.core.plan.training_response_analyzer import TrainingResponseAnalyzer
     from src.core.prediction.prediction_engine import PredictionEngine
+    from src.core.twin.digital_twin_engine import DigitalTwinEngine
     from src.core.visualization.plotext_renderer import PlotextRenderer
 
 
@@ -414,6 +415,24 @@ class AppContext:
                 model_manager=model_manager,
             )
             self.set_extension("prediction_engine", engine)
+        return engine
+
+    @property
+    def digital_twin_engine(self) -> DigitalTwinEngine:
+        """获取数字孪生引擎（v0.21.0新增）"""
+        from src.core.twin.digital_twin_engine import DigitalTwinEngine
+        from src.core.twin.state_vector_builder import StateVectorBuilder
+
+        engine = self.get_extension("digital_twin_engine")
+        if engine is None:
+            builder = StateVectorBuilder(
+                prediction_engine=self.prediction_engine,
+                body_signal_engine=self.body_signal_engine,
+                training_load_analyzer=self.training_load_analyzer,
+                session_repo=self.session_repo,
+            )
+            engine = DigitalTwinEngine(state_vector_builder=builder)
+            self.set_extension("digital_twin_engine", engine)
         return engine
 
 
