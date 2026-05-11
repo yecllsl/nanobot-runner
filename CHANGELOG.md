@@ -9,6 +9,67 @@
 
 ---
 
+## [0.20.1] - 2026-05-11
+
+### 版本主题
+**ML预测增强** - VDOT/伤病/比赛预测全面启用ML训练与推理，数据充足时自动启用ML模型
+
+> **⚠️ 版本说明**: v0.20.1 在v0.20.0架构基础上，完成了ML预测层的**训练与推理实现**，数据充足的用户现在可以享受更精准的ML增强预测。
+
+**本版本已实现**:
+- ✅ VDOT趋势预测ML训练（GradientBoosting分位数回归 p10/p50/p90）
+- ✅ VDOT趋势预测ML推理 + SHAP特征重要性分析
+- ✅ 伤病风险预测ML训练（LR+GBDT集成模型）
+- ✅ 伤病风险预测ML推理 + SHAP风险因子归因
+- ✅ 比赛成绩预测个人化模型（Riegel曲线拟合 + 跑者类型学习）
+- ✅ 训练响应预测器（TSB/恢复调整）
+- ✅ ModelManager持久化（sklearn兼容、predictions.parquet、回滚支持）
+- ✅ `predict model` CLI子命令组（status/train/rollback）
+- ✅ 新增Agent工具：ReportInjuryTool、ManagePredictionModelTool
+- ✅ 完整集成测试覆盖（E2E预测流程、降级链、跨模块数据流）
+
+### 新增功能
+
+#### VDOT ML增强预测
+- **GradientBoosting分位数回归**: 训练p10/p50/p90三个分位数模型，提供置信区间
+- **SHAP特征重要性**: 自动分析影响VDOT变化的关键因素（训练负荷、HRV、疲劳度等）
+- **冷启动自动训练**: 数据充足时自动触发模型训练，无需手动干预
+- **同日缓存机制**: 避免重复计算，提升响应速度
+
+#### 伤病风险ML增强预测
+- **LR+GBDT集成模型**: 逻辑回归提供基线风险，GBDT捕捉非线性风险模式
+- **SHAP风险因子归因**: 识别主要风险因素及贡献度（如急性负荷突增、连续高强度训练）
+- **三级预警系统**: 高/中/低风险分级，附带针对性预防建议
+- **时间轴预测**: 未来21天伤病风险概率曲线
+
+#### 个人化比赛成绩预测
+- **Riegel曲线拟合**: 基于个人历史比赛/训练数据校准个人Riegel指数
+- **跑者类型学习**: 自动识别跑者类型（速度型/耐力型/均衡型），调整预测策略
+- **赛前状态调整**: 基于当前TSB/疲劳度调整预测成绩
+
+#### 模型管理增强
+- **模型持久化**: 训练完成的模型自动保存到 `~/.nanobot-runner/models/`
+- **模型版本管理**: 跟踪模型版本、训练时间、验证误差
+- **模型回滚**: 支持回滚到上一个稳定模型版本
+- **CLI命令**: `nanobotrun predict model status/train/rollback`
+
+### 架构改进
+- 更新 `src/core/prediction/vdot_predictor.py`: 实现ML训练/推理、SHAP分析
+- 更新 `src/core/prediction/injury_predictor.py`: 实现LR+GBDT集成训练/推理
+- 更新 `src/core/prediction/race_predictor.py`: 实现Riegel拟合、跑者类型分类
+- 更新 `src/core/prediction/training_response_predictor.py`: 实现TSB/恢复调整
+- 更新 `src/core/prediction/model_manager.py`: 实现模型持久化、版本管理、回滚
+- 新增 `src/cli/commands/prediction.py`: `model`子命令组
+- 新增 `src/agents/tools.py`: ReportInjuryTool、ManagePredictionModelTool
+- 更新 `src/core/base/context.py`: 新增prediction_engine延迟属性
+
+### 测试覆盖
+- 新增ML训练/推理单元测试（SHAP、集成权重、标签持久化、跑者分类）
+- 新增E2E集成测试（完整预测流程、降级链、跨模块数据流）
+- 所有预测器通过基准测试验证
+
+---
+
 ## [0.20.0] - 2026-05-09
 
 ### 版本主题

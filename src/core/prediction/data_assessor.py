@@ -58,7 +58,8 @@ class DataAssessor:
             advice.append("继续积累训练数据以启用VDOT ML增强预测")
         else:
             advice.append(
-                "VDOT数据已充足，运行 predict model train vdot_predictor 训练ML模型以启用增强预测"
+                "VDOT数据已充足，运行 predict model train vdot_predictor "
+                "训练ML模型以启用增强预测"
             )
         if not race_status.is_sufficient:
             advice.append("积累更多比赛数据以启用个人化比赛预测")
@@ -66,7 +67,8 @@ class DataAssessor:
             advice.append("积累更多训练和心率数据以启用伤病ML预测")
         else:
             advice.append(
-                "伤病数据已充足，运行 predict model train injury_predictor 训练ML模型以启用增强预测"
+                "伤病数据已充足，运行 predict model train injury_predictor "
+                "训练ML模型以启用增强预测"
             )
 
         return PredictionStatusReport(

@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+from src.core.prediction.feature_engine import INJURY_FEATURE_NAMES
 from src.core.prediction.models import (
     AcuteLoadRisk,
     BodySignalRisk,
@@ -143,7 +144,7 @@ class InjuryPredictor:
                     message="session_repo未注入，无法获取训练数据",
                 )
 
-            sessions = self._session_repo.get_sessions_for_injury(limit=540)
+            sessions = self._session_repo.get_recent_sessions(limit=540)
             if len(sessions) < MIN_TRAINING_SAMPLES:
                 return ModelTrainingResult(
                     model_type="injury_predictor",
@@ -152,7 +153,10 @@ class InjuryPredictor:
                     validation_error=0.0,
                     training_duration_seconds=time.time() - start_time,
                     success=False,
-                    message=f"训练数据不足: {len(sessions)}条 < {MIN_TRAINING_SAMPLES}条最低要求",
+                    message=(
+                        f"训练数据不足: {len(sessions)}条 < "
+                        f"{MIN_TRAINING_SAMPLES}条最低要求"
+                    ),
                 )
 
             X, y = self._build_training_data(sessions)
@@ -243,46 +247,65 @@ class InjuryPredictor:
     def _build_training_data(
         self, sessions: list[Any]
     ) -> tuple[np.ndarray, np.ndarray]:
-        """从session数据构建训练特征和标签"""
-        features_list: list[np.ndarray] = []
+        """从session数据构建训练特征和标签
+
+        使用FeatureEngine提取8维特征，确保训练/推理特征语义一致。
+        标签来源：1) 本地伤病标签文件 2) 基于距离/心率/时长的启发式规则
+        """
+        features_list: list[list[float]] = []
         labels_list: list[int] = []
+        n_features = len(INJURY_FEATURE_NAMES)
+
+        if self._feature_engine is None:
+            logger.warning("FeatureEngine未注入，无法构建训练数据")
+            return np.array([]).reshape(0, n_features), np.array([])
 
         injury_dates = self._load_injury_labels()
 
         for s in sessions:
-            tss = getattr(s, "tss", 0) or 0
-            distance_m = getattr(s, "distance_m", 0) or 0
-            duration_s = getattr(s, "duration_s", 0) or 0
-            avg_hr = getattr(s, "avg_hr", 0) or 0
-            max_hr = getattr(s, "max_hr", 0) or 0
-            elevation_gain = getattr(s, "elevation_gain", 0) or 0
-            s_date = str(getattr(s, "date", "") or "")[:10]
+            ts = getattr(s, "timestamp", None)
+            if ts is None:
+                continue
+            try:
+                s_date = datetime.strptime(str(ts)[:10], "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                continue
 
-            feat = np.array(
-                [
-                    float(tss),
-                    float(tss) / max(float(duration_s), 1.0) * 3600,
-                    float(distance_m) / 1000.0,
-                    float(avg_hr),
-                    float(max_hr) - float(avg_hr),
-                    float(elevation_gain),
-                    float(duration_s) / 3600.0,
-                    float(tss) * 0.3,
-                ]
-            )
-            features_list.append(feat)
+            try:
+                matrix = self._feature_engine.extract_injury_features(
+                    reference_date=s_date
+                )
+                feat = matrix.features.flatten().tolist()
+            except Exception as e:
+                logger.debug(f"Injury特征提取失败({s_date}): {e}")
+                continue
 
+            if len(feat) != n_features:
+                logger.debug(f"特征维度不匹配({s_date}): {len(feat)} != {n_features}")
+                continue
+
+            date_str = str(ts)[:10]
             is_injured = 0
-            if s_date and s_date in injury_dates:
+            if date_str and date_str in injury_dates:
                 is_injured = 1
             else:
-                if tss > 150 and avg_hr > 170 or tss > 200:
+                dist_m = getattr(s, "distance_m", 0) or 0
+                dur_s = getattr(s, "duration_s", 0) or 0
+                avg_hr = getattr(s, "avg_heart_rate", None)
+                if (
+                    isinstance(avg_hr, (int, float))
+                    and float(avg_hr) > 170
+                    and dist_m > 20000
+                ) or dur_s > 7200:
                     is_injured = 1
+
+            features_list.append(feat)
             labels_list.append(is_injured)
 
-        X = np.array(features_list)
-        y = np.array(labels_list)
-        return X, y
+        if not features_list:
+            return np.array([]).reshape(0, n_features), np.array([])
+
+        return np.array(features_list), np.array(labels_list)
 
     def _load_injury_labels(self) -> set[str]:
         """从本地目录加载伤病标签"""
@@ -407,7 +430,8 @@ class InjuryPredictor:
             matrix = self._feature_engine.extract_injury_features(days=days)
             proba = self._logistic_model.predict_proba(matrix.features)
             risk_score = float(proba[0]) * 100
-        except Exception:
+        except Exception as e:
+            logger.debug(f"参数化伤病预测失败: {e}")
             risk_score = 30.0
 
         risk_level = self._score_to_level(risk_score)
@@ -436,7 +460,8 @@ class InjuryPredictor:
             risk_score = result.get("risk_score", 20.0)
             risk_level = result.get("risk_level", "low")
             advice = result.get("advice", "")
-        except Exception:
+        except Exception as e:
+            logger.debug(f"规则基线预测失败: {e}")
             risk_score = 20.0
             risk_level = "low"
             advice = ""
@@ -496,15 +521,15 @@ class InjuryPredictor:
                     return float(result)
                 if isinstance(result, dict):
                     return float(result.get("acwr", 1.2))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"ACWR计算失败: {e}")
         return 1.2
 
     def _get_weekly_load_change(self) -> float:
         """获取周负荷变化百分比"""
         if self._session_repo is not None:
             try:
-                sessions = self._session_repo.get_recent_sessions(days=14)
+                sessions = self._session_repo.get_recent_sessions(limit=42)
                 if sessions and len(sessions) >= 2:
                     mid = len(sessions) // 2
                     recent_tss = sum(
@@ -515,8 +540,8 @@ class InjuryPredictor:
                     )
                     if older_tss > 0:
                         return round((recent_tss - older_tss) / older_tss * 100, 1)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"周负荷变化计算失败: {e}")
         return 10.0
 
     def _get_tsb_low_days(self) -> int:
@@ -526,8 +551,8 @@ class InjuryPredictor:
                 result = self._injury_analyzer.get_tsb_low_days()
                 if isinstance(result, int):
                     return result
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"TSB低天数获取失败: {e}")
         return 2
 
     def _get_hr_deviation(self) -> float:
@@ -537,8 +562,8 @@ class InjuryPredictor:
                 result = self._injury_analyzer.get_resting_hr_deviation()
                 if isinstance(result, (int, float)):
                     return float(result)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"静息心率偏差获取失败: {e}")
         return 5.0
 
     def _get_fatigue_score(self) -> float:
@@ -548,8 +573,8 @@ class InjuryPredictor:
                 result = self._injury_analyzer.get_fatigue_score()
                 if isinstance(result, (int, float)):
                     return float(result)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"疲劳度评分获取失败: {e}")
         return 40.0
 
     def _get_risk_factors(self, acwr: float, ensemble_proba: float) -> list[RiskFactor]:

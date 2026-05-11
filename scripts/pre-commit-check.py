@@ -129,7 +129,9 @@ if PYDANTIC_AVAILABLE:
         mypy: CheckConfig = Field(default_factory=lambda: CheckConfig(timeout=120))
         bandit: CheckConfig = Field(default_factory=lambda: CheckConfig(timeout=120))
         pytest: CheckConfig = Field(
-            default_factory=lambda: CheckConfig(command="uv run pytest tests/unit/ -v")
+            default_factory=lambda: CheckConfig(
+                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n auto"
+            )
         )
         schema_check: CheckConfig = Field(default_factory=CheckConfig)
 
@@ -212,7 +214,9 @@ else:
             self.ruff_lint = CheckConfig()
             self.mypy = CheckConfig(timeout=120)
             self.bandit = CheckConfig(timeout=120)
-            self.pytest = CheckConfig(command="uv run pytest tests/unit/ -v")
+            self.pytest = CheckConfig(
+                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n auto"
+            )
             self.schema_check = CheckConfig()
             self.parallel_execution = True
             self.max_workers = 4
@@ -334,31 +338,46 @@ class PreCommitChecker:
         )
         self.console: Console | None = Console() if RICH_AVAILABLE else None
 
-    def get_changed_files(self) -> list[Path]:
-        """获取Git中已修改但未提交的文件"""
-        try:
-            result = subprocess.run(
-                ["git", "diff", "--name-only", "--cached"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                cwd=self.project_root,
-                timeout=10,
-            )
+    def get_changed_files(self, include_working_dir: bool = False) -> list[Path]:
+        """获取Git中已修改的文件
 
-            if result.returncode == 0 and result.stdout.strip():
-                changed_files = []
-                for file_path in result.stdout.strip().split("\n"):
-                    if file_path:
-                        full_path = self.project_root / file_path
-                        if full_path.exists() and full_path.suffix == ".py":
-                            changed_files.append(full_path)
-                return changed_files
-        except Exception as e:
-            logger.debug(f"获取变更文件失败: {e}")
+        Args:
+            include_working_dir: 是否包含工作区（未暂存）的变更文件，
+                                 增量测试场景下需要设为 True
+        """
+        commands: list[list[str]] = [
+            ["git", "diff", "--name-only", "--cached"],
+        ]
+        if include_working_dir:
+            commands.append(["git", "diff", "--name-only"])
 
-        return []
+        all_files: set[str] = set()
+        for cmd in commands:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    cwd=self.project_root,
+                    timeout=10,
+                )
+
+                if result.returncode == 0 and result.stdout.strip():
+                    for file_path in result.stdout.strip().split("\n"):
+                        if file_path:
+                            all_files.add(file_path)
+            except Exception as e:
+                logger.debug(f"获取变更文件失败: {e}")
+
+        changed_files = []
+        for file_path in sorted(all_files):
+            full_path = self.project_root / file_path
+            if full_path.exists() and full_path.suffix == ".py":
+                changed_files.append(full_path)
+
+        return changed_files
 
     def should_skip_checks(self) -> tuple[bool, str]:
         """
@@ -584,8 +603,114 @@ class PreCommitChecker:
         )
         return self.run_command(command, "mypy 类型检查", self.config.mypy.timeout)
 
+    def _map_source_to_test_dirs(self, source_path: Path) -> list[str] | None:
+        """将源文件路径映射到对应的测试目录
+
+        映射规则：
+        - src/core/<module>/*.py → tests/unit/core/<module>/
+        - src/cli/<module>/*.py → tests/unit/cli/<module>/
+        - src/agents/*.py → tests/unit/agents/
+        - src/notify/*.py → tests/unit/notify/
+        - src/core/base/*.py → 返回 None（基础模块影响面广，需全量测试）
+        - src/core/models.py → 返回 None（公共模型影响面广，需全量测试）
+        - 非 src/ 下的文件（scripts/、docs/等）→ 返回空列表（不影响增量测试决策）
+
+        Returns:
+            list[str] | None: 测试目录列表（相对于项目根目录），
+                              空列表表示该文件不影响测试决策，
+                              None 表示需全量测试
+        """
+        try:
+            rel_path = source_path.relative_to(self.project_root)
+            parts = rel_path.parts
+        except ValueError:
+            return []
+
+        if len(parts) < 2:
+            return []
+
+        src_root = parts[0]
+        if src_root != "src":
+            return []
+
+        if len(parts) < 3:
+            return None
+
+        module = parts[1]
+
+        broad_impact_modules = {"base", "models.py"}
+        if module in broad_impact_modules or (
+            len(parts) > 2 and parts[2] in broad_impact_modules
+        ):
+            return None
+
+        test_dir = "tests/unit"
+
+        if module == "core" and len(parts) > 2:
+            sub_module = parts[2]
+            if sub_module == "models.py":
+                return None
+            test_dir = f"tests/unit/core/{sub_module}"
+        elif module == "cli" and len(parts) > 2:
+            sub_module = parts[2]
+            if sub_module.endswith(".py"):
+                test_dir = "tests/unit/cli"
+            else:
+                test_dir = f"tests/unit/cli/{sub_module}"
+        elif module == "agents":
+            test_dir = "tests/unit/agents"
+        elif module == "notify":
+            test_dir = "tests/unit/notify"
+        else:
+            test_dir = f"tests/unit/{module}"
+
+        test_path = self.project_root / test_dir
+        if test_path.exists():
+            return [test_dir]
+
+        return None
+
+    def _get_incremental_test_command(self) -> str | None:
+        """构建增量测试命令
+
+        根据暂存区和工作区变更的源文件，推断应运行的测试目录。
+        如果变更文件影响面广（如公共模型、基础模块），则返回 None 执行全量测试。
+        非源码文件（scripts/、docs/等）不影响增量测试决策。
+
+        Returns:
+            str | None: 增量测试命令，None 表示需全量测试
+        """
+        changed_files = self.get_changed_files(include_working_dir=True)
+        if not changed_files:
+            return None
+
+        test_dirs: set[str] = set()
+        has_src_changes = False
+        for source_file in changed_files:
+            mapped = self._map_source_to_test_dirs(source_file)
+            if mapped is None:
+                logger.info(
+                    f"变更文件 {source_file.relative_to(self.project_root)} "
+                    "影响面广，执行全量测试"
+                )
+                return None
+            if mapped:
+                has_src_changes = True
+                test_dirs.update(mapped)
+
+        if not has_src_changes:
+            return None
+
+        if not test_dirs:
+            return None
+
+        sorted_dirs = sorted(test_dirs)
+        dirs_str = " ".join(sorted_dirs)
+        logger.info(f"增量测试目录: {dirs_str}")
+        return f"uv run pytest {dirs_str} -v --timeout=60 -n auto"
+
     def check_pytest_tests(self) -> CheckResult:
-        """运行单元测试"""
+        """运行单元测试（支持增量测试）"""
         if not self.config.pytest.enabled:
             return CheckResult(
                 name="pytest 单元测试",
@@ -595,7 +720,16 @@ class PreCommitChecker:
                 command="",
             )
 
-        command = self.config.pytest.command or "uv run pytest tests/unit/ -v"
+        command = (
+            self.config.pytest.command
+            or "uv run pytest tests/unit/ -v --timeout=60 -n auto"
+        )
+
+        if self.config.incremental_check:
+            incremental_cmd = self._get_incremental_test_command()
+            if incremental_cmd is not None:
+                command = incremental_cmd
+
         return self.run_command(command, "pytest 单元测试", self.config.pytest.timeout)
 
     def check_schema_updates(self) -> CheckResult:

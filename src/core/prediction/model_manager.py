@@ -428,7 +428,8 @@ class ModelManager:
                     sessions = session_repo.get_sessions_by_date_range(
                         target_date, target_date
                     )
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"获取日期范围session失败({date_str}): {e}")
                     sessions = []
                 if sessions:
                     if prediction_type == "vdot":

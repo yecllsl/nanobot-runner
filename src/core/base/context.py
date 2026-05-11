@@ -1,9 +1,11 @@
 # 应用上下文管理
 # 提供依赖注入和统一的对象管理
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.core.analytics import AnalyticsEngine
 from src.core.base.profile import ProfileEngine, ProfileStorageManager
@@ -16,6 +18,28 @@ from src.core.storage.indexer import IndexManager
 from src.core.storage.parquet_manager import StorageManager
 from src.core.storage.parser import FitParser
 from src.core.storage.session_repository import SessionRepository
+
+if TYPE_CHECKING:
+    from src.core.body_signal.body_signal_engine import BodySignalEngine
+    from src.core.calculators.injury_risk_analyzer import InjuryRiskAnalyzer
+    from src.core.calculators.race_prediction import RacePredictionEngine
+    from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+    from src.core.calculators.vdot_calculator import VDOTCalculator
+    from src.core.export.engine import ExportEngine
+    from src.core.plan.ask_user_confirm import AskUserConfirmManager
+    from src.core.plan.cron_callback import CronCallbackHandler
+    from src.core.plan.gateway_integration import GatewayIntegration
+    from src.core.plan.goal_prediction_engine import GoalPredictionEngine
+    from src.core.plan.long_term_plan_generator import LongTermPlanGenerator
+    from src.core.plan.plan_adjustment_validator import PlanAdjustmentValidator
+    from src.core.plan.plan_execution_repository import PlanExecutionRepository
+    from src.core.plan.plan_modification_dialog import PlanModificationDialogManager
+    from src.core.plan.prompt_template_engine import PromptTemplateEngine
+    from src.core.plan.smart_advice_engine import SmartAdviceEngine
+    from src.core.plan.training_reminder_manager import TrainingReminderManager
+    from src.core.plan.training_response_analyzer import TrainingResponseAnalyzer
+    from src.core.prediction.prediction_engine import PredictionEngine
+    from src.core.visualization.plotext_renderer import PlotextRenderer
 
 
 @dataclass
@@ -77,7 +101,7 @@ class AppContext:
         self._extensions[name] = instance
 
     @property
-    def plan_execution_repo(self) -> Any:
+    def plan_execution_repo(self) -> PlanExecutionRepository:
         """获取计划执行仓储（v0.10.0新增）"""
         from src.core.plan.plan_execution_repository import PlanExecutionRepository
 
@@ -88,7 +112,7 @@ class AppContext:
         return repo
 
     @property
-    def training_response_analyzer(self) -> Any:
+    def training_response_analyzer(self) -> TrainingResponseAnalyzer:
         """获取训练响应分析器（v0.10.0新增）"""
         from src.core.plan.training_response_analyzer import TrainingResponseAnalyzer
 
@@ -99,7 +123,7 @@ class AppContext:
         return analyzer
 
     @property
-    def plan_adjustment_validator(self) -> Any:
+    def plan_adjustment_validator(self) -> PlanAdjustmentValidator:
         """获取计划调整校验器（v0.11.0新增）"""
         from src.core.plan.plan_adjustment_validator import PlanAdjustmentValidator
 
@@ -110,7 +134,7 @@ class AppContext:
         return validator
 
     @property
-    def prompt_template_engine(self) -> Any:
+    def prompt_template_engine(self) -> PromptTemplateEngine:
         """获取Prompt模板引擎（v0.11.0新增）"""
         from src.core.plan.prompt_template_engine import PromptTemplateEngine
 
@@ -121,7 +145,7 @@ class AppContext:
         return engine
 
     @property
-    def plan_modification_dialog_manager(self) -> Any:
+    def plan_modification_dialog_manager(self) -> PlanModificationDialogManager:
         """获取计划修改对话管理器（v0.11.0新增）"""
         from src.core.plan.plan_modification_dialog import PlanModificationDialogManager
 
@@ -135,7 +159,7 @@ class AppContext:
         return manager
 
     @property
-    def goal_prediction_engine(self) -> Any:
+    def goal_prediction_engine(self) -> GoalPredictionEngine:
         """获取目标预测引擎（v0.12.0新增）"""
         from src.core.plan.goal_prediction_engine import GoalPredictionEngine
 
@@ -146,7 +170,7 @@ class AppContext:
         return engine
 
     @property
-    def long_term_plan_generator(self) -> Any:
+    def long_term_plan_generator(self) -> LongTermPlanGenerator:
         """获取长期规划生成器（v0.12.0新增）"""
         from src.core.plan.long_term_plan_generator import LongTermPlanGenerator
 
@@ -157,7 +181,7 @@ class AppContext:
         return generator
 
     @property
-    def smart_advice_engine(self) -> Any:
+    def smart_advice_engine(self) -> SmartAdviceEngine:
         """获取智能建议引擎（v0.12.0新增）"""
         from src.core.plan.smart_advice_engine import SmartAdviceEngine
 
@@ -168,7 +192,7 @@ class AppContext:
         return engine
 
     @property
-    def training_reminder_manager(self) -> Any:
+    def training_reminder_manager(self) -> TrainingReminderManager:
         """获取训练提醒管理器（v0.17.0新增）"""
         from src.core.plan.training_reminder_manager import TrainingReminderManager
 
@@ -179,7 +203,7 @@ class AppContext:
         return manager
 
     @property
-    def cron_callback_handler(self) -> Any:
+    def cron_callback_handler(self) -> CronCallbackHandler:
         """获取Cron回调处理器（v0.17.0新增）"""
         from src.core.plan.cron_callback import CronCallbackHandler
 
@@ -192,7 +216,7 @@ class AppContext:
         return handler
 
     @property
-    def gateway_integration(self) -> Any:
+    def gateway_integration(self) -> GatewayIntegration:
         """获取Gateway集成器（v0.17.0新增）"""
         from src.core.plan.gateway_integration import GatewayIntegration
 
@@ -206,7 +230,7 @@ class AppContext:
         return integration
 
     @property
-    def ask_user_confirm_manager(self) -> Any:
+    def ask_user_confirm_manager(self) -> AskUserConfirmManager:
         """获取异步确认管理器（v0.17.0新增，实验性功能）"""
         from src.core.plan.ask_user_confirm import AskUserConfirmManager
 
@@ -217,7 +241,7 @@ class AppContext:
         return manager
 
     @property
-    def chart_renderer(self) -> Any:
+    def chart_renderer(self) -> PlotextRenderer:
         """获取图表渲染器（v0.18.0新增）"""
         from src.core.visualization.plotext_renderer import PlotextRenderer
 
@@ -228,7 +252,7 @@ class AppContext:
         return renderer
 
     @property
-    def export_engine(self) -> Any:
+    def export_engine(self) -> ExportEngine:
         """获取导出引擎（v0.18.0新增）"""
         from src.core.export.engine import ExportEngine
 
@@ -239,7 +263,7 @@ class AppContext:
         return engine
 
     @property
-    def body_signal_engine(self) -> Any:
+    def body_signal_engine(self) -> BodySignalEngine:
         """获取身体信号引擎（v0.19.0新增）"""
         from src.core.body_signal.body_signal_engine import BodySignalEngine
         from src.core.body_signal.fatigue_assessor import FatigueAssessor
@@ -275,7 +299,7 @@ class AppContext:
         return engine
 
     @property
-    def training_load_analyzer(self) -> Any:
+    def training_load_analyzer(self) -> TrainingLoadAnalyzer:
         """获取训练负荷分析器（v0.20.1新增）"""
         from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
 
@@ -286,7 +310,7 @@ class AppContext:
         return analyzer
 
     @property
-    def vdot_calculator(self) -> Any:
+    def vdot_calculator(self) -> VDOTCalculator:
         """获取VDOT计算器（v0.20.1新增）"""
         from src.core.calculators.vdot_calculator import VDOTCalculator
 
@@ -297,7 +321,7 @@ class AppContext:
         return calculator
 
     @property
-    def race_prediction_engine(self) -> Any:
+    def race_prediction_engine(self) -> RacePredictionEngine:
         """获取比赛预测引擎（v0.20.1新增）"""
         from src.core.calculators.race_prediction import RacePredictionEngine
 
@@ -308,7 +332,7 @@ class AppContext:
         return engine
 
     @property
-    def injury_risk_analyzer(self) -> Any:
+    def injury_risk_analyzer(self) -> InjuryRiskAnalyzer:
         """获取伤病风险分析器（v0.20.1新增）"""
         from src.core.calculators.injury_risk_analyzer import InjuryRiskAnalyzer
 
@@ -319,7 +343,7 @@ class AppContext:
         return analyzer
 
     @property
-    def prediction_engine(self) -> Any:
+    def prediction_engine(self) -> PredictionEngine:
         """获取预测引擎（v0.20.0新增）"""
         from src.core.prediction.baselines.banister_ir import BanisterIRModel
         from src.core.prediction.baselines.logistic_injury import LogisticInjuryModel

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,16 +30,7 @@ def _make_session_repo(n: int = 50):
         MagicMock(
             distance_m=5000.0 + i * 100,
             duration_s=1800.0 + i * 10,
-            date=f"2026-03-{(i % 28) + 1:02d}",
-        )
-        for i in range(n)
-    ]
-    repo.get_sessions_for_injury.return_value = [
-        MagicMock(
-            distance_m=5000.0 + i * 100,
-            duration_s=1800.0 + i * 10,
-            tss=50.0 + i * 2,
-            date=f"2026-03-{(i % 28) + 1:02d}",
+            timestamp=datetime(2026, 3, 1 + (i % 28), 8, 0, 0),
         )
         for i in range(n)
     ]
@@ -47,7 +39,7 @@ def _make_session_repo(n: int = 50):
             distance_m=5000.0 + i * 100,
             duration_s=1800.0 + i * 10,
             tss=50.0 + i * 2,
-            date=f"2026-03-{(i % 28) + 1:02d}",
+            timestamp=datetime(2026, 3, 1 + (i % 28), 8, 0, 0),
         )
         for i in range(n)
     ]

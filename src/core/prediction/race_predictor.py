@@ -193,8 +193,8 @@ class RacePredictor:
                     return "speed"
                 else:
                     return "balanced"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"选手类型判断失败: {e}")
         return "balanced"
 
     def _estimate_correction_factor(self) -> float:
@@ -212,8 +212,8 @@ class RacePredictor:
                     ratios.append(actual / predicted)
             if ratios:
                 return round(sum(ratios) / len(ratios), 3)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"修正因子估算失败: {e}")
         return 1.0
 
     def _generate_pace_strategy(

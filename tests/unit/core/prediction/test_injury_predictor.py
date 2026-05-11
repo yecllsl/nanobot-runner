@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -30,6 +31,19 @@ def _make_feature_engine():
     matrix.feature_type = "injury"
     fe.extract_injury_features.return_value = matrix
     return fe
+
+
+def _make_injury_sessions(count: int = 50) -> list[MagicMock]:
+    """创建带timestamp的伤病训练session列表"""
+    sessions = []
+    for i in range(count):
+        s = MagicMock()
+        s.distance_m = 5000.0 + i * 100
+        s.duration_s = 1800.0 + i * 10
+        s.tss = 50.0 + i * 2
+        s.timestamp = datetime(2026, 3, 1 + (i % 28), 8, 0, 0)
+        sessions.append(s)
+    return sessions
 
 
 class TestInjuryPredictorMLEnhanced:
@@ -140,15 +154,7 @@ class TestInjuryPredictorReportInjury:
 class TestInjuryPredictorMLTraining:
     def test_train_lr_gbdt_ensemble(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_injury.return_value = [
-            MagicMock(
-                distance_m=5000.0 + i * 100,
-                duration_s=1800.0 + i * 10,
-                tss=50.0 + i * 2,
-                date=f"2026-03-{(i % 28) + 1:02d}",
-            )
-            for i in range(50)
-        ]
+        session_repo.get_recent_sessions.return_value = _make_injury_sessions(50)
         model_manager = MagicMock()
         predictor = InjuryPredictor(
             feature_engine=_make_feature_engine(),
@@ -172,15 +178,7 @@ class TestInjuryPredictorMLTraining:
 
     def test_ensemble_weights(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_injury.return_value = [
-            MagicMock(
-                distance_m=5000.0 + i * 100,
-                duration_s=1800.0 + i * 10,
-                tss=50.0 + i * 2,
-                date=f"2026-03-{(i % 28) + 1:02d}",
-            )
-            for i in range(50)
-        ]
+        session_repo.get_recent_sessions.return_value = _make_injury_sessions(50)
         model_manager = MagicMock()
         predictor = InjuryPredictor(
             feature_engine=_make_feature_engine(),
@@ -201,9 +199,7 @@ class TestInjuryPredictorMLTraining:
 
     def test_train_model_insufficient_data(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_injury.return_value = [
-            MagicMock(distance_m=5000.0, duration_s=1800.0, tss=50.0) for _ in range(5)
-        ]
+        session_repo.get_recent_sessions.return_value = _make_injury_sessions(5)
         predictor = InjuryPredictor(
             feature_engine=_make_feature_engine(),
             data_assessor=_make_assessor(sufficient=True),
@@ -275,15 +271,7 @@ class TestInjuryLabelPersistence:
 class TestInjuryPredictorMLInference:
     def _train_and_get_predictor(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_injury.return_value = [
-            MagicMock(
-                distance_m=5000.0 + i * 100,
-                duration_s=1800.0 + i * 10,
-                tss=50.0 + i * 2,
-                date=f"2026-03-{(i % 28) + 1:02d}",
-            )
-            for i in range(50)
-        ]
+        session_repo.get_recent_sessions.return_value = _make_injury_sessions(50)
         model_manager = MagicMock()
         predictor = InjuryPredictor(
             feature_engine=_make_feature_engine(),
@@ -310,15 +298,7 @@ class TestInjuryPredictorMLInference:
 
     def test_auto_train_on_first_predict(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_injury.return_value = [
-            MagicMock(
-                distance_m=5000.0 + i * 100,
-                duration_s=1800.0 + i * 10,
-                tss=50.0 + i * 2,
-                date=f"2026-03-{(i % 28) + 1:02d}",
-            )
-            for i in range(50)
-        ]
+        session_repo.get_recent_sessions.return_value = _make_injury_sessions(50)
         model_manager = MagicMock()
         model_manager.get_model_status.return_value = MagicMock(is_available=False)
         model_manager.load_model.return_value = None
@@ -336,15 +316,7 @@ class TestInjuryPredictorMLInference:
 
     def test_model_corruption_auto_retrain(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_injury.return_value = [
-            MagicMock(
-                distance_m=5000.0 + i * 100,
-                duration_s=1800.0 + i * 10,
-                tss=50.0 + i * 2,
-                date=f"2026-03-{(i % 28) + 1:02d}",
-            )
-            for i in range(50)
-        ]
+        session_repo.get_recent_sessions.return_value = _make_injury_sessions(50)
         model_manager = MagicMock()
         model_manager.get_model_status.return_value = MagicMock(is_available=True)
         model_manager.load_model.return_value = None

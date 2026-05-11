@@ -68,7 +68,8 @@ def predict_vdot(
 
         panel = Panel(
             f"[bold]当前VDOT:[/bold] {current_vdot:.1f}\n"
-            f"[bold]预测VDOT:[/bold] {predicted_vdot:.1f} ([{diff_color}]{diff:+.1f}[/{diff_color}])\n"
+            f"[bold]预测VDOT:[/bold] {predicted_vdot:.1f} "
+            f"([{diff_color}]{diff:+.1f}[/{diff_color}])\n"
             f"[bold]置信区间:[/bold] [{ci[0]:.1f}, {ci[1]:.1f}]\n"
             f"[bold]置信度:[/bold] {confidence:.0%}\n"
             f"[bold]趋势斜率:[/bold] {trend_slope:+.4f}/天\n"
@@ -179,8 +180,10 @@ def predict_injury(
                 recs_text += f"\n  - {r}"
 
         panel = Panel(
-            f"[bold]风险评分:[/bold] [{score_color}]{risk_score:.1f}/100[/{score_color}]\n"
-            f"[bold]风险等级:[/bold] [{level_color}]{risk_level}[/{level_color}]\n"
+            f"[bold]风险评分:[/bold] "
+            f"[{score_color}]{risk_score:.1f}/100[/{score_color}]\n"
+            f"[bold]风险等级:[/bold] "
+            f"[{level_color}]{risk_level}[/{level_color}]\n"
             f"[bold]预测模式:[/bold] {type_label}\n"
             f"[bold]数据质量:[/bold] {data_quality}"
             f"{factors_text}{recs_text}{data_hint}",
@@ -241,10 +244,12 @@ def predict_response(
         )
 
         panel = Panel(
-            f"[bold]VDOT影响:[/bold] [{vdot_color}]{vdot_impact:+.2f}[/{vdot_color}]\n"
+            f"[bold]VDOT影响:[/bold] "
+            f"[{vdot_color}]{vdot_impact:+.2f}[/{vdot_color}]\n"
             f"[bold]疲劳影响:[/bold] {fatigue_impact:.1f}\n"
             f"[bold]预计恢复:[/bold] {recovery_hours:.0f}小时\n"
-            f"[bold]伤病风险增量:[/bold] [{risk_color}]{injury_risk_delta:+.3f}[/{risk_color}]\n"
+            f"[bold]伤病风险增量:[/bold] "
+            f"[{risk_color}]{injury_risk_delta:+.3f}[/{risk_color}]\n"
             f"[bold]Banister体能增量:[/bold] {fitness_delta:+.2f}\n"
             f"[bold]Banister疲劳增量:[/bold] {fatigue_delta:+.2f}\n"
             f"[bold]预测模式:[/bold] 📊 参数化模型预测",

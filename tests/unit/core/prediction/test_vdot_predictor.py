@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -30,6 +31,18 @@ def _make_feature_engine():
     matrix.data_quality = "sufficient"
     fe.extract_vdot_features.return_value = matrix
     return fe
+
+
+def _make_vdot_sessions(count: int = 50) -> list[MagicMock]:
+    """创建带timestamp的VDOT训练session列表"""
+    sessions = []
+    for i in range(count):
+        s = MagicMock()
+        s.distance_m = 5000.0 + i * 100
+        s.duration_s = 1800.0 + i * 10
+        s.timestamp = datetime(2024, 1, 1 + (i % 28), 8, 0, 0)
+        sessions.append(s)
+    return sessions
 
 
 def _make_model_manager():
@@ -111,10 +124,7 @@ class TestVDOTPredictorBasic:
 class TestVDOTPredictorTrainModel:
     def test_train_model_with_sufficient_data(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
@@ -131,10 +141,7 @@ class TestVDOTPredictorTrainModel:
 
     def test_train_model_trains_three_quantile_models(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
@@ -154,10 +161,7 @@ class TestVDOTPredictorTrainModel:
 
     def test_train_model_persistence(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
@@ -176,9 +180,7 @@ class TestVDOTPredictorTrainModel:
 
     def test_train_model_insufficient_data(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0, duration_s=1800.0) for _ in range(5)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(5)
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
             data_assessor=_make_assessor(sufficient=True),
@@ -207,10 +209,7 @@ class TestVDOTPredictorTrainModel:
 class TestVDOTPredictorMLInference:
     def _train_and_get_predictor(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
@@ -226,7 +225,7 @@ class TestVDOTPredictorMLInference:
     def test_ml_inference_with_trained_model(self):
         predictor, model_manager = self._train_and_get_predictor()
         saved_data = model_manager.save_model.call_args[0][1]
-        sample = np.random.randn(1, 5)
+        sample = np.random.randn(1, 12)
         p10 = float(saved_data["p10"].predict(sample)[0])
         p50 = float(saved_data["p50"].predict(sample)[0])
         p90 = float(saved_data["p90"].predict(sample)[0])
@@ -234,10 +233,7 @@ class TestVDOTPredictorMLInference:
 
     def test_auto_train_on_first_predict(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         model_manager.get_model_status.return_value = MagicMock(is_available=False)
         model_manager.load_model.return_value = None
@@ -254,10 +250,7 @@ class TestVDOTPredictorMLInference:
 
     def test_model_corruption_auto_retrain(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         model_manager.get_model_status.return_value = MagicMock(is_available=True)
         model_manager.load_model.return_value = None
@@ -276,10 +269,7 @@ class TestVDOTPredictorMLInference:
 class TestVDOTPredictorSHAP:
     def test_shap_feature_importance_with_trained_model(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
@@ -302,10 +292,7 @@ class TestVDOTPredictorSHAP:
 
     def test_shap_timeout_fallback_to_sklearn(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.return_value = [
-            MagicMock(distance_m=5000.0 + i * 100, duration_s=1800.0 + i * 10)
-            for i in range(50)
-        ]
+        session_repo.get_sessions_for_vdot.return_value = _make_vdot_sessions(50)
         model_manager = MagicMock()
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),

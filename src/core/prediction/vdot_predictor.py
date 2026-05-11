@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 from typing import Any
 
 import numpy as np
 
 from src.core.prediction.baselines.banister_ir import BanisterIRModel
+from src.core.prediction.feature_engine import VDOT_FEATURE_NAMES
 from src.core.prediction.models import (
     DataQuality,
     MLPredictionInfo,
@@ -103,7 +105,10 @@ class VDOTPredictor:
                     validation_error=0.0,
                     training_duration_seconds=time.time() - start_time,
                     success=False,
-                    message=f"训练数据不足: {len(vdot_sessions)}条 < {MIN_TRAINING_SAMPLES}条最低要求",
+                    message=(
+                        f"训练数据不足: {len(vdot_sessions)}条 < "
+                        f"{MIN_TRAINING_SAMPLES}条最低要求"
+                    ),
                 )
 
             X, y = self._build_training_data(vdot_sessions)
@@ -190,20 +195,23 @@ class VDOTPredictor:
     ) -> tuple[np.ndarray, np.ndarray]:
         """从VDOT历史记录构建训练数据
 
+        使用FeatureEngine提取12维特征，确保训练/推理特征维度一致。
         每个session生成一个特征向量+VDOT标签。
-        特征: [distance_km, duration_min, avg_hr, day_of_week, month]
-        标签: VDOT值
         """
         from src.core.calculators.vdot_calculator import VDOTCalculator
 
         calculator = VDOTCalculator()
         features_list: list[list[float]] = []
         labels_list: list[float] = []
+        n_features = len(VDOT_FEATURE_NAMES)
 
-        for i, session in enumerate(vdot_sessions):
+        if self._feature_engine is None:
+            logger.warning("FeatureEngine未注入，无法构建训练数据")
+            return np.array([]).reshape(0, n_features), np.array([])
+
+        for session in vdot_sessions:
             dist_m = getattr(session, "distance_m", 0) or 0
             dur_s = getattr(session, "duration_s", 0) or 0
-            avg_hr = getattr(session, "avg_heart_rate", None)
 
             if dist_m < 1500 or dur_s <= 0:
                 continue
@@ -212,17 +220,32 @@ class VDOTPredictor:
             if vdot <= 0:
                 continue
 
-            dist_km = dist_m / 1000.0
-            dur_min = dur_s / 60.0
-            hr_val = float(avg_hr) if isinstance(avg_hr, (int, float)) else 0.0
-            day_of_week = float(i % 7)
-            month = float(i % 12)
+            ts = getattr(session, "timestamp", None)
+            if ts is None:
+                continue
+            try:
+                s_date = datetime.strptime(str(ts)[:10], "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                continue
 
-            features_list.append([dist_km, dur_min, hr_val, day_of_week, month])
+            try:
+                matrix = self._feature_engine.extract_vdot_features(
+                    reference_date=s_date
+                )
+                feat = matrix.features.flatten().tolist()
+            except Exception as e:
+                logger.debug(f"VDOT特征提取失败({s_date}): {e}")
+                continue
+
+            if len(feat) != n_features:
+                logger.debug(f"特征维度不匹配({s_date}): {len(feat)} != {n_features}")
+                continue
+
+            features_list.append(feat)
             labels_list.append(vdot)
 
         if not features_list:
-            return np.array([]).reshape(0, 5), np.array([])
+            return np.array([]).reshape(0, n_features), np.array([])
 
         return np.array(features_list), np.array(labels_list)
 
@@ -419,8 +442,8 @@ class VDOTPredictor:
                             recent.append(calc.calculate_vdot(d, t))
                     if len(recent) >= 2:
                         trend_slope = (recent[0] - recent[-1]) / len(recent)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"VDOT趋势计算失败: {e}")
 
         return VDOTPrediction(
             current_vdot=self._base_vdot,
@@ -452,7 +475,8 @@ class VDOTPredictor:
             predicted = self._banister_model.predict(
                 training_stress, base_vdot=self._base_vdot, days_ahead=days
             )
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Banister模型预测失败: {e}")
             predicted = self._base_vdot + 0.03 * days * 0.01
 
         std_dev = 0.5 + 0.02 * days
@@ -497,7 +521,7 @@ class VDOTPredictor:
         if self._session_repo is None:
             return []
         try:
-            sessions = self._session_repo.get_recent_sessions(days=days)
+            sessions = self._session_repo.get_recent_sessions(limit=days * 3)
             if not sessions:
                 return []
             tss_map: dict[str, float] = {}
