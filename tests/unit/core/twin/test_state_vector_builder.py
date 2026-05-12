@@ -200,3 +200,67 @@ class TestStateVectorBuilderFallback:
         result = builder.build()
         assert result.risk.injury_risk_7d == 0.0
         assert result.risk.injury_risk_28d == 0.0
+
+
+class TestStateVectorBuilderExceptionDistinction:
+    """测试预期异常与意外异常的区分（P2-06）"""
+
+    def test_attribute_error_returns_default_fitness(self) -> None:
+        engine = _make_mock_prediction_engine()
+        engine.predict_vdot_trend.side_effect = AttributeError("no method")
+        builder = StateVectorBuilder(
+            prediction_engine=engine,
+            body_signal_engine=_make_mock_body_signal_engine(),
+            training_load_analyzer=_make_mock_training_load_analyzer(),
+            session_repo=_make_mock_session_repo(),
+        )
+        result = builder.build()
+        assert result.fitness.vdot == 0.0
+
+    def test_value_error_returns_default_load(self) -> None:
+        analyzer = _make_mock_training_load_analyzer()
+        analyzer.calculate_atl_ctl.side_effect = ValueError("bad value")
+        builder = StateVectorBuilder(
+            prediction_engine=_make_mock_prediction_engine(),
+            body_signal_engine=_make_mock_body_signal_engine(),
+            training_load_analyzer=analyzer,
+            session_repo=_make_mock_session_repo(),
+        )
+        result = builder.build()
+        assert result.load.ctl == 0.0
+
+    def test_type_error_returns_default_body_signal(self) -> None:
+        engine = _make_mock_body_signal_engine()
+        engine.get_daily_summary.side_effect = TypeError("wrong type")
+        builder = StateVectorBuilder(
+            prediction_engine=_make_mock_prediction_engine(),
+            body_signal_engine=engine,
+            training_load_analyzer=_make_mock_training_load_analyzer(),
+            session_repo=_make_mock_session_repo(),
+        )
+        result = builder.build()
+        assert result.body_signal.fatigue_score == 0.0
+
+    def test_key_error_returns_default_risk(self) -> None:
+        engine = _make_mock_prediction_engine()
+        engine.predict_injury_risk.side_effect = KeyError("missing key")
+        builder = StateVectorBuilder(
+            prediction_engine=engine,
+            body_signal_engine=_make_mock_body_signal_engine(),
+            training_load_analyzer=_make_mock_training_load_analyzer(),
+            session_repo=_make_mock_session_repo(),
+        )
+        result = builder.build()
+        assert result.risk.injury_risk_7d == 0.0
+
+    def test_unexpected_exception_returns_default_fitness(self) -> None:
+        engine = _make_mock_prediction_engine()
+        engine.predict_vdot_trend.side_effect = RuntimeError("unexpected")
+        builder = StateVectorBuilder(
+            prediction_engine=engine,
+            body_signal_engine=_make_mock_body_signal_engine(),
+            training_load_analyzer=_make_mock_training_load_analyzer(),
+            session_repo=_make_mock_session_repo(),
+        )
+        result = builder.build()
+        assert result.fitness.vdot == 0.0

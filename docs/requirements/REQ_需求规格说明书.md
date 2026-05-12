@@ -744,21 +744,53 @@ uv run nanobotrun predict model train --type vdot
 
 - 状态向量计算结果缓存到 `~/.nanobot-runner/twin/state_vector.json`
 - TTL=24h：同一自然日内多次查询复用缓存，避免重复计算
-- 缓存失效：日期变更时自动失效；强制刷新通过 `twin state --refresh` 触发
-- 缓存文件结构：包含 `timestamp`(计算时间)、`ttl_hours`(24)、`data`(RunnerStateVector JSON)
+- 缓存失效：日期变更时自动失效；强制刷新通过 `twin status --refresh` 触发
+- 缓存文件结构：包含 `created_at`(ISO格式时间戳)、`ttl_hours`(24)、`state`(RunnerStateVector JSON)
 
 **验收标准**:
 
 - [ ] AC-01: RunnerStateVector为frozen dataclass，包含5个维度≥15个指标
 - [ ] AC-02: 状态向量可从现有计算器/引擎自动聚合生成，无需用户手动输入
 - [ ] AC-03: 新增Agent工具 `get_runner_state`，返回RunnerStateVector，支持use_cache参数(bool, 默认True)
-- [ ] AC-04: 新增CLI命令 `twin state`，Rich格式化输出当前跑者状态，支持`--refresh`强制刷新
+- [ ] AC-04: 新增CLI命令 `twin status`，Rich格式化输出当前跑者状态，支持`--refresh`强制刷新
 - [ ] AC-05: 缓存机制：同日内重复查询返回缓存结果，缓存文件存储于`~/.nanobot-runner/twin/state_vector.json`，TTL=24h
 - [ ] AC-06: 缓存失效后自动重新计算，计算耗时<3秒（聚合现有计算器结果）
 
 **数据模型**:
 
 ```python
+@dataclass(frozen=True)
+class FitnessDimension:
+    vdot: float
+    vdot_trend: float
+    vo2max_estimate: float
+
+@dataclass(frozen=True)
+class LoadDimension:
+    ctl: float
+    atl: float
+    tsb: float
+    acwr: float
+
+@dataclass(frozen=True)
+class BodySignalDimension:
+    fatigue_score: float
+    recovery_status: str  # "green" / "yellow" / "red"
+    resting_hr: float
+    hrv_rmssd: float
+
+@dataclass(frozen=True)
+class RiskDimension:
+    injury_risk_7d: float
+    injury_risk_28d: float
+    overtraining_risk: str  # "low" / "medium" / "high"
+
+@dataclass(frozen=True)
+class TrainingPatternDimension:
+    weekly_volume_km: float
+    intensity_distribution: IntensityDistribution
+    long_run_frequency: float  # 每28天长距离次数
+
 @dataclass(frozen=True)
 class IntensityDistribution:
     zone1_pct: float  # 低强度占比(0-100)
@@ -767,30 +799,19 @@ class IntensityDistribution:
 
 @dataclass(frozen=True)
 class RunnerStateVector:
-    timestamp: datetime
-    vdot: float
-    vdot_trend: float
-    vo2max_estimate: float
-    ctl: float
-    atl: float
-    tsb: float
-    acwr: float
-    fatigue_score: float
-    recovery_status: str  # "green" / "yellow" / "red"
-    resting_hr: float
-    hrv_rmssd: float
-    injury_risk_7d: float
-    injury_risk_28d: float
-    overtraining_risk: str  # "low" / "medium" / "high"
-    weekly_volume_km: float
-    intensity_distribution: IntensityDistribution
-    long_run_frequency: float  # 每28天长距离次数
+    fitness: FitnessDimension
+    load: LoadDimension
+    body_signal: BodySignalDimension
+    risk: RiskDimension
+    training_pattern: TrainingPatternDimension
+    snapshot_date: str  # ISO格式日期
+    data_quality: DataQuality  # SUFFICIENT / INSUFFICIENT / EMPTY
 
 @dataclass(frozen=True)
-class RunnerStateCache:
-    timestamp: datetime
+class StateVectorCache:
+    state: RunnerStateVector
+    created_at: str  # ISO格式时间戳
     ttl_hours: int  # 24
-    data: RunnerStateVector
 ```
 
 **前置依赖**:
@@ -835,7 +856,7 @@ class RunnerStateCache:
 
 **验收标准**:
 
-- [ ] AC-01: simulate_plan()输入plan_id(str) + weeks(int, 1-12)，输出PlanSimulationResult（含每周RunnerStateVector快照）
+- [ ] AC-01: simulate_plan()输入plan_id(str) + weeks(int, 1-12)，输出SimulationResult（含每周SimulationWeekSnapshot快照）
 - [ ] AC-02: compare_plans()输入多个plan_id(list[str], 2-5个)，输出PlanComparison（含VDOT预测、伤病风险、过度训练风险、恢复余量、综合推荐评分）
 - [ ] AC-03: 推演基于v0.20预测引擎，每步推演调用PredictionEngine.predict_vdot_trend()和PredictionEngine.predict_injury_risk()
 - [ ] AC-04: 综合推荐评分基于加权公式：VDOT提升权重0.4 + 伤病风险权重0.35 + 恢复余量权重0.25，评分范围0-100
@@ -849,22 +870,44 @@ class RunnerStateCache:
 
 ```python
 @dataclass(frozen=True)
-class PlanSimulationResult:
+class SimulationWeekSnapshot:
+    week_number: int
+    projected_vdot: float
+    projected_ctl: float
+    projected_atl: float
+    projected_tsb: float
+    projected_injury_risk: float
+    weekly_tss: float
+    confidence: float  # 0.0-1.0，逐周衰减
+
+@dataclass(frozen=True)
+class SimulationResult:
+    plan_name: str
+    initial_state: RunnerStateVector
+    final_state: RunnerStateVector
+    snapshots: list[SimulationWeekSnapshot]
+    total_weeks: int
+    prediction_type: str  # "ml_enhanced" / "parametric" / "basic"
+    vdot_delta: float
+    peak_injury_risk: float
+    avg_tsb: float
+
+@dataclass(frozen=True)
+class PlanComparisonMetrics:
     plan_id: str
     plan_name: str
-    vdot_start: float
-    vdot_end: float
-    injury_risk_max: float
-    overtraining_risk: str  # "low" / "medium" / "high"
-    recovery_margin: str  # "sufficient" / "tight" / "insufficient"
-    composite_score: float  # 0-100
-    weekly_states: list[RunnerStateVector]
+    vdot_delta: float
+    peak_injury_risk: float
+    avg_tsb: float
+    min_recovery_status: str  # "green" / "yellow" / "red"
+    recommendation_score: float  # 0-100
 
 @dataclass(frozen=True)
 class PlanComparison:
-    plans: list[PlanSimulationResult]
-    recommendation: str  # 推荐的plan_id
-    recommendation_reason: str
+    plans: list[PlanComparisonMetrics]
+    best_plan: str
+    comparison_dimensions: list[str]
+    recommendation: str
 ```
 
 **前置依赖**:
@@ -911,10 +954,10 @@ class PlanComparison:
 
 **新增 `twin` 命令组**：
 
-**`twin state --help`**
+**`twin status --help`**
 
 ```
-Usage: nanobotrun twin state [OPTIONS]
+Usage: nanobotrun twin status [OPTIONS]
 
   查看当前跑者状态向量，包含体能/负荷/身体信号/风险/训练模式五维度指标。
 
@@ -925,9 +968,9 @@ Arguments:
   --json      以JSON格式输出状态向量
 
 Examples:
-  $ nanobotrun twin state
-  $ nanobotrun twin state --refresh
-  $ nanobotrun twin state --json
+  $ nanobotrun twin status
+  $ nanobotrun twin status --refresh
+  $ nanobotrun twin status --json
 ```
 
 **`twin simulate --help`**

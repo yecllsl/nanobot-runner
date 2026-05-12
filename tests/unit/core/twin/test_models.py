@@ -265,6 +265,44 @@ class TestHypotheticalPlan:
         assert d["plan_id"] == "plan_001"
         assert len(d["weeks"]) == 1
 
+    def test_from_week_dicts(self) -> None:
+        weeks = [
+            {
+                "weekly_volume_km": 40.0,
+                "easy_ratio": 0.7,
+                "tempo_ratio": 0.15,
+                "interval_ratio": 0.15,
+                "long_run_km": 20.0,
+                "intensity_multiplier": 1.1,
+            },
+            {
+                "weekly_volume_km": 50.0,
+                "easy_ratio": 0.75,
+                "tempo_ratio": 0.1,
+                "interval_ratio": 0.15,
+                "long_run_km": 25.0,
+            },
+        ]
+        plan = HypotheticalPlan.from_week_dicts(
+            "测试计划", weeks, source="cli", plan_id="p001"
+        )
+        assert plan.name == "测试计划"
+        assert plan.source == "cli"
+        assert plan.plan_id == "p001"
+        assert len(plan.weeks) == 2
+        assert plan.weeks[0].weekly_volume_km == 40.0
+        assert plan.weeks[0].intensity_multiplier == 1.1
+        assert plan.weeks[1].weekly_volume_km == 50.0
+        assert plan.weeks[1].intensity_multiplier == 1.0
+
+    def test_from_week_dicts_defaults(self) -> None:
+        weeks = [{}]
+        plan = HypotheticalPlan.from_week_dicts("空计划", weeks)
+        assert plan.source == "cli"
+        assert plan.plan_id == ""
+        assert plan.weeks[0].weekly_volume_km == 0.0
+        assert plan.weeks[0].easy_ratio == 0.7
+
 
 class TestSimulationWeekSnapshot:
     def test_creation(self) -> None:

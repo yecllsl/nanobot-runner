@@ -2910,26 +2910,11 @@ class RunnerTools:
         """数字孪生What-If推演 - v0.21.0新增"""
         try:
             from src.core.base.context import get_context
+            from src.core.twin.models import HypotheticalPlan
 
             context = get_context()
             engine = context.digital_twin_engine
-            from src.core.twin.models import HypotheticalPlan, WeeklyPlanSpec
-
-            week_specs = []
-            for w in weeks:
-                week_specs.append(
-                    WeeklyPlanSpec(
-                        weekly_volume_km=float(w.get("weekly_volume_km", 0)),
-                        easy_ratio=float(w.get("easy_ratio", 0.7)),
-                        tempo_ratio=float(w.get("tempo_ratio", 0.15)),
-                        interval_ratio=float(w.get("interval_ratio", 0.15)),
-                        long_run_km=float(w.get("long_run_km", 0)),
-                        intensity_multiplier=float(w.get("intensity_multiplier", 1.0)),
-                    )
-                )
-            plan = HypotheticalPlan(
-                name=plan_name, weeks=week_specs, source="agent", plan_id=""
-            )
+            plan = HypotheticalPlan.from_week_dicts(plan_name, weeks, source="agent")
             result = engine.simulate(plan, prediction_type=prediction_type)
             return {"success": True, "data": result.to_dict()}
         except Exception as e:
@@ -2942,35 +2927,16 @@ class RunnerTools:
         """数字孪生多计划对比 - v0.21.0新增"""
         try:
             from src.core.base.context import get_context
+            from src.core.twin.models import HypotheticalPlan
 
             context = get_context()
             engine = context.digital_twin_engine
-            from src.core.twin.models import HypotheticalPlan, WeeklyPlanSpec
-
-            hypothetical_plans = []
-            for p in plans:
-                week_specs = []
-                for w in p.get("weeks", []):
-                    week_specs.append(
-                        WeeklyPlanSpec(
-                            weekly_volume_km=float(w.get("weekly_volume_km", 0)),
-                            easy_ratio=float(w.get("easy_ratio", 0.7)),
-                            tempo_ratio=float(w.get("tempo_ratio", 0.15)),
-                            interval_ratio=float(w.get("interval_ratio", 0.15)),
-                            long_run_km=float(w.get("long_run_km", 0)),
-                            intensity_multiplier=float(
-                                w.get("intensity_multiplier", 1.0)
-                            ),
-                        )
-                    )
-                hypothetical_plans.append(
-                    HypotheticalPlan(
-                        name=p.get("name", "未命名"),
-                        weeks=week_specs,
-                        source="agent",
-                        plan_id="",
-                    )
+            hypothetical_plans = [
+                HypotheticalPlan.from_week_dicts(
+                    p.get("name", "未命名"), p.get("weeks", []), source="agent"
                 )
+                for p in plans
+            ]
             result = engine.compare_plans(
                 hypothetical_plans, prediction_type=prediction_type
             )

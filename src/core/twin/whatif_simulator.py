@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+from typing import TYPE_CHECKING
 
 from src.core.twin.models import (
     BodySignalDimension,
@@ -16,6 +17,10 @@ from src.core.twin.models import (
     TrainingPatternDimension,
     WeeklyPlanSpec,
 )
+
+if TYPE_CHECKING:
+    from src.core.prediction.baselines.banister_ir import BanisterIRModel
+    from src.core.prediction.prediction_engine import PredictionEngine
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +54,19 @@ class WhatIfSimulator:
 
     支持三种预测模式的逐周推演，每步更新CTL/ATL/VDOT等指标，
     置信度按指数衰减。
+
+    依赖注入（架构7.5.3节）：
+    - banister_model: BanisterIRModel，用于L2参数化推演
+    - prediction_engine: PredictionEngine，用于L1 ML增强推演
     """
+
+    def __init__(
+        self,
+        banister_model: BanisterIRModel | None = None,
+        prediction_engine: PredictionEngine | None = None,
+    ) -> None:
+        self._banister_model = banister_model
+        self._prediction_engine = prediction_engine
 
     @staticmethod
     def estimate_weekly_tss(week_plan: WeeklyPlanSpec) -> float:
@@ -89,8 +106,8 @@ class WhatIfSimulator:
         ) * week_plan.intensity_multiplier
         return round(total_tss, 2)
 
-    @staticmethod
     def simulate_week(
+        self,
         current_state: RunnerStateVector,
         week_plan: WeeklyPlanSpec,
         prediction_type: str,
@@ -106,7 +123,7 @@ class WhatIfSimulator:
         new_tsb = new_ctl - new_atl
         new_acwr = new_atl / new_ctl if new_ctl > 0 else 0.0
 
-        vdot_delta = WhatIfSimulator._estimate_vdot_delta(
+        vdot_delta = self._estimate_vdot_delta(
             weekly_tss,
             current_state.load.ctl,
             prediction_type,
@@ -177,8 +194,8 @@ class WhatIfSimulator:
             data_quality=current_state.data_quality,
         )
 
-    @staticmethod
     def simulate(
+        self,
         initial_state: RunnerStateVector,
         plan: HypotheticalPlan,
         prediction_type: str,
@@ -196,7 +213,7 @@ class WhatIfSimulator:
         tsb_sum = 0.0
 
         for i, week_plan in enumerate(plan.weeks):
-            current_state = WhatIfSimulator.simulate_week(
+            current_state = self.simulate_week(
                 current_state, week_plan, prediction_type
             )
             confidence *= 1.0 - decay_rate
@@ -229,8 +246,8 @@ class WhatIfSimulator:
             avg_tsb=round(avg_tsb, 2),
         )
 
-    @staticmethod
     def _estimate_vdot_delta(
+        self,
         weekly_tss: float,
         current_ctl: float,
         prediction_type: str,
@@ -238,10 +255,33 @@ class WhatIfSimulator:
     ) -> float:
         """估算VDOT增量
 
-        L1用ML趋势斜率，L2/L3用stress_ratio公式
+        L1 ML增强：调用PredictionEngine获取趋势修正
+        L2 参数化：调用BanisterIRModel计算fitness/fatigue差分
+        L3 基础：简化stress_ratio公式
         """
-        if prediction_type == "ml_enhanced" and trend_slope != 0.0:
-            return trend_slope * 7.0
+        if prediction_type == "ml_enhanced":
+            if self._prediction_engine is not None and trend_slope != 0.0:
+                try:
+                    result = self._prediction_engine.predict_vdot_trend(days=7)
+                    if hasattr(result, "trend_slope"):
+                        return float(result.trend_slope) * 7.0
+                except Exception as e:
+                    logger.debug(f"ML增强VDOT预测失败，降级: {e}")
+            if trend_slope != 0.0:
+                return trend_slope * 7.0
+
+        if prediction_type == "parametric" and self._banister_model is not None:
+            try:
+                import numpy as np
+
+                avg_daily_tss = weekly_tss / 7.0
+                stress_array = np.full(7, avg_daily_tss)
+                predicted = self._banister_model.predict(
+                    stress_array, base_vdot=0.0, days_ahead=0
+                )
+                return float(predicted) * 0.1
+            except Exception as e:
+                logger.debug(f"Banister IR模型预测失败，降级: {e}")
 
         if current_ctl <= 0:
             return 0.0

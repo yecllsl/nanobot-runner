@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.core.base.context import AppContext, AppContextFactory
-from src.core.twin.models import HypotheticalPlan, WeeklyPlanSpec
+from src.core.twin.models import HypotheticalPlan
 
 
 class TwinHandler:
@@ -32,9 +32,20 @@ class TwinHandler:
         weeks: list[dict[str, Any]],
         prediction_type: str = "parametric",
     ) -> dict[str, Any]:
-        """What-If 推演"""
+        """What-If 推演（手动构建计划）"""
         engine = self._get_engine()
-        plan = self._build_plan(plan_name, weeks)
+        plan = HypotheticalPlan.from_week_dicts(plan_name, weeks, source="cli")
+        result = engine.simulate(plan, prediction_type=prediction_type)
+        return result.to_dict()
+
+    def simulate_by_plan_id(
+        self,
+        plan_id: str,
+        prediction_type: str = "parametric",
+    ) -> dict[str, Any]:
+        """What-If 推演（系统计划引用）"""
+        engine = self._get_engine()
+        plan = engine.load_plan(plan_id)
         result = engine.simulate(plan, prediction_type=prediction_type)
         return result.to_dict()
 
@@ -43,32 +54,23 @@ class TwinHandler:
         plans: list[dict[str, Any]],
         prediction_type: str = "parametric",
     ) -> dict[str, Any]:
-        """多计划对比"""
+        """多计划对比（手动构建计划）"""
         engine = self._get_engine()
-        hypothetical_plans = [self._build_plan(p["name"], p["weeks"]) for p in plans]
+        hypothetical_plans = [
+            HypotheticalPlan.from_week_dicts(p["name"], p["weeks"], source="cli")
+            for p in plans
+        ]
         result = engine.compare_plans(
             hypothetical_plans, prediction_type=prediction_type
         )
         return result.to_dict()
 
-    @staticmethod
-    def _build_plan(name: str, weeks: list[dict[str, Any]]) -> HypotheticalPlan:
-        """从字典构建 HypotheticalPlan"""
-        week_specs = []
-        for w in weeks:
-            week_specs.append(
-                WeeklyPlanSpec(
-                    weekly_volume_km=float(w.get("weekly_volume_km", 0)),
-                    easy_ratio=float(w.get("easy_ratio", 0.7)),
-                    tempo_ratio=float(w.get("tempo_ratio", 0.15)),
-                    interval_ratio=float(w.get("interval_ratio", 0.15)),
-                    long_run_km=float(w.get("long_run_km", 0)),
-                    intensity_multiplier=float(w.get("intensity_multiplier", 1.0)),
-                )
-            )
-        return HypotheticalPlan(
-            name=name,
-            weeks=week_specs,
-            source="cli",
-            plan_id="",
-        )
+    def compare_plans_by_ids(
+        self,
+        plan_ids: list[str],
+        prediction_type: str = "parametric",
+    ) -> dict[str, Any]:
+        """多计划对比（系统计划引用）"""
+        engine = self._get_engine()
+        result = engine.compare_plans_by_ids(plan_ids, prediction_type=prediction_type)
+        return result.to_dict()

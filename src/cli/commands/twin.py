@@ -61,12 +61,15 @@ def get_snapshot() -> None:
 
 @app.command(name="simulate")
 def simulate(
-    plan_name: str = typer.Option("自定义计划", "--name", "-n", help="计划名称"),
+    plan_id: str = typer.Option("", "--plan-id", "-p", help="系统训练计划ID"),
+    plan_name: str = typer.Option(
+        "自定义计划", "--name", "-n", help="计划名称(手动模式)"
+    ),
     weeks_json: str = typer.Option(
-        '[{"weekly_volume_km":40,"easy_ratio":0.7,"tempo_ratio":0.15,"interval_ratio":0.15,"long_run_km":20}]',
+        "",
         "--weeks",
         "-w",
-        help="周计划JSON数组",
+        help="周计划JSON数组(手动模式)",
     ),
     prediction_type: str = typer.Option(
         "parametric", "--type", "-t", help="预测模式(basic/parametric/ml_enhanced)"
@@ -75,20 +78,32 @@ def simulate(
     """What-If 推演
 
     基于当前状态推演训练计划执行后的变化。
+    支持两种输入方式：--plan-id 引用系统计划，或 --name + --weeks 手动构建。
 
     Examples:
+        nanobotrun twin simulate --plan-id plan_001
         nanobotrun twin simulate --name "破4计划" --weeks '[{"weekly_volume_km":50,"easy_ratio":0.7,"tempo_ratio":0.15,"interval_ratio":0.15,"long_run_km":25}]'
     """
     try:
         handler = TwinHandler()
 
-        weeks = json.loads(weeks_json)
-
-        result = handler.simulate(
-            plan_name=plan_name,
-            weeks=weeks,
-            prediction_type=prediction_type,
-        )
+        if plan_id:
+            result = handler.simulate_by_plan_id(
+                plan_id=plan_id,
+                prediction_type=prediction_type,
+            )
+            display_name = plan_id
+        elif weeks_json:
+            weeks = json.loads(weeks_json)
+            result = handler.simulate(
+                plan_name=plan_name,
+                weeks=weeks,
+                prediction_type=prediction_type,
+            )
+            display_name = plan_name
+        else:
+            print_error(CLIError.storage_error("请提供 --plan-id 或 --weeks 参数"))
+            raise typer.Exit(1)
 
         snapshots = result.get("snapshots", [])
         vdot_delta = result.get("vdot_delta", 0)
@@ -145,7 +160,7 @@ def simulate(
             f"[bold]峰值伤病风险:[/bold] [{risk_color}]{peak_injury_risk:.1f}%[/{risk_color}]\n"
             f"[bold]平均TSB:[/bold] {avg_tsb:+.1f}\n"
             f"[bold]预测模式:[/bold] {prediction_type}",
-            title=f"[Simulation] {plan_name}",
+            title=f"[Simulation] {display_name}",
             border_style="cyan",
         )
         console.print(summary)
@@ -160,8 +175,12 @@ def simulate(
 
 @app.command(name="compare")
 def compare_plans(
-    plans_json: str = typer.Argument(
-        ...,
+    plan_ids: str = typer.Option(
+        "", "--plan-ids", "-p", help="系统训练计划ID列表，逗号分隔(2-5个)"
+    ),
+    plans_json: str = typer.Option(
+        "",
+        "--plans",
         help='计划列表JSON，格式: [{"name":"A","weeks":[...]}, {"name":"B","weeks":[...]}]',
     ),
     prediction_type: str = typer.Option(
@@ -171,16 +190,27 @@ def compare_plans(
     """多计划对比
 
     对比多个训练计划的推演结果，推荐最优方案。
+    支持两种输入方式：--plan-ids 引用系统计划，或 --plans 手动构建。
 
     Examples:
-        nanobotrun twin compare '[{"name":"保守","weeks":[{"weekly_volume_km":30,"easy_ratio":0.8,"tempo_ratio":0.1,"interval_ratio":0.1,"long_run_km":15}]},{"name":"激进","weeks":[{"weekly_volume_km":60,"easy_ratio":0.6,"tempo_ratio":0.2,"interval_ratio":0.2,"long_run_km":30}]}]'
+        nanobotrun twin compare --plan-ids plan_001,plan_002,plan_003
+        nanobotrun twin compare --plans '[{"name":"保守","weeks":[{"weekly_volume_km":30,"easy_ratio":0.8,"tempo_ratio":0.1,"interval_ratio":0.1,"long_run_km":15}]},{"name":"激进","weeks":[{"weekly_volume_km":60,"easy_ratio":0.6,"tempo_ratio":0.2,"interval_ratio":0.2,"long_run_km":30}]}]'
     """
     try:
         handler = TwinHandler()
 
-        plans = json.loads(plans_json)
-
-        result = handler.compare_plans(plans=plans, prediction_type=prediction_type)
+        if plan_ids:
+            id_list = [pid.strip() for pid in plan_ids.split(",") if pid.strip()]
+            result = handler.compare_plans_by_ids(
+                plan_ids=id_list,
+                prediction_type=prediction_type,
+            )
+        elif plans_json:
+            plans = json.loads(plans_json)
+            result = handler.compare_plans(plans=plans, prediction_type=prediction_type)
+        else:
+            print_error(CLIError.storage_error("请提供 --plan-ids 或 --plans 参数"))
+            raise typer.Exit(1)
 
         metrics = result.get("plans", [])
         best_plan = result.get("best_plan", {})

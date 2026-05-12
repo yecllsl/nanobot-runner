@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -431,7 +432,19 @@ class AppContext:
                 training_load_analyzer=self.training_load_analyzer,
                 session_repo=self.session_repo,
             )
-            engine = DigitalTwinEngine(state_vector_builder=builder)
+            banister_model = None
+            if self.prediction_engine is not None:
+                with contextlib.suppress(AttributeError):
+                    banister_model = (
+                        self.prediction_engine._vdot_predictor._banister_model
+                    )
+            engine = DigitalTwinEngine(
+                state_vector_builder=builder,
+                plan_manager=self.plan_manager,
+                banister_model=banister_model,
+                prediction_engine=self.prediction_engine,
+                cache_dir=self.config.data_dir,
+            )
             self.set_extension("digital_twin_engine", engine)
         return engine
 

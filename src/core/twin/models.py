@@ -179,6 +179,29 @@ class HypotheticalPlan:
             "plan_id": self.plan_id,
         }
 
+    @classmethod
+    def from_week_dicts(
+        cls,
+        name: str,
+        weeks: list[dict[str, Any]],
+        source: str = "cli",
+        plan_id: str = "",
+    ) -> HypotheticalPlan:
+        """从字典列表构建HypotheticalPlan（CLI/Agent共用）"""
+        week_specs = []
+        for w in weeks:
+            week_specs.append(
+                WeeklyPlanSpec(
+                    weekly_volume_km=float(w.get("weekly_volume_km", 0)),
+                    easy_ratio=float(w.get("easy_ratio", 0.7)),
+                    tempo_ratio=float(w.get("tempo_ratio", 0.15)),
+                    interval_ratio=float(w.get("interval_ratio", 0.15)),
+                    long_run_km=float(w.get("long_run_km", 0)),
+                    intensity_multiplier=float(w.get("intensity_multiplier", 1.0)),
+                )
+            )
+        return cls(name=name, weeks=week_specs, source=source, plan_id=plan_id)
+
 
 @dataclass(frozen=True)
 class SimulationWeekSnapshot:
@@ -294,7 +317,12 @@ class StateVectorCache:
 
 @dataclass
 class TwinEngineError(NanobotRunnerError):
-    """数字孪生引擎异常"""
+    """数字孪生引擎异常
+
+    注意：未使用 frozen=True，因为基类 NanobotRunnerError 为可变 dataclass，
+    Python 不允许从非 frozen dataclass 继承 frozen dataclass。
+    若需冻结需同步修改 exceptions.py 中所有异常类，影响范围过大。
+    """
 
     error_code: str = "TWIN_ENGINE_ERROR"
     recovery_suggestion: str | None = None
