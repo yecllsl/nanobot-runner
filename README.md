@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-2570%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.20.1 - ML增强预测全面启用，VDOT/伤病/比赛预测支持ML训练与推理，数据充足时自动启用ML模型
+> **最新版本**: v0.21.0 - 数字孪生引擎上线，跑者状态向量+What-If推演，训练前预见训练后效果
 
 ## 项目简介
 
