@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.12.0 | **更新日期**: 2026-05-11
-> **当前基线**: v0.20.1
+> **版本**: v5.13.0 | **更新日期**: 2026-05-12
+> **当前基线**: v0.21.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -76,6 +76,11 @@ src/
 │       ├── race_predictor.py   # 比赛成绩预测
 │       ├── injury_predictor.py # 伤病风险预测
 │       └── model_manager.py    # 模型生命周期管理
+│   └── twin/                   # 数字孪生引擎 (v0.21.0)
+│       ├── models.py           # 状态向量数据模型
+│       ├── twin_engine.py      # 数字孪生引擎编排层
+│       ├── state_vector_builder.py # 5维度状态向量构建器
+│       └── whatif_simulator.py # What-If推演器
 ├── agents/tools.py             # Agent 工具集
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块

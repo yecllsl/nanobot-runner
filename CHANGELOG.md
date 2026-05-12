@@ -9,6 +9,59 @@
 
 ---
 
+## [0.21.0] - 2026-05-12
+
+### 版本主题
+**数字孪生引擎** —— 构建可推演的跑者生理模型，实现 What-If 推演能力
+
+> **⚠️ 版本说明**: v0.21.0 在v0.20.1预测能力基础上，构建了**跑者数字孪生模型**，让用户"在训练前看到训练后的自己"。
+
+**本版本已实现**:
+- ✅ 5维度跑者状态向量（体能/负荷/身体信号/风险/训练模式）
+- ✅ What-If 训练计划推演（逐周模拟VDOT/负荷/伤病变化）
+- ✅ 多计划对比与智能推荐（评分算法自动推荐最优计划）
+- ✅ `twin` CLI命令组（snapshot/simulate/compare）
+- ✅ 3个Agent数字孪生工具（get_twin_snapshot/simulate_twin/compare_twin_plans）
+- ✅ 状态向量24h缓存机制（TTL自动过期）
+- ✅ 推演三层降级策略（ML增强→参数化→基础）
+- ✅ 完整集成测试覆盖（StateVectorBuilder/WhatIfSimulator/DigitalTwinEngine）
+
+### 新增功能
+
+#### 数字孪生引擎核心
+- **5维度状态向量**: 聚合体能(VDOT)、负荷(CTL/ATL/TSB)、身体信号(疲劳/恢复)、风险(伤病概率)、训练模式(周跑量/强度分布)
+- **薄编排层架构**: DigitalTwinEngine作为编排器，复用v0.20 PredictionEngine/BodySignalEngine/TrainingLoadAnalyzer
+- **状态向量缓存**: 计算后缓存24h，存储到 `~/.nanobot-runner/twin/state_vector.json`
+
+#### What-If 推演能力
+- **逐周推演**: 基于Banister IR模型逐周计算体能/疲劳变化，支持ML修正
+- **周TSS估算**: 根据训练计划强度分布估算每周训练负荷
+- **置信度衰减**: 推演周数越多置信度越低（L1每周-5%，L2每周-8%，L3每周-12%）
+- **计划对比评分**: 综合VDOT提升(40%)、伤病风险(35%)、恢复余量(25%)自动推荐最优计划
+
+#### CLI命令组 (twin)
+- `twin snapshot`: 查看当前5维度跑者状态快照
+- `twin simulate --plan-id <id>`: 推演指定训练计划效果
+- `twin compare --plan-ids <id1,id2>`: 对比多个训练计划并推荐最优
+
+#### Agent工具集成
+- `get_twin_snapshot`: 获取当前跑者状态向量
+- `simulate_twin`: 模拟训练计划效果
+- `compare_twin_plans`: 对比多个训练计划
+
+### 架构改进
+- 新增 `src/core/twin/` 模块: DigitalTwinEngine/StateVectorBuilder/WhatIfSimulator
+- 新增 `src/cli/commands/twin.py`: twin命令组CLI
+- 更新 `src/core/base/context.py`: 新增twin_engine延迟属性
+- 复用v0.20 PredictionEngine/TrainingResponsePredictor/BanisterIRModel
+- 复用v0.19 BodySignalEngine/TrainingLoadAnalyzer
+
+### 测试覆盖
+- 新增单元测试: test_state_vector_builder.py, test_whatif_simulator.py, test_twin_engine.py
+- 覆盖场景: 5维度构建、数据缺失降级、逐周推演、置信度衰减、计划对比评分、缓存一致性
+
+---
+
 ## [0.20.1] - 2026-05-11
 
 ### 版本主题
