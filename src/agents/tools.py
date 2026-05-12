@@ -2888,6 +2888,63 @@ class RunnerTools:
             logger.error(f"模型管理失败: {e}")
             return {"success": False, "error": str(e)}
 
+    def get_twin_snapshot(self) -> dict[str, Any]:
+        """获取数字孪生状态快照 - v0.21.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.digital_twin_engine
+            result = engine.get_current_snapshot()
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"获取数字孪生快照失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def simulate_twin(
+        self,
+        plan_name: str,
+        weeks: list[dict[str, Any]],
+        prediction_type: str = "parametric",
+    ) -> dict[str, Any]:
+        """数字孪生What-If推演 - v0.21.0新增"""
+        try:
+            from src.core.base.context import get_context
+            from src.core.twin.models import HypotheticalPlan
+
+            context = get_context()
+            engine = context.digital_twin_engine
+            plan = HypotheticalPlan.from_week_dicts(plan_name, weeks, source="agent")
+            result = engine.simulate(plan, prediction_type=prediction_type)
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"数字孪生推演失败: {e}")
+            return {"success": False, "error": str(e)}
+
+    def compare_twin_plans(
+        self, plans: list[dict[str, Any]], prediction_type: str = "parametric"
+    ) -> dict[str, Any]:
+        """数字孪生多计划对比 - v0.21.0新增"""
+        try:
+            from src.core.base.context import get_context
+            from src.core.twin.models import HypotheticalPlan
+
+            context = get_context()
+            engine = context.digital_twin_engine
+            hypothetical_plans = [
+                HypotheticalPlan.from_week_dicts(
+                    p.get("name", "未命名"), p.get("weeks", []), source="agent"
+                )
+                for p in plans
+            ]
+            result = engine.compare_plans(
+                hypothetical_plans, prediction_type=prediction_type
+            )
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"数字孪生计划对比失败: {e}")
+            return {"success": False, "error": str(e)}
+
 
 class AskUserConfirmTool(BaseTool):
     """异步用户确认工具 - v0.17.0新增（实验性功能）
@@ -3402,6 +3459,139 @@ class ManagePredictionModelTool(BaseTool):
         )
 
 
+class GetTwinSnapshotTool(BaseTool):
+    """数字孪生状态快照工具 - v0.21.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_twin_snapshot"
+
+    @property
+    def description(self) -> str:
+        return "获取跑者数字孪生5维状态快照，包括体能(VDOT)、负荷(CTL/ATL/TSB)、身体信号(疲劳/恢复)、风险(伤病/过度训练)、训练模式(跑量/强度分布)。当用户询问'我的数字孪生'、'当前状态快照'、'5维状态'时使用此工具。返回JSON格式：{success: true, data: {fitness, load, body_signal, risk, training_pattern, snapshot_date, data_quality}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(self.runner_tools.get_twin_snapshot)
+
+
+class SimulateTwinTool(BaseTool):
+    """数字孪生What-If推演工具 - v0.21.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "simulate_twin"
+
+    @property
+    def description(self) -> str:
+        return "数字孪生What-If推演，基于当前状态模拟训练计划执行后的变化。当用户询问'如果我按这个计划训练会怎样'、'推演训练效果'、'What-If模拟'时使用此工具。返回JSON格式：{success: true, data: {plan_name, initial_state, final_state, snapshots, total_weeks, vdot_delta, peak_injury_risk, avg_tsb}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plan_name": {
+                    "type": "string",
+                    "description": "计划名称（必填）",
+                },
+                "weeks": {
+                    "type": "array",
+                    "description": "周计划列表，每项包含weekly_volume_km/easy_ratio/tempo_ratio/interval_ratio/long_run_km/intensity_multiplier（必填）",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "weekly_volume_km": {"type": "number"},
+                            "easy_ratio": {"type": "number"},
+                            "tempo_ratio": {"type": "number"},
+                            "interval_ratio": {"type": "number"},
+                            "long_run_km": {"type": "number"},
+                            "intensity_multiplier": {"type": "number"},
+                        },
+                    },
+                },
+                "prediction_type": {
+                    "type": "string",
+                    "description": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
+                    "enum": ["basic", "parametric", "ml_enhanced"],
+                },
+            },
+            "required": ["plan_name", "weeks"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        plan_name = kwargs.get("plan_name", "自定义计划")
+        weeks = kwargs.get("weeks", [])
+        prediction_type = kwargs.get("prediction_type", "parametric")
+        return self._run_sync(
+            self.runner_tools.simulate_twin, plan_name, weeks, prediction_type
+        )
+
+
+class CompareTwinPlansTool(BaseTool):
+    """数字孪生多计划对比工具 - v0.21.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "compare_twin_plans"
+
+    @property
+    def description(self) -> str:
+        return "数字孪生多计划对比，对多个训练计划执行推演并按综合评分排序推荐最优方案。当用户询问'哪个计划更好'、'对比训练方案'、'推荐计划'时使用此工具。返回JSON格式：{success: true, data: {plans, best_plan, comparison_dimensions, recommendation}} 或 {success: false, error: 错误信息}"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "plans": {
+                    "type": "array",
+                    "description": "计划列表，每项包含name和weeks（必填）",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "weeks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "weekly_volume_km": {"type": "number"},
+                                        "easy_ratio": {"type": "number"},
+                                        "tempo_ratio": {"type": "number"},
+                                        "interval_ratio": {"type": "number"},
+                                        "long_run_km": {"type": "number"},
+                                        "intensity_multiplier": {"type": "number"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                "prediction_type": {
+                    "type": "string",
+                    "description": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
+                    "enum": ["basic", "parametric", "ml_enhanced"],
+                },
+            },
+            "required": ["plans"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        plans = kwargs.get("plans", [])
+        prediction_type = kwargs.get("prediction_type", "parametric")
+        return self._run_sync(
+            self.runner_tools.compare_twin_plans, plans, prediction_type
+        )
+
+
 class SpawnSubagentTool(BaseTool):
     """调用Subagent工具 - v0.17.0新增
 
@@ -3862,6 +4052,9 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         CheckPredictionStatusTool(runner_tools),
         ReportInjuryTool(runner_tools),
         ManagePredictionModelTool(runner_tools),
+        GetTwinSnapshotTool(runner_tools),
+        SimulateTwinTool(runner_tools),
+        CompareTwinPlansTool(runner_tools),
     ]
 
 
@@ -4147,6 +4340,25 @@ TOOL_DESCRIPTIONS = {
         "parameters": {
             "action": "操作类型（train/status/rollback，必填）",
             "model_type": "模型类型（vdot_predictor/injury_predictor，必填）",
+        },
+    },
+    "get_twin_snapshot": {
+        "description": "获取跑者数字孪生5维状态快照，包括体能(VDOT)、负荷(CTL/ATL/TSB)、身体信号(疲劳/恢复)、风险(伤病/过度训练)、训练模式(跑量/强度分布)。当用户询问'我的数字孪生'、'当前状态快照'、'5维状态'时使用此工具。返回JSON格式：{success: true, data: {fitness, load, body_signal, risk, training_pattern, snapshot_date, data_quality}} 或 {success: false, error: 错误信息}",
+        "parameters": {},
+    },
+    "simulate_twin": {
+        "description": "数字孪生What-If推演，基于当前状态模拟训练计划执行后的变化。当用户询问'如果我按这个计划训练会怎样'、'推演训练效果'、'What-If模拟'时使用此工具。返回JSON格式：{success: true, data: {plan_name, initial_state, final_state, snapshots, total_weeks, vdot_delta, peak_injury_risk, avg_tsb}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plan_name": "计划名称（必填）",
+            "weeks": "周计划列表，每项包含weekly_volume_km/easy_ratio/tempo_ratio/interval_ratio/long_run_km/intensity_multiplier（必填）",
+            "prediction_type": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
+        },
+    },
+    "compare_twin_plans": {
+        "description": "数字孪生多计划对比，对多个训练计划执行推演并按综合评分排序推荐最优方案。当用户询问'哪个计划更好'、'对比训练方案'、'推荐计划'时使用此工具。返回JSON格式：{success: true, data: {plans, best_plan, comparison_dimensions, recommendation}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "plans": "计划列表，每项包含name和weeks（必填）",
+            "prediction_type": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
         },
     },
 }

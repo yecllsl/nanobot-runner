@@ -21,6 +21,7 @@
 2. Git Hook：自动在 git commit 前执行
 """
 
+import argparse
 import concurrent.futures
 import hashlib
 import json
@@ -1330,29 +1331,147 @@ class PreCommitChecker:
         return True
 
 
+def _is_interactive() -> bool:
+    """检测当前是否处于交互式终端环境
+
+    判断逻辑：
+    1. stdin 必须是 TTY（非管道/重定向）
+    2. 不能在 Git Hook 模式下（GIT_HOOK 环境变量）
+    3. 不能在 CI/CD 环境下（CI 环境变量）
+    4. 不能在 NO_COLOR 模式下（通常表示非交互环境）
+
+    Returns:
+        True 表示可以安全使用交互式提示
+    """
+    return not (
+        not sys.stdin.isatty()
+        or os.environ.get("GIT_HOOK")
+        or os.environ.get("CI")
+        or os.environ.get("PRE_COMMIT_CHECK_NON_INTERACTIVE")
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(
+        description="预提交检查脚本",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+使用示例:
+  uv run python scripts/pre-commit-check.py           # 运行检查，失败时交互提示修复
+  uv run python scripts/pre-commit-check.py --fix      # 运行检查，失败时自动修复
+  uv run python scripts/pre-commit-check.py --no-fix   # 运行检查，跳过修复提示
+  uv run python scripts/pre-commit-check.py --parallel # 强制并行执行
+""",
+    )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        default=False,
+        help="检查失败时自动修复，不弹出交互提示",
+    )
+    parser.add_argument(
+        "--no-fix",
+        action="store_true",
+        default=False,
+        help="检查失败时不尝试修复，直接退出",
+    )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        default=False,
+        help="强制并行执行检查",
+    )
+    parser.add_argument(
+        "--sequential",
+        action="store_true",
+        default=False,
+        help="强制串行执行检查",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        default=False,
+        help="禁用检查结果缓存",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        default=False,
+        help="全量检查（禁用增量模式）",
+    )
+    parser.add_argument(
+        "--output",
+        choices=["text", "json", "html"],
+        default=None,
+        help="输出格式（默认: text）",
+    )
+    return parser.parse_args()
+
+
 def main():
     """主函数"""
+    args = _parse_args()
+
     config_file = Path(__file__).parent.parent / ".pre-commit-config.yaml"
     config = PreCommitConfig.from_file(config_file)
+
+    if args.parallel:
+        config.parallel_execution = True
+    if args.sequential:
+        config.parallel_execution = False
+    if args.no_cache:
+        config.cache_enabled = False
+    if args.full:
+        config.incremental_check = False
+    if args.output:
+        config.output_format = args.output
 
     checker = PreCommitChecker(config)
 
     try:
         success = checker.run_all_checks()
 
-        if (
-            not success
-            and QUESTIONARY_AVAILABLE
-            and questionary.confirm("是否自动修复可修复的问题？").ask()
-            and checker.auto_fix_issues()
-        ):
-            checker.results = []
-            success = checker.run_all_checks()
+        if not success:
+            should_fix = False
 
-        if "GIT_HOOK" in os.environ:
-            sys.exit(0 if success else 1)
-        else:
-            sys.exit(0 if success else 1)
+            if args.no_fix:
+                should_fix = False
+            elif args.fix:
+                should_fix = True
+            elif _is_interactive() and QUESTIONARY_AVAILABLE:
+                try:
+                    if checker.console:
+                        checker.console.clear_live()
+                    should_fix = questionary.confirm(
+                        "是否自动修复可修复的问题？", default=True
+                    ).ask()
+                    if should_fix is None:
+                        should_fix = False
+                except (EOFError, KeyboardInterrupt):
+                    should_fix = False
+                except Exception as e:
+                    logger.debug(f"交互提示异常，跳过修复: {e}")
+                    should_fix = False
+            else:
+                if RICH_AVAILABLE and checker.console:
+                    checker.console.print(
+                        "\n💡 非交互环境，无法弹出修复提示。"
+                        "可使用 --fix 参数自动修复，或 --no-fix 跳过修复。",
+                        style="bold yellow",
+                    )
+                else:
+                    print(
+                        "\n💡 非交互环境，无法弹出修复提示。"
+                        "可使用 --fix 参数自动修复，或 --no-fix 跳过修复。"
+                    )
+                should_fix = False
+
+            if should_fix and checker.auto_fix_issues():
+                checker.results = []
+                success = checker.run_all_checks()
+
+        sys.exit(0 if success else 1)
 
     except KeyboardInterrupt:
         print("\n\n⚠️  检查被用户中断")

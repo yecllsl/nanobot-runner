@@ -17,6 +17,7 @@ from src.cli.commands.status import app as status_app
 from src.cli.commands.system import app as system_app
 from src.cli.commands.tools import app as tools_app
 from src.cli.commands.transparency import app as transparency_app
+from src.cli.commands.twin import app as twin_app
 from src.cli.commands.viz import app as viz_app
 
 __all__ = [
@@ -37,4 +38,5 @@ __all__ = [
     "cron_app",
     "status_app",
     "prediction_app",
+    "twin_app",
 ]
