@@ -18,8 +18,9 @@ docs/
 │   ├── uat_test_cases/
 │   │   ├── UAT_body_signal.md          # 新增：v0.19身体信号UAT用例
 │   │   ├── UAT_prediction.md           # 新增：v0.20 ML预测UAT用例
-│   │   └── UAT_twin.md                 # 新增：v0.21数字孪生UAT用例
-│   ├── 用户验收测试指南.md              # 修改：扩展覆盖v0.19-v0.21
+│   │   ├── UAT_twin.md                 # 新增：v0.21数字孪生UAT用例
+│   │   └── UAT_gateway_agent_enhanced.md # 新增：Gateway/Agent Chat增强UAT用例
+│   ├── 用户验收测试指南.md              # 修改：扩展覆盖v0.19-v0.21+Gateway增强
 │   ├── UAT测试执行报告_v0.22.0.md      # 新增：v0.22 UAT执行报告
 │   ├── UAT反馈记录表.md                # 新增：用户反馈收集表
 │   ├── 性能测试报告_v0.22.0.md         # 新增：性能测试报告
@@ -384,8 +385,9 @@ docs/
 | 身体信号分析(v0.19) | HRV分析/心率恢复/疲劳度/恢复状态/身体状态 | P0 | UAT-071 ~ UAT-080 |
 | ML智能预测(v0.20) | VDOT预测/比赛预测/伤病预测/训练响应/模型管理 | P0 | UAT-081 ~ UAT-091 |
 | 数字孪生(v0.21) | 状态快照/What-If推演/计划对比 | P0 | UAT-092 ~ UAT-100 |
+| Gateway/Agent增强 | Gateway异常/Agent Chat增强/性能边界 | P0/P1 | UAT-101 ~ UAT-115 |
 
-更新用例总数为 70(原有) + 30(新增) = 100 个
+更新用例总数为 70(原有) + 30(v0.19~v0.21) + 15(Gateway/Agent增强) = 115 个
 
 - [ ] **Step 5: 创建UAT反馈记录表模板**
 
@@ -559,13 +561,45 @@ Agent逐个执行以下用例，每个用例执行后收集用户反馈：
 
 同上交互模式。
 
-- [ ] **Step 10: 汇总v0.5~v0.17模块UAT反馈**
+- [ ] **Step 10: 执行Gateway异常场景UAT（UAT-101 ~ UAT-106）**
+
+逐个执行并收集用户反馈。这是v0.22新增的Gateway异常场景测试，需重点验证：
+- UAT-101: Gateway无LLM配置启动 → 退出码1，提示配置缺失
+- UAT-102: Gateway飞书通道连接失败 → 退出码1，提示认证失败
+- UAT-103: Gateway消息处理超时 → 响应<30秒，超时友好提示
+- UAT-104: Gateway并发消息处理 → 5条消息全部响应，无丢失
+- UAT-105: MCP工具不可用降级 → 返回降级提示，不崩溃
+- UAT-106: Gateway处理超长消息 → 拒绝/截断，不崩溃
+
+**前置条件**: 需要Gateway服务可用（部分用例需飞书测试环境或Mock）
+
+- [ ] **Step 11: 执行Agent Chat增强UAT（UAT-107 ~ UAT-112）**
+
+逐个执行并收集用户反馈。重点验证：
+- UAT-107: Agent Chat无LLM配置启动 → 退出码1，提示配置
+- UAT-108: Agent Chat对话中断恢复 → Ctrl+C后重新进入正常
+- UAT-109: Agent Chat多轮对话上下文保持 → 5轮对话上下文准确
+- UAT-110: Agent Chat上下文窗口溢出 → 50轮后自动截断，不崩溃
+- UAT-111: Agent Chat无效输入处理 → 空消息/特殊字符/超长文本友好响应
+- UAT-112: Agent Chat工具调用失败 → 明确提示无法完成，不崩溃
+
+- [ ] **Step 12: 执行Gateway/Agent性能边界UAT（UAT-113 ~ UAT-115）**
+
+逐个执行并收集用户反馈。重点验证：
+- UAT-113: 大数据量查询性能 → ≥1000条记录查询<10秒
+- UAT-114: Gateway长时间运行稳定性 → 4小时加速验证，内存增长<20%
+- UAT-115: 消息队列积压处理 → 100条消息按序处理，无丢失
+
+**注意**: UAT-114可降级为4小时加速验证（原计划24小时），UAT-115需编写测试脚本自动化。
+
+- [ ] **Step 13: 汇总v0.5~v0.17模块+Gateway/Agent增强UAT反馈**
 
 将所有收集到的用户反馈整理到 `docs/test/UAT反馈记录表.md`，统计：
 - 各模块通过率
 - 失败用例清单
 - 痛点汇总
 - 用户总体评价
+- Gateway/Agent异常用例通过率（P0必须100%）
 
 ---
 
@@ -651,11 +685,19 @@ Measure-Command { uv run nanobotrun data import .nanobot-runner-uat\test-data\ }
 
 Expected: 单文件<2秒，批量20文件<30秒
 
-- [ ] **Step 5: 记录性能测试结果并收集用户反馈**
+- [ ] **Step 5: Gateway并发处理性能测试**
+
+```powershell
+# 测试Gateway并发消息响应时间（需飞书测试环境或Mock）
+# 发送5条并发消息，测量最长响应时间
+# Expected: 每条响应<15秒
+```
+
+- [ ] **Step 6: 记录性能测试结果并收集用户反馈**
 
 将性能数据记录到 `docs/test/性能测试报告_v0.22.0.md`，询问用户对性能是否满意。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add docs/test/性能测试报告_v0.22.0.md
@@ -1397,7 +1439,7 @@ git commit -m "docs(improvement): add v0.22.0 improvement implementation report"
 ## [0.22.0] - 2026-05-XX
 
 ### 质量收口
-- 完成v0.5-v0.21全版本UAT验证（100个用例）
+- 完成v0.5-v0.21全版本UAT验证（115个用例，含Gateway/Agent增强）
 - 修复X个致命/严重缺陷，X个一般缺陷
 - 建立性能基线（ML预测<5s/推演<10s/聚合<3s）
 - 完成数据一致性验证和兼容性验证
