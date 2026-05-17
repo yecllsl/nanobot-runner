@@ -282,6 +282,53 @@ class TestConfigManager:
                 finally:
                     ConfigManager._cache_ttl = original_ttl
 
+    def test_get_reads_env_override(self, tmp_path):
+        """BUG-2201回归：验证get()方法读取环境变量覆盖"""
+        with patch.dict(
+            os.environ, {"NANOBOT_FEISHU_APP_ID": "env_app_id"}, clear=False
+        ):
+            with patch.object(Path, "home", return_value=tmp_path):
+                cm = ConfigManager()
+                cm.save_config(
+                    {
+                        "version": "0.1.0",
+                        "data_dir": str(tmp_path / "data"),
+                        "feishu_app_id": "file_app_id",
+                    }
+                )
+                value = cm.get("feishu_app_id")
+                assert value == "env_app_id"
+
+    def test_get_env_override_bool_type(self, tmp_path):
+        """BUG-2201回归：验证get()方法环境变量布尔类型转换"""
+        with patch.dict(os.environ, {"NANOBOT_AUTO_PUSH_FEISHU": "true"}, clear=False):
+            with patch.object(Path, "home", return_value=tmp_path):
+                cm = ConfigManager()
+                cm.save_config(
+                    {
+                        "version": "0.1.0",
+                        "data_dir": str(tmp_path / "data"),
+                        "auto_push_feishu": False,
+                    }
+                )
+                value = cm.get("auto_push_feishu")
+                assert value is True
+
+    def test_get_env_override_falls_back_to_file(self, tmp_path):
+        """BUG-2201回归：无环境变量时get()回退到配置文件"""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(Path, "home", return_value=tmp_path):
+                cm = ConfigManager()
+                cm.save_config(
+                    {
+                        "version": "0.1.0",
+                        "data_dir": str(tmp_path / "data"),
+                        "feishu_app_id": "file_app_id",
+                    }
+                )
+                value = cm.get("feishu_app_id")
+                assert value == "file_app_id"
+
     def test_cache_file_modification_detection(self, tmp_path):
         """测试文件修改检测"""
         import time

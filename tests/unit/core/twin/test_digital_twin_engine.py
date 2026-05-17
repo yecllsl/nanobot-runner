@@ -40,7 +40,7 @@ def _make_state() -> RunnerStateVector:
             ),
             long_run_frequency=1,
         ),
-        snapshot_date="2026-05-12",
+        snapshot_date=datetime.now().strftime("%Y-%m-%d"),
         data_quality=DataQuality.SUFFICIENT,
     )
 

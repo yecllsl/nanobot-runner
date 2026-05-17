@@ -94,8 +94,8 @@ class TestGatewayIntegration:
                 cron = integration.setup_cron_service(auto_register_reminder=True)
 
                 # 验证训练提醒任务被注册
-                mock_cron.register_job.assert_called_once()
-                call_kwargs = mock_cron.register_job.call_args.kwargs
+                mock_cron.add_job.assert_called_once()
+                call_kwargs = mock_cron.add_job.call_args.kwargs
                 assert call_kwargs["name"] == "training_reminder"
         finally:
             import shutil
@@ -119,7 +119,7 @@ class TestGatewayIntegration:
                 cron = integration.setup_cron_service(auto_register_reminder=True)
 
                 # 验证没有重复注册
-                mock_cron.register_job.assert_not_called()
+                mock_cron.add_job.assert_not_called()
         finally:
             import shutil
 

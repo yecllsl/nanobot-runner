@@ -50,8 +50,14 @@ class RecoveryMonitor:
         Returns:
             RecoveryStatusResult: 恢复状态结果
         """
+        try:
+            lf = self.session_repo.storage.read_parquet()
+            session_df = lf.collect()
+        except Exception:
+            session_df = pl.DataFrame()
+
         load_data = self.training_load_analyzer.calculate_training_load_from_dataframe(
-            pl.DataFrame()
+            session_df
         )
         tsb = float(load_data.get("tsb", 0.0))
         runs_count = int(load_data.get("runs_count", 0))

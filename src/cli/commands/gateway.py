@@ -16,10 +16,11 @@ logger = get_logger(__name__)
 app = typer.Typer(help="Gateway 服务命令")
 
 
-def _connect_mcp_tools_sync(context: Any, agent: Any) -> dict[str, Any]:
-    """同步方式连接MCP服务器工具到Agent
+async def _connect_mcp_tools(context: Any, agent: Any) -> dict[str, Any]:
+    """异步方式连接MCP服务器工具到Agent
 
-    在Gateway同步启动流程中调用，通过asyncio.run执行异步连接。
+    在Gateway异步启动流程中调用，与run()共享同一事件循环，
+    避免stdio_client的cancel scope跨事件循环导致的RuntimeError。
 
     Args:
         context: 应用上下文
@@ -32,7 +33,7 @@ def _connect_mcp_tools_sync(context: Any, agent: Any) -> dict[str, Any]:
 
     config_path = context.config.config_file
     try:
-        result = asyncio.run(connect_mcp_tools_from_config(config_path, agent.tools))
+        result = await connect_mcp_tools_from_config(config_path, agent.tools)
         connected = result.get("connected_servers", [])
         failed = result.get("failed_servers", [])
         if connected:
@@ -272,6 +273,15 @@ def start(
         logging.getLogger("nanobot").setLevel(logging.WARNING)
         logging.getLogger("src").setLevel(logging.WARNING)
 
+    import os
+    from pathlib import Path
+
+    if not os.getenv("NANOBOT_CONFIG_DIR"):
+        cwd_uat = Path.cwd() / ".nanobot-runner-uat"
+        if cwd_uat.exists() and (cwd_uat / "config.json").exists():
+            os.environ["NANOBOT_CONFIG_DIR"] = str(cwd_uat)
+            logger.info(f"自动检测到UAT配置目录: {cwd_uat}")
+
     context = None
     runner_tools = None
     workspace = None
@@ -323,8 +333,6 @@ def start(
         for tool in create_tools(runner_tools):
             agent.tools.register(tool)
         _register_runner_commands(agent, runner_tools)
-
-    _connect_mcp_tools_sync(context, agent)
 
     channels = ChannelManager(config=adapter._get_or_create_nanobot_config(), bus=bus)
 
@@ -403,6 +411,7 @@ def start(
 
     async def run():
         try:
+            await _connect_mcp_tools(context, agent)
             await cron.start()
             await heartbeat.start()
             await asyncio.gather(

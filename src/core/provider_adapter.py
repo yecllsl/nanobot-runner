@@ -234,23 +234,9 @@ class RunnerProviderAdapter:
 
             channels: dict[str, Any] = {}
 
-            feishu_app_id = os.getenv("NANOBOT_FEISHU_APP_ID")
-            feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
-            feishu_receive_id = os.getenv("NANOBOT_FEISHU_RECEIVE_ID")
-
-            if not (feishu_app_id and feishu_app_secret):
-                env_file = Path.home() / ".nanobot-runner" / ".env.local"
-                if env_file.exists():
-                    env_vars = self._parse_env_file(env_file)
-                    feishu_app_id = feishu_app_id or env_vars.get(
-                        "NANOBOT_FEISHU_APP_ID"
-                    )
-                    feishu_app_secret = feishu_app_secret or env_vars.get(
-                        "NANOBOT_FEISHU_APP_SECRET"
-                    )
-                    feishu_receive_id = feishu_receive_id or env_vars.get(
-                        "NANOBOT_FEISHU_RECEIVE_ID"
-                    )
+            feishu_app_id = self._runner_config.get("feishu_app_id")
+            feishu_app_secret = self._runner_config.get("feishu_app_secret")
+            feishu_receive_id = self._runner_config.get("feishu_receive_id")
 
             if feishu_app_id and feishu_app_secret:
                 channels["feishu"] = {
@@ -258,8 +244,8 @@ class RunnerProviderAdapter:
                     "app_id": feishu_app_id,
                     "app_secret": feishu_app_secret,
                     "receive_id": feishu_receive_id or "",
-                    "receive_id_type": os.getenv(
-                        "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
+                    "receive_id_type": self._runner_config.get(
+                        "feishu_receive_id_type", "user_id"
                     ),
                     "allowFrom": ["*"],
                 }
