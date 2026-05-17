@@ -107,6 +107,7 @@ async def _run_chat() -> None:
         mcp_result = await _connect_mcp_tools(context, agent)
         mcp_connected = mcp_result.get("connected_servers", [])
         mcp_failed = mcp_result.get("failed_servers", [])
+        mcp_exit_stacks = mcp_result.get("exit_stacks", {})
 
         console.print("[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {llm_config.model}[/dim]")
@@ -143,6 +144,16 @@ async def _run_chat() -> None:
         console.print(f"[red]Agent初始化失败：{str(e)}[/red]")
         console.print("[yellow]请确保已正确配置本地模型[/yellow]")
     finally:
+        # 先清理 MCP 连接，避免异步生成器在事件循环结束后被垃圾回收
+        if mcp_exit_stacks:
+            for server_name, exit_stack in list(mcp_exit_stacks.items()):
+                try:
+                    if hasattr(exit_stack, "aclose"):
+                        await exit_stack.aclose()
+                    elif hasattr(exit_stack, "__aexit__"):
+                        await exit_stack.__aexit__(None, None, None)
+                except Exception:
+                    pass
         with contextlib.suppress(Exception):
             adapter.close()
 

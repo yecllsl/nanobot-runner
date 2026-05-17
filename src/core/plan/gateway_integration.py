@@ -9,6 +9,7 @@ from typing import Any
 
 from nanobot.bus import MessageBus
 from nanobot.cron.service import CronService
+from nanobot.cron.types import CronSchedule
 from rich.console import Console
 
 from src.core.plan.cron_callback import CronCallbackHandler
@@ -114,14 +115,23 @@ class GatewayIntegration:
             # 注册新的训练提醒任务
             assert self.reminder_manager is not None
             schedule = self.reminder_manager.schedule
-            self.cron_service.register_job(
-                name=CronCallbackHandler.TRAINING_REMINDER_JOB,
-                cron_expr=schedule.cron_expression,
-                metadata={
+            cron_schedule = CronSchedule(
+                kind="cron",
+                expr=schedule.cron_expression,
+            )
+            import json
+
+            message = json.dumps(
+                {
                     "type": "training_reminder",
                     "advance_minutes": schedule.advance_minutes,
                     "check_weather": schedule.check_weather,
-                },
+                }
+            )
+            self.cron_service.add_job(
+                name=CronCallbackHandler.TRAINING_REMINDER_JOB,
+                schedule=cron_schedule,
+                message=message,
             )
 
             logger.info(f"训练提醒任务已注册: {schedule.cron_expression}")
@@ -187,7 +197,7 @@ class GatewayIntegration:
                     reminder_job = {
                         "id": job.id,
                         "name": job.name,
-                        "cron": job.cron_expr,
+                        "cron": job.schedule.expr if job.schedule else None,
                         "enabled": job.enabled,
                     }
                     break

@@ -71,6 +71,50 @@ class TestFatigueAssessor:
         assert result.data_quality == DataQuality.EMPTY
         assert result.recovery_status == RecoveryStatus.GREEN
 
+    def test_assess_fatigue_reads_session_data(
+        self, mock_session_repo, mock_training_load_analyzer
+    ):
+        """BUG-2202回归：验证assess_fatigue从session_repo读取数据"""
+        import polars as pl
+
+        lf = pl.DataFrame(
+            {
+                "session_total_distance": [5000.0, 8000.0],
+                "session_total_timer_time": [1800.0, 3000.0],
+                "session_avg_heart_rate": [150.0, 160.0],
+            }
+        ).lazy()
+        mock_session_repo.storage.read_parquet.return_value = lf
+        mock_training_load_analyzer.calculate_training_load_from_dataframe.return_value = {
+            "atl": 50.0,
+            "ctl": 60.0,
+            "tsb": 10.0,
+            "runs_count": 2,
+        }
+
+        assessor = FatigueAssessor(mock_session_repo, mock_training_load_analyzer)
+        result = assessor.assess_fatigue()
+
+        assert result.data_quality == DataQuality.SUFFICIENT
+        mock_session_repo.storage.read_parquet.assert_called()
+
+    def test_assess_fatigue_read_parquet_exception(
+        self, mock_session_repo, mock_training_load_analyzer
+    ):
+        """BUG-2202回归：read_parquet异常时回退到空DataFrame"""
+        mock_session_repo.storage.read_parquet.side_effect = Exception("文件不存在")
+        mock_training_load_analyzer.calculate_training_load_from_dataframe.return_value = {
+            "atl": 0.0,
+            "ctl": 0.0,
+            "tsb": 0.0,
+            "runs_count": 0,
+        }
+
+        assessor = FatigueAssessor(mock_session_repo, mock_training_load_analyzer)
+        result = assessor.assess_fatigue()
+
+        assert result.data_quality == DataQuality.EMPTY
+
     def test_assess_fatigue_with_rpe(
         self, mock_session_repo, mock_training_load_analyzer
     ):

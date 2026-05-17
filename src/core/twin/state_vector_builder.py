@@ -4,6 +4,8 @@ import logging
 from datetime import date
 from typing import TYPE_CHECKING
 
+import polars as pl
+
 from src.core.twin.models import (
     BodySignalDimension,
     DataQuality,
@@ -126,11 +128,23 @@ class StateVectorBuilder:
             return FitnessDimension(vdot=0.0, vdot_trend=0.0)
 
     def build_load(self) -> LoadDimension:
-        """构建负荷维度：调用 calculate_atl/ctl"""
+        """构建负荷维度：从session_repo读取数据计算ATL/CTL"""
         if self._training_load_analyzer is None:
             return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
         try:
-            result = self._training_load_analyzer.calculate_atl_ctl([])
+            if self._session_repo is not None:
+                try:
+                    lf = self._session_repo.storage.read_parquet()
+                    session_df = lf.collect()
+                except Exception:
+                    session_df = pl.DataFrame()
+                result = (
+                    self._training_load_analyzer.calculate_training_load_from_dataframe(
+                        session_df
+                    )
+                )
+            else:
+                result = self._training_load_analyzer.calculate_atl_ctl([])
             if not isinstance(result, dict):
                 return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
             atl = float(result.get("atl", 0.0))
