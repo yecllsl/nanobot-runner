@@ -108,9 +108,25 @@ def stats(
 
         if df.is_empty():
             console.print("[yellow]暂无数据[/yellow]")
-            console.print(
-                "[dim]提示: 请先使用 'nanobotrun data import <路径>' 导入数据[/dim]"
-            )
+            console.print("\n[bold]可能原因:[/bold]")
+            if year:
+                console.print(f"  • 指定年份 {year} 没有跑步记录")
+            if start_date or end_date:
+                console.print(
+                    f"  • 日期范围 {start_date or '开始'} ~ {end_date or '现在'} 没有记录"
+                )
+            if not year and not start_date and not end_date:
+                console.print("  • 数据库中暂无跑步数据")
+
+            console.print("\n[bold]建议操作:[/bold]")
+            console.print("  1. 导入数据: nanobotrun data import <FIT文件或目录>")
+            if year:
+                console.print(
+                    f"  2. 查看其他年份: nanobotrun data stats --year {year - 1}"
+                )
+            if start_date or end_date:
+                console.print("  3. 扩大查询范围: nanobotrun data stats")
+            console.print("  4. 查看数据概览: nanobotrun data stats")
             return
 
         import polars as pl

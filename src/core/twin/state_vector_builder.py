@@ -128,13 +128,22 @@ class StateVectorBuilder:
             return FitnessDimension(vdot=0.0, vdot_trend=0.0)
 
     def build_load(self) -> LoadDimension:
-        """构建负荷维度：从session_repo读取数据计算ATL/CTL"""
+        """构建负荷维度：从session_repo读取数据计算ATL/CTL
+
+        优化：只读取最近90天的数据，避免加载全部历史数据
+        """
         if self._training_load_analyzer is None:
             return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
         try:
             if self._session_repo is not None:
                 try:
+                    # 优化：只读取最近90天的数据，提升性能
+                    from datetime import datetime, timedelta
+
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(days=90)
                     lf = self._session_repo.storage.read_parquet()
+                    lf = lf.filter(pl.col("session_start_time") >= start_date)
                     session_df = lf.collect()
                 except Exception:
                     session_df = pl.DataFrame()
