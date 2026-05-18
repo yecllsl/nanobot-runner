@@ -122,26 +122,24 @@ class TrainingLoadAnalyzer:
         """
         max_hr = 220 - age
 
+        pace_min_per_km = (pl.col(duration_col) / 60) / (pl.col(distance_col) / 1000)
+
+        pace_based_if = 0.8 + (6.0 / pace_min_per_km) * 0.1
+
+        hr_based_if = (
+            (pl.col(hr_col) - rest_hr).clip(lower_bound=0) / (max_hr - rest_hr)
+        ).clip(upper_bound=1.5)
+
+        has_valid_hr = (pl.col(hr_col).is_not_null()) & (pl.col(hr_col) > 0)
+
+        intensity_factor = (
+            pl.when(has_valid_hr).then(hr_based_if).otherwise(pace_based_if)
+        )
+
         result_df = df.with_columns(
             [
-                pl.when(
-                    (pl.col(duration_col) > 0)
-                    & (pl.col(distance_col) > 0)
-                    & (pl.col(hr_col).is_not_null())
-                    & (pl.col(hr_col) > 0)
-                )
-                .then(
-                    (
-                        pl.col(duration_col)
-                        * (
-                            (pl.col(hr_col) - rest_hr).clip(lower_bound=0)
-                            / (max_hr - rest_hr)
-                        ).clip(upper_bound=1.5)
-                        ** 2
-                    )
-                    / 3600
-                    * 100
-                )
+                pl.when((pl.col(duration_col) > 0) & (pl.col(distance_col) > 0))
+                .then((pl.col(duration_col) * intensity_factor**2) / 3600 * 100)
                 .otherwise(0.0)
                 .round(2)
                 .alias("tss")

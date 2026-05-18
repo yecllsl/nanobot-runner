@@ -93,7 +93,7 @@ class TestPlanCreateCommand:
                 "plan",
                 "create",
                 "21.1",
-                "2026-05-01",
+                "2026-12-01",
                 "-v",
                 "40.0",
                 "--volume",
@@ -109,7 +109,7 @@ class TestPlanCreateCommand:
         mock_engine.generate_plan.assert_called_once_with(
             user_id="test_user",
             goal_distance_km=21.1,
-            goal_date="2026-05-01",
+            goal_date="2026-12-01",
             current_vdot=40.0,
             current_weekly_distance_km=30.0,
             age=35,

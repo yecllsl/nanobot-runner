@@ -77,7 +77,7 @@ class HRVAnalyzer:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
-            columns = lf.columns
+            columns = lf.collect_schema().names()
             if "heart_rate" not in columns:
                 return []
 
@@ -157,7 +157,7 @@ class HRVAnalyzer:
         """
         try:
             lf = self.session_repo.storage.read_parquet()
-            columns = lf.columns
+            columns = lf.collect_schema().names()
 
             if "heart_rate" not in columns or "session_start_time" not in columns:
                 return HRRecoveryResult(hr_end=0.0, data_quality=DataQuality.EMPTY)
@@ -216,7 +216,7 @@ class HRVAnalyzer:
         """
         try:
             lf = self.session_repo.storage.read_parquet()
-            columns = lf.columns
+            columns = lf.collect_schema().names()
 
             if "heart_rate" not in columns or "session_start_time" not in columns:
                 return HRDriftResult(drift_rate=0.0, data_quality=DataQuality.EMPTY)
@@ -280,7 +280,7 @@ class HRVAnalyzer:
         """
         try:
             lf = self.session_repo.storage.read_parquet()
-            columns = lf.columns
+            columns = lf.collect_schema().names()
 
             if "rr_interval" in columns:
                 df = lf.filter(pl.col("rr_interval").is_not_null()).collect()

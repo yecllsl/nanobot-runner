@@ -244,7 +244,7 @@ class TestTrainingLoadAnalyzerVectorized:
     def test_calculate_tss_batch_with_missing_hr(
         self, training_load_analyzer: TrainingLoadAnalyzer
     ) -> None:
-        """测试批量 TSS 计算 - 缺失心率"""
+        """测试批量 TSS 计算 - 缺失心率时基于配速估算TSS"""
         df = pl.DataFrame(
             {
                 "session_total_distance": [5000.0, 10000.0, 15000.0],
@@ -257,7 +257,7 @@ class TestTrainingLoadAnalyzerVectorized:
 
         assert tss_series.len() == 3
         assert tss_series[0] > 0
-        assert tss_series[1] == 0.0
+        assert tss_series[1] > 0
         assert tss_series[2] > 0
 
     def test_calculate_tss_batch_with_zero_duration(
@@ -411,7 +411,7 @@ class TestTrainingLoadAnalyzerVectorized:
     def test_calculate_training_load_from_dataframe_no_valid_tss(
         self, training_load_analyzer: TrainingLoadAnalyzer
     ) -> None:
-        """测试从 DataFrame 计算训练负荷 - 无有效 TSS"""
+        """测试从 DataFrame 计算训练负荷 - 无心率时基于配速估算TSS"""
         df = pl.DataFrame(
             {
                 "session_total_distance": [5000.0, 10000.0],
@@ -422,9 +422,8 @@ class TestTrainingLoadAnalyzerVectorized:
 
         result = training_load_analyzer.calculate_training_load_from_dataframe(df)
 
-        assert result["atl"] == 0.0
-        assert result["ctl"] == 0.0
-        assert result["fitness_status"] == "数据不足"
+        assert result["atl"] > 0.0
+        assert result["ctl"] > 0.0
 
     def test_performance_comparison(
         self, training_load_analyzer: TrainingLoadAnalyzer

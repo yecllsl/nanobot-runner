@@ -49,11 +49,33 @@ class FeishuAuth:
         self.app_id = app_id or self.config.get("feishu_app_id")
         self.app_secret = app_secret or self.config.get("feishu_app_secret")
 
+        if not self.app_id or not self.app_secret:
+            self._try_load_env_local()
+            self.app_id = self.app_id or self.config.get("feishu_app_id")
+            self.app_secret = self.app_secret or self.config.get("feishu_app_secret")
+
         self._access_token: str | None = None
         self._token_expire_time: float | None = None
 
         if not self.app_id or not self.app_secret:
             logger.warning("未配置飞书应用凭证 (feishu_app_id 或 feishu_app_secret)")
+
+    def _try_load_env_local(self) -> None:
+        """尝试从.env.local加载飞书凭证环境变量
+
+        当config.json和环境变量中均无飞书凭证时，
+        尝试从ConfigManager.base_dir/.env.local加载。
+        """
+        try:
+            from src.core.config.env_manager import EnvManager
+
+            env_file = self.config.base_dir / ".env.local"
+            if env_file.exists():
+                env_manager = EnvManager(env_file=env_file)
+                env_manager.load_env()
+                logger.debug(f"已从{env_file}加载环境变量")
+        except Exception as e:
+            logger.debug(f"加载.env.local失败: {e}")
 
     def _get_access_token(self) -> str:
         """

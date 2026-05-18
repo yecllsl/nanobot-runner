@@ -50,24 +50,43 @@ class RecoveryMonitor:
         Returns:
             RecoveryStatusResult: 恢复状态结果
         """
+        try:
+            lf = self.session_repo.storage.read_parquet()
+            session_df = lf.collect()
+        except Exception:
+            session_df = pl.DataFrame()
+
         load_data = self.training_load_analyzer.calculate_training_load_from_dataframe(
-            pl.DataFrame()
+            session_df
         )
         tsb = float(load_data.get("tsb", 0.0))
         runs_count = int(load_data.get("runs_count", 0))
 
         if runs_count == 0:
-            return RecoveryStatusResult(
-                recovery_status=RecoveryStatus.GREEN,
-                rest_day_effect=RestDayEffect(
-                    resting_hr_change_pct=0.0,
-                    tsb_change=0.0,
-                    effect_level="minimal",
-                    message="暂无训练数据",
-                ),
-                recovery_trend=[],
-                data_quality=DataQuality.EMPTY,
-            )
+            if session_df.is_empty():
+                return RecoveryStatusResult(
+                    recovery_status=RecoveryStatus.GREEN,
+                    rest_day_effect=RestDayEffect(
+                        resting_hr_change_pct=0.0,
+                        tsb_change=0.0,
+                        effect_level="minimal",
+                        message="暂无训练数据",
+                    ),
+                    recovery_trend=[],
+                    data_quality=DataQuality.EMPTY,
+                )
+            else:
+                return RecoveryStatusResult(
+                    recovery_status=RecoveryStatus.GREEN,
+                    rest_day_effect=RestDayEffect(
+                        resting_hr_change_pct=0.0,
+                        tsb_change=0.0,
+                        effect_level="minimal",
+                        message="训练数据缺少心率信息，无法计算训练负荷，建议使用带有心率监测的设备记录训练",
+                    ),
+                    recovery_trend=[],
+                    data_quality=DataQuality.INSUFFICIENT,
+                )
 
         tsb_capped = min(tsb, self.config.tsb_cap)
 
@@ -158,7 +177,7 @@ class RecoveryMonitor:
         """
         try:
             lf = self.session_repo.storage.read_parquet()
-            columns = lf.columns
+            columns = lf.collect_schema().names()
 
             if "session_start_time" not in columns:
                 return []

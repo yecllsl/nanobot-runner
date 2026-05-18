@@ -115,6 +115,36 @@ class DataHandler:
 
         return df
 
+    def _filter_lazy_by_date_range(
+        self, lf: pl.LazyFrame, start_date: str | None, end_date: str | None
+    ) -> pl.LazyFrame:
+        """
+        按日期范围过滤LazyFrame数据（在collect前执行，提升性能）
+
+        Args:
+            lf: LazyFrame数据
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            pl.LazyFrame: 过滤后的LazyFrame
+        """
+        if lf.columns and "session_start_time" not in lf.columns:
+            return lf
+
+        if not lf.columns:
+            return lf
+
+        if start_date:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            lf = lf.filter(pl.col("session_start_time") >= start_dt)
+
+        if end_date:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            lf = lf.filter(pl.col("session_start_time") < end_dt)
+
+        return lf
+
     def _filter_by_date_range(
         self, df: pl.DataFrame, start_date: str | None, end_date: str | None
     ) -> pl.DataFrame:
