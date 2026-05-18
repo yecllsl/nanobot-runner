@@ -71,14 +71,24 @@ class FatigueAssessor:
         runs_count = int(load_data.get("runs_count", 0))
 
         if runs_count == 0:
-            return FatigueResult(
-                fatigue_score=0.0,
-                recovery_status=RecoveryStatus.GREEN,
-                consecutive_hard_days=0,
-                breakdown=FatigueBreakdown(),
-                recommendation="暂无训练数据",
-                data_quality=DataQuality.EMPTY,
-            )
+            if session_df.is_empty():
+                return FatigueResult(
+                    fatigue_score=0.0,
+                    recovery_status=RecoveryStatus.GREEN,
+                    consecutive_hard_days=0,
+                    breakdown=FatigueBreakdown(),
+                    recommendation="暂无训练数据",
+                    data_quality=DataQuality.EMPTY,
+                )
+            else:
+                return FatigueResult(
+                    fatigue_score=0.0,
+                    recovery_status=RecoveryStatus.GREEN,
+                    consecutive_hard_days=0,
+                    breakdown=FatigueBreakdown(),
+                    recommendation="训练数据缺少心率信息，无法计算训练负荷，建议使用带有心率监测的设备记录训练",
+                    data_quality=DataQuality.INSUFFICIENT,
+                )
 
         tsb = min(tsb_raw, self.config.tsb_cap)
 
@@ -131,7 +141,7 @@ class FatigueAssessor:
         """
         try:
             lf = self.session_repo.storage.read_parquet()
-            columns = lf.columns
+            columns = lf.collect_schema().names()
 
             if "session_start_time" not in columns:
                 return 0

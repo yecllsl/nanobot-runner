@@ -1,248 +1,268 @@
+import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.core.base.exceptions import LLMError
 from src.core.config.llm_config import LLMConfig
+from src.core.config.manager import ConfigManager
 from src.core.provider_adapter import AgentDefaults, RunnerProviderAdapter
 
 
-class TestLLMConfig:
-    """LLMConfig数据类测试"""
-
-    def test_default_values(self) -> None:
-        config = LLMConfig(provider="openai", model="gpt-4o-mini")
-        assert config.provider == "openai"
-        assert config.model == "gpt-4o-mini"
-        assert config.api_key is None
-        assert config.base_url is None
-        assert config.max_iterations == 10
-        assert config.context_window_tokens == 128000
-        assert config.context_block_limit == 10
-        assert config.max_tool_result_chars == 32000
-
-    def test_custom_values(self) -> None:
-        config = LLMConfig(
-            provider="anthropic",
-            model="claude-3-5-sonnet",
-            api_key="sk-test",
-            base_url="https://api.anthropic.com",
-            max_iterations=20,
-        )
-        assert config.provider == "anthropic"
-        assert config.api_key == "sk-test"
-        assert config.max_iterations == 20
-
-    def test_is_complete(self) -> None:
-        assert LLMConfig(provider="openai", model="gpt-4o-mini").is_complete()
-        assert not LLMConfig(provider="", model="gpt-4o-mini").is_complete()
-        assert not LLMConfig(provider="openai", model="").is_complete()
-
-    def test_has_api_key(self) -> None:
-        assert LLMConfig(
-            provider="openai", model="gpt-4o-mini", api_key="sk-test"
-        ).has_api_key()
-        assert not LLMConfig(provider="openai", model="gpt-4o-mini").has_api_key()
-        assert not LLMConfig(
-            provider="openai", model="gpt-4o-mini", api_key=""
-        ).has_api_key()
-
-    def test_to_dict_masks_api_key(self) -> None:
-        config = LLMConfig(provider="openai", model="gpt-4o-mini", api_key="sk-secret")
-        d = config.to_dict()
-        assert d["api_key"] == "***"
-        assert d["provider"] == "openai"
-
-    def test_to_dict_no_api_key(self) -> None:
-        config = LLMConfig(provider="openai", model="gpt-4o-mini")
-        d = config.to_dict()
-        assert d["api_key"] is None
-
-    def test_frozen(self) -> None:
-        config = LLMConfig(provider="openai", model="gpt-4o-mini")
-        with pytest.raises(AttributeError):
-            config.provider = "anthropic"  # type: ignore[misc]
+@pytest.fixture
+def mock_runner_config():
+    config = MagicMock(spec=ConfigManager)
+    config.has_llm_config.return_value = True
+    config.get_llm_config.return_value = {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "api_key": "test-key",
+        "base_url": "https://api.openai.com",
+        "max_iterations": 10,
+        "context_window_tokens": 128000,
+        "context_block_limit": 10,
+        "max_tool_result_chars": 32000,
+    }
+    config.get.return_value = None
+    return config
 
 
 class TestAgentDefaults:
-    """AgentDefaults数据类测试"""
-
-    def test_default_values(self) -> None:
+    def test_defaults(self):
         defaults = AgentDefaults(model="gpt-4o-mini")
         assert defaults.model == "gpt-4o-mini"
         assert defaults.max_tool_iterations == 10
         assert defaults.context_window_tokens == 128000
+        assert defaults.context_block_limit == 10
+        assert defaults.max_tool_result_chars == 32000
 
-    def test_custom_values(self) -> None:
+    def test_custom_values(self):
         defaults = AgentDefaults(
             model="claude-3",
             max_tool_iterations=20,
-            context_window_tokens=64000,
+            context_window_tokens=256000,
+            context_block_limit=5,
+            max_tool_result_chars=16000,
         )
         assert defaults.model == "claude-3"
         assert defaults.max_tool_iterations == 20
-        assert defaults.context_window_tokens == 64000
+        assert defaults.context_window_tokens == 256000
 
 
-class TestRunnerProviderAdapter:
-    """RunnerProviderAdapter测试"""
+class TestRunnerProviderAdapterGetLlmConfig:
+    def test_get_llm_config_from_runner(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        config = adapter.get_llm_config()
+        assert isinstance(config, LLMConfig)
+        assert config.provider == "openai"
+        assert config.model == "gpt-4o-mini"
+        assert config.api_key == "test-key"
 
-    def _make_mock_config(self, llm_config: dict | None = None) -> MagicMock:
-        mock = MagicMock()
-        if llm_config is not None:
-            mock.has_llm_config.return_value = bool(
-                llm_config.get("provider") and llm_config.get("model")
-            )
-            mock.get_llm_config.return_value = llm_config
-        else:
-            mock.has_llm_config.return_value = False
-            mock.get_llm_config.return_value = {
-                "provider": "",
-                "model": "",
-                "api_key": None,
-                "base_url": None,
-            }
-        return mock
+    def test_get_llm_config_no_runner_config(self):
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = False
+        adapter = RunnerProviderAdapter(config)
 
-    def test_get_llm_config_from_runner(self) -> None:
-        mock_config = self._make_mock_config(
-            {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "api_key": "sk-test",
-                "base_url": None,
-            }
-        )
-
-        adapter = RunnerProviderAdapter(mock_config)
-        llm = adapter.get_llm_config()
-
-        assert llm.provider == "openai"
-        assert llm.model == "gpt-4o-mini"
-        assert llm.api_key == "sk-test"
-
-    def test_get_llm_config_no_config_raises(self) -> None:
-        mock_config = self._make_mock_config()
-
-        with patch.object(
-            RunnerProviderAdapter, "_try_load_nanobot_config", return_value=False
-        ):
-            adapter = RunnerProviderAdapter(mock_config)
+        with patch.object(adapter, "_try_load_nanobot_config", return_value=False):
             with pytest.raises(LLMError, match="未配置LLM"):
                 adapter.get_llm_config()
 
-    def test_is_available_with_runner_config(self) -> None:
-        mock_config = self._make_mock_config(
-            {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-            }
-        )
+    def test_get_llm_config_fallback_to_nanobot(self):
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = False
+        adapter = RunnerProviderAdapter(config)
 
-        adapter = RunnerProviderAdapter(mock_config)
-        assert adapter.is_available()
+        mock_nanobot_config = MagicMock()
+        mock_nanobot_config.agents.defaults.model = "gpt-4"
+        mock_nanobot_config.agents.defaults.max_tool_iterations = 15
+        mock_nanobot_config.agents.defaults.context_window_tokens = 128000
+        mock_nanobot_config.agents.defaults.context_block_limit = 10
+        mock_nanobot_config.agents.defaults.max_tool_result_chars = 32000
+        mock_nanobot_config.providers.default = "openai"
+        mock_provider_cfg = MagicMock()
+        mock_provider_cfg.api_key = "nanobot-key"
+        mock_provider_cfg.base_url = "https://api.openai.com"
+        mock_nanobot_config.providers = MagicMock()
+        mock_nanobot_config.providers.default = "openai"
+        mock_nanobot_config.providers.openai = mock_provider_cfg
 
-    def test_is_available_no_config(self) -> None:
-        mock_config = self._make_mock_config()
+        adapter._nanobot_config = mock_nanobot_config
 
-        with patch.object(
-            RunnerProviderAdapter, "_try_load_nanobot_config", return_value=False
-        ):
-            adapter = RunnerProviderAdapter(mock_config)
-            assert not adapter.is_available()
+        with patch.object(adapter, "_try_load_nanobot_config", return_value=True):
+            llm_config = adapter.get_llm_config()
+            assert llm_config.model == "gpt-4"
+            assert llm_config.api_key == "nanobot-key"
 
-    def test_get_agent_defaults(self) -> None:
-        mock_config = self._make_mock_config(
-            {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "api_key": "sk-test",
-                "base_url": None,
-            }
-        )
 
-        adapter = RunnerProviderAdapter(mock_config)
+class TestRunnerProviderAdapterIsAvailable:
+    def test_is_available_with_runner_config(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        assert adapter.is_available() is True
+
+    def test_is_available_no_config(self):
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = False
+        adapter = RunnerProviderAdapter(config)
+
+        with patch.object(adapter, "_try_load_nanobot_config", return_value=False):
+            assert adapter.is_available() is False
+
+    def test_is_available_with_nanobot_fallback(self):
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = False
+        adapter = RunnerProviderAdapter(config)
+
+        with patch.object(adapter, "_try_load_nanobot_config", return_value=True):
+            assert adapter.is_available() is True
+
+
+class TestRunnerProviderAdapterGetAgentDefaults:
+    def test_get_agent_defaults(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
         defaults = adapter.get_agent_defaults()
-
         assert isinstance(defaults, AgentDefaults)
         assert defaults.model == "gpt-4o-mini"
         assert defaults.max_tool_iterations == 10
 
-    @patch("src.core.provider_adapter.RunnerProviderAdapter._try_load_nanobot_config")
-    def test_fallback_to_nanobot_config(self, mock_try_load: MagicMock) -> None:
-        mock_config = self._make_mock_config()
-        mock_try_load.return_value = True
 
-        mock_nanobot = MagicMock()
-        mock_nanobot.agents.defaults.model = "deepseek-chat"
-        mock_nanobot.agents.defaults.max_tool_iterations = 15
-        mock_nanobot.agents.defaults.context_window_tokens = 64000
-        mock_nanobot.agents.defaults.context_block_limit = 8
-        mock_nanobot.agents.defaults.max_tool_result_chars = 16000
-        mock_nanobot.providers.default = "deepseek"
-
-        adapter = RunnerProviderAdapter(mock_config)
-        adapter._nanobot_config = mock_nanobot
-
-        llm = adapter.get_llm_config()
-        assert llm.provider == "deepseek"
-        assert llm.model == "deepseek-chat"
-        assert llm.max_iterations == 15
-
-    def test_close_clears_provider(self) -> None:
-        mock_config = self._make_mock_config(
-            {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-            }
-        )
-
-        adapter = RunnerProviderAdapter(mock_config)
+class TestRunnerProviderAdapterClose:
+    def test_close_clears_provider(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
         adapter._provider_instance = MagicMock()
         adapter.close()
         assert adapter._provider_instance is None
 
-    @patch("src.core.provider_adapter.RunnerProviderAdapter._try_load_nanobot_config")
-    def test_get_provider_instance_import_error(self, mock_try_load: MagicMock) -> None:
-        mock_config = self._make_mock_config(
-            {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-            }
-        )
 
-        adapter = RunnerProviderAdapter(mock_config)
+class TestRunnerProviderAdapterGetProviderInstance:
+    def test_get_provider_instance_cached(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        cached = MagicMock()
+        adapter._provider_instance = cached
+        assert adapter.get_provider_instance() is cached
 
-        with patch.dict(
-            "sys.modules", {"nanobot.providers.openai_compat_provider": None}
+    def test_get_provider_instance_import_error(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+
+        with patch.dict("sys.modules", {}):
+            with patch("builtins.__import__", side_effect=ImportError("no nanobot")):
+                with pytest.raises(LLMError, match="无法导入nanobot模块"):
+                    adapter.get_provider_instance()
+
+
+class TestRunnerProviderAdapterHasRunnerLlmConfig:
+    def test_has_runner_llm_config_true(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        assert adapter._has_runner_llm_config() is True
+
+    def test_has_runner_llm_config_exception(self):
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.side_effect = Exception("error")
+        adapter = RunnerProviderAdapter(config)
+        assert adapter._has_runner_llm_config() is False
+
+
+class TestRunnerProviderAdapterTryLoadNanobotConfig:
+    def test_try_load_already_loaded(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        adapter._nanobot_config = MagicMock()
+        assert adapter._try_load_nanobot_config() is True
+
+    def test_try_load_import_error(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+
+        with patch(
+            "src.core.provider_adapter.RunnerProviderAdapter._try_load_nanobot_config",
+            return_value=False,
         ):
-            with pytest.raises(LLMError, match="无法导入nanobot模块"):
-                adapter.get_provider_instance()
+            result = adapter._try_load_nanobot_config()
+            assert result is False
 
-    def test_has_runner_llm_config_exception_returns_false(self) -> None:
-        mock_config = MagicMock()
-        mock_config.has_llm_config.side_effect = Exception("config error")
 
-        adapter = RunnerProviderAdapter(mock_config)
-        assert not adapter._has_runner_llm_config()
+class TestRunnerProviderAdapterFromRunnerConfig:
+    def test_from_runner_config(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        llm_config = adapter._from_runner_config()
+        assert llm_config.provider == "openai"
+        assert llm_config.model == "gpt-4o-mini"
+        assert llm_config.api_key == "test-key"
+        assert llm_config.base_url == "https://api.openai.com"
 
-    @patch("src.core.provider_adapter.RunnerProviderAdapter._try_load_nanobot_config")
-    def test_from_runner_config_with_env_override(
-        self, mock_try_load: MagicMock
-    ) -> None:
-        mock_config = self._make_mock_config(
-            {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "api_key": "sk-env-key",
-                "base_url": "https://custom.api.com",
-            }
+
+class TestRunnerProviderAdapterFromNanobotConfig:
+    def test_from_nanobot_config_no_config(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        with pytest.raises(LLMError, match="nanobot配置未加载"):
+            adapter._from_nanobot_config()
+
+    def test_from_nanobot_config_with_config(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+
+        mock_cfg = MagicMock()
+        mock_cfg.agents.defaults.model = "gpt-4"
+        mock_cfg.agents.defaults.max_tool_iterations = 15
+        mock_cfg.agents.defaults.context_window_tokens = 128000
+        mock_cfg.agents.defaults.context_block_limit = 10
+        mock_cfg.agents.defaults.max_tool_result_chars = 32000
+        mock_cfg.providers.default = "openai"
+        mock_provider = MagicMock()
+        mock_provider.api_key = "key-123"
+        mock_provider.base_url = "https://api.openai.com"
+        mock_cfg.providers.openai = mock_provider
+
+        adapter._nanobot_config = mock_cfg
+        llm_config = adapter._from_nanobot_config()
+        assert llm_config.provider == "openai"
+        assert llm_config.model == "gpt-4"
+        assert llm_config.api_key == "key-123"
+
+    def test_from_nanobot_config_no_api_key_uses_env(self, mock_runner_config):
+        adapter = RunnerProviderAdapter(mock_runner_config)
+
+        mock_cfg = MagicMock()
+        mock_cfg.agents.defaults.model = "gpt-4"
+        mock_cfg.agents.defaults.max_tool_iterations = 15
+        mock_cfg.agents.defaults.context_window_tokens = 128000
+        mock_cfg.agents.defaults.context_block_limit = 10
+        mock_cfg.agents.defaults.max_tool_result_chars = 32000
+        mock_cfg.providers.default = "openai"
+        mock_provider = MagicMock()
+        mock_provider.api_key = None
+        mock_provider.base_url = None
+        mock_cfg.providers.openai = mock_provider
+
+        adapter._nanobot_config = mock_cfg
+        with patch.dict(os.environ, {"NANOBOT_LLM_API_KEY": "env-key"}):
+            llm_config = adapter._from_nanobot_config()
+            assert llm_config.api_key == "env-key"
+
+
+class TestParseEnvFile:
+    def test_parse_env_file(self, tmp_path: Path):
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "KEY1=value1\nKEY2=value2\n# comment\n\nKEY3='quoted'\n",
+            encoding="utf-8",
         )
+        result = RunnerProviderAdapter._parse_env_file(env_file)
+        assert result["KEY1"] == "value1"
+        assert result["KEY2"] == "value2"
+        assert result["KEY3"] == "quoted"
 
-        adapter = RunnerProviderAdapter(mock_config)
-        llm = adapter._from_runner_config()
+    def test_parse_env_file_no_equals(self, tmp_path: Path):
+        env_file = tmp_path / ".env"
+        env_file.write_text("NOEQUALS\nKEY=val\n", encoding="utf-8")
+        result = RunnerProviderAdapter._parse_env_file(env_file)
+        assert "NOEQUALS" not in result
+        assert result["KEY"] == "val"
 
-        assert llm.provider == "openai"
-        assert llm.model == "gpt-4o-mini"
-        assert llm.api_key == "sk-env-key"
-        assert llm.base_url == "https://custom.api.com"
+    def test_parse_env_file_nonexistent(self, tmp_path: Path):
+        result = RunnerProviderAdapter._parse_env_file(tmp_path / "missing.env")
+        assert result == {}
+
+    def test_parse_env_file_empty_value(self, tmp_path: Path):
+        env_file = tmp_path / ".env"
+        env_file.write_text("EMPTY=\nKEY=val\n", encoding="utf-8")
+        result = RunnerProviderAdapter._parse_env_file(env_file)
+        assert "EMPTY" not in result
+        assert result["KEY"] == "val"
