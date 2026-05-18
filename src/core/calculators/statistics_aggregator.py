@@ -2,7 +2,7 @@
 # 提供跑步数据的统计汇总功能
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
@@ -182,7 +182,7 @@ class StatisticsAggregator:
             total_duration = float(session_df["duration"].sum())
             avg_heart_rate_result = session_df["avg_hr"].mean()
             avg_heart_rate = (
-                float(avg_heart_rate_result)  # type: ignore[arg-type]
+                float(cast(float, avg_heart_rate_result))
                 if avg_heart_rate_result is not None
                 else 0.0
             )

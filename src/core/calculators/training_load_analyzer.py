@@ -2,7 +2,7 @@
 # 计算训练压力分数(TSS)、急性训练负荷(ATL)、慢性训练负荷(CTL)
 
 import math
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -48,7 +48,7 @@ class TrainingLoadAnalyzer:
             raise ValueError("心率数据不能为空且时长必须为正数")
 
         try:
-            avg_hr: float = float(heart_rate_data.mean())  # type: ignore[arg-type]
+            avg_hr: float = float(cast(float, heart_rate_data.mean()))
             intensity_factor = avg_hr / DEFAULT_LTHR
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)

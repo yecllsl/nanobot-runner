@@ -4,7 +4,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 
@@ -207,7 +207,7 @@ class StorageManager:
                             pass  # 保持现有的更宽泛类型
                         else:
                             # 对于不兼容的类型，统一转换为字符串类型
-                            all_schemas[col_name] = pl.Utf8  # type: ignore
+                            all_schemas[col_name] = cast(pl.DataType, pl.Utf8)
 
         all_columns = sorted(all_schemas.keys())
 

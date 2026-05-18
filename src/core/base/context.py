@@ -6,7 +6,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from src.core.analytics import AnalyticsEngine
 from src.core.base.profile import ProfileEngine, ProfileStorageManager
@@ -537,13 +537,13 @@ class AppContextFactory:
             storage=storage,
             indexer=indexer,
             parser=parser,
-            importer=None,  # type: ignore
+            importer=cast(ImportService, None),
             analytics=analytics,
-            profile_engine=None,  # type: ignore
+            profile_engine=cast(ProfileEngine, None),
             profile_storage=profile_storage,
             session_repo=session_repo,
-            report_service=None,  # type: ignore
-            plan_manager=None,  # type: ignore
+            report_service=cast(ReportService, None),
+            plan_manager=cast(PlanManager, None),
         )
 
         # 创建或使用提供的导入服务（需要AppContext）

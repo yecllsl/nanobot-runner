@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
@@ -330,15 +330,15 @@ class ProfileStorageManager:
                 total_duration_hours=profile_data.get("total_duration_hours", 0.0),
                 avg_vdot=profile_data.get("avg_vdot", 0.0),
                 max_vdot=profile_data.get("max_vdot", 0.0),
-                fitness_level=fitness_level,  # type: ignore[arg-type]
+                fitness_level=fitness_level,  # type: ignore[arg-type]  # no-redef 导致 mypy 使用旧定义
                 weekly_avg_distance_km=profile_data.get("weekly_avg_distance_km", 0.0),
                 weekly_avg_duration_hours=profile_data.get(
                     "weekly_avg_duration_hours", 0.0
                 ),
                 training_pattern=training_pattern,
-                avg_heart_rate=profile_data.get("avg_heart_rate"),  # type: ignore[arg-type]
-                max_heart_rate=profile_data.get("max_heart_rate"),  # type: ignore[arg-type]
-                resting_heart_rate=profile_data.get("resting_heart_rate"),  # type: ignore[arg-type]
+                avg_heart_rate=profile_data.get("avg_heart_rate"),  # type: ignore[arg-type]  # no-redef 导致 mypy 使用旧定义
+                max_heart_rate=profile_data.get("max_heart_rate"),  # type: ignore[arg-type]  # no-redef 导致 mypy 使用旧定义
+                resting_heart_rate=profile_data.get("resting_heart_rate"),  # type: ignore[arg-type]  # no-redef 导致 mypy 使用旧定义
                 injury_risk_level=injury_risk_level,
                 injury_risk_score=profile_data.get("injury_risk_score", 0.0),
                 atl=profile_data.get("atl", 0.0),
@@ -659,7 +659,7 @@ ANOMALY_FILTER_RULES: list[AnomalyFilterRule] = [
 
 
 @dataclass
-class RunnerProfile:  # type: ignore[no-redef]
+class RunnerProfile:  # type: ignore[no-redef]  # TODO: Task 20 拆分 profile.py 时消除
     """跑者画像数据结构"""
 
     # 基本信息
@@ -1129,7 +1129,7 @@ class ProfileEngine:
             if vdot_values:
                 profile.avg_vdot = sum(vdot_values) / len(vdot_values)
                 profile.max_vdot = max(vdot_values)
-                profile.fitness_level = self.get_fitness_level(profile.avg_vdot)  # type: ignore[assignment]
+                profile.fitness_level = self.get_fitness_level(profile.avg_vdot)  # type: ignore[assignment]  # no-redef 导致 mypy 使用旧定义
         except Exception as e:
             logger.warning(f"计算 VDOT 指标失败：{e}")
 
@@ -1191,8 +1191,8 @@ class ProfileEngine:
             if not hr_df.is_empty():
                 avg_hr = hr_df["avg_heart_rate"].mean()
                 max_hr = hr_df["max_heart_rate"].max()
-                profile.avg_heart_rate = float(avg_hr) if avg_hr is not None else None  # type: ignore[arg-type,assignment]
-                profile.max_heart_rate = float(max_hr) if max_hr is not None else None  # type: ignore[arg-type,assignment]
+                profile.avg_heart_rate = float(avg_hr) if avg_hr is not None else None  # type: ignore[arg-type,assignment]  # no-redef 导致 mypy 使用旧定义
+                profile.max_heart_rate = float(max_hr) if max_hr is not None else None  # type: ignore[arg-type,assignment]  # no-redef 导致 mypy 使用旧定义
         except Exception as e:
             logger.warning(f"计算心率指标失败：{e}")
 
@@ -1344,7 +1344,11 @@ class ProfileEngine:
                 if intervals:
                     intervals_series = pl.Series(intervals)
                     std_dev_value = intervals_series.std()
-                    std_dev = float(std_dev_value) if std_dev_value is not None else 0.0  # type: ignore[arg-type]
+                    std_dev = (
+                        float(cast(float, std_dev_value))
+                        if std_dev_value is not None
+                        else 0.0
+                    )
 
                     # 标准差越小，规律性越好（满分 40 分）
                     # 标准差 0 天 = 40 分，标准差 3 天 = 0 分

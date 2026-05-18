@@ -2,7 +2,7 @@
 # 封装晨报、周报、月报生成、推送和定时调度逻辑
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
@@ -1175,7 +1175,7 @@ class ReportService:
             if hasattr(report_data, "to_dict"):
                 report_dict = report_data.to_dict()
             else:
-                report_dict = report_data  # type: ignore[assignment]
+                report_dict = cast(dict[str, Any], report_data)
 
             result = {
                 "success": True,

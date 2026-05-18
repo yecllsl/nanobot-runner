@@ -185,7 +185,7 @@ class FeishuCalendarAPI:
             RuntimeError: 当创建失败时
         """
         endpoint = "/calendars/events"
-        payload = {
+        payload: dict[str, Any] = {
             "calendar_id": calendar_id,
             "summary": event.summary,
             "start_time": {
@@ -202,7 +202,7 @@ class FeishuCalendarAPI:
             payload["description"] = event.description
 
         if event.reminders:
-            payload["reminders"] = event.reminders  # type: ignore[assignment]
+            payload["reminders"] = event.reminders
 
         result = self._request("POST", endpoint, json=payload)
         data = result.get("data", {})
