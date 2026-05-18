@@ -130,6 +130,12 @@ class DataHandler:
         Returns:
             pl.LazyFrame: 过滤后的LazyFrame
         """
+        if lf.columns and "session_start_time" not in lf.columns:
+            return lf
+
+        if not lf.columns:
+            return lf
+
         if start_date:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             lf = lf.filter(pl.col("session_start_time") >= start_dt)

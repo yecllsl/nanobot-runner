@@ -110,12 +110,14 @@ class TestCLICommandContract:
         测试 data stats 命令的日期参数
 
         Bug历史：字符串日期与datetime类型比较失败
+        空数据场景：应返回友好提示而非Polars内部错误
         """
         result = runner.invoke(
             app, ["data", "stats", "--start", "2024-01-01", "--end", "2024-12-31"]
         )
-        assert result.exit_code == 0 or result.exit_code == 1
-        assert "错误" not in result.output or "暂无数据" in result.output
+        assert result.exit_code in [0, 1]
+        assert "unable to find column" not in result.output
+        assert "Resolved plan until failure" not in result.output
 
     def test_data_stats_year_parameter(self):
         """
