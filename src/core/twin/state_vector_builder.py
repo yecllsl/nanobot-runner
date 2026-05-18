@@ -126,15 +126,25 @@ class StateVectorBuilder:
             return FitnessDimension(vdot=0.0, vdot_trend=0.0)
 
     def build_load(self) -> LoadDimension:
-        """构建负荷维度：调用 calculate_atl/ctl"""
+        """构建负荷维度：从session_repo读取数据，调用TrainingLoadAnalyzer计算CTL/ATL"""
         if self._training_load_analyzer is None:
             return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
         try:
-            result = self._training_load_analyzer.calculate_atl_ctl([])
-            if not isinstance(result, dict):
-                return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
-            atl = float(result.get("atl", 0.0))
-            ctl = float(result.get("ctl", 0.0))
+            if self._session_repo is not None:
+                df = self._session_repo.storage.read_parquet().collect()
+                result = (
+                    self._training_load_analyzer.calculate_training_load_from_dataframe(
+                        df
+                    )
+                )
+                atl = float(result.get("atl", 0.0))
+                ctl = float(result.get("ctl", 0.0))
+            else:
+                result = self._training_load_analyzer.calculate_atl_ctl([])
+                if not isinstance(result, dict):
+                    return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
+                atl = float(result.get("atl", 0.0))
+                ctl = float(result.get("ctl", 0.0))
             tsb = ctl - atl
             acwr = atl / ctl if ctl > 0 else 0.0
             return LoadDimension(

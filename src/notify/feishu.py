@@ -3,6 +3,7 @@
 # 使用 access_token 调用消息发送接口
 
 import logging
+import os
 import time
 from collections.abc import Callable
 from typing import Any
@@ -51,8 +52,10 @@ class FeishuAuth:
 
         if not self.app_id or not self.app_secret:
             self._try_load_env_local()
-            self.app_id = self.app_id or self.config.get("feishu_app_id")
-            self.app_secret = self.app_secret or self.config.get("feishu_app_secret")
+            self.app_id = self.app_id or os.environ.get("NANOBOT_FEISHU_APP_ID")
+            self.app_secret = self.app_secret or os.environ.get(
+                "NANOBOT_FEISHU_APP_SECRET"
+            )
 
         self._access_token: str | None = None
         self._token_expire_time: float | None = None

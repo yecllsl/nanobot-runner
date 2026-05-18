@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import polars as pl
+
 from src.core.twin.models import (
     BodySignalDimension,
     FitnessDimension,
@@ -57,11 +59,20 @@ def _make_mock_training_load_analyzer() -> MagicMock:
     analyzer.calculate_atl.return_value = 50.0
     analyzer.calculate_ctl.return_value = 65.0
     analyzer.calculate_atl_ctl.return_value = {"atl": 50.0, "ctl": 65.0}
+    analyzer.calculate_training_load_from_dataframe.return_value = {
+        "atl": 50.0,
+        "ctl": 65.0,
+        "tsb": 15.0,
+        "fitness_status": "状态正常",
+        "training_advice": "保持训练",
+        "runs_count": 4,
+        "total_runs": 4,
+    }
     return analyzer
 
 
 def _make_mock_session_repo() -> MagicMock:
-    """Mock SessionRepository: get_recent_sessions"""
+    """Mock SessionRepository: get_recent_sessions + storage.read_parquet"""
     repo = MagicMock()
     repo.get_recent_sessions.return_value = [
         MagicMock(
@@ -81,6 +92,13 @@ def _make_mock_session_repo() -> MagicMock:
             duration_s=4200.0,
         ),
     ]
+    repo.storage.read_parquet.return_value = pl.DataFrame(
+        {
+            "session_total_distance": [8000.0, 10000.0, 5000.0, 12000.0],
+            "session_total_timer_time": [2400.0, 3600.0, 1800.0, 4200.0],
+            "session_avg_heart_rate": [150.0, 155.0, 145.0, 160.0],
+        }
+    ).lazy()
     return repo
 
 
@@ -165,7 +183,9 @@ class TestStateVectorBuilderFallback:
 
     def test_training_load_analyzer_failure(self) -> None:
         analyzer = _make_mock_training_load_analyzer()
-        analyzer.calculate_atl_ctl.side_effect = Exception("无TSS数据")
+        analyzer.calculate_training_load_from_dataframe.side_effect = Exception(
+            "无TSS数据"
+        )
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
             body_signal_engine=_make_mock_body_signal_engine(),
@@ -219,7 +239,9 @@ class TestStateVectorBuilderExceptionDistinction:
 
     def test_value_error_returns_default_load(self) -> None:
         analyzer = _make_mock_training_load_analyzer()
-        analyzer.calculate_atl_ctl.side_effect = ValueError("bad value")
+        analyzer.calculate_training_load_from_dataframe.side_effect = ValueError(
+            "bad value"
+        )
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
             body_signal_engine=_make_mock_body_signal_engine(),

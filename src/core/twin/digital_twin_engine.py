@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -80,7 +81,7 @@ class DigitalTwinEngine:
         state = self._builder.build()
         self._cache = StateVectorCache(
             state=state,
-            created_at=state.snapshot_date + "T00:00:00",
+            created_at=datetime.now().isoformat(),
             ttl_hours=24,
         )
         self._save_cache_to_disk(self._cache)
