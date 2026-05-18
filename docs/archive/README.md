@@ -83,6 +83,7 @@ git checkout v0.9.0 -- docs/
 docs/archive/
 ├── .gitignore           # 排除.zip文件
 ├── README.md            # 本文件（归档索引）
+├── v0.22.0-archive.zip # v0.22.0版本归档（本地备份，不提交）
 ├── v0.21.0-archive.zip # v0.21.0版本归档（本地备份，不提交）
 ├── v0.20.1-archive.zip # v0.20.1版本归档（本地备份，不提交）
 ├── v0.20.0-archive.zip # v0.20.0版本归档（本地备份，不提交）
@@ -109,6 +110,35 @@ docs/archive/
 ---
 
 ## 📋 归档清单
+
+### v0.22.0 (2026-05-18)
+
+**归档内容**（共18个文档）：
+- **测试文档**（12个）：测试报告_v0.22.0.md、回归报告_v0.22.0.md、Bug清单_v0.22.0.md、strategy_v0.22.0.md、UAT测试报告_v0.22.0.md、缺陷跟踪表_v0.22.0.md、缺陷修复规格说明书_v0.22.0.md、测试策略与规范.md、UAT测试报告_Sprint1.md、UAT测试执行报告.md、UAT反馈记录表.md、UAT反馈记录表_backup_20260517_192501.md
+- **运维文档**（2个）：发布报告_v0.22.0.md、流水线执行报告_v0.22.0.md
+- **开发文档**（2个）：Bug修复报告_v0.22.0.md、需求洞察报告_v0.22.0.md
+- **规划文档**（2个）：execution_plan_v0.22.0.md、task_list_v0.22.0.md
+
+**版本特性**：
+
+**数字孪生引擎优化**：
+- 修复StateVectorBuilder.build_load方法：从session_repo读取训练数据，使用calculate_training_load_from_dataframe计算CTL/ATL
+- 修复DigitalTwinEngine缓存机制：created_at使用当前时间而非state.snapshot_date，确保缓存不过期
+- 优化性能：只读取最近90天的训练数据
+
+**飞书通知模块修复**：
+- 修复FeishuAuth环境变量加载逻辑：从os.environ读取而非配置文件，确保.env.local加载生效
+
+**CI/CD流水线修复**：
+- 修复5个单元测试失败：飞书环境变量加载、训练负荷计算、缓存机制等问题
+- 采用系统化调试方法：复现测试→阅读源码→分析根因→实施修复→验证结果
+
+**质量门禁**：
+- CI流水线：全部通过
+- 回归测试：全部通过
+- 代码评审：通过
+
+---
 
 ### v0.21.0 (2026-05-12)
 
