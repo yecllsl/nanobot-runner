@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.core.base.exceptions import LLMError
+from src.core.base.exceptions import LLMError, NanobotRunnerError
 from src.core.config.llm_config import LLMConfig
 from src.core.config.manager import ConfigManager
 from src.core.provider_adapter import AgentDefaults, RunnerProviderAdapter
@@ -157,7 +157,7 @@ class TestRunnerProviderAdapterHasRunnerLlmConfig:
 
     def test_has_runner_llm_config_exception(self):
         config = MagicMock(spec=ConfigManager)
-        config.has_llm_config.side_effect = Exception("error")
+        config.has_llm_config.side_effect = NanobotRunnerError("error")
         adapter = RunnerProviderAdapter(config)
         assert adapter._has_runner_llm_config() is False
 

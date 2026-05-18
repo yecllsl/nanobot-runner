@@ -9,6 +9,7 @@ from typing import Any
 import typer
 
 from src.cli.common import console
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
@@ -40,7 +41,7 @@ def _connect_mcp_tools_sync(context: Any, agent: Any) -> dict[str, Any]:
         if failed:
             logger.warning(f"MCP连接失败: {failed}")
         return result.get("exit_stacks", {})
-    except Exception as e:
+    except NanobotRunnerError as e:
         logger.warning(f"连接MCP工具失败: {e}")
         return {}
 
@@ -284,7 +285,7 @@ def start(
 
         if context.config.has_llm_config():
             adapter = RunnerProviderAdapter(context.config)
-    except Exception:
+    except NanobotRunnerError:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
         from pathlib import Path
 

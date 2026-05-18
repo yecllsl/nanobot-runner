@@ -11,6 +11,7 @@ from nanobot.bus import MessageBus
 from nanobot.cron.service import CronService
 from rich.console import Console
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.plan.cron_callback import CronCallbackHandler
 from src.core.plan.training_reminder_manager import TrainingReminderManager
 from src.core.transparency.streaming_hook import StreamingHook
@@ -126,7 +127,7 @@ class GatewayIntegration:
 
             logger.info(f"训练提醒任务已注册: {schedule.cron_expression}")
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"注册训练提醒任务失败: {e}", exc_info=True)
 
     def setup_streaming_hook(
@@ -203,7 +204,7 @@ class GatewayIntegration:
                 ),
             }
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取Cron状态失败: {e}")
             return {"enabled": True, "error": str(e)}
 
@@ -213,7 +214,7 @@ class GatewayIntegration:
             try:
                 self.cron_service.stop()
                 logger.info("Cron服务已停止")
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.warning(f"停止Cron服务异常: {e}")
 
         self.reminder_manager = None

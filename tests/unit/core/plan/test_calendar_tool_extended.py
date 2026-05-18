@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import FitnessLevel, PlanType, TrainingType
 from src.core.plan.calendar_tool import (
     CalendarTool,
@@ -133,7 +134,7 @@ class TestBatchSyncExtended:
             nonlocal call_count
             call_count += 1
             if call_count == 3:
-                raise Exception("网络异常")
+                raise NanobotRunnerError("网络异常")
             return MagicMock(success=True, details={"event_ids": ["event_1"]})
 
         with patch.object(
@@ -232,7 +233,7 @@ class TestOptimisticUpdateExtended:
             "sync_daily_workout",
             new_callable=AsyncMock,
         ) as mock_sync:
-            mock_sync.side_effect = Exception("API异常")
+            mock_sync.side_effect = NanobotRunnerError("API异常")
 
             result = await calendar_tool.optimistic_update(plan, daily_plan, date)
 
@@ -421,7 +422,7 @@ class TestHealthCheckExtended:
     async def test_check_network_failure(self, calendar_tool):
         """网络检查-失败"""
         with patch("requests.get") as mock_get:
-            mock_get.side_effect = Exception("网络异常")
+            mock_get.side_effect = NanobotRunnerError("网络异常")
 
             result = await calendar_tool._check_network()
 

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.body_signal.exceptions import BodySignalError
 from src.core.body_signal.models import (
@@ -53,7 +54,7 @@ class RecoveryMonitor:
         try:
             lf = self.session_repo.storage.read_parquet()
             session_df = lf.collect()
-        except Exception:
+        except NanobotRunnerError:
             session_df = pl.DataFrame()
 
         load_data = self.training_load_analyzer.calculate_training_load_from_dataframe(

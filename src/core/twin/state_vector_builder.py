@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from src.core.prediction.prediction_engine import PredictionEngine
     from src.core.storage.session_repository import SessionRepository
     from src.core.training.training_load import TrainingLoadAnalyzer
+from src.core.base.exceptions import NanobotRunnerError
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class StateVectorBuilder:
         except (AttributeError, ValueError, TypeError, KeyError) as e:
             logger.warning(f"构建体能维度失败: {e}")
             return FitnessDimension(vdot=0.0, vdot_trend=0.0)
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError) as e:
             logger.error(f"构建体能维度发生意外错误: {e}", exc_info=True)
             return FitnessDimension(vdot=0.0, vdot_trend=0.0)
 
@@ -162,7 +163,7 @@ class StateVectorBuilder:
         ) as e:
             logger.warning(f"构建负荷维度失败: {e}")
             return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError) as e:
             logger.error(f"构建负荷维度发生意外错误: {e}", exc_info=True)
             return LoadDimension(ctl=0.0, atl=0.0, tsb=0.0, acwr=0.0)
 
@@ -184,7 +185,7 @@ class StateVectorBuilder:
         except (AttributeError, ValueError, TypeError, KeyError) as e:
             logger.warning(f"构建身体信号维度失败: {e}")
             return BodySignalDimension(fatigue_score=0.0, recovery_status="unknown")
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError) as e:
             logger.error(f"构建身体信号维度发生意外错误: {e}", exc_info=True)
             return BodySignalDimension(fatigue_score=0.0, recovery_status="unknown")
 
@@ -230,7 +231,7 @@ class StateVectorBuilder:
             return RiskDimension(
                 injury_risk_7d=0.0, injury_risk_28d=0.0, overtraining_risk="low"
             )
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError) as e:
             logger.error(f"构建风险维度发生意外错误: {e}", exc_info=True)
             return RiskDimension(
                 injury_risk_7d=0.0, injury_risk_28d=0.0, overtraining_risk="low"
@@ -269,7 +270,7 @@ class StateVectorBuilder:
                 ),
                 long_run_frequency=0,
             )
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError) as e:
             logger.error(f"构建训练模式维度发生意外错误: {e}", exc_info=True)
             return TrainingPatternDimension(
                 weekly_volume_km=0.0,

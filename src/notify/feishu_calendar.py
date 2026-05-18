@@ -10,6 +10,7 @@ from typing import Any
 import requests
 
 from src.cli.formatter import format_distance
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.config.manager import ConfigManager
 from src.core.models import CalendarEventResult, DailyPlan, TrainingPlan
 
@@ -368,7 +369,7 @@ class FeishuCalendarSync:
                 )
                 if calendars:
                     return calendars[0].get("calendar_id")
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.error(f"获取日历列表失败：{e}")
 
         return None
@@ -513,7 +514,7 @@ class FeishuCalendarSync:
                             f"同步训练计划事件失败：{daily_plan.date} - 未返回 event_id"
                         )
 
-                except Exception as e:
+                except NanobotRunnerError as e:
                     failed_count += 1
                     logger.error(
                         f"同步训练计划事件失败：{daily_plan.date} - {str(e)}",
@@ -592,7 +593,7 @@ class FeishuCalendarSync:
                     error="未返回 event_id",
                 )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"同步单日训练失败：{str(e)}", exc_info=True)
             return SyncResult(
                 success=False,
@@ -661,7 +662,7 @@ class FeishuCalendarSync:
                 details=result.to_dict(),
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"更新日历事件失败：{event_id} - {str(e)}", exc_info=True)
             return SyncResult(
                 success=False,
@@ -706,7 +707,7 @@ class FeishuCalendarSync:
                 event_id=event_id,
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"删除日历事件失败：{event_id} - {str(e)}", exc_info=True)
             return SyncResult(
                 success=False,
@@ -760,6 +761,6 @@ class FeishuCalendarSync:
 
             return conflicts
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"检测日程冲突失败：{str(e)}", exc_info=True)
             return []

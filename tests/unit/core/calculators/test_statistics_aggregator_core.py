@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.calculators.statistics_aggregator import StatisticsAggregator
 
 
@@ -84,7 +85,7 @@ class TestGetRunningSummary:
     def test_get_running_summary_error(self):
         """测试错误处理"""
         mock_storage = Mock()
-        mock_storage.read_parquet.side_effect = Exception("读取失败")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("读取失败")
         aggregator = StatisticsAggregator(mock_storage)
 
         with pytest.raises(RuntimeError, match="获取跑步摘要失败"):
@@ -145,7 +146,7 @@ class TestGetRunningStats:
     def test_get_running_stats_error(self):
         """测试错误处理"""
         mock_storage = Mock()
-        mock_storage.read_parquet.side_effect = Exception("读取失败")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("读取失败")
         aggregator = StatisticsAggregator(mock_storage)
 
         with pytest.raises(RuntimeError, match="获取统计数据失败"):
@@ -209,7 +210,7 @@ class TestGetPaceDistribution:
     def test_get_pace_distribution_error(self):
         """测试错误处理"""
         mock_storage = Mock()
-        mock_storage.read_parquet.side_effect = Exception("读取失败")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("读取失败")
         aggregator = StatisticsAggregator(mock_storage)
 
         with pytest.raises(RuntimeError, match="配速分布分析失败"):

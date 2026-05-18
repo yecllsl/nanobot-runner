@@ -8,7 +8,7 @@ from typing import Any
 
 import polars as pl
 
-from src.core.base.exceptions import StorageError, ValidationError
+from src.core.base.exceptions import NanobotRunnerError, StorageError, ValidationError
 from src.core.base.logger import get_logger
 from src.core.base.schema import ParquetSchema
 
@@ -31,7 +31,7 @@ class StorageManager:
 
                     config_manager = ConfigManager()
                     self.data_dir = config_manager.data_dir
-                except Exception:
+                except (NanobotRunnerError, Exception):
                     # 如果读取配置失败，使用默认路径
                     self.data_dir = Path(config_dir) / "data"
             else:

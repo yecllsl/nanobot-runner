@@ -136,8 +136,12 @@ class TestProfileEngine:
     def engine(self, mock_storage):
         """创建 ProfileEngine 实例"""
         context = create_mock_context(storage=mock_storage)
-        # Mock analytics.calculate_vdot 方法
+        # Mock analytics 方法
         context.analytics.calculate_vdot = Mock(return_value=40.0)
+        context.analytics.calculate_tss_for_run = Mock(return_value=50.0)
+        context.analytics.calculate_atl_ctl = Mock(
+            return_value={"atl": 30.0, "ctl": 40.0}
+        )
         return ProfileEngine(context)
 
     def test_init(self, engine, mock_storage):
@@ -660,7 +664,7 @@ class TestProfileEngine:
         df = pl.DataFrame(data)
 
         profile = RunnerProfile(user_id="test_user", profile_date=datetime.now())
-        engine._calculate_additional_metrics(df, profile, days=90)
+        engine._calculate_additional_metrics(df.lazy(), profile, days=90)
 
         assert profile.favorite_running_time in ["morning", "afternoon", "evening"]
         assert 0 <= profile.consistency_score <= 100
@@ -748,6 +752,11 @@ class TestProfileIntegration:
     def test_injury_risk_assessment_workflow(self, mock_storage_with_data):
         """测试伤病风险评估工作流程"""
         context = create_mock_context(storage=mock_storage_with_data)
+        context.analytics.calculate_vdot = Mock(return_value=40.0)
+        context.analytics.calculate_tss_for_run = Mock(return_value=100.0)
+        context.analytics.calculate_atl_ctl = Mock(
+            return_value={"atl": 50.0, "ctl": 60.0}
+        )
         engine = ProfileEngine(context)
 
         # 先构建画像

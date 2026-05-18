@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from src.core.base.exceptions import ConfigError
+from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.env_manager import EnvManager
 
@@ -274,7 +274,7 @@ class ConfigGenerator:
         except ImportError:
             logger.warning("dulwich 未安装，跳过 Git 初始化")
             return False
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"Git 初始化失败: {e}")
             return False
 

@@ -8,7 +8,7 @@ import polars as pl
 from rich.console import Console
 from rich.progress import Progress, TaskID
 
-from src.core.base.exceptions import ParseError
+from src.core.base.exceptions import NanobotRunnerError, ParseError
 from src.core.base.logger import get_logger
 
 if TYPE_CHECKING:
@@ -87,7 +87,7 @@ class ImportService:
 
         try:
             year = df.select(pl.col("timestamp").dt.year()).row(0)[0]
-        except Exception:
+        except NanobotRunnerError:
             year = 2024
 
         if self.storage.save_to_parquet(df, year):
@@ -134,7 +134,7 @@ class ImportService:
 
         try:
             year = df.select(pl.col("timestamp").dt.year()).row(0)[0]
-        except Exception:
+        except NanobotRunnerError:
             year = 2024
 
         if self.storage.save_to_parquet(df, year):

@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.env_manager import EnvManager
 from src.core.config.manager import ConfigManager
@@ -113,7 +114,7 @@ class InitWizard:
                 next_steps=next_steps,
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"初始化失败: {e}")
             return InitResult(
                 success=False,
@@ -341,5 +342,5 @@ class InitWizard:
             else:
                 for error in result.errors:
                     logger.warning(f"nanobot配置同步失败: {error}")
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"nanobot配置同步异常: {e}")

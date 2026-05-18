@@ -4,6 +4,7 @@ import logging
 from datetime import date
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.models import (
     InjuryReportResult,
     InjuryRiskPrediction,
@@ -195,7 +196,7 @@ class PredictionEngine:
                 message=f"{model_type}无可回滚版本",
                 details={},
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return ModelManagementResult(
                 action="rollback",
                 model_type=model_type,

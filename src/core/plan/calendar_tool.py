@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.config.manager import ConfigManager
 from src.core.models import DailyPlan, TrainingPlan
 from src.notify.feishu_calendar import (
@@ -122,7 +123,7 @@ class CalendarTool:
                         item=item,
                         message=f"未知的检查项：{item}",
                     )
-            except Exception as e:
+            except NanobotRunnerError as e:
                 result = HealthCheckResult(
                     healthy=False,
                     item=item,
@@ -151,7 +152,7 @@ class CalendarTool:
                     item=HealthCheckItem.NETWORK,
                     message=f"网络连接异常，状态码：{response.status_code}",
                 )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return HealthCheckResult(
                 healthy=False,
                 item=HealthCheckItem.NETWORK,
@@ -181,7 +182,7 @@ class CalendarTool:
                     item=HealthCheckItem.TOKEN,
                     message="访问令牌获取失败",
                 )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return HealthCheckResult(
                 healthy=False,
                 item=HealthCheckItem.TOKEN,
@@ -212,7 +213,7 @@ class CalendarTool:
                     item=HealthCheckItem.CALENDAR_PERMISSION,
                     message="无可用的日历",
                 )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return HealthCheckResult(
                 healthy=False,
                 item=HealthCheckItem.CALENDAR_PERMISSION,
@@ -299,7 +300,7 @@ class CalendarTool:
                         updated_count += 1
                     else:
                         failed_count += 1
-                except Exception as e:
+                except NanobotRunnerError as e:
                     failed_count += 1
                     logger.error(
                         f"更新训练计划事件失败：{daily_plan.date} - {str(e)}",
@@ -353,7 +354,7 @@ class CalendarTool:
                     logger.info(
                         f"删除训练计划事件成功：{daily_plan.date} - {daily_plan.event_id}"
                     )
-                except Exception as e:
+                except NanobotRunnerError as e:
                     failed_count += 1
                     logger.error(
                         f"删除训练计划事件失败：{daily_plan.date} - {str(e)}",
@@ -420,7 +421,7 @@ class CalendarTool:
                     error=result.error,
                 )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             await self._rollback_optimistic_update(temp_event_id, daily_plan)
             return SyncResult(
                 success=False,
@@ -483,7 +484,7 @@ class CalendarTool:
                             }
                         )
 
-                except Exception as e:
+                except NanobotRunnerError as e:
                     failed_count += 1
                     all_errors.append(
                         {
@@ -567,7 +568,7 @@ class CalendarTool:
                     message="训练事件已删除",
                     event_id=daily_plan.event_id,
                 )
-            except Exception as e:
+            except NanobotRunnerError as e:
                 return SyncResult(
                     success=False,
                     message="删除失败",

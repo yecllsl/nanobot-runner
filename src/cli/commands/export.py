@@ -11,6 +11,7 @@ import typer
 from src.cli.common import CLIError, console, print_error, print_status
 from src.cli.handlers.export_handler import ExportHandler
 from src.core.base.context import get_context
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.export.models import ExportConfig, ExportResult
 
 app = typer.Typer(help="数据导出命令")
@@ -132,7 +133,7 @@ def sessions(
         if not result.success:
             raise typer.Exit(1)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -246,6 +247,6 @@ def summary(
         if not result.success:
             raise typer.Exit(1)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

@@ -7,6 +7,7 @@ from typing import Any
 import typer
 
 from src.cli.common import CLIError, console, print_error
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="Agent 交互命令")
 
@@ -28,7 +29,7 @@ async def _connect_mcp_tools(context: Any, agent: Any) -> dict[str, Any]:
     config_path = context.config.config_file
     try:
         return await connect_mcp_tools_from_config(config_path, agent.tools)
-    except Exception as e:
+    except NanobotRunnerError as e:
         import logging
 
         logging.getLogger(__name__).warning(f"连接MCP工具失败: {e}")
@@ -136,10 +137,10 @@ async def _run_chat() -> None:
             except KeyboardInterrupt:
                 console.print("\n[yellow]检测到中断，已退出[/yellow]")
                 break
-            except Exception as e:
+            except NanobotRunnerError as e:
                 console.print(f"[red]错误：{str(e)}[/red]")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         console.print(f"[red]Agent初始化失败：{str(e)}[/red]")
         console.print("[yellow]请确保已正确配置本地模型[/yellow]")
     finally:
@@ -220,6 +221,6 @@ def memory(
             console.print(f"[red]未知操作: {action}[/red]")
             console.print("[dim]可用操作: show, edit, clear[/dim]")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

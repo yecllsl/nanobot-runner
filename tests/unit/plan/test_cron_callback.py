@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from nanobot.cron.types import CronJob, CronJobState, CronPayload, CronSchedule
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.plan.cron_callback import CronCallbackHandler
 from src.core.plan.training_reminder_manager import TrainingReminderManager
 
@@ -158,7 +159,9 @@ class TestOnJob:
 
         # 模拟异常
         with patch.object(
-            handler, "_handle_training_reminder", side_effect=Exception("测试异常")
+            handler,
+            "_handle_training_reminder",
+            side_effect=NanobotRunnerError("测试异常"),
         ):
             with pytest.raises(Exception, match="测试异常"):
                 await handler.on_job(job)

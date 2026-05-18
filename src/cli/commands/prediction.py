@@ -7,6 +7,7 @@ from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error
 from src.cli.handlers.prediction_handler import PredictionHandler
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="ML智能预测命令", no_args_is_help=True)
 
@@ -81,7 +82,7 @@ def predict_vdot(
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -126,7 +127,7 @@ def predict_race(
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -192,7 +193,7 @@ def predict_injury(
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -258,7 +259,7 @@ def predict_response(
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -300,7 +301,7 @@ def prediction_status() -> None:
                 for mt in ("vdot_predictor", "injury_predictor"):
                     st = engine._model_manager.get_model_status(mt)
                     model_status_map[mt] = st.is_available
-        except Exception:
+        except NanobotRunnerError:
             pass
 
         for name, status, model_key in [
@@ -334,7 +335,7 @@ def prediction_status() -> None:
             for a in advice:
                 console.print(f"  - {a}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -396,12 +397,12 @@ def model_status(
                     )
                 else:
                     table.add_row(mt, status_label, "-", "-", "-", "-")
-            except Exception:
+            except NanobotRunnerError:
                 table.add_row(mt, status_label, "-", "-", "-", "-")
 
         console.print(table)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -446,7 +447,7 @@ def model_train(
         else:
             console.print(f"[red]✗[/red] {message}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -484,6 +485,6 @@ def model_rollback(
         else:
             console.print(f"[red]✗[/red] {message}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

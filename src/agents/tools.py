@@ -16,6 +16,7 @@ import polars as pl
 from nanobot.agent.tools.base import Tool
 
 from src.core.base.context import AppContext, AppContextFactory
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.tools.weather_training_coordinator import TrainingData
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class BaseTool(Tool):
             json_result = json.dumps(result, ensure_ascii=False, default=str)
             logger.info(f"工具返回 JSON 长度: {len(json_result)}")
             return json_result
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(
                 f"工具调用异常: {func.__name__}, 错误: {str(e)}", exc_info=True
             )
@@ -1181,7 +1182,7 @@ class RunnerTools:
             else:
                 return {"error": "保存 MEMORY.md 失败"}
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"更新记忆失败：{e}")
             return {"error": f"更新记忆失败：{str(e)}"}
 
@@ -1230,7 +1231,7 @@ class RunnerTools:
                 "total_distance": sum(ws.weekly_distance_km for ws in plan.weeks),
             }
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"生成训练计划失败：{e}")
             return {"error": str(e)}
 
@@ -1276,7 +1277,7 @@ class RunnerTools:
                 actual_avg_hr=actual_avg_hr,
             )
             return result
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"记录执行反馈失败：{e}")
             return {"error": str(e)}
 
@@ -1296,7 +1297,7 @@ class RunnerTools:
             execution_repo = context.plan_execution_repo
             stats = execution_repo.get_plan_execution_stats(plan_id)
             return stats.to_dict()
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取执行统计失败：{e}")
             return {"error": str(e)}
 
@@ -1315,7 +1316,7 @@ class RunnerTools:
             context = get_context()
             analyzer = context.training_response_analyzer
             return analyzer.analyze_plan_response(plan_id)
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"训练响应分析失败：{e}")
             return {"error": str(e)}
 
@@ -1369,7 +1370,7 @@ class RunnerTools:
                 "validation": {"passed": True},
                 "requires_confirmation": False,
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"调整训练计划失败：{e}")
             return {"error": str(e)}
 
@@ -1436,7 +1437,7 @@ class RunnerTools:
                 "plan_id": plan_id,
                 "suggestions": suggestions,
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取调整建议失败：{e}")
             return {"error": str(e)}
 
@@ -1473,7 +1474,7 @@ class RunnerTools:
                 "success": True,
                 "data": evaluation.to_dict(),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"目标评估失败：{e}")
             return {"success": False, "error": str(e)}
 
@@ -1519,7 +1520,7 @@ class RunnerTools:
                 "success": True,
                 "data": plan.to_dict(),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"创建长期规划失败：{e}")
             return {"success": False, "error": str(e)}
 
@@ -1562,7 +1563,7 @@ class RunnerTools:
                     "total_count": len(advices),
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取训练建议失败：{e}")
             return {"success": False, "error": str(e)}
 
@@ -1639,7 +1640,7 @@ class RunnerTools:
                     "formatted_advice": formatted_advice,
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取天气+训练建议失败：{e}")
             return {"success": False, "error": str(e)}
 
@@ -1723,7 +1724,7 @@ class RunnerTools:
                 "success": True,
                 "data": report.to_dict(),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"建议诊断失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -1746,7 +1747,7 @@ class RunnerTools:
                 "success": True,
                 "data": report.to_dict(),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"错误诊断失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -1786,7 +1787,7 @@ class RunnerTools:
                 "success": True,
                 "data": suggestion.to_dict(),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取个性化建议失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -1846,7 +1847,7 @@ class RunnerTools:
                     "current_preferences": new_preferences.to_dict(),
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"记录反馈失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -1866,7 +1867,7 @@ class RunnerTools:
                 "success": True,
                 "data": preferences.to_dict(),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取用户偏好失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -1897,7 +1898,7 @@ class RunnerTools:
                     "updated_preferences": new_preferences.to_dict(),
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"更新用户偏好失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -1919,7 +1920,7 @@ class RunnerTools:
                 pref_data = profile_dict.get("preferences", {})
                 if pref_data:
                     return UserPreferences.from_dict(pref_data)
-        except Exception:
+        except NanobotRunnerError:
             pass
 
         return UserPreferences.default()
@@ -1946,7 +1947,7 @@ class RunnerTools:
             ):
                 profile_obj = self.profile_storage._dict_to_profile(profile_dict)
                 self.profile_storage.save_profile_json(profile_obj)
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"保存偏好到存储失败: {e}")
 
     def explain_decision(
@@ -2022,7 +2023,7 @@ class RunnerTools:
                     "detailed_analysis": explanation.detailed_analysis,
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"解释决策失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2074,7 +2075,7 @@ class RunnerTools:
                     ],
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"追溯数据来源失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2119,7 +2120,7 @@ class RunnerTools:
                     result["data"]["log_stats"] = trace_logger.get_stats()
 
             return result
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取透明化洞察失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2212,7 +2213,7 @@ class RunnerTools:
                 },
             }
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"Subagent调用失败: {e}", exc_info=True)
             # 降级处理：返回预查询数据，让主Agent直接处理
             fallback_result = self._prepare_fallback_response(
@@ -2285,7 +2286,7 @@ class RunnerTools:
                 context["user_request"] = user_request
                 context["error"] = f"不支持的Subagent类型: {subagent_type}"
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"预查询Subagent数据失败: {e}")
             context["user_request"] = user_request
             context["error"] = f"数据预查询失败: {str(e)}"
@@ -2463,7 +2464,7 @@ class RunnerTools:
                 "data": fallback_data,
                 "message": "Subagent调用失败，已返回预查询数据供主Agent处理",
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"降级响应准备失败: {e}")
             return {
                 "type": "fallback",
@@ -2555,7 +2556,7 @@ class RunnerTools:
                     ],
                 }
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"创建确认提示失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2595,7 +2596,7 @@ class RunnerTools:
                 "result": result.to_dict(),
             }
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"解析用户响应失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2614,7 +2615,7 @@ class RunnerTools:
             from src.core.plan.ask_user_confirm import CLIConfirmHelper
 
             return CLIConfirmHelper.ask_rpe_in_cli(session_summary)
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"CLI RPE询问失败: {e}")
             return None
 
@@ -2636,7 +2637,7 @@ class RunnerTools:
             result = hrv_result.to_dict()
             result["estimated_hrv_metrics"] = hrv_metrics
             return {"success": True, "data": result}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"HRV分析失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2648,7 +2649,7 @@ class RunnerTools:
             hrv_analyzer = HRVAnalyzer(session_repo=self._get_session_repo())
             recovery_result = hrv_analyzer.analyze_hr_recovery()
             return {"success": True, "data": recovery_result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"心率恢复分析失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2665,7 +2666,7 @@ class RunnerTools:
             )
             fatigue_result = fatigue_assessor.assess_fatigue(rpe=rpe)
             return {"success": True, "data": fatigue_result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"疲劳度评估失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2685,7 +2686,7 @@ class RunnerTools:
             )
             recovery_result = recovery_monitor.get_recovery_status()
             return {"success": True, "data": recovery_result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"恢复状态获取失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2721,7 +2722,7 @@ class RunnerTools:
                 summary = engine.get_daily_summary()
 
             return {"success": True, "data": summary.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"身体信号摘要获取失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2777,7 +2778,7 @@ class RunnerTools:
                     ),
                 },
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"训练周期对比失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2790,7 +2791,7 @@ class RunnerTools:
             engine = context.prediction_engine
             result = engine.predict_vdot_trend(days=days)
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"VDOT趋势预测失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2807,7 +2808,7 @@ class RunnerTools:
                 distance_km=distance_km, race_date=race_date
             )
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"比赛成绩预测失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2820,7 +2821,7 @@ class RunnerTools:
             engine = context.prediction_engine
             result = engine.predict_injury_risk(days=days)
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"伤病风险预测失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2839,7 +2840,7 @@ class RunnerTools:
                 intensity=intensity,
             )
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"训练响应预测失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2852,7 +2853,7 @@ class RunnerTools:
             engine = context.prediction_engine
             result = engine.check_prediction_status()
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"预测状态检查失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2871,7 +2872,7 @@ class RunnerTools:
                 date=date,
             )
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"伤病报告提交失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2884,7 +2885,7 @@ class RunnerTools:
             engine = context.prediction_engine
             result = engine.manage_model(action=action, model_type=model_type)
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"模型管理失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2897,7 +2898,7 @@ class RunnerTools:
             engine = context.digital_twin_engine
             result = engine.get_current_snapshot()
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取数字孪生快照失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2917,7 +2918,7 @@ class RunnerTools:
             plan = HypotheticalPlan.from_week_dicts(plan_name, weeks, source="agent")
             result = engine.simulate(plan, prediction_type=prediction_type)
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"数字孪生推演失败: {e}")
             return {"success": False, "error": str(e)}
 
@@ -2941,7 +2942,7 @@ class RunnerTools:
                 hypothetical_plans, prediction_type=prediction_type
             )
             return {"success": True, "data": result.to_dict()}
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"数字孪生计划对比失败: {e}")
             return {"success": False, "error": str(e)}
 

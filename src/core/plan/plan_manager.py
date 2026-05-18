@@ -84,7 +84,13 @@ class PlanManager:
                 data = json.load(f)
                 self._plans = data.get("plans", {})
             logger.info(f"成功加载 {len(self._plans)} 个训练计划")
-        except Exception as e:
+        except (
+            NanobotRunnerError,
+            json.JSONDecodeError,
+            OSError,
+            ValueError,
+            TypeError,
+        ) as e:
             logger.error(f"加载训练计划失败：{e}")
             self._plans = {}
 
@@ -100,7 +106,7 @@ class PlanManager:
             with open(self.plans_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             logger.info(f"成功保存 {len(self._plans)} 个训练计划")
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"保存训练计划失败：{e}")
             raise PlanManagerError(f"保存训练计划失败：{e}") from e
 
@@ -150,7 +156,13 @@ class PlanManager:
 
         try:
             return TrainingPlan.from_dict(plan_dict)
-        except Exception as e:
+        except (
+            NanobotRunnerError,
+            TypeError,
+            KeyError,
+            ValueError,
+            AttributeError,
+        ) as e:
             logger.error(f"解析训练计划失败：{e}")
             return None
 
@@ -450,7 +462,13 @@ class PlanManager:
             try:
                 plan = TrainingPlan.from_dict(plan_dict)
                 plans.append(plan)
-            except Exception as e:
+            except (
+                NanobotRunnerError,
+                TypeError,
+                KeyError,
+                ValueError,
+                AttributeError,
+            ) as e:
                 logger.error(f"解析训练计划失败：{e}")
                 continue
 
@@ -493,7 +511,13 @@ class PlanManager:
             if plan_dict.get("status") == PlanStatus.ACTIVE.value:
                 try:
                     return TrainingPlan.from_dict(plan_dict)
-                except Exception as e:
+                except (
+                    NanobotRunnerError,
+                    TypeError,
+                    KeyError,
+                    ValueError,
+                    AttributeError,
+                ) as e:
                     logger.error(f"解析训练计划失败：{e}")
                     continue
 

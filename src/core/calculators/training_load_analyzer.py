@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
+
 # TSS 计算常量
 DEFAULT_LTHR = 180
 
@@ -50,7 +52,7 @@ class TrainingLoadAnalyzer:
             intensity_factor = avg_hr / DEFAULT_LTHR
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise ValueError(f"TSS计算失败: {e}") from e
 
     def calculate_tss_for_run(
@@ -88,7 +90,7 @@ class TrainingLoadAnalyzer:
 
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)
-        except Exception:
+        except NanobotRunnerError:
             return 0.0
 
     def calculate_tss_batch(

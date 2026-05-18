@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.config.sync import NanobotConfigSync, SyncResult
 
 
@@ -118,7 +119,7 @@ class TestNanobotConfigSync:
 
     def test_has_runner_llm_config_exception(self) -> None:
         mock_config = MagicMock()
-        mock_config.has_llm_config.side_effect = Exception("error")
+        mock_config.has_llm_config.side_effect = NanobotRunnerError("error")
 
         sync = NanobotConfigSync(mock_config)
         assert not sync._has_runner_llm_config()

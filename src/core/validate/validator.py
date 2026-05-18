@@ -1,3 +1,6 @@
+import json
+
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.env_manager import EnvManager
 from src.core.config.manager import ConfigManager
@@ -104,8 +107,6 @@ class ConfigValidator:
             return errors
 
         try:
-            import json
-
             with open(config_file, encoding="utf-8") as f:
                 config_data = json.load(f)
 
@@ -150,7 +151,7 @@ class ConfigValidator:
 
         try:
             config_data = self.config.load_config()
-        except Exception:
+        except (NanobotRunnerError, json.JSONDecodeError, OSError, TypeError):
             return errors
 
         required_fields = {
@@ -197,7 +198,7 @@ class ConfigValidator:
 
         try:
             config_data = self.config.load_config()
-        except Exception:
+        except (NanobotRunnerError, json.JSONDecodeError, OSError, TypeError):
             return errors
 
         import re
@@ -267,7 +268,7 @@ class ConfigValidator:
 
         try:
             config_data = self.config.load_config()
-        except Exception:
+        except (NanobotRunnerError, json.JSONDecodeError, OSError, TypeError):
             return ConnectivityResult(
                 provider=provider or "unknown",
                 is_connected=False,
@@ -297,7 +298,7 @@ class ConfigValidator:
                     is_connected=True,
                     response_time=time.time() - start,
                 )
-        except Exception as e:
+        except (NanobotRunnerError, Exception) as e:
             return ConnectivityResult(
                 provider=target_provider,
                 is_connected=False,
@@ -333,7 +334,7 @@ class ConfigValidator:
                 is_connected=True,
                 response_time=time.time() - start,
             )
-        except Exception as e:
+        except (NanobotRunnerError, Exception) as e:
             return ConnectivityResult(
                 provider="openai",
                 is_connected=False,

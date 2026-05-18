@@ -7,6 +7,7 @@ import polars as pl
 import pytest
 
 from src.core.analytics import AnalyticsEngine
+from src.core.base.exceptions import NanobotRunnerError
 
 
 class TestAnalyticsEngine:
@@ -2260,7 +2261,7 @@ class TestPaceDistribution:
     def test_get_pace_distribution_runtime_error(self):
         """测试运行时错误处理"""
         mock_storage = Mock()
-        mock_storage.read_parquet.side_effect = Exception("数据库错误")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("数据库错误")
 
         engine = AnalyticsEngine(mock_storage)
 
@@ -3678,7 +3679,7 @@ class TestDailyReport:
         from datetime import datetime, timedelta
 
         mock_storage = MagicMock()
-        mock_storage.read_parquet.side_effect = Exception("数据库错误")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("数据库错误")
 
         yesterday = datetime.now().date() - timedelta(days=1)
 

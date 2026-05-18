@@ -4,6 +4,7 @@
 import typer
 
 from src.cli.common import console, print_error
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="偏好管理命令")
 
@@ -24,7 +25,7 @@ def _get_preference_learner():
             pref_data = profile_dict.get("preferences", {})
             if pref_data:
                 preferences = UserPreferences.from_dict(pref_data)
-    except Exception:
+    except NanobotRunnerError:
         pass
 
     return PreferenceLearner(preferences=preferences), profile_storage
@@ -82,7 +83,7 @@ def show_preferences() -> None:
             for k, v in pref_dict["custom_preferences"].items():
                 console.print(f"    [cyan]{k}[/cyan]: {v}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(f"获取偏好失败: {e}")
         raise typer.Exit(1)
 
@@ -137,12 +138,12 @@ def set_preference(
             profile_dict["preferences"] = new_preferences.to_dict()
             if hasattr(profile_storage, "save_profile_json"):
                 profile_storage.save_profile_json(profile_dict)
-        except Exception:
+        except NanobotRunnerError:
             pass
 
         console.print(f"[green]偏好已更新: {key} = {value}[/green]")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(f"更新偏好失败: {e}")
         raise typer.Exit(1)
 
@@ -166,12 +167,12 @@ def reset_preferences() -> None:
             profile_dict["preferences"] = new_preferences.to_dict()
             if hasattr(profile_storage, "save_profile_json"):
                 profile_storage.save_profile_json(profile_dict)
-        except Exception:
+        except NanobotRunnerError:
             pass
 
         console.print("[green]偏好已重置为默认值[/green]")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(f"重置偏好失败: {e}")
         raise typer.Exit(1)
 
@@ -198,6 +199,6 @@ def feedback_stats() -> None:
             for cat, count in stats["category_distribution"].items():
                 console.print(f"    {cat}: {count}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(f"获取反馈统计失败: {e}")
         raise typer.Exit(1)

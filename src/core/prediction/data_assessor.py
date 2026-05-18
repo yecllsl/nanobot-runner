@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.config import PredictionConfig
 from src.core.prediction.models import (
     DataSufficiencyReport,
@@ -228,6 +229,6 @@ class DataAssessor:
             if not isinstance(result, (int, float)):
                 return default
             return result
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError, AttributeError, TypeError) as e:
             logger.warning(f"DataAssessor调用{method_name}失败: {e}")
             return default

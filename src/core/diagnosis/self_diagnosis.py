@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.diagnosis.models import (
     DiagnosisCategory,
     DiagnosisReport,
@@ -234,7 +235,7 @@ class SelfDiagnosis:
                 severity=rule.get("severity", DiagnosisSeverity.WARNING),
                 suggestion_fix=rule.get("fix", "") if not is_valid else "",
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"规则 {rule_name} 执行异常: {e}")
             return ValidationResult(
                 rule_name=rule_name,

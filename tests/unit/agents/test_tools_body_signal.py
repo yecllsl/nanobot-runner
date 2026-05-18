@@ -15,6 +15,7 @@ from src.agents.tools import (
     GetRecoveryStatusTool,
     RunnerTools,
 )
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.body_signal.models import DataQuality
 from src.core.models.recovery import RecoveryStatus
 
@@ -65,7 +66,7 @@ class TestRunnerToolsBodySignal:
     @patch("src.core.storage.session_repository.SessionRepository")
     def test_get_hrv_analysis_error(self, mock_sr_cls, mock_hrv_cls, runner_tools):
         """测试获取HRV分析异常"""
-        mock_hrv_cls.side_effect = Exception("数据库错误")
+        mock_hrv_cls.side_effect = NanobotRunnerError("数据库错误")
 
         result = runner_tools.get_hrv_analysis(days=30)
 

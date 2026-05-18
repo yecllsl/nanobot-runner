@@ -7,6 +7,7 @@
 import logging
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.calculators.race_prediction import RacePredictionEngine
 from src.core.models import GoalAchievementEvaluation
 
@@ -314,7 +315,7 @@ class GoalPredictionEngine:
                 vdot_trend=vdot_trend or [],
                 training_consistency=training_consistency,
             )
-        except Exception:
+        except NanobotRunnerError:
             trend_confidence = 0.5
 
         data_confidence = 0.3

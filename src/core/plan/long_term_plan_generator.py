@@ -7,6 +7,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import LongTermPlan, TrainingCycle
 
 logger = logging.getLogger(__name__)
@@ -314,7 +315,7 @@ class LongTermPlanGenerator:
                 logger.info(
                     f"为周期[{cycle.cycle_type}]创建TrainingPlan成功：{plan_id}"
                 )
-            except Exception as e:
+            except (NanobotRunnerError, ValueError, RuntimeError) as e:
                 logger.warning(
                     f"创建TrainingPlan失败：{e}，跳过周期[{cycle.cycle_type}]"
                 )

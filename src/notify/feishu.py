@@ -10,6 +10,7 @@ from typing import Any
 
 import requests
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.config.manager import ConfigManager
 from src.core.models import OperationResult
 
@@ -77,7 +78,7 @@ class FeishuAuth:
                 env_manager = EnvManager(env_file=env_file)
                 env_manager.load_env()
                 logger.debug(f"已从{env_file}加载环境变量")
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"加载.env.local失败: {e}")
 
     def _get_access_token(self) -> str:
@@ -359,7 +360,7 @@ class FeishuBot:
                 error=f"{error_msg}，已重试{self.MAX_RETRIES}次",
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             return OperationResult(success=False, error=f"发送失败：{str(e)}")
 
     def send_text(self, text: str) -> OperationResult:

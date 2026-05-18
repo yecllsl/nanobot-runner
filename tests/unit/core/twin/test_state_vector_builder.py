@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.twin.models import (
     BodySignalDimension,
     FitnessDimension,
@@ -157,7 +158,7 @@ class TestStateVectorBuilderFallback:
 
     def test_prediction_engine_failure(self) -> None:
         engine = _make_mock_prediction_engine()
-        engine.predict_vdot_trend.side_effect = Exception("ML模型不可用")
+        engine.predict_vdot_trend.side_effect = NanobotRunnerError("ML模型不可用")
         builder = StateVectorBuilder(
             prediction_engine=engine,
             body_signal_engine=_make_mock_body_signal_engine(),
@@ -170,7 +171,7 @@ class TestStateVectorBuilderFallback:
 
     def test_body_signal_engine_failure(self) -> None:
         engine = _make_mock_body_signal_engine()
-        engine.get_daily_summary.side_effect = Exception("数据不足")
+        engine.get_daily_summary.side_effect = NanobotRunnerError("数据不足")
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
             body_signal_engine=engine,
@@ -183,8 +184,8 @@ class TestStateVectorBuilderFallback:
 
     def test_training_load_analyzer_failure(self) -> None:
         analyzer = _make_mock_training_load_analyzer()
-        analyzer.calculate_training_load_from_dataframe.side_effect = Exception(
-            "无TSS数据"
+        analyzer.calculate_training_load_from_dataframe.side_effect = (
+            NanobotRunnerError("无TSS数据")
         )
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
@@ -198,7 +199,7 @@ class TestStateVectorBuilderFallback:
 
     def test_session_repo_failure(self) -> None:
         repo = _make_mock_session_repo()
-        repo.get_recent_sessions.side_effect = Exception("存储不可用")
+        repo.get_recent_sessions.side_effect = NanobotRunnerError("存储不可用")
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
             body_signal_engine=_make_mock_body_signal_engine(),
@@ -210,7 +211,7 @@ class TestStateVectorBuilderFallback:
 
     def test_injury_risk_failure(self) -> None:
         engine = _make_mock_prediction_engine()
-        engine.predict_injury_risk.side_effect = Exception("风险模型不可用")
+        engine.predict_injury_risk.side_effect = NanobotRunnerError("风险模型不可用")
         builder = StateVectorBuilder(
             prediction_engine=engine,
             body_signal_engine=_make_mock_body_signal_engine(),

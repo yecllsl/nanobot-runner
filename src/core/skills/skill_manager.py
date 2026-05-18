@@ -7,6 +7,7 @@ import re
 import shutil
 from pathlib import Path
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.skills.models import (
     SkillDependency,
     SkillInfo,
@@ -132,7 +133,7 @@ class SkillManager:
             logger.info(f"技能已启用: {skill_name}")
             return True
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"启用技能失败: {skill_name}, 错误: {e}")
             return False
 
@@ -173,7 +174,7 @@ class SkillManager:
             logger.info(f"技能已禁用: {skill_name}")
             return True
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"禁用技能失败: {skill_name}, 错误: {e}")
             return False
 
@@ -213,7 +214,7 @@ class SkillManager:
             logger.info(f"技能已导入: {skill_info.name}")
             return True
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError, shutil.Error) as e:
             logger.error(f"导入技能失败: {skill_path}, 错误: {e}")
             return False
 
@@ -236,7 +237,7 @@ class SkillManager:
 
         try:
             return skill_file.read_text(encoding="utf-8")
-        except Exception as e:
+        except (NanobotRunnerError, OSError, UnicodeDecodeError) as e:
             logger.error(f"读取技能内容失败: {skill_file}, 错误: {e}")
             return None
 
@@ -252,7 +253,12 @@ class SkillManager:
             with open(self.config_path, encoding="utf-8") as f:
                 config = json.load(f)
             return config.get("skills", {}).get("disabled", [])
-        except Exception as e:
+        except (
+            NanobotRunnerError,
+            FileNotFoundError,
+            json.JSONDecodeError,
+            OSError,
+        ) as e:
             logger.debug(f"加载禁用技能列表失败: {e}")
             return []
 
@@ -269,7 +275,7 @@ class SkillManager:
         try:
             content = skill_file.read_text(encoding="utf-8")
             return self._parse_skill_content(skill_dir, content)
-        except Exception as e:
+        except (NanobotRunnerError, OSError, UnicodeDecodeError) as e:
             logger.error(f"解析技能文件失败: {skill_file}, 错误: {e}")
             return None
 
@@ -321,7 +327,7 @@ class SkillManager:
                                 )
 
                     enabled_tools = front_matter.get("enabled_tools", [])
-            except Exception as e:
+            except (NanobotRunnerError, yaml.YAMLError, ValueError) as e:
                 logger.debug(f"解析front matter失败: {e}")
         else:
             lines = content.strip().split("\n")

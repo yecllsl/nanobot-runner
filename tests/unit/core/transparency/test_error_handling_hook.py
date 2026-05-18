@@ -4,7 +4,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.base.exceptions import ConfigError, LLMError, StorageError
+from src.core.base.exceptions import (
+    ConfigError,
+    LLMError,
+    NanobotRunnerError,
+    StorageError,
+)
 from src.core.transparency.error_classifier import ErrorCategory
 from src.core.transparency.error_handling_hook import ErrorHandlingHook
 
@@ -107,7 +112,7 @@ class TestErrorHandlingHook:
         self, mock_console, mock_obs_manager, mock_context_with_error
     ):
         """测试ObservabilityManager记录失败不中断"""
-        mock_obs_manager.record_event.side_effect = Exception("记录失败")
+        mock_obs_manager.record_event.side_effect = NanobotRunnerError("记录失败")
         hook = ErrorHandlingHook(
             console=mock_console,
             observability_manager=mock_obs_manager,

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from src.core.plan.plan_manager import PlanManager
     from src.core.prediction.baselines.banister_ir import BanisterIRModel
     from src.core.prediction.prediction_engine import PredictionEngine
+from src.core.base.exceptions import NanobotRunnerError
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +304,7 @@ class DigitalTwinEngine:
                 created_at=data.get("created_at", ""),
                 ttl_hours=data.get("ttl_hours", 24),
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"加载状态向量缓存失败: {e}")
             return None
 
@@ -319,7 +320,7 @@ class DigitalTwinEngine:
                 json.dumps(cache.to_dict(), ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"保存状态向量缓存失败: {e}")
 
     @staticmethod

@@ -5,7 +5,9 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
+from polars.exceptions import ColumnNotFoundError
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.user_profile_manager import RunnerProfile
 
@@ -52,7 +54,7 @@ class TrainingHistoryAnalyzer:
                 return "afternoon"
             else:
                 return "evening"
-        except Exception:
+        except (NanobotRunnerError, TypeError, ValueError, AttributeError):
             return "morning"
 
     def calculate_consistency_score(self, df: pl.DataFrame, days: int) -> float:
@@ -84,7 +86,7 @@ class TrainingHistoryAnalyzer:
 
             consistency_score = base_score + regularity_score
             return min(max(consistency_score, 0), 100)
-        except Exception:
+        except NanobotRunnerError:
             return 0.0
 
     def _calculate_regularity_score(self, df: pl.DataFrame, total_runs: int) -> float:
@@ -116,7 +118,7 @@ class TrainingHistoryAnalyzer:
             )
 
             return max(40 - (std_dev / 3 * 40), 0)
-        except Exception:
+        except (NanobotRunnerError, TypeError, ValueError):
             return 0.0
 
     def calculate_data_quality(self, lf: pl.LazyFrame, profile: RunnerProfile) -> None:
@@ -166,7 +168,13 @@ class TrainingHistoryAnalyzer:
                 score += 10
 
             profile.data_quality_score = min(max(score, 0), 100)
-        except Exception as e:
+        except (
+            NanobotRunnerError,
+            TypeError,
+            ValueError,
+            KeyError,
+            ColumnNotFoundError,
+        ) as e:
             logger.warning(f"计算数据质量评分失败：{e}")
             profile.data_quality_score = 0.0
 
@@ -213,7 +221,7 @@ class TrainingHistoryAnalyzer:
                 "total_distance_km": round(total_distance / 1000, 2),
                 "total_duration_hours": round(total_duration / 3600, 2),
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取训练摘要失败：{e}")
             return {"total_runs": 0, "message": f"获取失败: {e}"}
 
@@ -245,7 +253,7 @@ class TrainingHistoryAnalyzer:
                     result[weekday_names[weekday]] = row["len"]
 
             return result
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"分析每周训练模式失败：{e}")
             return {}
 
@@ -286,6 +294,6 @@ class TrainingHistoryAnalyzer:
                 )
 
             return activities
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取最近活动失败：{e}")
             return []

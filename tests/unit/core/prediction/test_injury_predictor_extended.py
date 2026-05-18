@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.injury_predictor import InjuryPredictor
 from src.core.prediction.models import RiskFactor
 
@@ -67,7 +68,7 @@ class TestInjuryPredictorGetAcwr:
 
     def test_get_acwr_exception(self):
         analyzer = MagicMock()
-        analyzer.calculate_acwr.side_effect = Exception("error")
+        analyzer.calculate_acwr.side_effect = NanobotRunnerError("error")
         predictor = InjuryPredictor(injury_analyzer=analyzer)
         result = predictor._get_acwr()
         assert result == 1.2
@@ -93,7 +94,7 @@ class TestInjuryPredictorGetWeeklyLoadChange:
 
     def test_get_weekly_load_change_exception(self):
         session_repo = MagicMock()
-        session_repo.get_recent_sessions.side_effect = Exception("error")
+        session_repo.get_recent_sessions.side_effect = NanobotRunnerError("error")
         predictor = InjuryPredictor(session_repo=session_repo)
         result = predictor._get_weekly_load_change()
         assert result == 10.0
@@ -114,7 +115,7 @@ class TestInjuryPredictorGetTsbLowDays:
 
     def test_get_tsb_low_days_exception(self):
         analyzer = MagicMock()
-        analyzer.get_tsb_low_days.side_effect = Exception("error")
+        analyzer.get_tsb_low_days.side_effect = NanobotRunnerError("error")
         predictor = InjuryPredictor(injury_analyzer=analyzer)
         result = predictor._get_tsb_low_days()
         assert result == 2
@@ -285,7 +286,7 @@ class TestInjuryPredictorBuildTrainingData:
 class TestInjuryPredictorPredictBasicEdgeCases:
     def test_basic_prediction_rule_failure(self):
         rule_baseline = MagicMock()
-        rule_baseline.assess.side_effect = Exception("rule error")
+        rule_baseline.assess.side_effect = NanobotRunnerError("rule error")
         predictor = InjuryPredictor(
             data_assessor=_make_assessor(sufficient=False, parametric=False),
             rule_baseline=rule_baseline,
@@ -313,9 +314,9 @@ class TestInjuryPredictorPredictBasicEdgeCases:
 class TestInjuryPredictorParametricEdgeCases:
     def test_parametric_prediction_failure(self):
         fe = MagicMock()
-        fe.extract_injury_features.side_effect = Exception("feature error")
+        fe.extract_injury_features.side_effect = NanobotRunnerError("feature error")
         logistic = MagicMock()
-        logistic.predict_proba.side_effect = Exception("model error")
+        logistic.predict_proba.side_effect = NanobotRunnerError("model error")
         predictor = InjuryPredictor(
             feature_engine=fe,
             data_assessor=_make_assessor(sufficient=False, parametric=True),

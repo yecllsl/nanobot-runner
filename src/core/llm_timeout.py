@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypeVar
 
-from src.core.base.exceptions import LLMError
+from src.core.base.exceptions import LLMError, NanobotRunnerError
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class LLMTimeoutController:
                 if attempt > self.config.max_retries:
                     return self._handle_timeout_error()
 
-            except Exception as e:
+            except (NanobotRunnerError, Exception) as e:
                 attempt += 1
                 logger.warning(
                     f"LLM调用失败: {e}，尝试 {attempt}/{self.config.max_retries + 1}"
@@ -156,7 +156,7 @@ class LLMTimeoutController:
                 logger.info("超时策略: 使用备用函数")
                 try:
                     return self.config.fallback_fn()
-                except Exception as e:
+                except (NanobotRunnerError, Exception) as e:
                     logger.error(f"备用函数执行失败: {e}")
                     return None
             else:

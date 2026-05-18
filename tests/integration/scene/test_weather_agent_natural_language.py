@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
+
 
 @pytest.fixture
 def config_with_weather_and_llm(tmp_path: Path) -> Path:
@@ -122,7 +124,7 @@ class TestAgentNaturalLanguageWeatherQuery:
         """测试Agent优雅处理天气工具错误"""
         from src.core.tools.mcp_connector import connect_mcp_tools_from_config
 
-        mock_connect.side_effect = Exception("Weather service unavailable")
+        mock_connect.side_effect = NanobotRunnerError("Weather service unavailable")
 
         registry = MagicMock()
         result = await connect_mcp_tools_from_config(

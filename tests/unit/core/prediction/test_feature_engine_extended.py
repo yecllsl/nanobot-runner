@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.feature_engine import (
     INJURY_FEATURE_NAMES,
     RACE_FEATURE_NAMES,
@@ -437,7 +438,7 @@ class TestFeatureEngineGetSessionsWindow:
 
     def test_repo_exception(self):
         repo = MagicMock()
-        repo.get_recent_sessions.side_effect = Exception("error")
+        repo.get_recent_sessions.side_effect = NanobotRunnerError("error")
         fe = FeatureEngine(session_repo=repo)
         result = fe._get_sessions_window(days=7)
         assert result == []

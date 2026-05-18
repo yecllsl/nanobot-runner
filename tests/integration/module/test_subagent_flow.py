@@ -12,6 +12,7 @@ import pytest
 
 from src.agents.tools import RunnerTools, SpawnSubagentTool, create_tools
 from src.core.analytics import AnalyticsEngine
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.storage.parquet_manager import StorageManager
 from tests.conftest import create_mock_context
 
@@ -491,7 +492,7 @@ class TestSubagentFallback:
 
             # 模拟 _invoke_subagent 失败
             with patch.object(
-                tools, "_invoke_subagent", side_effect=Exception("调用失败")
+                tools, "_invoke_subagent", side_effect=NanobotRunnerError("调用失败")
             ):
                 result = tools.spawn_subagent(
                     subagent_type="data_analyst",

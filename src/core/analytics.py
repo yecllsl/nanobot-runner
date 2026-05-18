@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.calculators.heart_rate_analyzer import HeartRateAnalyzer
 from src.core.calculators.race_prediction import RacePredictionEngine
 from src.core.calculators.statistics_aggregator import StatisticsAggregator
@@ -217,7 +218,7 @@ class AnalyticsEngine:
             minutes = int(avg_pace_min_km)
             seconds = int((avg_pace_min_km - minutes) * 60)
             return f"{minutes}:{seconds:02d}"
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise ValueError(f"配速计算失败: {e}") from e
 
     def _calculate_avg_pace(self, df: pl.DataFrame) -> str:
@@ -241,7 +242,7 @@ class AnalyticsEngine:
             minutes = int(avg_pace_min_km)
             seconds = int((avg_pace_min_km - minutes) * 60)
             return f"{minutes}:{seconds:02d}"
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise ValueError(f"配速计算失败: {e}") from e
 
     def get_vdot_trend(self, days: int = 30) -> list[VdotTrendItem]:
@@ -304,7 +305,7 @@ class AnalyticsEngine:
                 )
 
             return trend_data
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"获取VDOT趋势失败: {e}") from e
 
     def calculate_tss_for_run(
@@ -942,7 +943,7 @@ class AnalyticsEngine:
                 message=f"年龄: {age}",
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"心率区间分析失败: {e}") from e
 
     def _calculate_zones_from_avg_hr(
@@ -1171,7 +1172,7 @@ class AnalyticsEngine:
                 "tss": round(total_tss, 1),
                 "run_count": df.height,
             }
-        except Exception:
+        except NanobotRunnerError:
             return None
 
     def _generate_training_advice(

@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.models import PlanAdjustment, ValidationResult, Violation
 
@@ -137,7 +138,7 @@ class PlanAdjustmentValidator:
                         )
                     else:
                         warnings.append(rule.violation_message)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.warning(f"规则 {rule.name} 执行失败: {e}")
                 rule_results[rule.name] = False
 

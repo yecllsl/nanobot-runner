@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.skills.models import SkillInfo, SkillStatus
 from src.core.skills.skill_manager import SkillManager
 
@@ -186,7 +187,7 @@ class TestSkillManagerEnableDisable:
         config_path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
 
         manager = SkillManager(workspace, config_path)
-        with patch("json.dump", side_effect=PermissionError("no write")):
+        with patch("json.dump", side_effect=NanobotRunnerError("no write")):
             result = manager.enable_skill("yaml-skill")
         assert result is False
 
@@ -195,7 +196,7 @@ class TestSkillManagerEnableDisable:
     ):
         workspace, config_path = temp_workspace
         manager = SkillManager(workspace, config_path)
-        with patch("json.dump", side_effect=PermissionError("no write")):
+        with patch("json.dump", side_effect=NanobotRunnerError("no write")):
             result = manager.disable_skill("yaml-skill")
         assert result is False
 
@@ -247,7 +248,7 @@ class TestSkillManagerImportSkill:
         )
 
         manager = SkillManager(workspace, config_path)
-        with patch("shutil.copytree", side_effect=OSError("copy failed")):
+        with patch("shutil.copytree", side_effect=NanobotRunnerError("copy failed")):
             result = manager.import_skill(ext_dir)
         assert result is False
 
@@ -287,7 +288,9 @@ class TestSkillManagerGetContent:
     ):
         workspace, config_path = temp_workspace
         manager = SkillManager(workspace, config_path)
-        with patch.object(Path, "read_text", side_effect=OSError("read error")):
+        with patch.object(
+            Path, "read_text", side_effect=NanobotRunnerError("read error")
+        ):
             result = manager.get_skill_content("yaml-skill")
         assert result is None
 

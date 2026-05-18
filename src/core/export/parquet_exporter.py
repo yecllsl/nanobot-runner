@@ -10,7 +10,7 @@ from typing import Any
 
 import polars as pl
 
-from src.core.base.exceptions import StorageError
+from src.core.base.exceptions import NanobotRunnerError, StorageError
 from src.core.export.models import ExportConfig, ExportResult
 
 # 原始字段列表：仅导出从 FIT 文件解析的原始数据，不含 TSS/VDOT 等计算值
@@ -119,7 +119,7 @@ class ParquetExporter:
                     message="Parquet导出成功：数据为空",
                     duration_ms=0,
                 )
-            except Exception as e:
+            except NanobotRunnerError as e:
                 raise StorageError(
                     message=f"Parquet导出失败：写入空文件错误 {e}",
                     error_code="EXPORT_PARQUET_ERROR",
@@ -156,7 +156,7 @@ class ParquetExporter:
                 message=f"Parquet导出失败：文件系统错误 {e}",
                 error_code="EXPORT_OS_ERROR",
             ) from e
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise StorageError(
                 message=f"Parquet导出失败：Polars写入错误 {e}",
                 error_code="EXPORT_PARQUET_ERROR",

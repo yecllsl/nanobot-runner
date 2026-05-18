@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from src.core.base.exceptions import LLMError
+from src.core.base.exceptions import LLMError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.llm_config import LLMConfig
 from src.core.config.manager import ConfigManager
@@ -152,7 +152,7 @@ class RunnerProviderAdapter:
                 f"无法导入nanobot模块: {e}",
                 recovery_suggestion="请确认已安装nanobot-ai: uv add nanobot-ai",
             ) from e
-        except Exception as e:
+        except (NanobotRunnerError, OSError, ValueError) as e:
             raise LLMError(
                 f"创建Provider失败: {e}",
                 recovery_suggestion="请检查LLM配置是否正确，特别是API Key和Base URL",
@@ -272,7 +272,7 @@ class RunnerProviderAdapter:
 
             self._nanobot_config = config
             return config
-        except (ImportError, Exception) as e:
+        except (ImportError, NanobotRunnerError) as e:
             logger.debug(f"从项目配置构建nanobot配置失败: {e}")
             raise LLMError(
                 f"无法构建nanobot配置: {e}",
@@ -303,7 +303,7 @@ class RunnerProviderAdapter:
                     value = value.strip().strip("\"'")
                     if key and value:
                         env_vars[key] = value
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.debug(f"解析 .env 文件失败: {e}")
         return env_vars
 
@@ -315,7 +315,7 @@ class RunnerProviderAdapter:
         """
         try:
             return self._runner_config.has_llm_config()
-        except Exception:
+        except (NanobotRunnerError, Exception):
             return False
 
     def _try_load_nanobot_config(self) -> bool:

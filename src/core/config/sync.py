@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.core.base.exceptions import ConfigError
+from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.manager import ConfigManager
 
@@ -83,7 +83,7 @@ class NanobotConfigSync:
                 success=True,
                 synced_fields=synced_fields,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"同步到nanobot配置失败: {e}")
             return SyncResult(
                 success=False,
@@ -99,7 +99,7 @@ class NanobotConfigSync:
         """
         try:
             return self._runner_config.has_llm_config()
-        except Exception:
+        except NanobotRunnerError:
             return False
 
     def _is_nanobot_installed(self) -> bool:

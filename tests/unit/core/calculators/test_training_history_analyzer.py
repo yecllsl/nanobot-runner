@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.calculators.training_history_analyzer import TrainingHistoryAnalyzer
 from src.core.user_profile_manager import RunnerProfile
 
@@ -252,7 +253,7 @@ class TestTrainingHistoryAnalyzer:
         self, history_analyzer: TrainingHistoryAnalyzer, mock_storage: MagicMock
     ) -> None:
         """测试异常情况下的最近活动"""
-        mock_storage.read_parquet.side_effect = Exception("读取失败")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("读取失败")
 
         result = history_analyzer.get_recent_activities()
 

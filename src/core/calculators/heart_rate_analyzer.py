@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import HRDriftResult, HRZoneResult
 
 if TYPE_CHECKING:
@@ -84,7 +85,7 @@ class HeartRateAnalyzer:
                 correlation=round(correlation, 3) if correlation else 0,
                 assessment=assessment,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return HRDriftResult(error=f"分析失败: {str(e)}")
 
     def analyze_hr_drift_vectorized(
@@ -149,7 +150,7 @@ class HeartRateAnalyzer:
                 "correlation": round(correlation, 3) if correlation else 0,
                 "assessment": assessment,
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             return {"error": f"分析失败: {str(e)}"}
 
     def analyze_hr_drift_batch(
@@ -688,5 +689,5 @@ class HeartRateAnalyzer:
                 message=f"年龄: {age}",
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"心率区间分析失败: {e}") from e

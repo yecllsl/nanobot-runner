@@ -15,6 +15,7 @@ from src.agents.tools import (
     UpdateMemoryTool,
     create_tools,
 )
+from src.core.base.exceptions import NanobotRunnerError
 from tests.conftest import create_mock_context
 
 
@@ -322,7 +323,7 @@ class TestToolErrorHandling:
         """
         mock_storage = MagicMock()
         mock_analytics = MagicMock()
-        mock_analytics.get_running_summary.side_effect = Exception("测试异常")
+        mock_analytics.get_running_summary.side_effect = NanobotRunnerError("测试异常")
 
         runner_tools = RunnerTools(
             context=create_mock_context(storage=mock_storage, analytics=mock_analytics)

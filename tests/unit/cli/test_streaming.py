@@ -6,6 +6,7 @@ import pytest
 from rich.console import Console
 
 from src.cli.streaming import CLIStreamingManager, stream_agent_response
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.transparency.streaming_hook import StreamingHook
 
 
@@ -156,7 +157,7 @@ class TestStreamAgentResponse:
     def test_stream_exception(self):
         """测试异常处理"""
         agent = MagicMock()
-        agent.run.side_effect = Exception("Test error")
+        agent.run.side_effect = NanobotRunnerError("Test error")
 
         with patch("src.cli.streaming.CLIStreamingManager") as MockManager:
             mock_manager = MagicMock()

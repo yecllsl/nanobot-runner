@@ -11,6 +11,7 @@ import typer
 from src.cli.common import CLIError, console, print_error, print_status
 from src.cli.handlers.viz_handler import VizHandler
 from src.core.base.context import get_context
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="数据可视化命令")
 
@@ -81,7 +82,7 @@ def vdot(
             output.write_text(result, encoding="utf-8")
             print_status(f"图表已导出到: {output}", "success")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -129,7 +130,7 @@ def training_load(
             output.write_text(result, encoding="utf-8")
             print_status(f"图表已导出到: {output}", "success")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -213,6 +214,6 @@ def hr_zones(
             output.write_text(result, encoding="utf-8")
             print_status(f"图表已导出到: {output}", "success")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

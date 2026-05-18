@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.models import FitnessLevel, InjuryRiskLevel, TrainingPattern
 
@@ -102,7 +103,7 @@ class ProfileStorageManager:
             self.workspace_dir.mkdir(parents=True, exist_ok=True)
             (self.workspace_dir / "data").mkdir(parents=True, exist_ok=True)
             (self.workspace_dir / "memory").mkdir(parents=True, exist_ok=True)
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"创建目录失败：{e}")
 
     def save_profile_json(self, profile: RunnerProfile) -> bool:
@@ -116,7 +117,7 @@ class ProfileStorageManager:
 
             logger.info(f"画像已保存到 profile.json: {profile.user_id}")
             return True
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"保存 profile.json 失败：{e}")
             raise RuntimeError(f"保存 profile.json 失败：{e}") from e
 
@@ -136,7 +137,7 @@ class ProfileStorageManager:
         except json.JSONDecodeError as e:
             logger.error(f"profile.json 格式错误：{e}")
             return None
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"加载 profile.json 失败：{e}")
             raise RuntimeError(f"加载 profile.json 失败：{e}") from e
 
@@ -206,7 +207,7 @@ class ProfileStorageManager:
 
             logger.info(f"画像已保存到 MEMORY.md: {profile.user_id}")
             return True
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"保存 MEMORY.md 失败：{e}")
             raise RuntimeError(f"保存 MEMORY.md 失败：{e}") from e
 

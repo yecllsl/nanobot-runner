@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -210,7 +212,7 @@ class HeartbeatTaskManager:
             result = task.handler()
             self._last_execution[name] = __import__("time").time()
             return result
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"任务执行失败: {name} - {e}")
             raise
 
@@ -234,7 +236,7 @@ class HeartbeatTaskManager:
                 try:
                     result = self.execute_task(name)
                     results[name] = result
-                except Exception as e:
+                except NanobotRunnerError as e:
                     results[name] = e
 
         return results

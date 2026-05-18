@@ -5,6 +5,8 @@ import logging
 import numpy as np
 from scipy.optimize import curve_fit
 
+from src.core.base.exceptions import NanobotRunnerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,7 +76,7 @@ class BanisterIRModel:
             )
             self.tau_fitness, self.tau_fatigue, self.k1, self.k2 = popt
             self._fitted = True
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"Banister IR拟合失败，使用默认参数: {e}")
 
     def _banister_func(

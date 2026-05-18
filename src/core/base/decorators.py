@@ -58,25 +58,11 @@ def tool_handler(
                 if return_format == "json":
                     return ToolResult(success=False, error=e.message).to_json()
                 return e.to_dict()
-            except ValueError as e:
-                logger.error(f"参数错误: {e}", exc_info=True)
-                if return_format == "json":
-                    return ToolResult(
-                        success=False, error=f"参数错误: {str(e)}"
-                    ).to_json()
-                return {"error": f"参数错误：{str(e)}"}
-            except KeyError as e:
-                logger.error(f"数据字段缺失: {e}", exc_info=True)
-                if return_format == "json":
-                    return ToolResult(
-                        success=False, error=f"数据字段缺失: {str(e)}"
-                    ).to_json()
-                return {"error": f"数据字段缺失：{str(e)}"}
             except Exception as e:
                 logger.error(f"内部错误: {e}", exc_info=True)
                 if return_format == "json":
                     return ToolResult(success=False, error=f"内部错误: {e}").to_json()
-                return default_response or {"error": error_message}
+                return default_response or {"error": f"{error_message}: {e}"}
 
         return wrapper
 
@@ -112,25 +98,26 @@ def handle_errors(default_response: Any = None, log_traceback: bool = True) -> C
             except FileNotFoundError as e:
                 logger.error(f"文件未找到: {e}", exc_info=log_traceback)
                 return default_response or {
-                    "error": f"文件未找到: {str(e)}",
+                    "error": f"文件未找到: {e}",
                     "error_code": "FILE_NOT_FOUND",
-                    "recovery_suggestion": "请确认文件路径是否正确",
+                    "recovery_suggestion": "请检查文件路径是否正确",
                 }
             except ValueError as e:
                 logger.error(f"参数错误: {e}", exc_info=log_traceback)
                 return default_response or {
-                    "error": f"参数错误: {str(e)}",
+                    "error": f"参数错误: {e}",
                     "error_code": "VALUE_ERROR",
-                    "recovery_suggestion": "请检查输入参数是否正确",
+                    "recovery_suggestion": "请检查输入参数",
                 }
             except KeyError as e:
                 logger.error(f"键错误: {e}", exc_info=log_traceback)
                 return default_response or {
-                    "error": f"数据字段缺失: {str(e)}",
+                    "error": f"键错误: {e}",
                     "error_code": "KEY_ERROR",
-                    "recovery_suggestion": "请检查数据结构是否完整",
+                    "recovery_suggestion": "请检查数据完整性",
                 }
             except Exception as e:
+                # 外层边界：捕获所有未预期的异常并包装
                 logger.error(f"未知错误: {e}", exc_info=log_traceback)
                 return default_response or {
                     "error": f"操作失败: {str(e)}",

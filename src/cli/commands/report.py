@@ -11,6 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error, print_status
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import MonthlyReportData, ReportType, WeeklyReportData
 
 app = typer.Typer(help="报告和画像命令")
@@ -129,7 +130,7 @@ def report(
     except PermissionError:
         print_error(CLIError.storage_error("权限不足，无法访问配置文件"))
         raise typer.Exit(1)
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(
             {
                 "message": f"操作失败: {str(e)}",
@@ -194,7 +195,7 @@ def weekly(
             else:
                 print_error(CLIError.push_failed(push_result.error or "未知错误"))
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(
             {
                 "message": f"操作失败: {str(e)}",
@@ -259,7 +260,7 @@ def monthly(
             else:
                 print_error(CLIError.push_failed(push_result.error or "未知错误"))
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(
             {
                 "message": f"操作失败: {str(e)}",
@@ -307,7 +308,7 @@ def _save_report_to_file(report_type: ReportType, age: int, output_dir: Path) ->
                 }
             )
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(
             {
                 "message": f"保存报告失败: {str(e)}",
@@ -767,7 +768,7 @@ def profile_show(
             )
         )
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(
             {
                 "message": f"获取用户画像失败: {str(e)}",

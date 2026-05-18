@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.calculators.heart_rate_analyzer import HeartRateAnalyzer
 
 
@@ -774,7 +775,7 @@ class TestHeartRateAnalyzerEdgeCases:
 
     def test_get_heart_rate_zones_with_exception(self, hr_analyzer, mock_storage):
         """测试心率区间分析 - 异常处理"""
-        mock_storage.read_parquet.side_effect = Exception("数据库错误")
+        mock_storage.read_parquet.side_effect = NanobotRunnerError("数据库错误")
 
         with pytest.raises(RuntimeError, match="心率区间分析失败"):
             hr_analyzer.get_heart_rate_zones(age=30)

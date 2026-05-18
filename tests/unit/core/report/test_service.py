@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import DailyReportData, OperationResult, ReportType
 from src.core.report.service import ReportService
 from tests.conftest import create_mock_context
@@ -153,7 +154,9 @@ class TestReportServiceGenerateReport:
 
     def test_generate_weekly_report_exception(self, mock_service):
         """测试生成周报异常处理"""
-        mock_service.storage.query_by_date_range.side_effect = Exception("数据库错误")
+        mock_service.storage.query_by_date_range.side_effect = NanobotRunnerError(
+            "数据库错误"
+        )
 
         result = mock_service.generate_report(ReportType.WEEKLY, age=30)
 

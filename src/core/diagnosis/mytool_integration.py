@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -155,7 +157,7 @@ class MyToolIntegration:
             )
             return True
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"更新MyTool配置失败: {e}")
             return False
 
