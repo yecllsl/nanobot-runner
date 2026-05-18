@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 
 from src.core.base.exceptions import NanobotRunnerError
+from src.core.base.formatters import format_duration_hms, format_pace
 from src.core.calculators.statistics_aggregator import StatisticsAggregator
 
 
@@ -218,63 +219,51 @@ class TestGetPaceDistribution:
 
 
 class TestFormatDuration:
-    """_format_duration方法测试"""
+    """format_duration_hms函数测试"""
 
-    @pytest.fixture
-    def aggregator(self):
-        """创建StatisticsAggregator实例"""
-        mock_storage = Mock()
-        return StatisticsAggregator(mock_storage)
-
-    def test_format_duration_hours(self, aggregator):
+    def test_format_duration_hours(self):
         """测试小时格式化"""
-        assert aggregator._format_duration(3661.0) == "01:01:01"
-        assert aggregator._format_duration(7200.0) == "02:00:00"
+        assert format_duration_hms(3661.0) == "01:01:01"
+        assert format_duration_hms(7200.0) == "02:00:00"
 
-    def test_format_duration_minutes(self, aggregator):
+    def test_format_duration_minutes(self):
         """测试分钟格式化"""
-        assert aggregator._format_duration(1800.0) == "00:30:00"
-        assert aggregator._format_duration(900.0) == "00:15:00"
+        assert format_duration_hms(1800.0) == "00:30:00"
+        assert format_duration_hms(900.0) == "00:15:00"
 
-    def test_format_duration_zero(self, aggregator):
+    def test_format_duration_zero(self):
         """测试零时长"""
-        assert aggregator._format_duration(0.0) == "00:00:00"
+        assert format_duration_hms(0.0) == "00:00:00"
 
-    def test_format_duration_error(self, aggregator):
+    def test_format_duration_error(self):
         """测试错误处理"""
-        assert aggregator._format_duration(None) == "00:00:00"
+        assert format_duration_hms(None) == "00:00:00"
 
 
 class TestFormatPace:
-    """_format_pace方法测试"""
+    """format_pace函数测试"""
 
-    @pytest.fixture
-    def aggregator(self):
-        """创建StatisticsAggregator实例"""
-        mock_storage = Mock()
-        return StatisticsAggregator(mock_storage)
-
-    def test_format_pace_basic(self, aggregator):
+    def test_format_pace_basic(self):
         """测试基本配速格式化"""
-        assert aggregator._format_pace(300.0) == "5'00\""
-        assert aggregator._format_pace(360.0) == "6'00\""
+        assert format_pace(300.0) == "5'00\""
+        assert format_pace(360.0) == "6'00\""
 
-    def test_format_pace_with_seconds(self, aggregator):
+    def test_format_pace_with_seconds(self):
         """测试带秒的配速格式化"""
-        assert aggregator._format_pace(330.0) == "5'30\""
-        assert aggregator._format_pace(345.0) == "5'45\""
+        assert format_pace(330.0) == "5'30\""
+        assert format_pace(345.0) == "5'45\""
 
-    def test_format_pace_zero(self, aggregator):
+    def test_format_pace_zero(self):
         """测试零配速"""
-        assert aggregator._format_pace(0.0) == "0'00\""
+        assert format_pace(0.0) == "0'00\""
 
-    def test_format_pace_none(self, aggregator):
+    def test_format_pace_none(self):
         """测试None配速"""
-        assert aggregator._format_pace(None) == "0'00\""
+        assert format_pace(None) == "0'00\""
 
-    def test_format_pace_negative(self, aggregator):
+    def test_format_pace_negative(self):
         """测试负配速"""
-        assert aggregator._format_pace(-10.0) == "0'00\""
+        assert format_pace(-10.0) == "0'00\""
 
 
 class TestCalculateAvgPaceFromValues:

@@ -3,53 +3,15 @@
 
 from typing import Any
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-console = Console()
+from src.cli.common import console
+from src.core.base.formatters import format_duration_human, format_pace_cli
 
-
-def format_duration(seconds: int | float) -> str:
-    """
-    格式化时长为人类可读格式
-
-    Args:
-        seconds: 秒数
-
-    Returns:
-        str: 格式化后的时长字符串
-    """
-    seconds = int(seconds)
-    if seconds < 60:
-        return f"{seconds}秒"
-    elif seconds < 3600:
-        minutes = seconds // 60
-        secs = seconds % 60
-        return f"{minutes}分{secs}秒"
-    else:
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        secs = seconds % 60
-        return f"{hours}小时{minutes}分{secs}秒"
-
-
-def format_pace(seconds_per_km: float) -> str:
-    """
-    格式化配速为人类可读格式
-
-    Args:
-        seconds_per_km: 每公里秒数
-
-    Returns:
-        str: 格式化后的配速字符串
-    """
-    if seconds_per_km <= 0:
-        return "N/A"
-
-    minutes = int(seconds_per_km // 60)
-    seconds = int(seconds_per_km % 60)
-    return f"{minutes}'{seconds:02d}\""
+# 保持公共 API 向后兼容：format_duration / format_pace 委托到 formatters
+format_duration = format_duration_human
+format_pace = format_pace_cli
 
 
 def format_distance(meters: float) -> str:

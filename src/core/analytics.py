@@ -601,6 +601,40 @@ class AnalyticsEngine:
 
         return zone_time
 
+    @staticmethod
+    def _calculate_training_effect(
+        total_duration: int,
+        zone_times: dict[str, int],
+        weights: dict[str, float],
+        scale: float,
+    ) -> float:
+        """训练效果通用计算方法
+
+        根据心率区间加权时长占比，映射到 1.0-5.0 的训练效果值。
+
+        Args:
+            total_duration: 总时长（秒）
+            zone_times: 各心率区间时长
+            weights: 各区间权重，如 {"zone2": 0.8, "zone3": 1.0}
+            scale: 映射比例系数（有氧 4.0，无氧 6.67）
+
+        Returns:
+            float: 训练效果值（1.0-5.0）
+        """
+        if total_duration == 0:
+            return 1.0
+
+        # 计算加权时长
+        weighted_time = sum(
+            zone_times.get(zone, 0) * weight for zone, weight in weights.items()
+        )
+
+        # 计算占比并映射到 1.0-5.0 范围
+        ratio = weighted_time / total_duration
+        effect = 1.0 + ratio * scale
+
+        return round(min(max(effect, 1.0), 5.0), 1)
+
     def _calculate_aerobic_effect(
         self, zone_time: dict[str, int], total_duration: int
     ) -> float:
@@ -618,24 +652,12 @@ class AnalyticsEngine:
         Returns:
             float: 有氧效果值（1.0-5.0）
         """
-        if total_duration == 0:
-            return 1.0
-
-        # 计算区间2和区间3的加权时长
-        zone2_time = zone_time.get("zone2", 0)
-        zone3_time = zone_time.get("zone3", 0)
-
-        # 加权计算：区间3权重更高
-        weighted_time = zone2_time * 0.8 + zone3_time * 1.0
-
-        # 计算占比
-        ratio = weighted_time / total_duration
-
-        # 映射到1.0-5.0范围
-        # ratio 0.0 -> 1.0, ratio 0.5 -> 3.0, ratio 1.0 -> 5.0
-        effect = 1.0 + ratio * 4.0
-
-        return round(min(max(effect, 1.0), 5.0), 1)
+        return self._calculate_training_effect(
+            total_duration=total_duration,
+            zone_times=zone_time,
+            weights={"zone2": 0.8, "zone3": 1.0},
+            scale=4.0,
+        )
 
     def _calculate_anaerobic_effect(
         self, zone_time: dict[str, int], total_duration: int
@@ -654,24 +676,12 @@ class AnalyticsEngine:
         Returns:
             float: 无氧效果值（1.0-5.0）
         """
-        if total_duration == 0:
-            return 1.0
-
-        # 计算区间4和区间5的加权时长
-        zone4_time = zone_time.get("zone4", 0)
-        zone5_time = zone_time.get("zone5", 0)
-
-        # 加权计算：区间5权重更高
-        weighted_time = zone4_time * 0.8 + zone5_time * 1.2
-
-        # 计算占比
-        ratio = weighted_time / total_duration
-
-        # 映射到1.0-5.0范围
-        # ratio 0.0 -> 1.0, ratio 0.3 -> 3.0, ratio 0.6 -> 5.0
-        effect = 1.0 + ratio * 6.67
-
-        return round(min(max(effect, 1.0), 5.0), 1)
+        return self._calculate_training_effect(
+            total_duration=total_duration,
+            zone_times=zone_time,
+            weights={"zone4": 0.8, "zone5": 1.2},
+            scale=6.67,
+        )
 
     def _calculate_recovery_time(
         self,

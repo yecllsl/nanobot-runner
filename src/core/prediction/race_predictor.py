@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from src.core.base.exceptions import NanobotRunnerError
+from src.core.base.formatters import format_pace_with_unit
 from src.core.prediction.models import (
     PaceSplit,
     PaceStrategy,
@@ -240,7 +241,7 @@ class RacePredictor:
                 splits.append(
                     PaceSplit(
                         segment=seg,
-                        pace=self._format_pace(pace),
+                        pace=format_pace_with_unit(pace),
                         pace_seconds=round(pace, 1),
                     )
                 )
@@ -248,7 +249,7 @@ class RacePredictor:
             splits.append(
                 PaceSplit(
                     segment="全程",
-                    pace=self._format_pace(avg_pace),
+                    pace=format_pace_with_unit(avg_pace),
                     pace_seconds=round(avg_pace, 1),
                 )
             )
@@ -262,10 +263,3 @@ class RacePredictor:
         m = int((seconds % 3600) // 60)
         s = int(seconds % 60)
         return f"{h}:{m:02d}:{s:02d}"
-
-    @staticmethod
-    def _format_pace(pace_seconds: float) -> str:
-        """格式化配速为 M'SS"/km"""
-        m = int(pace_seconds // 60)
-        s = int(pace_seconds % 60)
-        return f"{m}'{s:02d}\"/km"

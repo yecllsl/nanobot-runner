@@ -96,43 +96,6 @@ class StatisticsAggregator:
         except NanobotRunnerError as e:
             raise RuntimeError(f"获取跑步摘要失败: {e}") from e
 
-    def _format_duration(self, duration_s: float) -> str:
-        """
-        格式化时长（HH:MM:SS）
-
-        Args:
-            duration_s: 时长（秒）
-
-        Returns:
-            str: 格式化后的时长
-        """
-        try:
-            hours = int(duration_s // 3600)
-            minutes = int((duration_s % 3600) // 60)
-            seconds = int(duration_s % 60)
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        except (NanobotRunnerError, TypeError, ValueError):
-            return "00:00:00"
-
-    def _format_pace(self, pace_sec_per_km: float | None) -> str:
-        """
-        格式化配速（M'SS"/km）
-
-        Args:
-            pace_sec_per_km: 配速（秒/公里）
-
-        Returns:
-            str: 格式化后的配速
-        """
-        try:
-            if pace_sec_per_km is None or pace_sec_per_km <= 0:
-                return "0'00\""
-            minutes = int(pace_sec_per_km // 60)
-            seconds = int(pace_sec_per_km % 60)
-            return f"{minutes}'{seconds:02d}\""
-        except (NanobotRunnerError, TypeError, ValueError):
-            return "0'00\""
-
     def get_running_stats(self, year: int | None = None) -> RunningStats:
         """
         获取跑步统计数据

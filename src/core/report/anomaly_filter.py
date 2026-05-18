@@ -1,84 +1,12 @@
 # 异常数据过滤器
 # 过滤跑步数据中的异常记录
 
-from dataclasses import dataclass
-
 import polars as pl
 
 from src.core.base.logger import get_logger
+from src.core.models.anomaly_schema import ANOMALY_FILTER_RULES, AnomalyFilterRule
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class AnomalyFilterRule:
-    """异常过滤规则"""
-
-    field_name: str
-    condition: str
-    threshold: float
-    action: str
-    description: str
-
-
-ANOMALY_FILTER_RULES: list[AnomalyFilterRule] = [
-    AnomalyFilterRule(
-        field_name="avg_heart_rate",
-        condition="<",
-        threshold=30,
-        action="filter",
-        description="心率过低（<30 bpm）可能是数据错误",
-    ),
-    AnomalyFilterRule(
-        field_name="avg_heart_rate",
-        condition=">",
-        threshold=220,
-        action="filter",
-        description="心率过高（>220 bpm）可能是数据错误",
-    ),
-    AnomalyFilterRule(
-        field_name="max_heart_rate",
-        condition="<",
-        threshold=50,
-        action="filter",
-        description="最大心率过低（<50 bpm）可能是数据错误",
-    ),
-    AnomalyFilterRule(
-        field_name="max_heart_rate",
-        condition=">",
-        threshold=250,
-        action="filter",
-        description="最大心率过高（>250 bpm）可能是数据错误",
-    ),
-    AnomalyFilterRule(
-        field_name="total_distance",
-        condition="<",
-        threshold=100,
-        action="filter",
-        description="距离过短（<100m）可能是无效记录",
-    ),
-    AnomalyFilterRule(
-        field_name="total_distance",
-        condition=">",
-        threshold=100000,
-        action="filter",
-        description="距离过长（>100km）可能是数据错误",
-    ),
-    AnomalyFilterRule(
-        field_name="total_timer_time",
-        condition="<",
-        threshold=60,
-        action="filter",
-        description="时长过短（<60s）可能是无效记录",
-    ),
-    AnomalyFilterRule(
-        field_name="total_timer_time",
-        condition=">",
-        threshold=28800,
-        action="filter",
-        description="时长过长（>8小时）可能是数据错误",
-    ),
-]
 
 
 class AnomalyDataFilter:
@@ -91,7 +19,7 @@ class AnomalyDataFilter:
         Args:
             rules: 过滤规则列表，如果为 None 则使用默认规则
         """
-        self.rules = rules or ANOMALY_FILTER_RULES
+        self.rules = rules if rules is not None else list(ANOMALY_FILTER_RULES)
 
     def filter_anomaly_data(
         self,

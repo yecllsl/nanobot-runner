@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 
 from src.core.base.exceptions import NanobotRunnerError
+from src.core.base.formatters import format_duration_hms, format_pace
 from src.core.calculators.statistics_aggregator import StatisticsAggregator
 
 
@@ -96,17 +97,17 @@ class TestStatisticsAggregator:
         self, stats_aggregator: StatisticsAggregator
     ) -> None:
         """测试时长格式化"""
-        assert stats_aggregator._format_duration(3661) == "01:01:01"
-        assert stats_aggregator._format_duration(3600) == "01:00:00"
-        assert stats_aggregator._format_duration(60) == "00:01:00"
-        assert stats_aggregator._format_duration(0) == "00:00:00"
+        assert format_duration_hms(3661) == "01:01:01"
+        assert format_duration_hms(3600) == "01:00:00"
+        assert format_duration_hms(60) == "00:01:00"
+        assert format_duration_hms(0) == "00:00:00"
 
     def test_format_pace_success(self, stats_aggregator: StatisticsAggregator) -> None:
         """测试配速格式化"""
-        assert stats_aggregator._format_pace(300) == "5'00\""
-        assert stats_aggregator._format_pace(360) == "6'00\""
-        assert stats_aggregator._format_pace(0) == "0'00\""
-        assert stats_aggregator._format_pace(-10) == "0'00\""
+        assert format_pace(300) == "5'00\""
+        assert format_pace(360) == "6'00\""
+        assert format_pace(0) == "0'00\""
+        assert format_pace(-10) == "0'00\""
 
     def test_get_running_stats_empty_storage(
         self, stats_aggregator: StatisticsAggregator, mock_storage: MagicMock
