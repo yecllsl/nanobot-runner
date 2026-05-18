@@ -57,19 +57,11 @@ def _make_mock_training_load_analyzer() -> MagicMock:
     analyzer.calculate_atl.return_value = 50.0
     analyzer.calculate_ctl.return_value = 65.0
     analyzer.calculate_atl_ctl.return_value = {"atl": 50.0, "ctl": 65.0}
-    analyzer.calculate_training_load_from_dataframe.return_value = {
-        "atl": 50.0,
-        "ctl": 65.0,
-        "tsb": 15.0,
-        "runs_count": 5,
-    }
     return analyzer
 
 
 def _make_mock_session_repo() -> MagicMock:
     """Mock SessionRepository: get_recent_sessions"""
-    import polars as pl
-
     repo = MagicMock()
     repo.get_recent_sessions.return_value = [
         MagicMock(
@@ -89,13 +81,6 @@ def _make_mock_session_repo() -> MagicMock:
             duration_s=4200.0,
         ),
     ]
-    repo.storage.read_parquet.return_value = pl.DataFrame(
-        {
-            "session_total_distance": [8000.0, 10000.0, 5000.0, 12000.0],
-            "session_total_timer_time": [2400.0, 3600.0, 1800.0, 4200.0],
-            "session_avg_heart_rate": [150.0, 160.0, 145.0, 165.0],
-        }
-    ).lazy()
     return repo
 
 
@@ -165,78 +150,6 @@ class TestStateVectorBuilderFallback:
         assert result.fitness.vdot == 0.0
         assert result.fitness.vdot_trend == 0.0
 
-
-class TestStateVectorBuilderBug2203:
-    """BUG-2203回归：验证build_load从session_repo读取数据"""
-
-    def test_build_load_with_session_data(self) -> None:
-        """验证build_load从session_repo读取数据计算CTL/ATL"""
-        import polars as pl
-
-        mock_repo = MagicMock()
-        mock_repo.storage.read_parquet.return_value = pl.DataFrame(
-            {
-                "session_total_distance": [5000.0, 8000.0],
-                "session_total_timer_time": [1800.0, 3000.0],
-                "session_avg_heart_rate": [150.0, 160.0],
-            }
-        ).lazy()
-        mock_analyzer = MagicMock()
-        mock_analyzer.calculate_training_load_from_dataframe.return_value = {
-            "atl": 50.0,
-            "ctl": 60.0,
-            "tsb": 10.0,
-            "runs_count": 2,
-        }
-
-        builder = StateVectorBuilder(
-            training_load_analyzer=mock_analyzer,
-            session_repo=mock_repo,
-        )
-        load = builder.build_load()
-
-        assert load.ctl == 60.0
-        assert load.atl == 50.0
-        assert load.tsb == 10.0
-        mock_repo.storage.read_parquet.assert_called()
-        mock_analyzer.calculate_training_load_from_dataframe.assert_called()
-
-    def test_build_load_without_session_repo(self) -> None:
-        """验证无session_repo时回退到calculate_atl_ctl"""
-        mock_analyzer = MagicMock()
-        mock_analyzer.calculate_atl_ctl.return_value = {"atl": 30.0, "ctl": 40.0}
-
-        builder = StateVectorBuilder(
-            training_load_analyzer=mock_analyzer,
-            session_repo=None,
-        )
-        load = builder.build_load()
-
-        assert load.atl == 30.0
-        assert load.ctl == 40.0
-        mock_analyzer.calculate_atl_ctl.assert_called_with([])
-
-    def test_build_load_read_parquet_exception(self) -> None:
-        """验证read_parquet异常时回退到空DataFrame"""
-        mock_repo = MagicMock()
-        mock_repo.storage.read_parquet.side_effect = Exception("文件不存在")
-        mock_analyzer = MagicMock()
-        mock_analyzer.calculate_training_load_from_dataframe.return_value = {
-            "atl": 0.0,
-            "ctl": 0.0,
-            "tsb": 0.0,
-            "runs_count": 0,
-        }
-
-        builder = StateVectorBuilder(
-            training_load_analyzer=mock_analyzer,
-            session_repo=mock_repo,
-        )
-        load = builder.build_load()
-
-        assert load.ctl == 0.0
-        assert load.atl == 0.0
-
     def test_body_signal_engine_failure(self) -> None:
         engine = _make_mock_body_signal_engine()
         engine.get_daily_summary.side_effect = Exception("数据不足")
@@ -252,9 +165,7 @@ class TestStateVectorBuilderBug2203:
 
     def test_training_load_analyzer_failure(self) -> None:
         analyzer = _make_mock_training_load_analyzer()
-        analyzer.calculate_training_load_from_dataframe.side_effect = Exception(
-            "无TSS数据"
-        )
+        analyzer.calculate_atl_ctl.side_effect = Exception("无TSS数据")
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
             body_signal_engine=_make_mock_body_signal_engine(),
@@ -308,9 +219,7 @@ class TestStateVectorBuilderExceptionDistinction:
 
     def test_value_error_returns_default_load(self) -> None:
         analyzer = _make_mock_training_load_analyzer()
-        analyzer.calculate_training_load_from_dataframe.side_effect = ValueError(
-            "bad value"
-        )
+        analyzer.calculate_atl_ctl.side_effect = ValueError("bad value")
         builder = StateVectorBuilder(
             prediction_engine=_make_mock_prediction_engine(),
             body_signal_engine=_make_mock_body_signal_engine(),

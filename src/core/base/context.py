@@ -495,41 +495,17 @@ class AppContextFactory:
         """
         import os
 
-        env_files: list[Path] = []
-
+        env_file: Path | None = None
         if env_path := os.getenv("NANOBOT_CONFIG_DIR"):
-            env_files.append(Path(env_path) / ".env.local")
+            env_file = Path(env_path) / ".env.local"
         else:
-            home_env = Path.home() / ".nanobot-runner" / ".env.local"
-            env_files.append(home_env)
+            env_file = Path.home() / ".nanobot-runner" / ".env.local"
 
-        if config_dir := os.getenv("NANOBOT_CONFIG_FILE"):
-            detected_dir = Path(config_dir).parent
-        elif env_path:
-            detected_dir = Path(env_path)
-        else:
-            config_json = Path.home() / ".nanobot-runner" / "config.json"
-            detected_dir = (
-                config_json.parent
-                if config_json.exists()
-                else Path.home() / ".nanobot-runner"
-            )
+        EnvManager(env_file=env_file).load_env()
 
-        detected_env = detected_dir / ".env.local"
-        if detected_env not in env_files:
-            env_files.append(detected_env)
-
-        env_manager = EnvManager()
-        for ef in env_files:
-            if ef.exists():
-                env_manager.load_env(ef)
-
+        # 创建或使用提供的配置管理器
         if config is None:
             config = ConfigManager(allow_default=allow_default)
-
-            config_env = config.base_dir / ".env.local"
-            if config_env.exists() and config_env not in env_files:
-                env_manager.load_env(config_env)
 
         # 创建或使用提供的存储管理器
         if storage is None:

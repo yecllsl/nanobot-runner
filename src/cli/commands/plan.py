@@ -3,8 +3,6 @@
 # v0.11.0新增：plan adjust / plan suggest
 # v0.12.0新增：plan evaluate / plan long-term / plan advice
 
-from datetime import datetime
-
 import typer
 
 from src.cli.common import CLIError, console, print_error, print_status
@@ -12,103 +10,25 @@ from src.cli.common import CLIError, console, print_error, print_status
 app = typer.Typer(help="训练计划执行反馈命令")
 
 
-def _validate_date(date_str: str, param_name: str = "日期") -> datetime:
-    """验证日期格式是否为 YYYY-MM-DD
-
-    Args:
-        date_str: 日期字符串
-        param_name: 参数名称，用于错误提示
-
-    Returns:
-        解析后的 datetime 对象
-
-    Raises:
-        typer.BadParameter: 日期格式无效时抛出
-    """
-    try:
-        return datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError:
-        raise typer.BadParameter(
-            f"{param_name}格式错误: '{date_str}'\n"
-            f"  正确格式: YYYY-MM-DD\n"
-            f"  示例: 2026-06-15"
-        )
-
-
-def _validate_positive(value: float, param_name: str, min_value: float = 0.0) -> None:
-    """验证数值为正数
-
-    Args:
-        value: 待验证的数值
-        param_name: 参数名称，用于错误提示
-        min_value: 最小允许值
-
-    Raises:
-        typer.BadParameter: 数值无效时抛出
-    """
-    if value <= min_value:
-        raise typer.BadParameter(f"{param_name}必须大于 {min_value}，当前值: {value}")
-
-
-def _validate_range(
-    value: float, param_name: str, min_val: float, max_val: float
-) -> None:
-    """验证数值在指定范围内
-
-    Args:
-        value: 待验证的数值
-        param_name: 参数名称
-        min_val: 最小允许值
-        max_val: 最大允许值
-
-    Raises:
-        typer.BadParameter: 数值超出范围时抛出
-    """
-    if value < min_val or value > max_val:
-        raise typer.BadParameter(
-            f"{param_name}必须在 {min_val} ~ {max_val} 之间，当前值: {value}"
-        )
-
-
 @app.command(name="create")
 def create_plan(
-    goal_distance_km: float = typer.Argument(..., help="目标距离（公里）", min=0.1),
+    goal_distance_km: float = typer.Argument(..., help="目标距离（公里）"),
     goal_date: str = typer.Argument(..., help="目标日期（YYYY-MM-DD）"),
-    current_vdot: float = typer.Option(
-        ..., "--vdot", "-v", help="当前VDOT值", min=1.0, max=85.0
-    ),
+    current_vdot: float = typer.Option(..., "--vdot", "-v", help="当前VDOT值"),
     current_weekly_distance_km: float = typer.Option(
-        30.0, "--volume", help="当前周跑量（公里）", min=0.0
+        30.0, "--volume", help="当前周跑量（公里）"
     ),
-    age: int = typer.Option(30, "--age", "-a", help="年龄", min=10, max=120),
-    resting_hr: int = typer.Option(60, "--rhr", help="静息心率", min=20, max=200),
+    age: int = typer.Option(30, "--age", "-a", help="年龄"),
+    resting_hr: int = typer.Option(60, "--rhr", help="静息心率"),
 ) -> None:
     """创建训练计划
-
-    基于目标距离和日期，结合当前体能水平生成个性化训练计划。
-
-    常用目标距离参考：
-        - 5km: 5.0
-        - 10km: 10.0
-        - 半程马拉松: 21.0975
-        - 全程马拉松: 42.195
 
     示例：
         nanobotrun plan create 42.195 2026-06-15 --vdot 42.0 --volume 35
         nanobotrun plan create 21.1 2026-05-01 -v 40.0 --volume 30
-        nanobotrun plan create 10.0 2026-04-01 --vdot 38.0 --age 25
     """
     from src.core.base.context import get_context
     from src.core.training_plan import TrainingPlanEngine
-
-    # 验证日期格式
-    goal_dt = _validate_date(goal_date, "目标日期")
-
-    # 验证目标日期在未来
-    if goal_dt.date() <= datetime.now().date():
-        raise typer.BadParameter(
-            f"目标日期必须在未来，当前日期: {datetime.now().strftime('%Y-%m-%d')}"
-        )
 
     try:
         context = get_context()

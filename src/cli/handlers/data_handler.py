@@ -95,8 +95,6 @@ class DataHandler:
         """
         获取统计数据
 
-        优化：使用LazyFrame延迟计算，避免加载不必要的数据
-
         Args:
             year: 指定年份
             start_date: 开始日期 (YYYY-MM-DD)
@@ -107,38 +105,15 @@ class DataHandler:
         """
         years = [year] if year else None
         lf = self.storage.read_parquet(years=years)
-
-        # 在LazyFrame阶段应用日期过滤，避免加载不必要的数据
-        if start_date or end_date:
-            lf = self._filter_lazy_by_date_range(lf, start_date, end_date)
-
         df = lf.collect()
 
+        if df.is_empty():
+            return df
+
+        if start_date or end_date:
+            df = self._filter_by_date_range(df, start_date, end_date)
+
         return df
-
-    def _filter_lazy_by_date_range(
-        self, lf: pl.LazyFrame, start_date: str | None, end_date: str | None
-    ) -> pl.LazyFrame:
-        """
-        按日期范围过滤LazyFrame数据（在collect前执行，提升性能）
-
-        Args:
-            lf: LazyFrame数据
-            start_date: 开始日期
-            end_date: 结束日期
-
-        Returns:
-            pl.LazyFrame: 过滤后的LazyFrame
-        """
-        if start_date:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            lf = lf.filter(pl.col("session_start_time") >= start_dt)
-
-        if end_date:
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-            lf = lf.filter(pl.col("session_start_time") < end_dt)
-
-        return lf
 
     def _filter_by_date_range(
         self, df: pl.DataFrame, start_date: str | None, end_date: str | None

@@ -57,14 +57,8 @@ class FatigueAssessor:
         if rpe is not None and (rpe < 1 or rpe > 10):
             raise ValueError("RPE值必须在1-10范围内")
 
-        try:
-            lf = self.session_repo.storage.read_parquet()
-            session_df = lf.collect()
-        except Exception:
-            session_df = pl.DataFrame()
-
         load_data = self.training_load_analyzer.calculate_training_load_from_dataframe(
-            session_df
+            pl.DataFrame()
         )
         atl = float(load_data.get("atl", 0.0))
         tsb_raw = float(load_data.get("tsb", 0.0))

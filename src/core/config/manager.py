@@ -257,8 +257,6 @@ class ConfigManager:
     def get(self, key: str, default: Any = None) -> Any:
         """获取配置项
 
-        优先级：环境变量 > 配置文件 > 默认值
-
         Args:
             key: 配置项键名
             default: 默认值
@@ -269,7 +267,7 @@ class ConfigManager:
         Raises:
             ValueError: 配置验证失败时抛出
         """
-        config = self.load_config_with_env_override()
+        config = self.load_config()
         return config.get(key, default)
 
     def set(self, key: str, value: Any) -> None:

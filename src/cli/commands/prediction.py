@@ -86,75 +86,19 @@ def predict_vdot(
         raise typer.Exit(1)
 
 
-def _validate_race_distance(distance: float) -> None:
-    """验证比赛距离是否在合理范围内
-
-    Args:
-        distance: 比赛距离（公里）
-
-    Raises:
-        typer.BadParameter: 距离无效时抛出
-    """
-    if distance <= 0:
-        raise typer.BadParameter(f"比赛距离必须大于0，当前值: {distance}")
-    if distance > 500:
-        raise typer.BadParameter(
-            f"比赛距离不能超过500km，当前值: {distance}\n"
-            f"  常用距离参考: 5km, 10km, 21.0975km(半马), 42.195km(全马)"
-        )
-
-
-def _validate_date(date_str: str | None, param_name: str = "日期") -> None:
-    """验证日期格式是否为 YYYY-MM-DD
-
-    Args:
-        date_str: 日期字符串
-        param_name: 参数名称，用于错误提示
-
-    Raises:
-        typer.BadParameter: 日期格式无效时抛出
-    """
-    if date_str is None:
-        return
-    try:
-        from datetime import datetime
-
-        datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError:
-        raise typer.BadParameter(
-            f"{param_name}格式错误: '{date_str}'\n"
-            f"  正确格式: YYYY-MM-DD\n"
-            f"  示例: 2026-06-15"
-        )
-
-
 @app.command(name="race")
 def predict_race(
-    distance: float = typer.Option(
-        42.195, "--distance", "-D", help="比赛距离(km)", min=0.1, max=500.0
-    ),
+    distance: float = typer.Option(42.195, "--distance", "-D", help="比赛距离(km)"),
     race_date: str | None = typer.Option(None, "--date", help="比赛日期(YYYY-MM-DD)"),
 ) -> None:
     """比赛成绩预测
 
     基于个人化Riegel公式预测不同距离的比赛完赛时间。
 
-    常用比赛距离：
-        - 5km: 5.0
-        - 10km: 10.0
-        - 半程马拉松: 21.0975
-        - 全程马拉松: 42.195
-        - 超马50km: 50.0
-        - 超马100km: 100.0
-
     Examples:
         nanobotrun predict race --distance 42.195
         nanobotrun predict race -D 10 --date 2026-06-01
-        nanobotrun predict race --distance 21.0975
     """
-    # 验证日期格式
-    _validate_date(race_date, "比赛日期")
-
     try:
         handler = PredictionHandler()
         distance_label = f"{distance:.1f}km"

@@ -120,11 +120,7 @@ class CsvExporter:
                 encoding=config.encoding,
             ) as f:
                 if filtered_data:
-                    # 收集所有行的字段并集，确保每行数据都能正确写入
-                    # 不同行可能包含不同的计算字段（如 session_vdot 仅在距离>=1500m时存在）
-                    fieldnames = list(
-                        dict.fromkeys(key for row in filtered_data for key in row)
-                    )
+                    fieldnames = list(filtered_data[0].keys())
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(filtered_data)
