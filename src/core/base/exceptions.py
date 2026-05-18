@@ -66,8 +66,8 @@ class IndexStoreError(NanobotRunnerError):
 
 
 @dataclass
-class ImportError(NanobotRunnerError):
-    """导入相关错误"""
+class DataImportError(NanobotRunnerError):
+    """数据导入相关错误"""
 
     error_code: str = "IMPORT_ERROR"
     recovery_suggestion: str | None = "请检查文件路径和文件格式"

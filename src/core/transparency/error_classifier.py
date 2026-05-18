@@ -10,7 +10,7 @@ from typing import Any
 
 from src.core.base.exceptions import (
     ConfigError,
-    ImportError,
+    DataImportError,
     IndexStoreError,
     LLMError,
     NanobotRunnerError,
@@ -64,7 +64,7 @@ ERROR_TYPE_PATTERNS: dict[type[Exception], ErrorCategory] = {
     # 配置相关 -> CONFIG
     ConfigError: ErrorCategory.CONFIG,
     # 导入相关 -> TOOL
-    ImportError: ErrorCategory.TOOL,
+    DataImportError: ErrorCategory.TOOL,
     # LLM相关 -> NETWORK
     LLMError: ErrorCategory.NETWORK,
 }

@@ -14,7 +14,7 @@ from src.core.base.decorators import (
 )
 from src.core.base.exceptions import (
     ConfigError,
-    ImportError,
+    DataImportError,
     IndexStoreError,
     LLMError,
     NanobotRunnerError,
@@ -52,7 +52,7 @@ __all__ = [
     "ConfigError",
     "ValidationError",
     "IndexStoreError",
-    "ImportError",
+    "DataImportError",
     "LLMError",
     "JsonFormatter",
     "TextFormatter",
