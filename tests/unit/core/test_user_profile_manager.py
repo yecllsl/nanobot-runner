@@ -154,13 +154,13 @@ class TestProfileStorageManager:
         with open(storage_manager.profile_json_path, "w", encoding="utf-8") as f:
             f.write("invalid json content")
 
-        result = storage_manager.load_profile_json()
-
-        assert result is None
+        # 新版 ProfileStorageManager 对无效 JSON 抛出 RuntimeError
+        with pytest.raises(RuntimeError, match="profile.json 格式错误"):
+            storage_manager.load_profile_json()
 
     def test_save_memory_md(self, storage_manager, sample_profile):
         """测试保存MEMORY.md"""
-        result = storage_manager.save_memory_md(sample_profile)
+        result = storage_manager.save_memory_md("", profile=sample_profile)
 
         assert result is True
         assert storage_manager.memory_md_path.exists()
@@ -168,24 +168,18 @@ class TestProfileStorageManager:
         with open(storage_manager.memory_md_path, encoding="utf-8") as f:
             content = f.read()
 
-        assert "# 跑者画像" in content
         assert "test_user" in content
         assert "50.00 km" in content
         assert "intermediate" in content
 
     def test_generate_memory_content(self, storage_manager, sample_profile):
         """测试生成MEMORY.md内容"""
-        content = storage_manager._generate_memory_content(sample_profile)
+        content = storage_manager._generate_memory_content("", sample_profile)
 
-        assert "# 跑者画像" in content
         assert "test_user" in content
-        assert "## 基础信息" in content
-        assert "## 体能水平" in content
-        assert "## 训练模式" in content
-        assert "## 心率数据" in content
-        assert "## 训练负荷" in content
-        assert "## 伤病风险" in content
-        assert "测试备注" in content
+        assert "用户画像摘要" in content
+        assert "训练负荷" in content
+        assert "伤病风险" in content
 
     def test_dict_to_profile(self, storage_manager):
         """测试字典转换为画像"""

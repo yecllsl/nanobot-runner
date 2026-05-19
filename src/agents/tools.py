@@ -1,5 +1,15 @@
 # Agent 工具集
 # 封装为 nanobot-ai 可识别的工具
+#
+# 工具类已按领域拆分到子模块：
+# - tools_stats.py: 统计/分析工具
+# - tools_plan.py: 训练计划工具
+# - tools_body.py: 身体信号/健康工具
+# - tools_twin.py: 数字孪生/预测工具
+# - tools_data.py: 数据管理/系统工具
+#
+# 本文件保留 BaseTool、RunnerTools 和所有工具类的 re-exports，
+# 确保 `from src.agents.tools import XxxTool` 向后兼容。
 
 from __future__ import annotations
 
@@ -20,6 +30,11 @@ from src.core.base.exceptions import NanobotRunnerError
 from src.core.tools.weather_training_coordinator import TrainingData
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# BaseTool - 工具基类
+# ============================================================================
 
 
 class BaseTool(Tool):
@@ -90,762 +105,9 @@ class BaseTool(Tool):
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
-class GetRunningStatsTool(BaseTool):
-    """获取跑步统计数据"""
-
-    @property
-    def name(self) -> str:
-        return "get_running_stats"
-
-    @property
-    def description(self) -> str:
-        return "获取跑步统计数据。返回JSON格式数据，包含 total_runs（总次数）、total_distance（总距离，单位米）、total_duration（总时长，单位秒）等字段。当用户询问'跑了多少次'、'总距离'、'跑步统计'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "start_date": {
-                    "type": "string",
-                    "description": "开始日期（可选，格式：YYYY-MM-DD）",
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "结束日期（可选，格式：YYYY-MM-DD）",
-                },
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        start_date = kwargs.get("start_date")
-        end_date = kwargs.get("end_date")
-        return self._run_sync(self.runner_tools.get_running_stats, start_date, end_date)
-
-
-class GetRecentRunsTool(BaseTool):
-    """获取最近跑步记录"""
-
-    @property
-    def name(self) -> str:
-        return "get_recent_runs"
-
-    @property
-    def description(self) -> str:
-        return "获取最近的跑步记录列表。返回JSON数组，每条记录包含 timestamp（时间）、distance_km（距离，单位公里）、duration_min（时长，单位分钟）、vdot（跑力值）等字段。当用户询问'最近跑步'、'跑步记录'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "返回数量限制（默认10条）",
-                    "default": 10,
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        limit = kwargs.get("limit", 10)
-        return self._run_sync(self.runner_tools.get_recent_runs, limit)
-
-
-class CalculateVdotForRunTool(BaseTool):
-    """计算单次跑步的VDOT值"""
-
-    @property
-    def name(self) -> str:
-        return "calculate_vdot_for_run"
-
-    @property
-    def description(self) -> str:
-        return "计算单次跑步的VDOT值（跑力值），用于评估跑步能力"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "distance_m": {"type": "number", "description": "距离（米）"},
-                "time_s": {"type": "number", "description": "用时（秒）"},
-            },
-            "required": ["distance_m", "time_s"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        distance_m = kwargs.get("distance_m")
-        time_s = kwargs.get("time_s")
-
-        if distance_m is None or time_s is None:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": "缺少必要参数：distance_m（距离，米）和 time_s（用时，秒）",
-                },
-                ensure_ascii=False,
-            )
-
-        try:
-            distance_m = float(distance_m)
-            time_s = float(time_s)
-        except (TypeError, ValueError):
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": "参数类型错误：distance_m 和 time_s 必须为数字",
-                },
-                ensure_ascii=False,
-            )
-
-        if distance_m <= 0 or time_s <= 0:
-            return json.dumps(
-                {"success": False, "error": "参数值错误：距离和时间必须为正数"},
-                ensure_ascii=False,
-            )
-
-        return self._run_sync(
-            self.runner_tools.calculate_vdot_for_run, distance_m, time_s
-        )
-
-
-class GetVdotTrendTool(BaseTool):
-    """获取VDOT趋势"""
-
-    @property
-    def name(self) -> str:
-        return "get_vdot_trend"
-
-    @property
-    def description(self) -> str:
-        return "获取VDOT（跑力值）趋势变化，自动从历史跑步数据计算每次跑步的VDOT值。当用户询问'我的VDOT是多少'、'我的跑力值'或'查看VDOT趋势'时使用此工具。不需要用户提供任何参数，工具会自动从已导入的跑步数据中计算VDOT"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "返回数量限制（默认20条）",
-                    "default": 20,
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        limit = kwargs.get("limit", 20)
-        return self._run_sync(self.runner_tools.get_vdot_trend, limit)
-
-
-class GetHrDriftAnalysisTool(BaseTool):
-    """分析心率漂移"""
-
-    @property
-    def name(self) -> str:
-        return "get_hr_drift_analysis"
-
-    @property
-    def description(self) -> str:
-        return "分析心率漂移情况，评估跑步效率和有氧基础"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "run_id": {"type": "string", "description": "活动ID（可选）"}
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        run_id = kwargs.get("run_id")
-        return self._run_sync(self.runner_tools.get_hr_drift_analysis, run_id)
-
-
-class GetTrainingLoadTool(BaseTool):
-    """获取训练负荷"""
-
-    @property
-    def name(self) -> str:
-        return "get_training_load"
-
-    @property
-    def description(self) -> str:
-        return "获取训练负荷数据，包括ATL（急性负荷）、CTL（慢性负荷）、TSB（训练压力平衡）"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "分析天数（默认42天）",
-                    "default": 42,
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        days = kwargs.get("days", 42)
-        return self._run_sync(self.runner_tools.get_training_load, days)
-
-
-class QueryByDateRangeTool(BaseTool):
-    """按日期范围查询"""
-
-    @property
-    def name(self) -> str:
-        return "query_by_date_range"
-
-    @property
-    def description(self) -> str:
-        return "按日期范围查询跑步记录。返回JSON数组，每条记录包含 timestamp（时间）、distance（距离，单位公里）、duration（时长，单位秒）、heart_rate（平均心率）、pace（配速，单位分钟/公里）。当用户询问'某段时间跑了多少'、'上个月跑步'、'本周跑步'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "start_date": {
-                    "type": "string",
-                    "description": "开始日期（格式：YYYY-MM-DD）",
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "结束日期（格式：YYYY-MM-DD）",
-                },
-            },
-            "required": ["start_date", "end_date"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        start_date = kwargs.get("start_date", "")
-        end_date = kwargs.get("end_date", "")
-        return self._run_sync(
-            self.runner_tools.query_by_date_range, start_date, end_date
-        )
-
-
-class QueryByDistanceTool(BaseTool):
-    """按距离范围查询"""
-
-    @property
-    def name(self) -> str:
-        return "query_by_distance"
-
-    @property
-    def description(self) -> str:
-        return "按距离范围查询跑步记录。返回JSON数组，每条记录包含 timestamp（时间）、distance（距离，单位公里）、duration（时长，单位秒）、heart_rate（平均心率）、pace（配速，单位分钟/公里）。当用户询问'跑了多少公里'、'长距离跑步'、'短距离跑步'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "min_distance": {"type": "number", "description": "最小距离（公里）"},
-                "max_distance": {
-                    "type": "number",
-                    "description": "最大距离（公里，可选）",
-                },
-            },
-            "required": ["min_distance"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        min_distance = kwargs.get("min_distance", 0)
-        max_distance = kwargs.get("max_distance")
-        return self._run_sync(
-            self.runner_tools.query_by_distance, min_distance, max_distance
-        )
-
-
-class UpdateMemoryTool(BaseTool):
-    """更新 Agent 记忆工具（Agent 专用）"""
-
-    @property
-    def name(self) -> str:
-        return "update_memory"
-
-    @property
-    def description(self) -> str:
-        return "更新 Agent 观察笔记到 MEMORY.md，用于记录用户偏好、训练反馈等长期记忆"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "note": {
-                    "type": "string",
-                    "description": "要添加的观察笔记内容",
-                },
-                "category": {
-                    "type": "string",
-                    "description": "笔记分类（可选）：training(训练), preference(偏好), injury(伤病), other(其他)",
-                    "enum": ["training", "preference", "injury", "other"],
-                    "default": "other",
-                },
-            },
-            "required": ["note"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        note = kwargs.get("note", "")
-        category = kwargs.get("category", "other")
-        return self._run_sync(self.runner_tools.update_memory, note, category)
-
-
-class GenerateTrainingPlanTool(BaseTool):
-    """生成训练计划工具"""
-
-    @property
-    def name(self) -> str:
-        return "generate_training_plan"
-
-    @property
-    def description(self) -> str:
-        return "根据用户目标生成个性化训练计划"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "goal_distance_km": {
-                    "type": "number",
-                    "description": "目标比赛距离（公里），例如：5, 10, 21.0975, 42.195",
-                },
-                "goal_date": {
-                    "type": "string",
-                    "description": "目标比赛日期（YYYY-MM-DD）",
-                },
-            },
-            "required": ["goal_distance_km", "goal_date"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        goal_distance_km = float(kwargs.get("goal_distance_km", 0))
-        goal_date = kwargs.get("goal_date", "")
-        return self._run_sync(
-            self.runner_tools.generate_training_plan, goal_distance_km, goal_date
-        )
-
-
-class RecordPlanExecutionTool(BaseTool):
-    """记录计划执行反馈工具 - v0.10.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "record_plan_execution"
-
-    @property
-    def description(self) -> str:
-        return "记录训练计划执行反馈，包括完成度、体感评分、反馈备注等。当用户说'记录训练反馈'、'今天跑完了'、'训练完成'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string",
-                    "description": "训练计划ID",
-                },
-                "date": {
-                    "type": "string",
-                    "description": "日期（YYYY-MM-DD）",
-                },
-                "completion_rate": {
-                    "type": "number",
-                    "description": "完成度（0.0-1.0），1.0表示完全完成",
-                },
-                "effort_score": {
-                    "type": "integer",
-                    "description": "体感评分（1-10），1最轻松，10最吃力",
-                },
-                "notes": {
-                    "type": "string",
-                    "description": "反馈备注",
-                },
-                "actual_distance_km": {
-                    "type": "number",
-                    "description": "实际距离（公里）",
-                },
-                "actual_duration_min": {
-                    "type": "integer",
-                    "description": "实际时长（分钟）",
-                },
-                "actual_avg_hr": {
-                    "type": "integer",
-                    "description": "实际平均心率",
-                },
-            },
-            "required": ["plan_id", "date"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.record_plan_execution,
-            plan_id=kwargs.get("plan_id", ""),
-            date=kwargs.get("date", ""),
-            completion_rate=kwargs.get("completion_rate"),
-            effort_score=kwargs.get("effort_score"),
-            notes=kwargs.get("notes", ""),
-            actual_distance_km=kwargs.get("actual_distance_km"),
-            actual_duration_min=kwargs.get("actual_duration_min"),
-            actual_avg_hr=kwargs.get("actual_avg_hr"),
-        )
-
-
-class GetPlanExecutionStatsTool(BaseTool):
-    """获取计划执行统计工具 - v0.10.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_plan_execution_stats"
-
-    @property
-    def description(self) -> str:
-        return "获取训练计划执行统计，包括完成率、平均体感评分、总距离等。当用户询问'训练完成情况'、'计划执行统计'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string",
-                    "description": "训练计划ID",
-                },
-            },
-            "required": ["plan_id"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.get_plan_execution_stats,
-            plan_id=kwargs.get("plan_id", ""),
-        )
-
-
-class AnalyzeTrainingResponseTool(BaseTool):
-    """训练响应分析工具 - v0.10.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "analyze_training_response"
-
-    @property
-    def description(self) -> str:
-        return "分析训练响应模式，识别用户最适应和最不适应的训练类型。当用户询问'训练适应情况'、'哪种训练最适合我'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string",
-                    "description": "训练计划ID",
-                },
-            },
-            "required": ["plan_id"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.analyze_training_response,
-            plan_id=kwargs.get("plan_id", ""),
-        )
-
-
-class AdjustPlanTool(BaseTool):
-    """计划调整工具 - v0.11.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "adjust_plan"
-
-    @property
-    def description(self) -> str:
-        return "调整训练计划。支持自然语言调整指令，如'下周减量'、'把周三的间歇跑改成轻松跑'。当用户说'调整计划'、'减量'、'加量'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string",
-                    "description": "训练计划ID",
-                },
-                "adjustment_request": {
-                    "type": "string",
-                    "description": "调整请求（自然语言），如'下周减量20%'、'增加间歇跑'",
-                },
-                "confirmation_required": {
-                    "type": "boolean",
-                    "description": "是否需要确认后再执行调整（默认true）",
-                },
-            },
-            "required": ["plan_id", "adjustment_request"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.adjust_plan,
-            plan_id=kwargs.get("plan_id", ""),
-            adjustment_request=kwargs.get("adjustment_request", ""),
-            confirmation_required=kwargs.get("confirmation_required", True),
-        )
-
-
-class GetPlanAdjustmentSuggestionsTool(BaseTool):
-    """获取计划调整建议工具 - v0.11.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_plan_adjustment_suggestions"
-
-    @property
-    def description(self) -> str:
-        return "获取训练计划调整建议。基于训练数据和执行反馈，生成个性化调整建议。当用户说'给我建议'、'如何调整'、'训练建议'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string",
-                    "description": "训练计划ID",
-                },
-            },
-            "required": ["plan_id"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.get_plan_adjustment_suggestions,
-            plan_id=kwargs.get("plan_id", ""),
-        )
-
-
-class EvaluateGoalAchievementTool(BaseTool):
-    """目标达成评估工具 - v0.12.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "evaluate_goal_achievement"
-
-    @property
-    def description(self) -> str:
-        return "评估目标达成概率。基于当前体能、训练趋势和目标差距，预测目标达成概率和关键风险。当用户说'我能达到目标吗'、'目标评估'、'达成概率'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "goal_type": {
-                    "type": "string",
-                    "description": "目标类型（vdot/5k/10k/half_marathon/marathon）",
-                },
-                "goal_value": {
-                    "type": "number",
-                    "description": "目标值（VDOT值或秒数）",
-                },
-                "current_vdot": {
-                    "type": "number",
-                    "description": "当前VDOT值",
-                },
-                "weeks_available": {
-                    "type": "integer",
-                    "description": "可用训练周数（可选）",
-                },
-            },
-            "required": ["goal_type", "goal_value", "current_vdot"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.evaluate_goal_achievement,
-            goal_type=kwargs.get("goal_type", "vdot"),
-            goal_value=kwargs.get("goal_value", 0.0),
-            current_vdot=kwargs.get("current_vdot", 0.0),
-            weeks_available=kwargs.get("weeks_available"),
-        )
-
-
-class CreateLongTermPlanTool(BaseTool):
-    """创建长期训练规划工具 - v0.12.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "create_long_term_plan"
-
-    @property
-    def description(self) -> str:
-        return "创建长期训练规划。支持年度/赛季/多周期规划，自动生成基础期、提升期、巅峰期、减量期。当用户说'制定长期计划'、'备赛计划'、'年度规划'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_name": {
-                    "type": "string",
-                    "description": "计划名称",
-                },
-                "current_vdot": {
-                    "type": "number",
-                    "description": "当前VDOT值",
-                },
-                "target_vdot": {
-                    "type": "number",
-                    "description": "目标VDOT值（可选）",
-                },
-                "target_race": {
-                    "type": "string",
-                    "description": "目标赛事名称（可选）",
-                },
-                "target_date": {
-                    "type": "string",
-                    "description": "目标日期（YYYY-MM-DD，可选）",
-                },
-                "total_weeks": {
-                    "type": "integer",
-                    "description": "总训练周数（默认16）",
-                },
-                "fitness_level": {
-                    "type": "string",
-                    "description": "体能水平（beginner/intermediate/advanced/elite，默认intermediate）",
-                },
-            },
-            "required": ["plan_name", "current_vdot"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.create_long_term_plan,
-            plan_name=kwargs.get("plan_name", ""),
-            current_vdot=kwargs.get("current_vdot", 0.0),
-            target_vdot=kwargs.get("target_vdot"),
-            target_race=kwargs.get("target_race"),
-            target_date=kwargs.get("target_date"),
-            total_weeks=kwargs.get("total_weeks", 16),
-            fitness_level=kwargs.get("fitness_level", "intermediate"),
-        )
-
-
-class GetSmartTrainingAdviceTool(BaseTool):
-    """获取智能训练建议工具 - v0.12.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_smart_training_advice"
-
-    @property
-    def description(self) -> str:
-        return "获取智能训练建议。基于训练数据和体能状态，生成训练、恢复、营养、伤病预防等多维度建议。当用户说'给我训练建议'、'如何恢复'、'营养建议'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "current_vdot": {
-                    "type": "number",
-                    "description": "当前VDOT值（可选）",
-                },
-                "weekly_volume_km": {
-                    "type": "number",
-                    "description": "周跑量（公里，可选）",
-                },
-                "training_consistency": {
-                    "type": "number",
-                    "description": "训练一致性（0-1，可选）",
-                },
-                "injury_risk": {
-                    "type": "string",
-                    "description": "伤病风险（low/medium/high，可选）",
-                },
-                "goal_type": {
-                    "type": "string",
-                    "description": "目标类型（5k/10k/half_marathon/marathon，可选）",
-                },
-            },
-            "required": [],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.get_smart_training_advice,
-            current_vdot=kwargs.get("current_vdot"),
-            weekly_volume_km=kwargs.get("weekly_volume_km", 0.0),
-            training_consistency=kwargs.get("training_consistency", 1.0),
-            injury_risk=kwargs.get("injury_risk", "low"),
-            goal_type=kwargs.get("goal_type"),
-        )
-
-
-class GetWeatherTrainingAdviceTool(BaseTool):
-    """天气+训练协同建议工具 - v0.13.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_weather_training_advice"
-
-    @property
-    def description(self) -> str:
-        return "获取天气+训练综合建议。结合天气数据和训练数据，生成多维度的训练建议。当用户询问'今天适合跑步吗'、'天气对训练的影响'、'综合训练建议'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "temperature": {
-                    "type": "number",
-                    "description": "温度（摄氏度）",
-                },
-                "humidity": {
-                    "type": "number",
-                    "description": "湿度（百分比，0-100）",
-                },
-                "weather": {
-                    "type": "string",
-                    "description": "天气状况（晴/阴/雨/雪等）",
-                },
-                "wind": {
-                    "type": "string",
-                    "description": "风力描述（可选）",
-                },
-                "precipitation": {
-                    "type": "number",
-                    "description": "降水概率（百分比，0-100，可选）",
-                },
-                "uv_index": {
-                    "type": "number",
-                    "description": "紫外线指数（可选）",
-                },
-            },
-            "required": ["temperature", "humidity", "weather"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(
-            self.runner_tools.get_weather_training_advice,
-            temperature=kwargs.get("temperature", 20.0),
-            humidity=kwargs.get("humidity", 50.0),
-            weather=kwargs.get("weather", "晴"),
-            wind=kwargs.get("wind", "无风"),
-            precipitation=kwargs.get("precipitation", 0.0),
-            uv_index=kwargs.get("uv_index", 0.0),
-        )
+# ============================================================================
+# RunnerTools - 业务逻辑层
+# ============================================================================
 
 
 class RunnerTools:
@@ -864,6 +126,10 @@ class RunnerTools:
         self.storage = context.storage
         self.analytics = context.analytics
         self.profile_storage = context.profile_storage
+
+    # ----------------------------------------------------------------
+    # 统计/分析方法
+    # ----------------------------------------------------------------
 
     def get_running_stats(
         self, start_date: str | None = None, end_date: str | None = None
@@ -1137,6 +403,10 @@ class RunnerTools:
 
         return results
 
+    # ----------------------------------------------------------------
+    # 数据管理方法
+    # ----------------------------------------------------------------
+
     def update_memory(self, note: str, category: str = "other") -> dict[str, Any]:
         """
         更新 Agent 观察笔记到 MEMORY.md
@@ -1185,6 +455,10 @@ class RunnerTools:
         except NanobotRunnerError as e:
             logger.error(f"更新记忆失败：{e}")
             return {"error": f"更新记忆失败：{str(e)}"}
+
+    # ----------------------------------------------------------------
+    # 训练计划方法
+    # ----------------------------------------------------------------
 
     def generate_training_plan(
         self, goal_distance_km: float, goal_date: str
@@ -1693,6 +967,10 @@ class RunnerTools:
             last_run_date=last_run_date,
         )
 
+    # ----------------------------------------------------------------
+    # 诊断/个性化方法
+    # ----------------------------------------------------------------
+
     def diagnose_suggestion(
         self,
         user_query: str,
@@ -1950,6 +1228,10 @@ class RunnerTools:
         except NanobotRunnerError as e:
             logger.warning(f"保存偏好到存储失败: {e}")
 
+    # ----------------------------------------------------------------
+    # 透明化方法
+    # ----------------------------------------------------------------
+
     def explain_decision(
         self,
         decision_id: str | None = None,
@@ -2147,6 +1429,10 @@ class RunnerTools:
 
             self._trace_logger: Any = TraceLogger()
         return self._trace_logger
+
+    # ----------------------------------------------------------------
+    # Subagent 方法
+    # ----------------------------------------------------------------
 
     def spawn_subagent(
         self,
@@ -2473,6 +1759,10 @@ class RunnerTools:
                 "message": "Subagent调用失败且无法获取预查询数据",
             }
 
+    # ----------------------------------------------------------------
+    # 用户确认方法
+    # ----------------------------------------------------------------
+
     def ask_user_confirm(
         self,
         scenario: str,
@@ -2624,6 +1914,10 @@ class RunnerTools:
         from src.core.storage.session_repository import SessionRepository
 
         return SessionRepository(self.storage)
+
+    # ----------------------------------------------------------------
+    # 身体信号方法
+    # ----------------------------------------------------------------
 
     def get_hrv_analysis(self, days: int = 30) -> dict[str, Any]:
         """获取HRV分析结果 - v0.19.0新增"""
@@ -2782,6 +2076,10 @@ class RunnerTools:
             logger.error(f"训练周期对比失败: {e}")
             return {"success": False, "error": str(e)}
 
+    # ----------------------------------------------------------------
+    # 预测方法
+    # ----------------------------------------------------------------
+
     def predict_vdot_trend(self, days: int = 30) -> dict[str, Any]:
         """VDOT趋势预测 - v0.20.0新增"""
         try:
@@ -2889,6 +2187,10 @@ class RunnerTools:
             logger.error(f"模型管理失败: {e}")
             return {"success": False, "error": str(e)}
 
+    # ----------------------------------------------------------------
+    # 数字孪生方法
+    # ----------------------------------------------------------------
+
     def get_twin_snapshot(self) -> dict[str, Any]:
         """获取数字孪生状态快照 - v0.21.0新增"""
         try:
@@ -2947,1063 +2249,79 @@ class RunnerTools:
             return {"success": False, "error": str(e)}
 
 
-class AskUserConfirmTool(BaseTool):
-    """异步用户确认工具 - v0.17.0新增（实验性功能）
-
-    实现ask_user异步确认模式。Agent通过此工具输出结构化选项+确认提示，
-    用户在下一轮对话中确认。不支持同步阻塞模式。
-
-    使用场景：
-    1. 训练计划确认 - 输出结构化选项 + 确认提示
-    2. RPE 反馈 - 输出 1-10 分选择提示
-    3. 伤病风险调整 - 输出调整建议 + 确认提示
-
-    使用方式：
-    1. Agent调用此工具创建确认提示
-    2. 将agent_prompt展示给用户
-    3. 用户在下轮对话中回复选项编号
-    4. Agent调用parse_user_confirm解析用户响应
-    """
-
-    @property
-    def name(self) -> str:
-        return "ask_user_confirm"
-
-    @property
-    def description(self) -> str:
-        return (
-            "异步用户确认工具（实验性功能）。当需要用户确认训练计划、RPE评分、"
-            "伤病风险调整建议时使用此工具。工具会生成结构化选项，用户在下轮对话中"
-            "回复选项编号确认。支持场景: training_plan(训练计划确认)/rpe_feedback(体感评分)/"
-            "injury_risk(伤病风险调整)。返回JSON格式: {success: true, prompt: 提示结构, "
-            "agent_prompt: 展示给用户的文本, requires_user_response: true} 或 "
-            "{success: false, error: 错误信息}"
-        )
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "scenario": {
-                    "type": "string",
-                    "description": "确认场景: training_plan(训练计划确认) / rpe_feedback(体感评分) / injury_risk(伤病风险调整)",
-                    "enum": ["training_plan", "rpe_feedback", "injury_risk"],
-                },
-                "prompt_id": {
-                    "type": "string",
-                    "description": "提示ID（plan_id或session_id）",
-                },
-                "context_data": {
-                    "type": "object",
-                    "description": "场景相关数据（可选）。training_plan需要{goal, weeks, weekly_volume_km}；rpe_feedback需要{distance_km, duration_min}；injury_risk需要{risk_level, suggestions}",
-                },
-            },
-            "required": ["scenario", "prompt_id"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        scenario = kwargs.get("scenario", "")
-        prompt_id = kwargs.get("prompt_id", "")
-        context_data = kwargs.get("context_data")
-        return self._run_sync(
-            self.runner_tools.ask_user_confirm,
-            scenario=scenario,
-            prompt_id=prompt_id,
-            context_data=context_data,
-        )
-
-
-class ParseUserConfirmTool(BaseTool):
-    """解析用户确认响应工具 - v0.17.0新增（实验性功能）"""
-
-    @property
-    def name(self) -> str:
-        return "parse_user_confirm"
-
-    @property
-    def description(self) -> str:
-        return (
-            "解析用户对确认提示的响应（实验性功能）。在ask_user_confirm之后使用，"
-            "解析用户回复的选项编号或选项名称。返回JSON格式: "
-            "{success: true, confirmed: 是否确认, status: 状态, selected_key: 选项key, "
-            "selected_label: 选项标签, raw_input: 原始输入} 或 "
-            "{success: false, error: 错误信息}"
-        )
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "prompt_id": {
-                    "type": "string",
-                    "description": "提示ID（与ask_user_confirm中的prompt_id一致）",
-                },
-                "user_input": {
-                    "type": "string",
-                    "description": "用户的回复内容",
-                },
-            },
-            "required": ["prompt_id", "user_input"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        prompt_id = kwargs.get("prompt_id", "")
-        user_input = kwargs.get("user_input", "")
-        return self._run_sync(
-            self.runner_tools.parse_user_confirm_response,
-            prompt_id=prompt_id,
-            user_input=user_input,
-        )
-
-
-class GetHrvAnalysisTool(BaseTool):
-    """获取HRV分析工具 - v0.19.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_hrv_analysis"
-
-    @property
-    def description(self) -> str:
-        return "获取HRV（心率变异）分析结果，包括静息心率趋势和估算的HRV指标（RMSSD/SDNN）。当用户询问'HRV是多少'、'心率变异分析'、'静息心率趋势'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "分析天数（默认30天）",
-                    "default": 30,
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        days = kwargs.get("days", 30)
-        return self._run_sync(self.runner_tools.get_hrv_analysis, days)
-
-
-class GetHrRecoveryTool(BaseTool):
-    """获取心率恢复分析工具 - v0.19.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_hr_recovery"
-
-    @property
-    def description(self) -> str:
-        return "获取心率恢复分析结果，评估训练后心率下降速率和心脏恢复能力。当用户询问'心率恢复'、'恢复能力'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {"type": "object", "properties": {}}
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(self.runner_tools.get_hr_recovery)
-
-
-class GetFatigueScoreTool(BaseTool):
-    """获取疲劳度评估工具 - v0.19.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_fatigue_score"
-
-    @property
-    def description(self) -> str:
-        return "获取疲劳度评估结果，综合训练负荷、心率偏差、连续训练天数等维度计算疲劳度分数。当用户询问'我累不累'、'疲劳度'、'身体状态'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "rpe": {
-                    "type": "integer",
-                    "description": "主观疲劳度 (1-10)，可选",
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        rpe = kwargs.get("rpe")
-        return self._run_sync(self.runner_tools.get_fatigue_score, rpe)
-
-
-class GetRecoveryStatusTool(BaseTool):
-    """获取恢复状态工具 - v0.19.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_recovery_status"
-
-    @property
-    def description(self) -> str:
-        return "获取恢复状态评估，包括TSB变化、休息日效果和恢复趋势。当用户询问'恢复得怎么样'、'今天能训练吗'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {"type": "object", "properties": {}}
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(self.runner_tools.get_recovery_status)
-
-
-class GetBodySignalSummaryTool(BaseTool):
-    """获取身体信号综合摘要工具 - v0.19.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_body_signal_summary"
-
-    @property
-    def description(self) -> str:
-        return "获取身体信号综合摘要，整合HRV、疲劳度和恢复状态三个维度生成每日或每周摘要。当用户询问'今天状态怎么样'、'身体信号'、'综合状态'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "period": {
-                    "type": "string",
-                    "description": "周期类型（daily/weekly，默认daily）",
-                    "enum": ["daily", "weekly"],
-                    "default": "daily",
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        period = kwargs.get("period", "daily")
-        return self._run_sync(self.runner_tools.get_body_signal_summary, period)
-
-
-class CompareTrainingPeriodsTool(BaseTool):
-    """对比训练周期工具 - v0.19.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "compare_training_periods"
-
-    @property
-    def description(self) -> str:
-        return "对比两个训练周期的身体信号变化，分析恢复状态趋势。当用户询问'最近状态有没有变好'、'对比上周'、'训练趋势'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "period1_days": {
-                    "type": "integer",
-                    "description": "近期周期天数（默认7天）",
-                    "default": 7,
-                },
-                "period2_days": {
-                    "type": "integer",
-                    "description": "对比周期天数（默认7天）",
-                    "default": 7,
-                },
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        period1_days = kwargs.get("period1_days", 7)
-        period2_days = kwargs.get("period2_days", 7)
-        return self._run_sync(
-            self.runner_tools.compare_training_periods, period1_days, period2_days
-        )
-
-
-class PredictVdotTrendTool(BaseTool):
-    """VDOT趋势预测工具 - v0.20.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "predict_vdot_trend"
-
-    @property
-    def description(self) -> str:
-        return "预测VDOT（跑力值）趋势，基于训练数据预测未来VDOT变化。当用户询问'VDOT会怎么变'、'跑力趋势预测'、'未来VDOT'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "预测天数（默认30天）",
-                    "default": 30,
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        days = kwargs.get("days", 30)
-        return self._run_sync(self.runner_tools.predict_vdot_trend, days)
-
-
-class PredictRaceResultTool(BaseTool):
-    """比赛成绩预测工具 - v0.20.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "predict_race_result"
-
-    @property
-    def description(self) -> str:
-        return "预测比赛完赛时间，基于个人化Riegel公式预测不同距离的比赛成绩。当用户询问'全马能跑多少'、'比赛预测'、'完赛时间预测'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "distance_km": {
-                    "type": "number",
-                    "description": "比赛距离（公里），如5/10/21.0975/42.195",
-                },
-                "race_date": {
-                    "type": "string",
-                    "description": "比赛日期（YYYY-MM-DD，可选）",
-                },
-            },
-            "required": ["distance_km"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        distance_km = kwargs.get("distance_km", 42.195)
-        race_date = kwargs.get("race_date")
-        return self._run_sync(
-            self.runner_tools.predict_race_result, distance_km, race_date
-        )
-
-
-class PredictInjuryRiskTool(BaseTool):
-    """伤病风险预测工具 - v0.20.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "predict_injury_risk"
-
-    @property
-    def description(self) -> str:
-        return "预测伤病风险，综合急性/慢性负荷比、训练单调性、身体信号等评估受伤概率。当用户询问'会不会受伤'、'伤病风险'、'训练安全吗'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "days": {
-                    "type": "integer",
-                    "description": "预测天数（默认21天）",
-                    "default": 21,
-                }
-            },
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        days = kwargs.get("days", 21)
-        return self._run_sync(self.runner_tools.predict_injury_risk, days)
-
-
-class PredictTrainingResponseTool(BaseTool):
-    """训练响应预测工具 - v0.20.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "predict_training_response"
-
-    @property
-    def description(self) -> str:
-        return "预测单次训练的响应效果，包括VDOT影响、疲劳影响、恢复时间和伤病风险增量。当用户询问'这次训练效果如何'、'跑完会怎样'、'训练影响预测'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "session_type": {
-                    "type": "string",
-                    "description": "训练类型（easy/threshold/interval/recovery）",
-                    "enum": ["easy", "threshold", "interval", "recovery"],
-                },
-                "duration_min": {
-                    "type": "integer",
-                    "description": "训练时长（分钟）",
-                },
-                "intensity": {
-                    "type": "string",
-                    "description": "强度（low/moderate/high）",
-                    "enum": ["low", "moderate", "high"],
-                },
-            },
-            "required": ["session_type", "duration_min", "intensity"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        session_type = kwargs.get("session_type", "easy")
-        duration_min = kwargs.get("duration_min", 60)
-        intensity = kwargs.get("intensity", "moderate")
-        return self._run_sync(
-            self.runner_tools.predict_training_response,
-            session_type,
-            duration_min,
-            intensity,
-        )
-
-
-class CheckPredictionStatusTool(BaseTool):
-    """预测数据充足度评估工具 - v0.20.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "check_prediction_status"
-
-    @property
-    def description(self) -> str:
-        return "检查预测功能的数据充足度，评估各预测类型是否具备足够数据支撑ML增强预测。当用户询问'预测准不准'、'数据够不够预测'时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {"type": "object", "properties": {}}
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(self.runner_tools.check_prediction_status)
-
-
-class ReportInjuryTool(BaseTool):
-    """伤病报告提交工具 - v0.20.1新增"""
-
-    @property
-    def name(self) -> str:
-        return "report_injury"
-
-    @property
-    def description(self) -> str:
-        return "提交伤病报告，记录伤病类型、严重程度和日期，用于ML模型训练标签。当用户报告受伤、疼痛、不适时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "injury_type": {
-                    "type": "string",
-                    "description": "伤病类型（overuse/acute/chronic/other）",
-                    "enum": ["overuse", "acute", "chronic", "other"],
-                },
-                "severity": {
-                    "type": "string",
-                    "description": "严重程度（mild/moderate/severe）",
-                    "enum": ["mild", "moderate", "severe"],
-                },
-                "date": {
-                    "type": "string",
-                    "description": "伤病日期（YYYY-MM-DD）",
-                },
-            },
-            "required": ["injury_type", "severity", "date"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        injury_type = kwargs.get("injury_type", "other")
-        severity = kwargs.get("severity", "mild")
-        date = kwargs.get("date", "")
-        return self._run_sync(
-            self.runner_tools.report_injury, injury_type, severity, date
-        )
-
-
-class ManagePredictionModelTool(BaseTool):
-    """预测模型管理工具 - v0.20.1新增"""
-
-    @property
-    def name(self) -> str:
-        return "manage_prediction_model"
-
-    @property
-    def description(self) -> str:
-        return "管理预测模型，支持训练(train)、查看状态(status)、回滚(rollback)操作。当用户需要重新训练模型、查看模型状态或回滚模型版本时使用此工具。"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "操作类型",
-                    "enum": ["train", "status", "rollback"],
-                },
-                "model_type": {
-                    "type": "string",
-                    "description": "模型类型",
-                    "enum": ["vdot_predictor", "injury_predictor"],
-                },
-            },
-            "required": ["action", "model_type"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        action = kwargs.get("action", "status")
-        model_type = kwargs.get("model_type", "vdot_predictor")
-        return self._run_sync(
-            self.runner_tools.manage_prediction_model, action, model_type
-        )
-
-
-class GetTwinSnapshotTool(BaseTool):
-    """数字孪生状态快照工具 - v0.21.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_twin_snapshot"
-
-    @property
-    def description(self) -> str:
-        return "获取跑者数字孪生5维状态快照，包括体能(VDOT)、负荷(CTL/ATL/TSB)、身体信号(疲劳/恢复)、风险(伤病/过度训练)、训练模式(跑量/强度分布)。当用户询问'我的数字孪生'、'当前状态快照'、'5维状态'时使用此工具。返回JSON格式：{success: true, data: {fitness, load, body_signal, risk, training_pattern, snapshot_date, data_quality}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(self.runner_tools.get_twin_snapshot)
-
-
-class SimulateTwinTool(BaseTool):
-    """数字孪生What-If推演工具 - v0.21.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "simulate_twin"
-
-    @property
-    def description(self) -> str:
-        return "数字孪生What-If推演，基于当前状态模拟训练计划执行后的变化。当用户询问'如果我按这个计划训练会怎样'、'推演训练效果'、'What-If模拟'时使用此工具。返回JSON格式：{success: true, data: {plan_name, initial_state, final_state, snapshots, total_weeks, vdot_delta, peak_injury_risk, avg_tsb}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plan_name": {
-                    "type": "string",
-                    "description": "计划名称（必填）",
-                },
-                "weeks": {
-                    "type": "array",
-                    "description": "周计划列表，每项包含weekly_volume_km/easy_ratio/tempo_ratio/interval_ratio/long_run_km/intensity_multiplier（必填）",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "weekly_volume_km": {"type": "number"},
-                            "easy_ratio": {"type": "number"},
-                            "tempo_ratio": {"type": "number"},
-                            "interval_ratio": {"type": "number"},
-                            "long_run_km": {"type": "number"},
-                            "intensity_multiplier": {"type": "number"},
-                        },
-                    },
-                },
-                "prediction_type": {
-                    "type": "string",
-                    "description": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
-                    "enum": ["basic", "parametric", "ml_enhanced"],
-                },
-            },
-            "required": ["plan_name", "weeks"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        plan_name = kwargs.get("plan_name", "自定义计划")
-        weeks = kwargs.get("weeks", [])
-        prediction_type = kwargs.get("prediction_type", "parametric")
-        return self._run_sync(
-            self.runner_tools.simulate_twin, plan_name, weeks, prediction_type
-        )
-
-
-class CompareTwinPlansTool(BaseTool):
-    """数字孪生多计划对比工具 - v0.21.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "compare_twin_plans"
-
-    @property
-    def description(self) -> str:
-        return "数字孪生多计划对比，对多个训练计划执行推演并按综合评分排序推荐最优方案。当用户询问'哪个计划更好'、'对比训练方案'、'推荐计划'时使用此工具。返回JSON格式：{success: true, data: {plans, best_plan, comparison_dimensions, recommendation}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "plans": {
-                    "type": "array",
-                    "description": "计划列表，每项包含name和weeks（必填）",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "weeks": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "weekly_volume_km": {"type": "number"},
-                                        "easy_ratio": {"type": "number"},
-                                        "tempo_ratio": {"type": "number"},
-                                        "interval_ratio": {"type": "number"},
-                                        "long_run_km": {"type": "number"},
-                                        "intensity_multiplier": {"type": "number"},
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-                "prediction_type": {
-                    "type": "string",
-                    "description": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
-                    "enum": ["basic", "parametric", "ml_enhanced"],
-                },
-            },
-            "required": ["plans"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        plans = kwargs.get("plans", [])
-        prediction_type = kwargs.get("prediction_type", "parametric")
-        return self._run_sync(
-            self.runner_tools.compare_twin_plans, plans, prediction_type
-        )
-
-
-class SpawnSubagentTool(BaseTool):
-    """调用Subagent工具 - v0.17.0新增
-
-    实现"主Agent预查询 + 数据上下文传入"模式：
-    1. 主Agent识别子任务类型（数据分析/报告撰写）
-    2. 通过RunnerTools预查询相关数据
-    3. 将序列化数据嵌入task参数传入Subagent
-    4. Subagent基于传入数据进行分析和报告生成
-
-    支持的Subagent:
-    - data_analyst: 数据分析专家，解释VDOT趋势、训练负荷、心率漂移等
-    - report_writer: 报告撰写专家，生成周报/月报/训练总结
-
-    数据上下文格式:
-    {user_request}\n---数据上下文---\n{serialized_data}\n---数据上下文结束---
-
-    数据上下文大小控制: task参数总长度 ≤ 8000字符
-    """
-
-    # 数据上下文最大长度限制
-    MAX_CONTEXT_LENGTH: int = 8000
-    # 数据上下文分隔符
-    CONTEXT_SEPARATOR: str = "\n---数据上下文---\n"
-    CONTEXT_END: str = "\n---数据上下文结束---"
-
-    @property
-    def name(self) -> str:
-        return "spawn_subagent"
-
-    @property
-    def description(self) -> str:
-        return (
-            "调用Subagent执行专项任务。支持数据分析(data_analyst)和报告撰写(report_writer)两种Subagent。"
-            "主Agent会自动预查询相关数据并传入Subagent。当用户需要深度数据分析、生成训练周报/月报时使用此工具。"
-            "返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}"
-        )
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "subagent_type": {
-                    "type": "string",
-                    "description": "Subagent类型: data_analyst(数据分析) / report_writer(报告撰写)",
-                    "enum": ["data_analyst", "report_writer"],
-                },
-                "user_request": {
-                    "type": "string",
-                    "description": "用户的原始请求描述",
-                },
-                "date_range": {
-                    "type": "string",
-                    "description": "日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）",
-                },
-                "report_type": {
-                    "type": "string",
-                    "description": "报告类型（可选，仅report_writer使用）：weekly/monthly/summary",
-                    "enum": ["weekly", "monthly", "summary"],
-                },
-            },
-            "required": ["subagent_type", "user_request"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        """执行Subagent调用
-
-        Args:
-            subagent_type: Subagent类型
-            user_request: 用户请求
-            date_range: 日期范围（可选）
-            report_type: 报告类型（可选）
-
-        Returns:
-            JSON字符串，包含Subagent执行结果或降级处理结果
-        """
-        subagent_type = kwargs.get("subagent_type", "")
-        user_request = kwargs.get("user_request", "")
-        date_range = kwargs.get("date_range", "")
-        report_type = kwargs.get("report_type", "")
-
-        return self._run_sync(
-            self.runner_tools.spawn_subagent,
-            subagent_type=subagent_type,
-            user_request=user_request,
-            date_range=date_range,
-            report_type=report_type,
-        )
-
-
-class DiagnoseSuggestionTool(BaseTool):
-    """诊断AI建议质量 - v0.14.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "diagnose_suggestion"
-
-    @property
-    def description(self) -> str:
-        return "验证AI建议质量，检查建议的完整性、相关性、安全性和可执行性。当AI需要自我检查建议质量、诊断错误原因时使用此工具。返回JSON格式：{success: true, data: {report_id, category, overall_status, pass_count, fail_count, results: [{rule_name, status, message, severity, suggestion_fix}]}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "user_query": {
-                    "type": "string",
-                    "description": "用户原始查询",
-                },
-                "suggestion_text": {
-                    "type": "string",
-                    "description": "AI生成的建议文本",
-                },
-                "tools_used": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "使用的工具列表（可选）",
-                },
-            },
-            "required": ["user_query", "suggestion_text"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        user_query = kwargs.get("user_query", "")
-        suggestion_text = kwargs.get("suggestion_text", "")
-        tools_used = kwargs.get("tools_used", [])
-        return self._run_sync(
-            self.runner_tools.diagnose_suggestion,
-            user_query,
-            suggestion_text,
-            tools_used,
-        )
-
-
-class DiagnoseErrorTool(BaseTool):
-    """诊断错误原因 - v0.14.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "diagnose_error"
-
-    @property
-    def description(self) -> str:
-        return "诊断错误原因，分析错误根因并给出修复建议。当AI遇到执行错误、工具调用失败时使用此工具进行自我诊断。返回JSON格式：{success: true, data: {report_id, category, overall_status, results: [{rule_name, status, message, severity, suggestion_fix}]}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "error_message": {
-                    "type": "string",
-                    "description": "错误信息",
-                },
-            },
-            "required": ["error_message"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        error_message = kwargs.get("error_message", "")
-        return self._run_sync(self.runner_tools.diagnose_error, error_message)
-
-
-class GetPersonalizedSuggestionTool(BaseTool):
-    """获取个性化建议 - v0.14.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_personalized_suggestion"
-
-    @property
-    def description(self) -> str:
-        return "根据用户偏好对建议进行个性化调整。当AI需要根据用户偏好调整建议风格、强度、详细程度时使用此工具。返回JSON格式：{success: true, data: {id, original_text, personalized_text, suggestion_type, confidence, preference_factors}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "suggestion_text": {
-                    "type": "string",
-                    "description": "原始建议文本",
-                },
-                "suggestion_type": {
-                    "type": "string",
-                    "description": "建议类型（training_plan/recovery_advice/pace_guidance/weather_advice/nutrition_tip/injury_prevention/general，默认general）",
-                },
-            },
-            "required": ["suggestion_text"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        suggestion_text = kwargs.get("suggestion_text", "")
-        suggestion_type = kwargs.get("suggestion_type", "general")
-        return self._run_sync(
-            self.runner_tools.get_personalized_suggestion,
-            suggestion_text,
-            suggestion_type,
-        )
-
-
-class RecordFeedbackTool(BaseTool):
-    """记录用户反馈 - v0.14.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "record_feedback"
-
-    @property
-    def description(self) -> str:
-        return "记录用户对AI建议的反馈，用于偏好学习和个性化进化。当用户对建议表达满意、不满或修正意见时使用此工具。返回JSON格式：{success: true, data: {feedback_id, feedback_type, preference_updated, current_preferences}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "feedback_type": {
-                    "type": "string",
-                    "description": "反馈类型（positive/negative/neutral/correction）",
-                },
-                "content": {
-                    "type": "string",
-                    "description": "反馈内容",
-                },
-                "preference_category": {
-                    "type": "string",
-                    "description": "偏好类别（training_time/training_intensity/communication_style/suggestion_frequency/detail_preference/pace_preference/distance_preference/weather_sensitivity，默认communication_style）",
-                },
-                "suggestion_id": {
-                    "type": "string",
-                    "description": "关联的建议ID（可选）",
-                },
-            },
-            "required": ["feedback_type", "content"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        feedback_type = kwargs.get("feedback_type", "neutral")
-        content = kwargs.get("content", "")
-        preference_category = kwargs.get("preference_category", "communication_style")
-        suggestion_id = kwargs.get("suggestion_id", "")
-        return self._run_sync(
-            self.runner_tools.record_feedback,
-            feedback_type,
-            content,
-            preference_category,
-            suggestion_id,
-        )
-
-
-class GetUserPreferencesTool(BaseTool):
-    """获取用户偏好 - v0.14.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_user_preferences"
-
-    @property
-    def description(self) -> str:
-        return "获取当前用户的偏好设置，包括训练时段、强度偏好、沟通风格等。当AI需要了解用户偏好以提供更个性化的建议时使用此工具。返回JSON格式：{success: true, data: {training_time, training_intensity, communication_style, suggestion_frequency, detail_preference, pace_preference, distance_preference, weather_sensitivity, custom_preferences}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {},
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        return self._run_sync(self.runner_tools.get_user_preferences)
-
-
-class UpdateUserPreferencesTool(BaseTool):
-    """更新用户偏好 - v0.14.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "update_user_preferences"
-
-    @property
-    def description(self) -> str:
-        return "直接更新用户偏好设置。当用户明确表达偏好变更时使用此工具，如'我喜欢简洁的回答'、'把训练强度调低'。返回JSON格式：{success: true, data: {updated_preferences}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "updates": {
-                    "type": "object",
-                    "description": "偏好更新键值对，key为偏好字段名（training_time/training_intensity/communication_style/suggestion_frequency/detail_preference/pace_preference/distance_preference/weather_sensitivity），value为新值",
-                    "additionalProperties": {"type": "string"},
-                },
-            },
-            "required": ["updates"],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        updates = kwargs.get("updates", {})
-        return self._run_sync(self.runner_tools.update_user_preferences, updates)
-
-
-class ExplainDecisionTool(BaseTool):
-    """解释AI决策过程 - v0.15.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "explain_decision"
-
-    @property
-    def description(self) -> str:
-        return "解释AI决策过程，展示思考过程和决策依据。当用户询问'为什么这么建议'、'你是怎么想的'、'解释一下你的建议'时使用此工具。返回JSON格式：{success: true, data: {decision_id, brief_reasons, confidence, data_sources, decision_path}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "decision_id": {
-                    "type": "string",
-                    "description": "决策ID（可选，不提供则解释最近一次决策）",
-                },
-                "detail_level": {
-                    "type": "string",
-                    "description": "详细程度（brief/detailed，默认brief）",
-                },
-            },
-            "required": [],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        decision_id = kwargs.get("decision_id")
-        detail_level = kwargs.get("detail_level", "brief")
-        return self._run_sync(
-            self.runner_tools.explain_decision, decision_id, detail_level
-        )
-
-
-class TraceDataSourcesTool(BaseTool):
-    """追溯数据来源 - v0.15.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "trace_data_sources"
-
-    @property
-    def description(self) -> str:
-        return "追溯AI决策使用的数据来源，展示决策基于哪些数据做出。当用户询问'你的数据来源是什么'、'这个建议基于什么数据'、'你怎么知道这些'时使用此工具。返回JSON格式：{success: true, data: {decision_id, sources: [{name, type, description, quality_score}]}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "decision_id": {
-                    "type": "string",
-                    "description": "决策ID（可选，不提供则追溯最近一次决策）",
-                },
-            },
-            "required": [],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        decision_id = kwargs.get("decision_id")
-        return self._run_sync(self.runner_tools.trace_data_sources, decision_id)
-
-
-class GetTransparencyInsightTool(BaseTool):
-    """获取透明化洞察 - v0.15.0新增"""
-
-    @property
-    def name(self) -> str:
-        return "get_transparency_insight"
-
-    @property
-    def description(self) -> str:
-        return "获取AI透明化洞察信息，包括可观测性指标、决策统计、工具可靠性等。当用户询问'AI表现如何'、'你的决策质量怎么样'、'工具调用情况'时使用此工具。返回JSON格式：{success: true, data: {metrics: {total_traces, successful_traces, avg_duration_ms, error_rate, tool_success_rate}, recent_decisions, log_stats}} 或 {success: false, error: 错误信息}"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "include_metrics": {
-                    "type": "boolean",
-                    "description": "是否包含可观测性指标（默认true）",
-                },
-                "include_recent_decisions": {
-                    "type": "boolean",
-                    "description": "是否包含最近决策（默认true）",
-                },
-                "recent_limit": {
-                    "type": "integer",
-                    "description": "最近决策返回数量（默认5）",
-                },
-            },
-            "required": [],
-        }
-
-    async def execute(self, **kwargs: Any) -> str:
-        include_metrics = kwargs.get("include_metrics", True)
-        include_recent_decisions = kwargs.get("include_recent_decisions", True)
-        recent_limit = kwargs.get("recent_limit", 5)
-        return self._run_sync(
-            self.runner_tools.get_transparency_insight,
-            include_metrics,
-            include_recent_decisions,
-            recent_limit,
-        )
+# ============================================================================
+# Re-exports: 从子模块导入所有工具类，保持向后兼容
+# ============================================================================
+
+# 统计/分析工具
+# 身体信号/健康工具
+from .tools_body import (  # noqa: E402
+    AskUserConfirmTool,
+    CompareTrainingPeriodsTool,
+    GetBodySignalSummaryTool,
+    GetFatigueScoreTool,
+    GetHrRecoveryTool,
+    GetHrvAnalysisTool,
+    GetRecoveryStatusTool,
+    ParseUserConfirmTool,
+)
+
+# 数据管理/系统工具
+from .tools_data import (  # noqa: E402
+    DiagnoseErrorTool,
+    DiagnoseSuggestionTool,
+    ExplainDecisionTool,
+    GetPersonalizedSuggestionTool,
+    GetTransparencyInsightTool,
+    GetUserPreferencesTool,
+    RecordFeedbackTool,
+    TraceDataSourcesTool,
+    UpdateMemoryTool,
+    UpdateUserPreferencesTool,
+)
+
+# 训练计划工具
+from .tools_plan import (  # noqa: E402
+    AdjustPlanTool,
+    AnalyzeTrainingResponseTool,
+    CreateLongTermPlanTool,
+    EvaluateGoalAchievementTool,
+    GenerateTrainingPlanTool,
+    GetPlanAdjustmentSuggestionsTool,
+    GetPlanExecutionStatsTool,
+    GetSmartTrainingAdviceTool,
+    GetWeatherTrainingAdviceTool,
+    RecordPlanExecutionTool,
+)
+from .tools_stats import (  # noqa: E402
+    CalculateVdotForRunTool,
+    GetHrDriftAnalysisTool,
+    GetRecentRunsTool,
+    GetRunningStatsTool,
+    GetTrainingLoadTool,
+    GetVdotTrendTool,
+    QueryByDateRangeTool,
+    QueryByDistanceTool,
+)
+
+# 数字孪生/预测工具
+from .tools_twin import (  # noqa: E402
+    CheckPredictionStatusTool,
+    CompareTwinPlansTool,
+    GetTwinSnapshotTool,
+    ManagePredictionModelTool,
+    PredictInjuryRiskTool,
+    PredictRaceResultTool,
+    PredictTrainingResponseTool,
+    PredictVdotTrendTool,
+    ReportInjuryTool,
+    SimulateTwinTool,
+    SpawnSubagentTool,
+)
+
+# ============================================================================
+# 工厂函数
+# ============================================================================
 
 
 def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
@@ -4057,6 +2375,11 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         SimulateTwinTool(runner_tools),
         CompareTwinPlansTool(runner_tools),
     ]
+
+
+# ============================================================================
+# 工具描述字典
+# ============================================================================
 
 
 TOOL_DESCRIPTIONS = {
@@ -4363,3 +2686,66 @@ TOOL_DESCRIPTIONS = {
         },
     },
 }
+
+__all__ = [
+    # 基类
+    "BaseTool",
+    # 业务逻辑层
+    "RunnerTools",
+    # 工厂函数
+    "create_tools",
+    # 工具描述
+    "TOOL_DESCRIPTIONS",
+    # 统计/分析工具
+    "GetRunningStatsTool",
+    "GetRecentRunsTool",
+    "CalculateVdotForRunTool",
+    "GetVdotTrendTool",
+    "GetHrDriftAnalysisTool",
+    "GetTrainingLoadTool",
+    "QueryByDateRangeTool",
+    "QueryByDistanceTool",
+    # 训练计划工具
+    "GenerateTrainingPlanTool",
+    "RecordPlanExecutionTool",
+    "GetPlanExecutionStatsTool",
+    "AnalyzeTrainingResponseTool",
+    "AdjustPlanTool",
+    "GetPlanAdjustmentSuggestionsTool",
+    "EvaluateGoalAchievementTool",
+    "CreateLongTermPlanTool",
+    "GetSmartTrainingAdviceTool",
+    "GetWeatherTrainingAdviceTool",
+    # 身体信号/健康工具
+    "AskUserConfirmTool",
+    "ParseUserConfirmTool",
+    "GetHrvAnalysisTool",
+    "GetHrRecoveryTool",
+    "GetFatigueScoreTool",
+    "GetRecoveryStatusTool",
+    "GetBodySignalSummaryTool",
+    "CompareTrainingPeriodsTool",
+    # 数字孪生/预测工具
+    "PredictVdotTrendTool",
+    "PredictRaceResultTool",
+    "PredictInjuryRiskTool",
+    "PredictTrainingResponseTool",
+    "CheckPredictionStatusTool",
+    "ReportInjuryTool",
+    "ManagePredictionModelTool",
+    "GetTwinSnapshotTool",
+    "SimulateTwinTool",
+    "CompareTwinPlansTool",
+    "SpawnSubagentTool",
+    # 数据管理/系统工具
+    "UpdateMemoryTool",
+    "DiagnoseSuggestionTool",
+    "DiagnoseErrorTool",
+    "GetPersonalizedSuggestionTool",
+    "RecordFeedbackTool",
+    "GetUserPreferencesTool",
+    "UpdateUserPreferencesTool",
+    "ExplainDecisionTool",
+    "TraceDataSourcesTool",
+    "GetTransparencyInsightTool",
+]

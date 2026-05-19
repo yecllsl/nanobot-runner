@@ -136,27 +136,21 @@ class TestProfileStorageManager:
         self, storage_manager: ProfileStorageManager, sample_profile: RunnerProfile
     ) -> None:
         """测试保存画像到 MEMORY.md"""
-        result = storage_manager.save_memory_md(sample_profile)
+        result = storage_manager.save_memory_md("", profile=sample_profile)
 
         assert result is True
         assert storage_manager.memory_md_path.exists()
 
         content = storage_manager.memory_md_path.read_text(encoding="utf-8")
-        assert "跑者画像" in content
         assert sample_profile.user_id in content
 
     def test_generate_memory_content(
         self, storage_manager: ProfileStorageManager, sample_profile: RunnerProfile
     ) -> None:
         """测试生成 MEMORY.md 内容"""
-        content = storage_manager._generate_memory_content(sample_profile)
+        content = storage_manager._generate_memory_content("", sample_profile)
 
-        assert "# 跑者画像" in content
         assert sample_profile.user_id in content
-        assert "基础信息" in content
-        assert "体能水平" in content
-        assert "训练模式" in content
-        assert "心率数据" in content
         assert "训练负荷" in content
         assert "伤病风险" in content
 
@@ -177,9 +171,9 @@ class TestProfileStorageManager:
         """测试加载无效 JSON 文件"""
         storage_manager.profile_json_path.write_text("invalid json", encoding="utf-8")
 
-        result = storage_manager.load_profile_json()
-
-        assert result is None
+        # 新版 ProfileStorageManager 对无效 JSON 抛出 RuntimeError
+        with pytest.raises(RuntimeError, match="profile.json 格式错误"):
+            storage_manager.load_profile_json()
 
 
 class TestUserProfileManager:
