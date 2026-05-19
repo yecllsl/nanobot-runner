@@ -1,7 +1,7 @@
 # HeartRateAnalyzer 单元测试
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 import polars as pl
 import pytest
@@ -862,3 +862,84 @@ class TestHeartRateAnalyzerEdgeCases:
         z5_zone = next((z for z in result.zones if z["zone"] == "Z5"), None)
         assert z5_zone is not None
         assert z5_zone["time_seconds"] > 0
+
+
+class TestHeartRateAnalyzerExtra:
+    """心率分析器补充测试（合并自 test_heart_rate_analyzer_core.py）"""
+
+    @pytest.fixture
+    def mock_storage(self):
+        """创建 mock StorageManager"""
+        storage = Mock()
+        storage.read_parquet.return_value = pl.LazyFrame(
+            {
+                "timestamp": ["2024-01-01"],
+                "session_avg_heart_rate": [150],
+                "session_total_timer_time": [3600],
+            }
+        )
+        return storage
+
+    @pytest.fixture
+    def analyzer(self, mock_storage):
+        """创建心率分析器实例"""
+        return HeartRateAnalyzer(mock_storage)
+
+    def test_analyze_hr_drift_with_none_values(self, analyzer):
+        """测试包含None值的数据"""
+        heart_rate = [140, None, 145, 148, None, 152, 155, 158, 160, 162, 164, 166]
+        pace = [5.5, 5.4, None, 5.2, 5.1, 5.0, 4.9, None, 4.7, 4.6, 4.5, 4.4]
+
+        result = analyzer.analyze_hr_drift(heart_rate, pace)
+
+        assert hasattr(result, "drift") or result.error is not None
+
+    def test_analyze_hr_drift_batch_with_none(self, analyzer):
+        """测试批量分析包含None"""
+        df = pl.DataFrame(
+            {
+                "heart_rate": [
+                    None,
+                    [140, 142, 145, 148, 150, 152, 155, 158, 160, 162],
+                ],
+                "pace": [None, [5.5, 5.4, 5.3, 5.2, 5.1, 5.0, 4.9, 4.8, 4.7, 4.6]],
+            }
+        )
+
+        results = analyzer.analyze_hr_drift_batch(df)
+
+        assert len(results) == 2
+        assert "error" in results[0]
+
+    def test_hr_drift_assessment_positive(self, analyzer):
+        """测试正向心率漂移评估"""
+        heart_rate = [140, 145, 150, 155, 160, 165, 170, 175, 180, 185]
+        pace = [5.5, 5.4, 5.3, 5.2, 5.1, 5.0, 4.9, 4.8, 4.7, 4.6]
+
+        result = analyzer.analyze_hr_drift(heart_rate, pace)
+
+        assert hasattr(result, "assessment")
+        assert result.drift > 0
+
+    def test_hr_drift_assessment_negative(self, analyzer):
+        """测试负向心率漂移评估"""
+        heart_rate = [180, 175, 170, 165, 160, 155, 150, 145, 140, 135]
+        pace = [4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5]
+
+        result = analyzer.analyze_hr_drift(heart_rate, pace)
+
+        assert hasattr(result, "assessment")
+        assert result.drift < 0
+
+    def test_hr_drift_consistency(self, analyzer):
+        """测试心率漂移计算一致性"""
+        heart_rate = [140, 142, 145, 148, 150, 152, 155, 158, 160, 162]
+        pace = [5.5, 5.4, 5.3, 5.2, 5.1, 5.0, 4.9, 4.8, 4.7, 4.6]
+
+        result_list = analyzer.analyze_hr_drift(heart_rate, pace)
+
+        hr_series = pl.Series(heart_rate)
+        pace_series = pl.Series(pace)
+        result_vectorized = analyzer.analyze_hr_drift_vectorized(hr_series, pace_series)
+
+        assert abs(result_list.drift - result_vectorized["drift"]) < 1.0

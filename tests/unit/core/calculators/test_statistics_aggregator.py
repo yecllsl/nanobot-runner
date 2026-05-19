@@ -319,3 +319,46 @@ class TestStatisticsAggregator:
 
         assert hasattr(result, "zones")
         assert result.total_count == 1
+
+
+class TestStatisticsIntegration:
+    """统计聚合器集成测试（合并自 test_statistics_aggregator_core.py）"""
+
+    @pytest.fixture
+    def mock_storage(self):
+        """创建mock StorageManager"""
+        mock_storage = MagicMock()
+        now = datetime.now()
+        mock_storage.read_parquet.return_value = pl.LazyFrame(
+            {
+                "timestamp": [now - timedelta(days=i) for i in range(30)],
+                "session_start_time": [f"session_{i}" for i in range(30)],
+                "session_total_distance": [5000.0] * 30,
+                "session_total_timer_time": [1500.0] * 30,
+                "session_avg_heart_rate": [150.0] * 30,
+            }
+        )
+        return mock_storage
+
+    @pytest.fixture
+    def aggregator(self, mock_storage):
+        """创建StatisticsAggregator实例"""
+        return StatisticsAggregator(mock_storage)
+
+    def test_full_statistics_workflow(self, aggregator):
+        """测试完整统计流程"""
+        summary = aggregator.get_running_summary()
+        stats = aggregator.get_running_stats()
+        pace_dist = aggregator.get_pace_distribution()
+
+        assert summary.height == 1
+        assert stats.total_runs == 30
+        assert hasattr(pace_dist, "zones")
+
+    def test_year_filtering(self, aggregator, mock_storage):
+        """测试年份过滤"""
+        stats_2024 = aggregator.get_running_stats(year=2024)
+        pace_2024 = aggregator.get_pace_distribution(year=2024)
+
+        assert stats_2024.total_runs == 30
+        assert hasattr(pace_2024, "zones")

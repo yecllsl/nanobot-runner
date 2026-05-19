@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import polars as pl
 import pytest
 
-from src.core.analytics import AnalyticsEngine
+from src.core.analytics import AnalyticsEngine, _resolve_col
 from src.core.base.exceptions import NanobotRunnerError
 
 
@@ -3876,3 +3876,143 @@ class TestDailyReport:
         assert result is not None
         assert result["distance_km"] == 8.0
         assert result["run_count"] == 2
+
+
+# ============================================================
+# 以下测试类合并自 tests/unit/core/test_analytics.py
+# ============================================================
+
+
+class TestResolveCol:
+    """列名解析测试"""
+
+    def test_resolve_col_first_candidate(self):
+        """测试第一个候选列存在"""
+        df = pl.DataFrame({"distance": [1000], "duration": [300]})
+
+        result = _resolve_col(df, "distance", "total_distance")
+
+        assert result == "distance"
+
+    def test_resolve_col_second_candidate(self):
+        """测试第二个候选列存在"""
+        df = pl.DataFrame({"total_distance": [1000], "duration": [300]})
+
+        result = _resolve_col(df, "distance", "total_distance")
+
+        assert result == "total_distance"
+
+    def test_resolve_col_not_found(self):
+        """测试所有候选列均不存在"""
+        df = pl.DataFrame({"other": [1000]})
+
+        with pytest.raises(RuntimeError, match="DataFrame中未找到候选列"):
+            _resolve_col(df, "distance", "total_distance")
+
+
+class TestCalculateAvgPace:
+    """平均配速计算测试"""
+
+    @pytest.fixture
+    def engine(self):
+        """创建AnalyticsEngine实例"""
+        mock_storage = Mock()
+        mock_storage.read_parquet.return_value = pl.LazyFrame()
+        return AnalyticsEngine(mock_storage)
+
+    def test_calculate_avg_pace_normal(self, engine):
+        """测试正常配速计算"""
+        df = pl.DataFrame(
+            {
+                "distance": [5000.0, 10000.0],
+                "duration": [1500.0, 3000.0],
+            }
+        )
+
+        pace = engine._calculate_avg_pace(df)
+
+        assert pace == "5:00"
+
+    def test_calculate_avg_pace_zero_distance(self, engine):
+        """测试零距离"""
+        df = pl.DataFrame(
+            {
+                "distance": [0.0],
+                "duration": [1500.0],
+            }
+        )
+
+        pace = engine._calculate_avg_pace(df)
+
+        assert pace == "0:00"
+
+    def test_calculate_avg_pace_from_values(self, engine):
+        """测试从数值计算配速"""
+        pace = engine._calculate_avg_pace_from_values(
+            total_distance=5000.0, total_duration=1500.0
+        )
+
+        assert pace == "5:00"
+
+    def test_calculate_avg_pace_from_values_zero_distance(self, engine):
+        """测试从数值计算配速（零距离）"""
+        pace = engine._calculate_avg_pace_from_values(
+            total_distance=0.0, total_duration=1500.0
+        )
+
+        assert pace == "0:00"
+
+
+class TestAnalyticsEngineDelegation:
+    """AnalyticsEngine委托测试"""
+
+    @pytest.fixture
+    def engine(self):
+        """创建AnalyticsEngine实例"""
+        mock_storage = Mock()
+        mock_storage.read_parquet.return_value = pl.LazyFrame()
+        return AnalyticsEngine(mock_storage)
+
+    def test_calculate_vdot_delegation(self, engine):
+        """测试VDOT计算委托"""
+        vdot = engine.calculate_vdot(5000.0, 1800.0)
+
+        assert vdot > 0
+
+    def test_calculate_tss_delegation(self, engine):
+        """测试TSS计算委托"""
+        hr_data = pl.Series([150, 155, 160, 155, 150])
+        tss = engine.calculate_tss(hr_data, 3600)
+
+        assert tss > 0
+
+    def test_calculate_atl_delegation(self, engine):
+        """测试ATL计算委托"""
+        tss_values = [100.0] * 7
+        atl = engine.calculate_atl(tss_values)
+
+        assert atl > 0
+
+    def test_calculate_ctl_delegation(self, engine):
+        """测试CTL计算委托"""
+        tss_values = [100.0] * 42
+        ctl = engine.calculate_ctl(tss_values)
+
+        assert ctl > 0
+
+    def test_calculate_atl_ctl_delegation(self, engine):
+        """测试ATL/CTL计算委托"""
+        tss_values = [100.0] * 42
+        result = engine.calculate_atl_ctl(tss_values)
+
+        assert "atl" in result
+        assert "ctl" in result
+
+    def test_analyze_hr_drift_delegation(self, engine):
+        """测试心率漂移分析委托"""
+        heart_rate = [140, 145, 150, 155, 160, 165, 170, 175, 180, 185]
+        pace = [5.5, 5.4, 5.3, 5.2, 5.1, 5.0, 4.9, 4.8, 4.7, 4.6]
+
+        result = engine.analyze_hr_drift(heart_rate, pace)
+
+        assert hasattr(result, "drift") or result.error is not None

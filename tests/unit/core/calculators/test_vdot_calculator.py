@@ -302,3 +302,87 @@ class TestVDOTCalculatorVectorized:
         assert vdot_series[0] > 0
         assert vdot_series[1] == 0.0
         assert vdot_series[2] == 0.0
+
+
+class TestVDOTCalculatorEdgeCases:
+    """VDOTCalculator 边界与补充测试（合并自 test_vdot_calculator_core.py）"""
+
+    def test_calculate_vdot_none_distance(
+        self, vdot_calculator: VDOTCalculator
+    ) -> None:
+        """测试None距离"""
+        vdot = vdot_calculator.calculate_vdot(None, 1200)
+        assert vdot == 0.0
+
+    def test_calculate_vdot_none_time(self, vdot_calculator: VDOTCalculator) -> None:
+        """测试None时间"""
+        vdot = vdot_calculator.calculate_vdot(5000, None)
+        assert vdot == 0.0
+
+    def test_calculate_vdot_exactly_1500m(
+        self, vdot_calculator: VDOTCalculator
+    ) -> None:
+        """测试恰好1500m距离"""
+        vdot = vdot_calculator.calculate_vdot(1500, 300)
+        assert vdot > 0
+
+    def test_calculate_vdot_high_performance(
+        self, vdot_calculator: VDOTCalculator
+    ) -> None:
+        """测试高水平跑者VDOT"""
+        vdot = vdot_calculator.calculate_vdot(5000, 900)
+        assert vdot > 50
+
+    def test_calculate_vdot_low_performance(
+        self, vdot_calculator: VDOTCalculator
+    ) -> None:
+        """测试低水平跑者VDOT"""
+        vdot = vdot_calculator.calculate_vdot(5000, 2400)
+        assert 20 <= vdot <= 40
+
+    def test_calculate_vdot_very_slow(self, vdot_calculator: VDOTCalculator) -> None:
+        """测试极慢配速VDOT"""
+        vdot = vdot_calculator.calculate_vdot(5000, 3600)
+        assert vdot >= 0
+
+    def test_vdot_to_time_negative_vdot(self, vdot_calculator: VDOTCalculator) -> None:
+        """测试负VDOT预测用时"""
+        with pytest.raises(ValueError, match="VDOT和距离必须为正数"):
+            vdot_calculator.vdot_to_time(-45.0, 5000)
+
+    def test_vdot_to_time_negative_distance(
+        self, vdot_calculator: VDOTCalculator
+    ) -> None:
+        """测试负距离预测用时"""
+        with pytest.raises(ValueError, match="VDOT和距离必须为正数"):
+            vdot_calculator.vdot_to_time(45.0, -5000)
+
+    def test_vdot_round_trip_consistency(self, vdot_calculator: VDOTCalculator) -> None:
+        """测试VDOT计算与预测的往返一致性"""
+        distance = 5000
+        time_s = 1200
+
+        vdot = vdot_calculator.calculate_vdot(distance, time_s)
+        predicted_time = vdot_calculator.vdot_to_time(vdot, distance)
+
+        time_diff = abs(predicted_time - time_s)
+        assert time_diff < 120
+
+    def test_vdot_batch_scalar_consistency(
+        self, vdot_calculator: VDOTCalculator
+    ) -> None:
+        """测试批量VDOT计算与标量版本一致性"""
+        df = pl.DataFrame(
+            {
+                "session_total_distance": [5000.0, 10000.0, 21097.5],
+                "session_total_timer_time": [1200.0, 2700.0, 6000.0],
+            }
+        )
+
+        vdot_series = vdot_calculator.calculate_vdot_batch(df)
+
+        for i in range(len(df)):
+            single_vdot = vdot_calculator.calculate_vdot(
+                df["session_total_distance"][i], df["session_total_timer_time"][i]
+            )
+            assert abs(vdot_series[i] - single_vdot) < 0.01

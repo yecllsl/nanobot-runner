@@ -31,6 +31,15 @@ from src.core.calculators.race_prediction import RacePredictionEngine
 from src.core.calculators.statistics_aggregator import StatisticsAggregator
 from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
 from src.core.calculators.vdot_calculator import VDOTCalculator
+from src.core.constants import (
+    ATL_TIME_CONSTANT,
+    CTL_TIME_CONSTANT,
+    DEFAULT_LTHR,
+    VDOT_COEFFICIENT,
+    VDOT_DISTANCE_EXPONENT,
+    VDOT_MULTIPLIER,
+    VDOT_TIME_EXPONENT,
+)
 from src.core.models import (
     DailyReportData,
     HRDriftResult,
@@ -42,10 +51,6 @@ from src.core.models import (
 
 if TYPE_CHECKING:
     from src.core.storage.parquet_manager import StorageManager
-
-# VDOT 计算常量 (Jack Daniels 公式)
-VDOT_COEFFICIENT = 0.000104
-VDOT_DISTANCE_EXPONENT = 1.06
 
 
 def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
@@ -65,17 +70,6 @@ def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
         if col in df.columns:
             return col
     raise RuntimeError(f"DataFrame中未找到候选列: {candidates}")
-
-
-VDOT_TIME_EXPONENT = 0.5
-VDOT_MULTIPLIER = 100
-
-# TSS 计算常量
-DEFAULT_LTHR = 180  # 默认乳酸阈值心率
-
-# 训练负荷计算常量
-ATL_TIME_CONSTANT = 7.0  # 急性训练负荷时间常数（天）
-CTL_TIME_CONSTANT = 42.0  # 慢性训练负荷时间常数（天）
 
 
 class AnalyticsEngine:
@@ -244,6 +238,8 @@ class AnalyticsEngine:
         """
         计算平均配速
 
+        从DataFrame提取总距离和总时长，委托给 _calculate_avg_pace_from_values 计算
+
         Args:
             df: 跑步数据DataFrame
 
@@ -251,16 +247,9 @@ class AnalyticsEngine:
             str: 平均配速（分钟/公里）
         """
         try:
-            total_distance = float(df["distance"].sum()) / 1000.0
-            total_duration = float(df["duration"].sum()) / 60.0
-
-            if total_distance <= 0:
-                return "0:00"
-
-            avg_pace_min_km = total_duration / total_distance
-            minutes = int(avg_pace_min_km)
-            seconds = int((avg_pace_min_km - minutes) * 60)
-            return f"{minutes}:{seconds:02d}"
+            total_distance = float(df["distance"].sum())
+            total_duration = float(df["duration"].sum())
+            return self._calculate_avg_pace_from_values(total_distance, total_duration)
         except NanobotRunnerError as e:
             raise ValueError(f"配速计算失败: {e}") from e
 

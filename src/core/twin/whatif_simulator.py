@@ -5,6 +5,7 @@ import math
 from typing import TYPE_CHECKING
 
 from src.core.base.exceptions import NanobotRunnerError
+from src.core.constants import ATL_TIME_CONSTANT, CTL_TIME_CONSTANT
 from src.core.twin.models import (
     BodySignalDimension,
     FitnessDimension,
@@ -45,9 +46,6 @@ TSS_INTENSITY_FACTORS: dict[str, float] = {
     "interval": 1.1,
     "long": 0.65,
 }
-
-ATL_TIME_CONSTANT = 7.0
-CTL_TIME_CONSTANT = 42.0
 
 
 class WhatIfSimulator:

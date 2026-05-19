@@ -4,10 +4,8 @@
 import polars as pl
 import pytest
 
-from src.core.calculators.training_load_analyzer import (
-    ATL_TIME_CONSTANT,
-    TrainingLoadAnalyzer,
-)
+from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
+from src.core.constants import ATL_TIME_CONSTANT
 
 
 @pytest.fixture
@@ -589,3 +587,105 @@ class TestTrainingLoadAnalyzerIncremental:
         print(f"性能提升: {(batch_time / incremental_time - 1) * 100:.1f}%")
 
         assert incremental_time < batch_time
+
+
+class TestTrainingLoadAnalyzerExtra:
+    """训练负荷分析器补充测试（合并自 test_training_load_analyzer_core.py）"""
+
+    @pytest.fixture
+    def analyzer(self):
+        """创建训练负荷分析器实例"""
+        return TrainingLoadAnalyzer()
+
+    def test_calculate_tss_zero_duration(self, analyzer):
+        """测试零时长"""
+        hr_data = pl.Series([150, 155, 160])
+        duration_s = 0
+
+        with pytest.raises(ValueError, match="心率数据不能为空"):
+            analyzer.calculate_tss(hr_data, duration_s)
+
+    def test_calculate_tss_negative_duration(self, analyzer):
+        """测试负时长"""
+        hr_data = pl.Series([150, 155, 160])
+        duration_s = -100
+
+        with pytest.raises(ValueError, match="心率数据不能为空"):
+            analyzer.calculate_tss(hr_data, duration_s)
+
+    def test_calculate_tss_for_run_none_distance(self, analyzer):
+        """测试None距离"""
+        tss = analyzer.calculate_tss_for_run(None, 1500)
+        assert tss == 0.0
+
+    def test_calculate_tss_for_run_none_duration(self, analyzer):
+        """测试None时长"""
+        tss = analyzer.calculate_tss_for_run(5000, None)
+        assert tss == 0.0
+
+    def test_calculate_tss_for_run_zero_distance(self, analyzer):
+        """测试零距离"""
+        tss = analyzer.calculate_tss_for_run(0, 1500)
+        assert tss == 0.0
+
+    def test_calculate_tss_for_run_zero_duration(self, analyzer):
+        """测试零时长"""
+        tss = analyzer.calculate_tss_for_run(5000, 0)
+        assert tss == 0.0
+
+    def test_atl_ctl_consistency(self, analyzer):
+        """测试ATL/CTL计算一致性"""
+        tss_values = [100.0, 80.0, 60.0, 40.0, 20.0, 50.0, 70.0]
+
+        atl = analyzer.calculate_atl(tss_values)
+        ctl = analyzer.calculate_ctl(tss_values)
+
+        tss_series = pl.Series(tss_values)
+        vectorized = analyzer.calculate_atl_ctl_vectorized(tss_series, 7, 42)
+
+        assert abs(atl - vectorized["atl"]) < 1.0
+        assert abs(ctl - vectorized["ctl"]) < 1.0
+
+    def test_incremental_vs_batch(self, analyzer):
+        """测试增量计算与批量计算一致性"""
+        tss_values = [100.0, 80.0, 60.0, 40.0, 20.0]
+
+        batch_atl_ctl = analyzer.calculate_atl_ctl(tss_values)
+
+        analyzer.reset_incremental_state()
+        for tss in tss_values:
+            result = analyzer.update_atl_ctl_incremental(tss)
+
+        incremental_state = analyzer.get_incremental_state()
+
+        assert abs(batch_atl_ctl["atl"] - incremental_state["atl"]) < 30.0
+
+    def test_tss_batch_with_different_ages(self, analyzer):
+        """测试不同年龄的批量TSS计算"""
+        df = pl.DataFrame(
+            {
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1500.0, 3000.0],
+                "session_avg_heart_rate": [150.0, 155.0],
+            }
+        )
+
+        tss_20 = analyzer.calculate_tss_batch(df, age=20)
+        tss_40 = analyzer.calculate_tss_batch(df, age=40)
+
+        assert len(tss_20) == len(tss_40)
+
+    def test_tss_batch_with_different_rest_hr(self, analyzer):
+        """测试不同静息心率的批量TSS计算"""
+        df = pl.DataFrame(
+            {
+                "session_total_distance": [5000.0, 10000.0],
+                "session_total_timer_time": [1500.0, 3000.0],
+                "session_avg_heart_rate": [150.0, 155.0],
+            }
+        )
+
+        tss_50 = analyzer.calculate_tss_batch(df, rest_hr=50)
+        tss_70 = analyzer.calculate_tss_batch(df, rest_hr=70)
+
+        assert len(tss_50) == len(tss_70)

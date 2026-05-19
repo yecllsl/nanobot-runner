@@ -8,13 +8,7 @@ import numpy as np
 import polars as pl
 
 from src.core.base.exceptions import NanobotRunnerError
-
-# TSS 计算常量
-DEFAULT_LTHR = 180
-
-# 训练负荷计算常量
-ATL_TIME_CONSTANT = 7.0
-CTL_TIME_CONSTANT = 42.0
+from src.core.constants import ATL_TIME_CONSTANT, CTL_TIME_CONSTANT, DEFAULT_LTHR
 
 
 class TrainingLoadAnalyzer:
