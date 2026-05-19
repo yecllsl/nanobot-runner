@@ -15,14 +15,20 @@
         "command": "npx",
         "args": ["-y", "@dangahagan/weather-mcp"],
         "tool_timeout": 30,
-        "enabled_tools": ["*"]
+        "enabled_tools": [
+          "*"
+        ],
+        "disabled": true
       },
       "osm": {
         "type": "stdio",
         "command": "uvx",
         "args": ["osm-mcp-server"],
         "tool_timeout": 30,
-        "enabled_tools": ["*"]
+        "enabled_tools": [
+          "*"
+        ],
+        "disabled": true
       },
       "coros": {
         "type": "stdio",
@@ -33,7 +39,10 @@
           "mcp"
         ],
         "tool_timeout": 30,
-        "enabled_tools": ["*"]
+        "enabled_tools": [
+          "*"
+        ],
+        "disabled": true
       }
 
   }

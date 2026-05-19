@@ -161,6 +161,7 @@ class PlotextRenderer:
         width = _get_terminal_width(config)
         height = _get_terminal_height(config)
         plt.plotsize(width, height)
+        plt.date_form(input_form="Y-m-d")
 
         series = data.series[0]
         plt.plot(series.labels, series.values, label=series.name)
@@ -168,14 +169,11 @@ class PlotextRenderer:
         plt.xlabel(data.x_label)
         plt.ylabel(data.y_label)
 
-        if config is not None and config.show_legend:
-            plt.legend()
-
-        # 极值标注（根据配置决定是否启用）
-        if config is None or config.annotate_extremes:
-            annotations = _annotate_extremes(series.labels, series.values)
-            for idx, text in annotations.items():
-                plt.annotate(text, idx, series.values[idx])
+        # 极值标注（plotext 5.x 不支持 annotate，暂时禁用）
+        # if config is None or config.annotate_extremes:
+        #     annotations = _annotate_extremes(series.labels, series.values)
+        #     for idx, text in annotations.items():
+        #         plt.annotate(text, idx, series.values[idx])
 
         return plt.build()
 
@@ -204,6 +202,7 @@ class PlotextRenderer:
         width = _get_terminal_width(config)
         height = _get_terminal_height(config)
         plt.plotsize(width, height)
+        plt.date_form(input_form="Y-m-d")
 
         for s in data.series:
             kwargs: dict[str, object] = {"label": s.name}
@@ -214,9 +213,6 @@ class PlotextRenderer:
         plt.title(data.title)
         plt.xlabel(data.x_label)
         plt.ylabel(data.y_label)
-
-        if config is not None and config.show_legend:
-            plt.legend()
 
         return plt.build()
 
@@ -243,15 +239,13 @@ class PlotextRenderer:
         width = _get_terminal_width(config)
         height = _get_terminal_height(config)
         plt.plotsize(width, height)
+        plt.date_form(input_form="Y-m-d")
 
         series = data.series[0]
         plt.bar(series.labels, series.values, label=series.name)
         plt.title(data.title)
         plt.xlabel(data.x_label)
         plt.ylabel(data.y_label)
-
-        if config is not None and config.show_legend:
-            plt.legend()
 
         return plt.build()
 
@@ -282,6 +276,7 @@ class PlotextRenderer:
         width = _get_terminal_width(config)
         height = _get_terminal_height(config)
         plt.plotsize(width, height)
+        plt.date_form(input_form="Y-m-d")
 
         # plotext 的 bar 支持多组数据时可通过嵌套列表实现堆叠效果
         # 若不支持则捕获异常降级为表格
@@ -303,9 +298,6 @@ class PlotextRenderer:
             plt.title(data.title)
             plt.xlabel(data.x_label)
             plt.ylabel(data.y_label)
-
-            if config is not None and config.show_legend:
-                plt.legend()
 
             return plt.build()
         except (TypeError, ValueError, NanobotRunnerError):

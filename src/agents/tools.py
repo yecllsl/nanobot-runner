@@ -103,6 +103,15 @@ class BaseTool(Tool):
                 f"工具调用异常: {func.__name__}, 错误: {str(e)}", exc_info=True
             )
             return json.dumps({"error": str(e)}, ensure_ascii=False)
+        except Exception as e:
+            # 工具入口层防御性编程：捕获所有未预期异常，防止框架崩溃
+            logger.error(
+                f"工具调用未预期异常: {func.__name__}, 错误类型: {type(e).__name__}, 错误: {str(e)}",
+                exc_info=True,
+            )
+            return json.dumps(
+                {"error": f"{type(e).__name__}: {str(e)}"}, ensure_ascii=False
+            )
 
 
 # ============================================================================

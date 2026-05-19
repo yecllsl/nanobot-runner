@@ -143,7 +143,7 @@ class VizHandler:
         """
         try:
             return render_func(data, ChartConfig())
-        except NanobotRunnerError:
+        except (NanobotRunnerError, Exception):
             # 降级为 Rich Table 纯文字表格
             return self._render_text_table(data)
 
