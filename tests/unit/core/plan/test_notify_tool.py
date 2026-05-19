@@ -477,7 +477,9 @@ class TestNotifyToolBatchReminders:
         """创建NotifyTool实例"""
         mock_bot = Mock()
         mock_bot.send_card = Mock(
-            return_value={"success": True, "data": {"message_id": "test_msg_id"}}
+            return_value=OperationResult(
+                success=True, data={"message_id": "test_msg_id"}
+            )
         )
         mock_weather = Mock()
         mock_weather.get_weather = Mock(
