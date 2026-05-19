@@ -127,7 +127,7 @@ class InjuryPredictor:
                 json.dumps(label_data, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-        except NanobotRunnerError as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.warning(f"保存伤病标签失败: {e}")
 
     def train_model(self) -> ModelTrainingResult:

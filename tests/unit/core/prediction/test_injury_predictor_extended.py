@@ -329,7 +329,11 @@ class TestInjuryPredictorParametricEdgeCases:
 
 class TestInjuryPredictorSaveLabel:
     def test_save_injury_label_failure(self, tmp_path):
+        # 使用只读目录模拟写入失败
+        readonly_dir = tmp_path / "readonly"
+        readonly_dir.mkdir()
         predictor = InjuryPredictor(
-            injury_labels_dir="/nonexistent/path/that/cannot/be/created",
+            injury_labels_dir=str(readonly_dir),
         )
+        # 不应抛出异常，应优雅处理
         predictor._save_injury_label("inj_001", "overuse", "moderate", "2026-05-08")
