@@ -1,16 +1,45 @@
 # 分析引擎
 # 基于Polars实现核心数据分析算法
+# 拆分说明：训练效果计算 → analytics_effects.py，报告生成 → analytics_reports.py
 
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from src.core.analytics_effects import (
+    calculate_aerobic_effect,
+    calculate_anaerobic_effect,
+    calculate_hr_zones,
+    calculate_recovery_time,
+    calculate_training_effect,
+    calculate_zone_time,
+)
+from src.core.analytics_reports import (
+    generate_daily_report as _generate_daily_report,
+)
+from src.core.analytics_reports import (
+    generate_greeting,
+    generate_training_advice,
+    generate_weekly_plan,
+    get_daily_plan,
+    get_yesterday_run,
+)
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.calculators.heart_rate_analyzer import HeartRateAnalyzer
 from src.core.calculators.race_prediction import RacePredictionEngine
 from src.core.calculators.statistics_aggregator import StatisticsAggregator
 from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
 from src.core.calculators.vdot_calculator import VDOTCalculator
+from src.core.constants import (
+    ATL_TIME_CONSTANT,
+    CTL_TIME_CONSTANT,
+    DEFAULT_LTHR,
+    VDOT_COEFFICIENT,
+    VDOT_DISTANCE_EXPONENT,
+    VDOT_MULTIPLIER,
+    VDOT_TIME_EXPONENT,
+)
 from src.core.models import (
     DailyReportData,
     HRDriftResult,
@@ -22,10 +51,6 @@ from src.core.models import (
 
 if TYPE_CHECKING:
     from src.core.storage.parquet_manager import StorageManager
-
-# VDOT 计算常量 (Jack Daniels 公式)
-VDOT_COEFFICIENT = 0.000104
-VDOT_DISTANCE_EXPONENT = 1.06
 
 
 def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
@@ -45,17 +70,6 @@ def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
         if col in df.columns:
             return col
     raise RuntimeError(f"DataFrame中未找到候选列: {candidates}")
-
-
-VDOT_TIME_EXPONENT = 0.5
-VDOT_MULTIPLIER = 100
-
-# TSS 计算常量
-DEFAULT_LTHR = 180  # 默认乳酸阈值心率
-
-# 训练负荷计算常量
-ATL_TIME_CONSTANT = 7.0  # 急性训练负荷时间常数（天）
-CTL_TIME_CONSTANT = 42.0  # 慢性训练负荷时间常数（天）
 
 
 class AnalyticsEngine:
@@ -217,12 +231,14 @@ class AnalyticsEngine:
             minutes = int(avg_pace_min_km)
             seconds = int((avg_pace_min_km - minutes) * 60)
             return f"{minutes}:{seconds:02d}"
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise ValueError(f"配速计算失败: {e}") from e
 
     def _calculate_avg_pace(self, df: pl.DataFrame) -> str:
         """
         计算平均配速
+
+        从DataFrame提取总距离和总时长，委托给 _calculate_avg_pace_from_values 计算
 
         Args:
             df: 跑步数据DataFrame
@@ -231,17 +247,10 @@ class AnalyticsEngine:
             str: 平均配速（分钟/公里）
         """
         try:
-            total_distance = float(df["distance"].sum()) / 1000.0
-            total_duration = float(df["duration"].sum()) / 60.0
-
-            if total_distance <= 0:
-                return "0:00"
-
-            avg_pace_min_km = total_duration / total_distance
-            minutes = int(avg_pace_min_km)
-            seconds = int((avg_pace_min_km - minutes) * 60)
-            return f"{minutes}:{seconds:02d}"
-        except Exception as e:
+            total_distance = float(df["distance"].sum())
+            total_duration = float(df["duration"].sum())
+            return self._calculate_avg_pace_from_values(total_distance, total_duration)
+        except NanobotRunnerError as e:
             raise ValueError(f"配速计算失败: {e}") from e
 
     def get_vdot_trend(self, days: int = 30) -> list[VdotTrendItem]:
@@ -304,7 +313,7 @@ class AnalyticsEngine:
                 )
 
             return trend_data
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"获取VDOT趋势失败: {e}") from e
 
     def calculate_tss_for_run(
@@ -548,129 +557,39 @@ class AnalyticsEngine:
 
         return status, advice
 
+    # ---- 委托到 analytics_effects 模块的方法 ----
+
     def _calculate_hr_zones(self, max_hr: int) -> dict[str, tuple]:
-        """
-        计算心率区间边界
-
-        Args:
-            max_hr: 最大心率
-
-        Returns:
-            dict: 心率区间边界字典
-        """
-        return {
-            "zone1": (int(max_hr * 0.50), int(max_hr * 0.60)),  # 恢复区
-            "zone2": (int(max_hr * 0.60), int(max_hr * 0.70)),  # 有氧基础区
-            "zone3": (int(max_hr * 0.70), int(max_hr * 0.80)),  # 有氧耐力区
-            "zone4": (int(max_hr * 0.80), int(max_hr * 0.90)),  # 乳酸阈值区
-            "zone5": (int(max_hr * 0.90), int(max_hr * 1.00)),  # 无氧耐力区
-        }
+        """计算心率区间边界（委托到 analytics_effects 模块）"""
+        return calculate_hr_zones(max_hr)
 
     def _calculate_zone_time(
         self, heart_rate_data: list[int], hr_zones: dict[str, tuple]
     ) -> dict[str, int]:
-        """
-        计算各心率区间的时长（秒）
+        """计算各心率区间的时长（委托到 analytics_effects 模块）"""
+        return calculate_zone_time(heart_rate_data, hr_zones)
 
-        Args:
-            heart_rate_data: 心率数据列表（每秒一个数据点）
-            hr_zones: 心率区间边界
-
-        Returns:
-            dict: 各区间时长（秒）
-        """
-        zone_time = {"zone1": 0, "zone2": 0, "zone3": 0, "zone4": 0, "zone5": 0}
-
-        if not heart_rate_data:
-            return zone_time
-
-        for hr in heart_rate_data:
-            if hr < hr_zones["zone1"][0]:
-                continue
-            elif hr < hr_zones["zone1"][1]:
-                zone_time["zone1"] += 1
-            elif hr < hr_zones["zone2"][1]:
-                zone_time["zone2"] += 1
-            elif hr < hr_zones["zone3"][1]:
-                zone_time["zone3"] += 1
-            elif hr < hr_zones["zone4"][1]:
-                zone_time["zone4"] += 1
-            else:
-                zone_time["zone5"] += 1
-
-        return zone_time
+    @staticmethod
+    def _calculate_training_effect(
+        total_duration: int,
+        zone_times: dict[str, int],
+        weights: dict[str, float],
+        scale: float,
+    ) -> float:
+        """训练效果通用计算方法（委托到 analytics_effects 模块）"""
+        return calculate_training_effect(total_duration, zone_times, weights, scale)
 
     def _calculate_aerobic_effect(
         self, zone_time: dict[str, int], total_duration: int
     ) -> float:
-        """
-        计算有氧训练效果（1.0-5.0）
-
-        有氧效果基于心率区间2-3的时间占比：
-        - 区间2（有氧基础）: 权重0.8
-        - 区间3（有氧耐力）: 权重1.0
-
-        Args:
-            zone_time: 各区间时长
-            total_duration: 总时长（秒）
-
-        Returns:
-            float: 有氧效果值（1.0-5.0）
-        """
-        if total_duration == 0:
-            return 1.0
-
-        # 计算区间2和区间3的加权时长
-        zone2_time = zone_time.get("zone2", 0)
-        zone3_time = zone_time.get("zone3", 0)
-
-        # 加权计算：区间3权重更高
-        weighted_time = zone2_time * 0.8 + zone3_time * 1.0
-
-        # 计算占比
-        ratio = weighted_time / total_duration
-
-        # 映射到1.0-5.0范围
-        # ratio 0.0 -> 1.0, ratio 0.5 -> 3.0, ratio 1.0 -> 5.0
-        effect = 1.0 + ratio * 4.0
-
-        return round(min(max(effect, 1.0), 5.0), 1)
+        """计算有氧训练效果（委托到 analytics_effects 模块）"""
+        return calculate_aerobic_effect(zone_time, total_duration)
 
     def _calculate_anaerobic_effect(
         self, zone_time: dict[str, int], total_duration: int
     ) -> float:
-        """
-        计算无氧训练效果（1.0-5.0）
-
-        无氧效果基于心率区间4-5的时间占比：
-        - 区间4（乳酸阈值）: 权重0.8
-        - 区间5（无氧耐力）: 权重1.2
-
-        Args:
-            zone_time: 各区间时长
-            total_duration: 总时长（秒）
-
-        Returns:
-            float: 无氧效果值（1.0-5.0）
-        """
-        if total_duration == 0:
-            return 1.0
-
-        # 计算区间4和区间5的加权时长
-        zone4_time = zone_time.get("zone4", 0)
-        zone5_time = zone_time.get("zone5", 0)
-
-        # 加权计算：区间5权重更高
-        weighted_time = zone4_time * 0.8 + zone5_time * 1.2
-
-        # 计算占比
-        ratio = weighted_time / total_duration
-
-        # 映射到1.0-5.0范围
-        # ratio 0.0 -> 1.0, ratio 0.3 -> 3.0, ratio 0.6 -> 5.0
-        effect = 1.0 + ratio * 6.67
-
-        return round(min(max(effect, 1.0), 5.0), 1)
+        """计算无氧训练效果（委托到 analytics_effects 模块）"""
+        return calculate_anaerobic_effect(zone_time, total_duration)
 
     def _calculate_recovery_time(
         self,
@@ -680,36 +599,10 @@ class AnalyticsEngine:
         avg_heart_rate: float,
         max_hr: int,
     ) -> int:
-        """
-        计算恢复时间（小时）
-
-        基于训练效果、时长和心率强度估算恢复时间
-
-        Args:
-            aerobic_effect: 有氧效果值
-            anaerobic_effect: 无氧效果值
-            duration_s: 训练时长（秒）
-            avg_heart_rate: 平均心率
-            max_hr: 最大心率
-
-        Returns:
-            int: 恢复时间（小时）
-        """
-        # 基础恢复时间（基于训练效果）
-        base_recovery = (aerobic_effect + anaerobic_effect) / 2 * 12  # 最大60小时
-
-        # 时长因子（每30分钟增加10%恢复时间）
-        duration_factor = 1.0 + (duration_s / 1800) * 0.1
-
-        # 心率强度因子
-        hr_intensity = avg_heart_rate / max_hr if max_hr > 0 else 0.5
-        hr_factor = 1.0 + (hr_intensity - 0.5) * 0.5
-
-        # 综合计算
-        recovery_hours = base_recovery * duration_factor * hr_factor
-
-        # 限制在6-72小时范围内
-        return int(min(max(recovery_hours, 6), 72))
+        """计算恢复时间（委托到 analytics_effects 模块）"""
+        return calculate_recovery_time(
+            aerobic_effect, anaerobic_effect, duration_s, avg_heart_rate, max_hr
+        )
 
     def get_training_effect(
         self,
@@ -755,10 +648,10 @@ class AnalyticsEngine:
             avg_heart_rate = sum(heart_rate_data) / len(heart_rate_data)
 
         # 计算心率区间
-        hr_zones = self._calculate_hr_zones(max_hr)
+        hr_zones = calculate_hr_zones(max_hr)
 
         # 计算各区间时长
-        zone_time = self._calculate_zone_time(heart_rate_data, hr_zones)
+        zone_time = calculate_zone_time(heart_rate_data, hr_zones)
 
         # 计算总时长（用于百分比计算）
         total_zone_time = sum(zone_time.values())
@@ -766,13 +659,13 @@ class AnalyticsEngine:
             total_zone_time = int(duration_s)
 
         # 计算有氧效果
-        aerobic_effect = self._calculate_aerobic_effect(zone_time, total_zone_time)
+        aerobic_effect = calculate_aerobic_effect(zone_time, total_zone_time)
 
         # 计算无氧效果
-        anaerobic_effect = self._calculate_anaerobic_effect(zone_time, total_zone_time)
+        anaerobic_effect = calculate_anaerobic_effect(zone_time, total_zone_time)
 
         # 计算恢复时间
-        recovery_hours = self._calculate_recovery_time(
+        recovery_hours = calculate_recovery_time(
             aerobic_effect, anaerobic_effect, duration_s, avg_heart_rate, max_hr
         )
 
@@ -942,7 +835,7 @@ class AnalyticsEngine:
                 message=f"年龄: {age}",
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"心率区间分析失败: {e}") from e
 
     def _calculate_zones_from_avg_hr(
@@ -1033,9 +926,11 @@ class AnalyticsEngine:
             message="基于平均心率估算",
         )
 
+    # ---- 委托到 analytics_reports 模块的方法 ----
+
     def generate_daily_report(self, age: int = 30) -> DailyReportData:
         """
-        生成每日晨报内容
+        生成每日晨报内容（委托到 analytics_reports 模块）
 
         包含：
         - 日期和问候语
@@ -1050,129 +945,15 @@ class AnalyticsEngine:
         Returns:
             DailyReportData: 晨报内容
         """
-        from datetime import datetime, timedelta
-
-        # 获取当前日期
-        now = datetime.now()
-        today = now.date()
-        yesterday = today - timedelta(days=1)
-
-        # 星期映射
-        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-
-        # 1. 生成日期和问候语
-        date_str = f"{today.year}年{today.month}月{today.day}日 {weekday_names[today.weekday()]}"
-        greeting = self._generate_greeting(now.hour, today.weekday())
-
-        # 2. 获取昨日训练摘要
-        yesterday_run = self._get_yesterday_run(yesterday)
-
-        # 3. 获取体能状态
-        fitness_status = self.get_training_load(days=42)
-
-        # 4. 生成训练建议
-        training_advice = self._generate_training_advice(
-            fitness_status, yesterday_run, today.weekday(), age
-        )
-
-        # 5. 生成本周训练计划预览
-        weekly_plan = self._generate_weekly_plan(today, fitness_status, age)
-
-        return DailyReportData(
-            date=date_str,
-            greeting=greeting,
-            yesterday_run=yesterday_run,
-            fitness_status={
-                "atl": fitness_status.get("atl", 0.0),
-                "ctl": fitness_status.get("ctl", 0.0),
-                "tsb": fitness_status.get("tsb", 0.0),
-                "status": fitness_status.get("fitness_status", "数据不足"),
-            },
-            training_advice=training_advice,
-            weekly_plan=weekly_plan,
-            generated_at=now.isoformat(),
-        )
+        return _generate_daily_report(self, age)
 
     def _generate_greeting(self, hour: int, weekday: int) -> str:
-        """
-        根据时间和星期生成问候语
-
-        Args:
-            hour: 当前小时（0-23）
-            weekday: 当前星期（0=周一，6=周日）
-
-        Returns:
-            str: 问候语
-        """
-        # 时间段问候
-        if 5 <= hour < 9:
-            time_greeting = "早上好"
-        elif 9 <= hour < 12:
-            time_greeting = "上午好"
-        elif 12 <= hour < 14:
-            time_greeting = "中午好"
-        elif 14 <= hour < 18:
-            time_greeting = "下午好"
-        else:
-            time_greeting = "晚上好"
-
-        # 根据星期添加训练提示
-        if weekday == 0:  # 周一
-            return f"{time_greeting}！新的一周开始了，让我们制定训练计划吧。"
-        elif weekday == 6:  # 周日
-            return f"{time_greeting}！今天是休息日，好好恢复吧。"
-        else:
-            return f"{time_greeting}！今天是您的训练日。"
+        """根据时间和星期生成问候语（委托到 analytics_reports 模块）"""
+        return generate_greeting(hour, weekday)
 
     def _get_yesterday_run(self, yesterday: date) -> dict[str, Any] | None:
-        """
-        获取昨日训练摘要
-
-        Args:
-            yesterday: 昨日日期对象
-
-        Returns:
-            Optional[Dict]: 昨日训练数据，无训练返回None
-        """
-        from datetime import datetime
-
-        try:
-            lf = self.storage.read_parquet()
-
-            # 过滤昨日的数据
-            start_of_yesterday = datetime.combine(yesterday, datetime.min.time())
-            end_of_yesterday = datetime.combine(yesterday, datetime.max.time())
-
-            df = lf.filter(
-                pl.col("timestamp").is_between(start_of_yesterday, end_of_yesterday)
-            ).collect()
-
-            if df.is_empty():
-                return None
-
-            # 计算昨日训练汇总
-            total_distance = df["session_total_distance"].sum()
-            total_duration = df["session_total_timer_time"].sum()
-
-            # 计算TSS
-            tss_values = []
-            for row in df.iter_rows(named=True):
-                tss = self.calculate_tss_for_run(
-                    distance_m=row.get("session_total_distance") or 0,
-                    duration_s=row.get("session_total_timer_time") or 0,
-                    avg_heart_rate=row.get("session_avg_heart_rate"),
-                )
-                tss_values.append(tss)
-            total_tss = sum(tss_values)
-
-            return {
-                "distance_km": round(total_distance / 1000, 2),
-                "duration_min": round(total_duration / 60, 1),
-                "tss": round(total_tss, 1),
-                "run_count": df.height,
-            }
-        except Exception:
-            return None
+        """获取昨日训练摘要（委托到 analytics_reports 模块）"""
+        return get_yesterday_run(self.storage, self.calculate_tss_for_run, yesterday)
 
     def _generate_training_advice(
         self,
@@ -1181,162 +962,20 @@ class AnalyticsEngine:
         weekday: int,
         _age: int,
     ) -> str:
-        """
-        基于训练负荷数据生成训练建议
-
-        Args:
-            fitness_status: 体能状态数据
-            yesterday_run: 昨日训练数据
-            weekday: 当前星期
-            age: 年龄
-
-        Returns:
-            str: 训练建议文本
-        """
-        tsb = fitness_status.get("tsb", 0.0)
-        status = fitness_status.get("fitness_status", "数据不足")
-        ctl = fitness_status.get("ctl", 0.0)
-
-        advice_parts = []
-
-        # 基于TSB状态生成建议
-        if status == "数据不足":
-            advice_parts.append("暂无足够数据生成个性化建议，请先导入更多训练数据。")
-            advice_parts.append("建议开始规律训练，每次训练都记录心率数据。")
-        elif tsb > 10:
-            advice_parts.append("状态良好，可以进行中等强度训练。")
-            if weekday in [1, 3, 5]:  # 周二、周四、周六
-                advice_parts.append("建议进行 8-10 公里的节奏跑，保持心率在区间3。")
-            elif weekday in [2, 4]:  # 周三、周五
-                advice_parts.append("建议进行轻松跑 6-8 公里，保持心率在区间2。")
-            else:
-                advice_parts.append("可以进行长距离慢跑或交叉训练。")
-        elif tsb > 0:
-            advice_parts.append("状态正常，可以保持正常训练节奏。")
-            advice_parts.append("建议进行 6-8 公里的轻松跑，注意监控身体反应。")
-        elif tsb > -10:
-            advice_parts.append("有一定训练累积疲劳，建议适当降低强度。")
-            advice_parts.append("建议进行轻松跑或交叉训练，保证充足休息。")
-        else:
-            advice_parts.append("警告：疲劳累积过多，建议安排休息日。")
-            advice_parts.append("建议进行 2-3 天轻松活动或完全休息。")
-
-        # 考虑昨日训练情况
-        if yesterday_run:
-            if yesterday_run["tss"] > 100:
-                advice_parts.append(
-                    f"昨日训练强度较高（TSS: {yesterday_run['tss']}），注意恢复。"
-                )
-            elif yesterday_run["tss"] > 50:
-                advice_parts.append("昨日进行了中等强度训练，今日可适度活动。")
-
-        # 基于CTL补充建议
-        if ctl < 30:
-            advice_parts.append("体能基础较弱，建议循序渐进增加训练量。")
-        elif ctl > 80:
-            advice_parts.append("体能基础扎实，可保持当前训练水平。")
-
-        return " ".join(advice_parts)
+        """基于训练负荷数据生成训练建议（委托到 analytics_reports 模块）"""
+        return generate_training_advice(fitness_status, yesterday_run, weekday, _age)
 
     def _generate_weekly_plan(
         self, today: date, fitness_status: dict[str, Any], _age: int
     ) -> list[dict[str, Any]]:
-        """
-        生成本周训练计划预览
-
-        Args:
-            today: 今日日期对象
-            fitness_status: 体能状态数据
-            age: 年龄
-
-        Returns:
-            List[Dict]: 每日训练计划列表
-        """
-        from datetime import timedelta
-
-        weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-        tsb = fitness_status.get("tsb", 0.0)
-        ctl = fitness_status.get("ctl", 0.0)
-
-        # 获取本周一的日期
-        monday = today - timedelta(days=today.weekday())
-
-        weekly_plan = []
-
-        for i in range(7):
-            current_date = monday + timedelta(days=i)
-            weekday_name = weekday_names[i]
-            is_today = current_date == today
-            is_past = current_date < today
-
-            # 根据TSB和星期生成计划
-            plan = self._get_daily_plan(i, tsb, ctl, is_past)
-            weekly_plan.append(
-                {
-                    "day": weekday_name,
-                    "date": current_date.strftime("%m/%d"),
-                    "plan": plan,
-                    "is_today": is_today,
-                    "is_past": is_past,
-                }
-            )
-
-        return weekly_plan
+        """生成本周训练计划预览（委托到 analytics_reports 模块）"""
+        return generate_weekly_plan(today, fitness_status, _age)
 
     def _get_daily_plan(
         self, weekday: int, tsb: float, _ctl: float, is_past: bool
     ) -> str:
-        """
-        获取单日训练计划
-
-        Args:
-            weekday: 星期几（0=周一，6=周日）
-            tsb: 训练压力平衡
-            ctl: 慢性训练负荷
-            is_past: 是否已过去
-
-        Returns:
-            str: 训练计划
-        """
-        if is_past:
-            return "已完成"
-
-        # 基于TSB调整训练计划
-        if tsb < -10:
-            # 过度训练状态，减少训练量
-            plans = {
-                0: "休息",
-                1: "轻松跑 4km",
-                2: "休息",
-                3: "轻松跑 5km",
-                4: "休息",
-                5: "轻松跑 4km",
-                6: "休息",
-            }
-        elif tsb < 0:
-            # 轻度疲劳状态
-            plans = {
-                0: "休息",
-                1: "轻松跑 6km",
-                2: "节奏跑 8km",
-                3: "轻松跑 5km",
-                4: "间歇跑 6km",
-                5: "轻松跑 6km",
-                6: "休息",
-            }
-        else:
-            # 状态良好
-            plans = {
-                0: "休息",
-                1: "轻松跑 6km",
-                2: "节奏跑 8km",
-                3: "轻松跑 5km",
-                4: "间歇跑 8km",
-                5: "轻松跑 6km",
-                6: "长距离跑 15km",
-            }
-
-        return plans.get(weekday, "休息")
+        """获取单日训练计划（委托到 analytics_reports 模块）"""
+        return get_daily_plan(weekday, tsb, _ctl, is_past)
 
     def get_training_load_trend(
         self,
@@ -1361,18 +1000,7 @@ class AnalyticsEngine:
         Returns:
             dict: 训练负荷趋势数据，包含：
                 - trend_data: 每日训练负荷数据列表
-                    - date: 日期
-                    - tss: 当日 TSS 总和
-                    - atl: 急性训练负荷
-                    - ctl: 慢性训练负荷
-                    - tsb: 训练压力平衡
-                    - status: 体能状态
                 - summary: 汇总信息
-                    - current_atl: 当前 ATL
-                    - current_ctl: 当前 CTL
-                    - current_tsb: 当前 TSB
-                    - status: 当前体能状态
-                    - recommendation: 训练建议
 
         Raises:
             ValueError: 当日期格式无效时
@@ -1498,7 +1126,7 @@ class AnalyticsEngine:
         # 计算累积的 ATL、CTL、TSB
         # 需要包含历史数据进行 EWMA 计算
         # 先获取历史 TSS 数据（在 start_date 之前的）
-        history_tss = {}
+        history_tss: dict[str, float] = {}
         for record in tss_records:
             ts = record["timestamp"]
             date_key = ts.strftime("%Y-%m-%d")
@@ -1512,7 +1140,7 @@ class AnalyticsEngine:
         historical_tss_values = [tss for _, tss in sorted_history]
 
         # 计算每日趋势
-        trend_data = []
+        trend_data: list[dict[str, Any]] = []
         cumulative_tss = historical_tss_values.copy()  # 累积的 TSS 列表
 
         for row in complete_daily.iter_rows(named=True):
@@ -1583,3 +1211,31 @@ class AnalyticsEngine:
             PaceDistributionResult: 配速分布数据
         """
         return self.statistics_aggregator.get_pace_distribution(year)
+
+
+# Re-exports：保持向后兼容，所有从 src.core.analytics 的导入仍然有效
+__all__ = [
+    "AnalyticsEngine",
+    "_resolve_col",
+    # analytics_effects 模块的 re-exports
+    "calculate_hr_zones",
+    "calculate_zone_time",
+    "calculate_training_effect",
+    "calculate_aerobic_effect",
+    "calculate_anaerobic_effect",
+    "calculate_recovery_time",
+    # analytics_reports 模块的 re-exports
+    "generate_greeting",
+    "get_yesterday_run",
+    "generate_training_advice",
+    "get_daily_plan",
+    "generate_weekly_plan",
+    # 常量 re-exports
+    "VDOT_COEFFICIENT",
+    "VDOT_DISTANCE_EXPONENT",
+    "VDOT_TIME_EXPONENT",
+    "VDOT_MULTIPLIER",
+    "DEFAULT_LTHR",
+    "ATL_TIME_CONSTANT",
+    "CTL_TIME_CONSTANT",
+]

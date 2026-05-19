@@ -7,6 +7,7 @@ import typer
 
 from src.cli.common import CLIError, console, print_error, print_status
 from src.cli.handlers.data_handler import DataHandler
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="数据管理命令")
 
@@ -63,7 +64,7 @@ def import_data(
             print_error(CLIError.path_not_found(path))
             raise typer.Exit(1)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.import_failed(str(e)))
         raise typer.Exit(1)
 
@@ -143,7 +144,7 @@ def stats(
 
         console.print(format_stats_panel(stats_data))
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(
             {
                 "message": f"获取统计失败: {str(e)}",
@@ -218,6 +219,6 @@ def recent(
 
         console.print(table)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

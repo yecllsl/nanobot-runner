@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.tools.models import MCPServerConfig
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ async def connect_mcp_tools_from_config(
             "failed_servers": failed_servers,
             "exit_stacks": exit_stacks,
         }
-    except Exception as e:
+    except NanobotRunnerError as e:
         logger.error(f"连接MCP服务器失败: {e}")
         return {
             "connected_servers": [],

@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, Mock
 import polars as pl
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.profile import (
     ANOMALY_FILTER_RULES,
     AnomalyFilterRule,
@@ -219,7 +220,7 @@ class TestProfileEngineCheckFreshness:
     def test_exception_handling(self, profile_engine, mock_storage):
         """测试异常处理"""
         profile_engine.storage_manager.load_profile_json = Mock(
-            side_effect=Exception("加载失败")
+            side_effect=NanobotRunnerError("加载失败")
         )
 
         with pytest.raises(RuntimeError, match="检查画像保鲜期失败"):

@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from src.cli.common import CLIError, console, print_error
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="工具管理命令")
 
@@ -78,7 +79,7 @@ def list_tools() -> None:
             f"(启用: {enabled_count}, 禁用: {disabled_count})[/dim]"
         )
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -152,7 +153,7 @@ def add_server(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -184,7 +185,7 @@ def remove_server(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -216,7 +217,7 @@ def enable_server(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -248,7 +249,7 @@ def disable_server(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -287,7 +288,7 @@ def import_claude_config(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -315,6 +316,6 @@ def validate_config() -> None:
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

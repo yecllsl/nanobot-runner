@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.core.base.exceptions import ConfigError
+from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.manager import ConfigManager
 
@@ -101,7 +101,7 @@ class ConfigMigrator:
                 config_path=config_path,
                 env_path=env_path,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return MigrationResult(
                 success=False,
                 errors=[f"保存迁移配置失败: {e}"],
@@ -195,7 +195,7 @@ class ConfigMigrator:
             existing_config: dict[str, Any] = {}
             try:
                 existing_config = self._runner_config.load_config()
-            except Exception:
+            except NanobotRunnerError:
                 existing_config = self._runner_config._get_default_config()
 
             existing_config.update(llm_config)

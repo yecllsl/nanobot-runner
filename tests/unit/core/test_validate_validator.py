@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.config.manager import ConfigManager
 from src.core.validate.models import (
     ConnectivityResult,
@@ -222,7 +223,9 @@ class TestConfigValidator:
                 config = ConfigManager(allow_default=True)
                 validator = ConfigValidator(config=config)
 
-                with patch.object(config, "load_config", side_effect=Exception("fail")):
+                with patch.object(
+                    config, "load_config", side_effect=NanobotRunnerError("fail")
+                ):
                     errors = validator.validate_completeness()
                     assert errors == []
 
@@ -232,7 +235,9 @@ class TestConfigValidator:
                 config = ConfigManager(allow_default=True)
                 validator = ConfigValidator(config=config)
 
-                with patch.object(config, "load_config", side_effect=Exception("fail")):
+                with patch.object(
+                    config, "load_config", side_effect=NanobotRunnerError("fail")
+                ):
                     errors = validator.validate_validity()
                     assert errors == []
 
@@ -263,7 +268,9 @@ class TestConfigValidator:
                 config = ConfigManager(allow_default=True)
                 validator = ConfigValidator(config=config)
 
-                with patch.object(config, "load_config", side_effect=Exception("fail")):
+                with patch.object(
+                    config, "load_config", side_effect=NanobotRunnerError("fail")
+                ):
                     result = validator.test_api_connectivity()
                     assert result.is_connected is False
                     assert "无法加载配置" in result.error_message
@@ -334,7 +341,7 @@ class TestConfigValidator:
                 ):
                     with patch(
                         "urllib.request.urlopen",
-                        side_effect=Exception("connection failed"),
+                        side_effect=NanobotRunnerError("connection failed"),
                     ):
                         result = validator.test_api_connectivity(provider="openai")
                         assert result.is_connected is False

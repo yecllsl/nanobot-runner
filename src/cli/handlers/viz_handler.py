@@ -9,6 +9,7 @@ from typing import Any
 from rich.table import Table
 
 from src.core.analytics import AnalyticsEngine
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import HRZoneResult, VdotTrendItem
 from src.core.visualization.models import ChartConfig, ChartData, DataSeries
 from src.core.visualization.renderer import ChartRenderer
@@ -57,7 +58,7 @@ class VizHandler:
                 chart_data,
                 self.chart_renderer.render_line_chart,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return f"VDOT 图表渲染失败: {e}"
 
     def handle_load(self, days: int) -> str:
@@ -84,7 +85,7 @@ class VizHandler:
                 chart_data,
                 self.chart_renderer.render_multi_line_chart,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return f"训练负荷图表渲染失败: {e}"
 
     def handle_hr_zones(
@@ -123,7 +124,7 @@ class VizHandler:
                 chart_data,
                 self.chart_renderer.render_stacked_bar_chart,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return f"心率区间图表渲染失败: {e}"
 
     def _render_with_fallback(
@@ -142,7 +143,7 @@ class VizHandler:
         """
         try:
             return render_func(data, ChartConfig())
-        except Exception:
+        except NanobotRunnerError:
             # 降级为 Rich Table 纯文字表格
             return self._render_text_table(data)
 

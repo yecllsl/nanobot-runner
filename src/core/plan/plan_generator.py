@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from typing import Any
 
-from src.core.base.exceptions import LLMError, ValidationError
+from src.core.base.exceptions import LLMError, NanobotRunnerError, ValidationError
 from src.core.base.logger import get_logger
 from src.core.models import (
     DailyPlan,
@@ -248,7 +248,7 @@ class PlanGenerator:
             return response
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
-            raise LLMError(f"LLM调用失败: {e}")
+            raise LLMError(f"LLM调用失败: {e}") from e
 
     def _parse_llm_response(
         self,
@@ -339,6 +339,6 @@ class PlanGenerator:
         except KeyError as e:
             logger.error(f"缺少必需字段: {e}")
             raise ValidationError(f"LLM响应缺少必需字段: {e}") from e
-        except Exception as e:
+        except (NanobotRunnerError, TypeError, ValueError, AttributeError) as e:
             logger.error(f"解析LLM响应失败: {e}")
             raise ValidationError(f"解析LLM响应失败: {e}") from e

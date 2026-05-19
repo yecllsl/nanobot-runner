@@ -19,6 +19,7 @@ from src.core.models.analytics import (
     WeatherInfo,
     WeeklyReportData,
 )
+from src.core.models.anomaly_schema import ANOMALY_FILTER_RULES, AnomalyFilterRule
 from src.core.models.recovery import RecoveryStatus
 from src.core.models.training_plan import (
     DailyPlan,
@@ -98,4 +99,6 @@ __all__ = [
     "WeeklyReportData",
     "MonthlyReportData",
     "RecoveryStatus",
+    "AnomalyFilterRule",
+    "ANOMALY_FILTER_RULES",
 ]

@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import (
     DailyPlan,
     NotifyResult,
@@ -352,7 +353,9 @@ class TestNotifyToolSendReminder:
 
     def test_send_reminder_exception(self, notify_tool):
         """测试发送异常"""
-        notify_tool.feishu_bot.send_card = Mock(side_effect=Exception("测试异常"))
+        notify_tool.feishu_bot.send_card = Mock(
+            side_effect=NanobotRunnerError("测试异常")
+        )
 
         daily_plan = create_test_daily_plan()
         user_context = create_test_user_context()

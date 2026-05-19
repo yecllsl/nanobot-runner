@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from src.cli.app import app
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import PlanExecutionStats
 
 runner = CliRunner()
@@ -98,7 +99,7 @@ class TestPlanLogCommand:
         """测试计划不存在"""
         mock_context = MagicMock()
         mock_plan_manager = MagicMock()
-        mock_plan_manager.record_execution.side_effect = Exception(
+        mock_plan_manager.record_execution.side_effect = NanobotRunnerError(
             "计划不存在：plan_unknown"
         )
         mock_context.plan_manager = mock_plan_manager
@@ -190,7 +191,7 @@ class TestPlanStatsCommand:
         """测试计划不存在"""
         mock_context = MagicMock()
         mock_execution_repo = MagicMock()
-        mock_execution_repo.get_plan_execution_stats.side_effect = Exception(
+        mock_execution_repo.get_plan_execution_stats.side_effect = NanobotRunnerError(
             "计划不存在：plan_unknown"
         )
         mock_context.plan_execution_repo = mock_execution_repo

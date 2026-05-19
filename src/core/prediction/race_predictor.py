@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
+from src.core.base.formatters import format_pace_with_unit
 from src.core.prediction.models import (
     PaceSplit,
     PaceStrategy,
@@ -82,7 +84,7 @@ class RacePredictor:
                 riegel, distances, times, p0=[times[0], RIEGEL_STANDARD_EXPONENT]
             )
             self._riegel_exponent = max(0.95, min(1.15, float(popt[1])))
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"Riegel拟合失败，使用标准值: {e}")
             self._riegel_exponent = RIEGEL_STANDARD_EXPONENT
 
@@ -117,7 +119,7 @@ class RacePredictor:
                 fatigue_val = features.features.flatten()
                 if len(fatigue_val) >= 4:
                     fatigue_adj = float(fatigue_val[3]) * 0.03
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"赛前疲劳修正提取失败: {e}")
 
         predicted_seconds *= 1.0 + fatigue_adj
@@ -193,7 +195,7 @@ class RacePredictor:
                     return "speed"
                 else:
                     return "balanced"
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"选手类型判断失败: {e}")
         return "balanced"
 
@@ -212,7 +214,7 @@ class RacePredictor:
                     ratios.append(actual / predicted)
             if ratios:
                 return round(sum(ratios) / len(ratios), 3)
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"修正因子估算失败: {e}")
         return 1.0
 
@@ -239,7 +241,7 @@ class RacePredictor:
                 splits.append(
                     PaceSplit(
                         segment=seg,
-                        pace=self._format_pace(pace),
+                        pace=format_pace_with_unit(pace),
                         pace_seconds=round(pace, 1),
                     )
                 )
@@ -247,7 +249,7 @@ class RacePredictor:
             splits.append(
                 PaceSplit(
                     segment="全程",
-                    pace=self._format_pace(avg_pace),
+                    pace=format_pace_with_unit(avg_pace),
                     pace_seconds=round(avg_pace, 1),
                 )
             )
@@ -261,10 +263,3 @@ class RacePredictor:
         m = int((seconds % 3600) // 60)
         s = int(seconds % 60)
         return f"{h}:{m:02d}:{s:02d}"
-
-    @staticmethod
-    def _format_pace(pace_seconds: float) -> str:
-        """格式化配速为 M'SS"/km"""
-        m = int(pace_seconds // 60)
-        s = int(pace_seconds % 60)
-        return f"{m}'{s:02d}\"/km"

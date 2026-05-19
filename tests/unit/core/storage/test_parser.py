@@ -9,7 +9,7 @@ from unittest.mock import Mock, PropertyMock, patch
 import polars as pl
 import pytest
 
-from src.core.base.exceptions import ParseError, ValidationError
+from src.core.base.exceptions import NanobotRunnerError, ParseError, ValidationError
 from src.core.storage.parser import FitParser
 
 
@@ -106,7 +106,7 @@ class TestFitParser:
         """测试FIT解析错误"""
         parser = FitParser()
 
-        with patch("fitparse.FitFile", side_effect=Exception("Parse error")):
+        with patch("fitparse.FitFile", side_effect=NanobotRunnerError("Parse error")):
             with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
                 temp_path = Path(f.name)
 
@@ -120,7 +120,7 @@ class TestFitParser:
         """测试通用错误"""
         parser = FitParser()
 
-        with patch("fitparse.FitFile", side_effect=Exception("Unknown error")):
+        with patch("fitparse.FitFile", side_effect=NanobotRunnerError("Unknown error")):
             with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
                 temp_path = Path(f.name)
 
@@ -198,7 +198,7 @@ class TestFitParser:
         """测试元数据解析错误"""
         parser = FitParser()
 
-        with patch("fitparse.FitFile", side_effect=Exception("Parse error")):
+        with patch("fitparse.FitFile", side_effect=NanobotRunnerError("Parse error")):
             with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
                 temp_path = Path(f.name)
 
@@ -683,7 +683,9 @@ class TestFitParserAdvanced:
         """测试验证损坏的FIT文件"""
         parser = FitParser()
 
-        with patch("fitparse.FitFile", side_effect=Exception("File corrupted")):
+        with patch(
+            "fitparse.FitFile", side_effect=NanobotRunnerError("File corrupted")
+        ):
             with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
                 temp_path = Path(f.name)
 
@@ -825,7 +827,9 @@ class TestFitParserBoundaryConditions:
         parser = FitParser()
 
         # 模拟外层异常
-        with patch("pathlib.Path.exists", side_effect=Exception("System error")):
+        with patch(
+            "pathlib.Path.exists", side_effect=NanobotRunnerError("System error")
+        ):
             with tempfile.NamedTemporaryFile(suffix=".fit", delete=False) as f:
                 temp_path = Path(f.name)
 
@@ -847,7 +851,7 @@ class TestFitParserSessionMetadata:
 
         # 创建一个会导致异常的DataFrame
         mock_df = Mock()
-        mock_df.with_columns.side_effect = Exception("DataFrame error")
+        mock_df.with_columns.side_effect = NanobotRunnerError("DataFrame error")
 
         with pytest.raises(ParseError, match="添加会话元数据失败"):
             parser._add_session_metadata(mock_df, {"test": "value"})
@@ -890,7 +894,9 @@ class TestFitParserDirectoryEdgeCases:
             txt_file.touch()
 
             # Mock fitparse.FitFile 抛出异常
-            with patch("fitparse.FitFile", side_effect=Exception("Invalid file")):
+            with patch(
+                "fitparse.FitFile", side_effect=NanobotRunnerError("Invalid file")
+            ):
                 result = parser.parse_directory(tmp_path)
 
                 # 应返回空DataFrame
@@ -940,7 +946,7 @@ class TestFitParserDirectoryEdgeCases:
         mock_path = Mock(spec=Path)
         mock_path.exists.return_value = True
         mock_path.is_dir.return_value = True
-        mock_path.glob.side_effect = Exception("Glob error")
+        mock_path.glob.side_effect = NanobotRunnerError("Glob error")
 
         with pytest.raises(ParseError, match="解析目录失败"):
             parser.parse_directory(mock_path)
@@ -1063,7 +1069,7 @@ class TestFitParserDataQuality:
         mock_df = Mock()
         mock_df.columns = ["timestamp"]
         mock_df.height = 1
-        mock_df.__getitem__ = Mock(side_effect=Exception("DataFrame error"))
+        mock_df.__getitem__ = Mock(side_effect=NanobotRunnerError("DataFrame error"))
 
         with pytest.raises(ParseError, match="数据质量验证失败"):
             parser._validate_data_quality(mock_df)
@@ -1158,7 +1164,7 @@ class TestFitParserQualityScore:
         mock_df.columns = ["timestamp"]
         # 模拟异常
         del mock_df.height
-        mock_df.height = PropertyMock(side_effect=Exception("Error"))
+        mock_df.height = PropertyMock(side_effect=NanobotRunnerError("Error"))
 
         score = parser._calculate_quality_score(mock_df, [], {})
 

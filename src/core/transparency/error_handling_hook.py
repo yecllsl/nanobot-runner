@@ -9,6 +9,7 @@ import traceback
 from nanobot.agent.hook import AgentHook, AgentHookContext
 from rich.console import Console
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.transparency.error_classifier import ErrorClassifier, FriendlyError
 from src.core.transparency.observability_manager import ObservabilityManager
 
@@ -71,7 +72,7 @@ class ErrorHandlingHook(AgentHook):
                         "original_error": str(original_error),
                     },
                 )
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.warning(f"记录错误到ObservabilityManager失败: {e}")
 
         # 输出错误信息

@@ -9,6 +9,7 @@ from typing import Any
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.models import (
     ModelManagementResult,
     ModelStatus,
@@ -102,7 +103,7 @@ class ModelManager:
             model = joblib.load(str(model_path))
         except ImportError:
             raise ImportError("joblib未安装，无法加载模型。请运行: pip install joblib")
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"模型加载失败: {e}")
             return None
 
@@ -136,7 +137,7 @@ class ModelManager:
                 return False
         except ImportError:
             pass
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"sklearn版本校验异常: {e}")
 
         return True
@@ -428,7 +429,7 @@ class ModelManager:
                     sessions = session_repo.get_sessions_by_date_range(
                         target_date, target_date
                     )
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.debug(f"获取日期范围session失败({date_str}): {e}")
                     sessions = []
                 if sessions:
@@ -441,7 +442,7 @@ class ModelManager:
                         if duration and duration > 0:
                             actuals[date_str] = float(duration)
             return actuals
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"获取实际值失败: {e}")
             return {}
 

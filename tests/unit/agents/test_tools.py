@@ -22,6 +22,7 @@ from src.agents.tools import (
     UpdateMemoryTool,
     create_tools,
 )
+from src.core.base.exceptions import NanobotRunnerError
 from tests.conftest import create_mock_context
 
 
@@ -116,7 +117,7 @@ class TestBaseTool:
             tool = GetRunningStatsTool(runner_tools)
 
             def mock_func():
-                raise ValueError("test error")
+                raise NanobotRunnerError("test error")
 
             result = tool._run_sync(mock_func)
             assert "error" in result
@@ -985,7 +986,9 @@ class TestRunnerTools:
             ) as MockProfileStorage:
                 mock_profile_storage = MagicMock()
                 MockProfileStorage.return_value = mock_profile_storage
-                mock_profile_storage.save_memory_md.side_effect = Exception("测试异常")
+                mock_profile_storage.save_memory_md.side_effect = NanobotRunnerError(
+                    "测试异常"
+                )
 
                 runner_tools = RunnerTools()
                 result = runner_tools.update_memory("测试笔记")
@@ -1375,7 +1378,7 @@ class TestRunnerToolsSpawnSubagent:
             mock_lf = MagicMock()
             mock_storage.read_parquet.return_value = mock_lf
             # 模拟数据查询异常
-            mock_lf.sort.side_effect = Exception("数据库错误")
+            mock_lf.sort.side_effect = NanobotRunnerError("数据库错误")
 
             runner_tools = RunnerTools(
                 context=create_mock_context(storage=mock_storage)
@@ -1408,7 +1411,7 @@ class TestRunnerToolsSpawnSubagent:
             with patch.object(
                 runner_tools,
                 "_invoke_subagent",
-                side_effect=Exception("Subagent调用失败"),
+                side_effect=NanobotRunnerError("Subagent调用失败"),
             ):
                 result = runner_tools.spawn_subagent(
                     subagent_type="data_analyst",

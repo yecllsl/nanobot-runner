@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.feature_engine import INJURY_FEATURE_NAMES
 from src.core.prediction.models import (
     AcuteLoadRisk,
@@ -126,7 +127,7 @@ class InjuryPredictor:
                 json.dumps(label_data, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"保存伤病标签失败: {e}")
 
     def train_model(self) -> ModelTrainingResult:
@@ -232,7 +233,7 @@ class InjuryPredictor:
                 success=True,
                 message=f"伤病预测模型训练完成: {len(y)}条样本, LR+GBDT集成",
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"伤病模型训练失败: {e}")
             return ModelTrainingResult(
                 model_type="injury_predictor",
@@ -276,7 +277,7 @@ class InjuryPredictor:
                     reference_date=s_date
                 )
                 feat = matrix.features.flatten().tolist()
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"Injury特征提取失败({s_date}): {e}")
                 continue
 
@@ -327,7 +328,7 @@ class InjuryPredictor:
                                 date_str = item.get("date", "")
                                 if date_str:
                                     labels.add(str(date_str)[:10])
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"加载伤病标签失败: {e}")
         return labels
 
@@ -352,7 +353,7 @@ class InjuryPredictor:
                 if model is not None:
                     try:
                         return self._run_ml_inference(model, days)
-                    except Exception as e:
+                    except NanobotRunnerError as e:
                         logger.warning(f"ML推理失败，尝试重训: {e}")
                         train_result = self.train_model()
                         if train_result.success:
@@ -362,7 +363,7 @@ class InjuryPredictor:
                             if retrained is not None:
                                 try:
                                     return self._run_ml_inference(retrained, days)
-                                except Exception as e2:
+                                except NanobotRunnerError as e2:
                                     logger.warning(f"重训后推理仍失败: {e2}")
 
         logger.info("无已训练ML模型，尝试自动训练")
@@ -372,7 +373,7 @@ class InjuryPredictor:
             if model is not None:
                 try:
                     return self._run_ml_inference(model, days)
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.warning(f"自动训练后推理失败: {e}")
 
         logger.info("ML训练/推理失败，降级到参数化预测")
@@ -430,7 +431,7 @@ class InjuryPredictor:
             matrix = self._feature_engine.extract_injury_features(days=days)
             proba = self._logistic_model.predict_proba(matrix.features)
             risk_score = float(proba[0]) * 100
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"参数化伤病预测失败: {e}")
             risk_score = 30.0
 
@@ -460,7 +461,7 @@ class InjuryPredictor:
             risk_score = result.get("risk_score", 20.0)
             risk_level = result.get("risk_level", "low")
             advice = result.get("advice", "")
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"规则基线预测失败: {e}")
             risk_score = 20.0
             risk_level = "low"
@@ -521,7 +522,7 @@ class InjuryPredictor:
                     return float(result)
                 if isinstance(result, dict):
                     return float(result.get("acwr", 1.2))
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"ACWR计算失败: {e}")
         return 1.2
 
@@ -540,7 +541,7 @@ class InjuryPredictor:
                     )
                     if older_tss > 0:
                         return round((recent_tss - older_tss) / older_tss * 100, 1)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"周负荷变化计算失败: {e}")
         return 10.0
 
@@ -551,7 +552,7 @@ class InjuryPredictor:
                 result = self._injury_analyzer.get_tsb_low_days()
                 if isinstance(result, int):
                     return result
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"TSB低天数获取失败: {e}")
         return 2
 
@@ -562,7 +563,7 @@ class InjuryPredictor:
                 result = self._injury_analyzer.get_resting_hr_deviation()
                 if isinstance(result, (int, float)):
                     return float(result)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"静息心率偏差获取失败: {e}")
         return 5.0
 
@@ -573,7 +574,7 @@ class InjuryPredictor:
                 result = self._injury_analyzer.get_fatigue_score()
                 if isinstance(result, (int, float)):
                     return float(result)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"疲劳度评分获取失败: {e}")
         return 40.0
 

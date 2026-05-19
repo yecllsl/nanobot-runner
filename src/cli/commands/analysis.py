@@ -9,6 +9,7 @@ from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error
 from src.cli.handlers.analysis_handler import AnalysisHandler
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="数据分析命令")
 
@@ -87,7 +88,7 @@ def vdot(
                 json.dump(trend_data, f, ensure_ascii=False, indent=2)
             console.print(f"\n[green]✓[/green] 数据已保存到: {output}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -151,7 +152,7 @@ def hrv(
             if sdnn:
                 console.print(f"  SDNN: {sdnn:.2f} ms")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -190,7 +191,7 @@ def hr_recovery() -> None:
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -246,7 +247,7 @@ def fatigue(
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -287,7 +288,7 @@ def recovery() -> None:
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -345,7 +346,7 @@ def compare(
         console.print(table)
         console.print(f"\n[bold]总结:[/bold] {summary}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -395,7 +396,7 @@ def training_load(
 
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -452,6 +453,6 @@ def hr_drift(
 
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

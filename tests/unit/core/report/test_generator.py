@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import polars as pl
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import ReportData, ReportType, VdotTrendItem
 from src.core.report.generator import ReportConfig, ReportGenerator, TemplateEngine
 
@@ -247,7 +248,9 @@ class TestGenerateReport:
 
     def test_generate_report_with_exception(self, generator, mock_context):
         """测试生成报告时发生异常"""
-        mock_context.analytics.get_running_summary.side_effect = Exception("数据库错误")
+        mock_context.analytics.get_running_summary.side_effect = NanobotRunnerError(
+            "数据库错误"
+        )
 
         result = generator.generate_report(
             report_type=ReportType.WEEKLY,

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.tools.mcp_connector import (
     connect_mcp_tools_from_config,
     load_mcp_servers_config,
@@ -150,7 +151,7 @@ class TestConnectMcpToolsFromConfig:
     @patch("nanobot.agent.tools.mcp.connect_mcp_servers", new_callable=AsyncMock)
     async def test_connection_failure(self, mock_connect, config_with_weather: Path):
         """测试MCP服务器连接失败"""
-        mock_connect.side_effect = Exception("Connection failed")
+        mock_connect.side_effect = NanobotRunnerError("Connection failed")
 
         registry = MagicMock()
         result = await connect_mcp_tools_from_config(config_with_weather, registry)

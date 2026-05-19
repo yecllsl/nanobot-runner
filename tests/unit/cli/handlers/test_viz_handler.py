@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from src.cli.handlers.viz_handler import VizHandler
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import VdotTrendItem
 from src.core.visualization.models import ChartData, DataSeries
 
@@ -164,7 +165,7 @@ class TestRenderWithFallback:
 
     def test_render_fallback_to_table(self, handler, mock_renderer):
         """测试渲染失败时降级为文字表格"""
-        mock_renderer.render_line_chart.side_effect = Exception("render error")
+        mock_renderer.render_line_chart.side_effect = NanobotRunnerError("render error")
         data = ChartData(
             title="Test",
             x_label="x",

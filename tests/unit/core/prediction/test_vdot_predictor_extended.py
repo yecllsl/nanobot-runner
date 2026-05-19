@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.models import DataQuality
 from src.core.prediction.vdot_predictor import VDOTPredictor
 
@@ -81,7 +82,7 @@ class TestVDOTPredictorGetTssSeries:
 
     def test_get_tss_series_exception(self):
         session_repo = MagicMock()
-        session_repo.get_recent_sessions.side_effect = Exception("db error")
+        session_repo.get_recent_sessions.side_effect = NanobotRunnerError("db error")
         predictor = VDOTPredictor(session_repo=session_repo, base_vdot=45.0)
         result = predictor._get_tss_series()
         assert result == []
@@ -200,7 +201,7 @@ class TestVDOTPredictorPredictParametric:
 
     def test_parametric_banister_failure(self):
         banister = MagicMock()
-        banister.predict.side_effect = Exception("model error")
+        banister.predict.side_effect = NanobotRunnerError("model error")
         predictor = VDOTPredictor(
             data_assessor=_make_assessor(sufficient=False, parametric=True),
             banister_model=banister,
@@ -312,7 +313,7 @@ class TestVDOTPredictorFeatureImportance:
 class TestVDOTPredictorTrainModelEdgeCases:
     def test_train_model_exception(self):
         session_repo = MagicMock()
-        session_repo.get_sessions_for_vdot.side_effect = Exception("db error")
+        session_repo.get_sessions_for_vdot.side_effect = NanobotRunnerError("db error")
         predictor = VDOTPredictor(
             feature_engine=_make_feature_engine(),
             session_repo=session_repo,

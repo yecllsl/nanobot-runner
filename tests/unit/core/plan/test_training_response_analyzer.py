@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import (
     PlanExecutionStats,
     TrainingResponsePattern,
@@ -81,7 +82,9 @@ class TestAnalyzePlanResponse:
         assert "overall_assessment" in result["data"]
 
     def test_returns_error_on_exception(self):
-        self.mock_repo.get_plan_execution_stats.side_effect = Exception("db error")
+        self.mock_repo.get_plan_execution_stats.side_effect = NanobotRunnerError(
+            "db error"
+        )
 
         result = self.analyzer.analyze_plan_response("test_plan")
 

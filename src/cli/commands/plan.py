@@ -6,6 +6,7 @@
 import typer
 
 from src.cli.common import CLIError, console, print_error, print_status
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="训练计划执行反馈命令")
 
@@ -58,7 +59,7 @@ def create_plan(
             f"    nanobotrun plan log {plan_id} <日期> --completion 0.8 --effort 6"
         )
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"创建失败：{e}"))
         raise typer.Exit(1)
 
@@ -117,7 +118,7 @@ def log_execution(
             )
             raise typer.Exit(1)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         if "计划不存在" in str(e) or "日期不存在" in str(e):
             print_error(CLIError.execution_record_failed(str(e)))
         else:
@@ -156,7 +157,7 @@ def get_stats(
         if stats.avg_hr_drift is not None:
             console.print(f"  平均心率漂移: {stats.avg_hr_drift:.3f}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"查询失败：{e}"))
         raise typer.Exit(1)
 
@@ -225,7 +226,7 @@ def adjust_plan(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"调整失败：{e}"))
         raise typer.Exit(1)
 
@@ -286,7 +287,7 @@ def get_suggestions(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"获取建议失败：{e}"))
         raise typer.Exit(1)
 
@@ -333,7 +334,7 @@ def evaluate_goal(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"目标评估失败：{e}"))
         raise typer.Exit(1)
 
@@ -413,7 +414,7 @@ def create_long_term_plan(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"创建长期规划失败：{e}"))
         raise typer.Exit(1)
 
@@ -464,6 +465,6 @@ def get_training_advice(
 
     except typer.Exit:
         raise
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"获取训练建议失败：{e}"))
         raise typer.Exit(1)

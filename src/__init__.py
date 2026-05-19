@@ -4,6 +4,8 @@
 import tomllib
 from pathlib import Path
 
+from src.core.base.exceptions import NanobotRunnerError
+
 
 def _get_version() -> str:
     """从 pyproject.toml 动态读取版本号"""
@@ -12,7 +14,7 @@ def _get_version() -> str:
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
             return data["project"]["version"]
-    except Exception:
+    except NanobotRunnerError:
         return "0.0.0"
 
 

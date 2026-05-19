@@ -2,10 +2,11 @@
 # 提供跑步数据的统计汇总功能
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import PaceDistributionResult, RunningStats
 
 if TYPE_CHECKING:
@@ -92,45 +93,8 @@ class StatisticsAggregator:
             )
 
             return result
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"获取跑步摘要失败: {e}") from e
-
-    def _format_duration(self, duration_s: float) -> str:
-        """
-        格式化时长（HH:MM:SS）
-
-        Args:
-            duration_s: 时长（秒）
-
-        Returns:
-            str: 格式化后的时长
-        """
-        try:
-            hours = int(duration_s // 3600)
-            minutes = int((duration_s % 3600) // 60)
-            seconds = int(duration_s % 60)
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        except Exception:
-            return "00:00:00"
-
-    def _format_pace(self, pace_sec_per_km: float | None) -> str:
-        """
-        格式化配速（M'SS"/km）
-
-        Args:
-            pace_sec_per_km: 配速（秒/公里）
-
-        Returns:
-            str: 格式化后的配速
-        """
-        try:
-            if pace_sec_per_km is None or pace_sec_per_km <= 0:
-                return "0'00\""
-            minutes = int(pace_sec_per_km // 60)
-            seconds = int(pace_sec_per_km % 60)
-            return f"{minutes}'{seconds:02d}\""
-        except Exception:
-            return "0'00\""
 
     def get_running_stats(self, year: int | None = None) -> RunningStats:
         """
@@ -181,7 +145,7 @@ class StatisticsAggregator:
             total_duration = float(session_df["duration"].sum())
             avg_heart_rate_result = session_df["avg_hr"].mean()
             avg_heart_rate = (
-                float(avg_heart_rate_result)  # type: ignore[arg-type]
+                float(cast(float, avg_heart_rate_result))
                 if avg_heart_rate_result is not None
                 else 0.0
             )
@@ -195,7 +159,7 @@ class StatisticsAggregator:
                     total_distance, total_duration
                 ),
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"获取统计数据失败: {e}") from e
 
     def _calculate_avg_pace_from_values(
@@ -219,7 +183,7 @@ class StatisticsAggregator:
             minutes = int(avg_pace_min_km)
             seconds = int((avg_pace_min_km - minutes) * 60)
             return f"{minutes}:{seconds:02d}"
-        except Exception:
+        except (NanobotRunnerError, TypeError, ValueError, ZeroDivisionError):
             return "0:00"
 
     def _calculate_avg_pace(self, df: pl.DataFrame) -> str:
@@ -243,7 +207,7 @@ class StatisticsAggregator:
             minutes = int(avg_pace_min_km)
             seconds = int((avg_pace_min_km - minutes) * 60)
             return f"{minutes}:{seconds:02d}"
-        except Exception:
+        except (NanobotRunnerError, TypeError, ValueError, ZeroDivisionError):
             return "0:00"
 
     def get_pace_distribution(self, year: int | None = None) -> PaceDistributionResult:
@@ -328,5 +292,5 @@ class StatisticsAggregator:
                 zones=zones, trend=[], total_count=total_count
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"配速分布分析失败: {e}") from e

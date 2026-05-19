@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.memory.models import MemoryVersion
 from src.core.personality.models import Personality
 
@@ -79,7 +80,7 @@ class MemoryManager:
             content = self.memory_file.read_text(encoding="utf-8")
             logger.debug(f"读取记忆文件: {len(content)}字符")
             return content
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"读取记忆文件失败: {e}")
             return ""
 
@@ -93,7 +94,7 @@ class MemoryManager:
             self.workspace.mkdir(parents=True, exist_ok=True)
             self.memory_file.write_text(content, encoding="utf-8")
             logger.info(f"写入记忆文件: {len(content)}字符")
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"写入记忆文件失败: {e}")
 
     def read_user_profile(self) -> str:
@@ -110,7 +111,7 @@ class MemoryManager:
             content = self.user_file.read_text(encoding="utf-8")
             logger.debug(f"读取用户画像: {len(content)}字符")
             return content
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"读取用户画像失败: {e}")
             return ""
 
@@ -124,7 +125,7 @@ class MemoryManager:
             self.workspace.mkdir(parents=True, exist_ok=True)
             self.user_file.write_text(content, encoding="utf-8")
             logger.info(f"写入用户画像: {len(content)}字符")
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"写入用户画像失败: {e}")
 
     def read_personality(self) -> Personality:
@@ -141,7 +142,13 @@ class MemoryManager:
             content = self.personality_file.read_text(encoding="utf-8")
             data = json.loads(content)
             return Personality.from_dict(data)
-        except Exception as e:
+        except (
+            NanobotRunnerError,
+            OSError,
+            json.JSONDecodeError,
+            ValueError,
+            KeyError,
+        ) as e:
             logger.error(f"读取人格数据失败: {e}")
             return Personality.default()
 
@@ -158,7 +165,7 @@ class MemoryManager:
                 json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
             )
             logger.info("写入AI人格数据")
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"写入人格数据失败: {e}")
 
     def save_preference_to_memory(self, preferences: dict[str, Any]) -> bool:
@@ -198,7 +205,7 @@ class MemoryManager:
             logger.info("偏好已保存到记忆")
             return True
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError, ValueError) as e:
             logger.error(f"保存偏好到记忆失败: {e}")
             return False
 
@@ -279,7 +286,7 @@ class MemoryManager:
             logger.info(f"记忆上下文已更新: {context_key}")
             return True
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError, ValueError) as e:
             logger.error(f"更新记忆上下文失败: {e}")
             return False
 
@@ -329,7 +336,7 @@ class MemoryManager:
             logger.info(f"记忆备份已创建: {version}")
             return str(backup_dir)
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"创建记忆备份失败: {e}")
             return ""
 
@@ -362,7 +369,7 @@ class MemoryManager:
             logger.info(f"记忆备份已恢复: {backup_path}")
             return True
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"恢复记忆备份失败: {e}")
             return False
 
@@ -394,7 +401,13 @@ class MemoryManager:
                         backup_path=data.get("backup_path", str(version_dir)),
                     )
                 )
-            except Exception as e:
+            except (
+                NanobotRunnerError,
+                json.JSONDecodeError,
+                KeyError,
+                ValueError,
+                OSError,
+            ) as e:
                 logger.warning(f"读取版本信息失败: {version_dir}, 错误: {e}")
 
         return versions

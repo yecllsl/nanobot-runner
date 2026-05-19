@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from src.core.base.exceptions import StorageError, ValidationError
+from src.core.base.exceptions import NanobotRunnerError, StorageError, ValidationError
 from src.core.storage.parquet_manager import StorageManager
 
 
@@ -765,7 +765,9 @@ class TestStorageManager:
             manager.save_to_parquet(test_data, 2024)
 
             # Mock pl.read_parquet 抛出异常
-            with patch("polars.read_parquet", side_effect=Exception("Read error")):
+            with patch(
+                "polars.read_parquet", side_effect=NanobotRunnerError("Read error")
+            ):
                 with pytest.raises(StorageError, match="读取活动数据失败"):
                     manager.read_activities(2024)
 
@@ -781,7 +783,7 @@ class TestStorageManager:
                 patch.object(
                     manager,
                     "get_available_years",
-                    side_effect=Exception("Get years error"),
+                    side_effect=NanobotRunnerError("Get years error"),
                 ),
                 pytest.raises(StorageError, match="获取数据摘要失败"),
             ):
@@ -806,7 +808,9 @@ class TestStorageManager:
             manager.save_to_parquet(test_data, 2024)
 
             # Mock unlink 抛出异常
-            with patch("pathlib.Path.unlink", side_effect=Exception("Delete error")):
+            with patch(
+                "pathlib.Path.unlink", side_effect=NanobotRunnerError("Delete error")
+            ):
                 with pytest.raises(StorageError, match="删除年份数据失败"):
                     manager.delete_year_data(2024)
 
@@ -821,7 +825,7 @@ class TestStorageManager:
             with patch.object(
                 manager,
                 "get_available_years",
-                side_effect=Exception("Stats error"),
+                side_effect=NanobotRunnerError("Stats error"),
             ):
                 stats = manager.get_stats()
                 assert "error" in stats
@@ -849,7 +853,7 @@ class TestStorageManager:
                 patch.object(
                     manager,
                     "_read_and_concat_parquet_files",
-                    side_effect=Exception("Read error"),
+                    side_effect=NanobotRunnerError("Read error"),
                 ),
                 pytest.raises(StorageError, match="读取Parquet数据失败"),
             ):
@@ -876,7 +880,7 @@ class TestStorageManager:
                 patch.object(
                     pl.DataFrame,
                     "write_parquet",
-                    side_effect=Exception("Write error"),
+                    side_effect=NanobotRunnerError("Write error"),
                 ),
                 pytest.raises(StorageError, match="保存Parquet文件失败"),
             ):
@@ -1091,7 +1095,9 @@ class TestStorageManager:
             test_data.write_parquet(filepath)
 
             # Mock pl.read_parquet 抛出异常，强制使用pyarrow
-            with patch("polars.read_parquet", side_effect=Exception("Read error")):
+            with patch(
+                "polars.read_parquet", side_effect=NanobotRunnerError("Read error")
+            ):
                 result = manager._read_parquet_file_with_schema_fix(filepath)
                 assert result is not None
                 assert result.height == 1
@@ -1107,9 +1113,12 @@ class TestStorageManager:
             filepath.touch()
 
             # Mock pl.read_parquet 和 pyarrow 都失败
-            with patch("polars.read_parquet", side_effect=Exception("Polars error")):
+            with patch(
+                "polars.read_parquet", side_effect=NanobotRunnerError("Polars error")
+            ):
                 with patch(
-                    "pyarrow.parquet.read_table", side_effect=Exception("PyArrow error")
+                    "pyarrow.parquet.read_table",
+                    side_effect=NanobotRunnerError("PyArrow error"),
                 ):
                     result = manager._read_parquet_file_with_schema_fix(filepath)
                     assert result is None
@@ -1230,7 +1239,7 @@ class TestStorageManager:
             with patch.object(
                 manager,
                 "save_to_parquet",
-                side_effect=Exception("Unexpected error"),
+                side_effect=NanobotRunnerError("Unexpected error"),
             ):
                 result = manager.save_activities(test_data, 2024)
                 assert result["success"] is False
@@ -1256,7 +1265,7 @@ class TestStorageManager:
                 patch.object(
                     Path,
                     "glob",
-                    side_effect=Exception("Glob error"),
+                    side_effect=NanobotRunnerError("Glob error"),
                 ),
                 pytest.raises(StorageError, match="获取可用年份失败"),
             ):
@@ -1274,7 +1283,9 @@ class TestStorageManager:
 
             # Mock pl.read_parquet 抛出异常
             # Mock pyarrow返回非DataFrame类型
-            with patch("polars.read_parquet", side_effect=Exception("Polars error")):
+            with patch(
+                "polars.read_parquet", side_effect=NanobotRunnerError("Polars error")
+            ):
                 with patch("pyarrow.parquet.read_table") as mock_read:
                     # 返回一个mock对象，pl.from_arrow会返回非DataFrame
                     mock_table = MagicMock()

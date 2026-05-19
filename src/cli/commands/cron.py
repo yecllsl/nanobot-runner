@@ -4,6 +4,7 @@
 import typer
 
 from src.cli.common import CLIError, console, print_error, print_status
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="定时任务管理命令")
 
@@ -67,7 +68,7 @@ def cron_status() -> None:
                 }.get(record["status"], "❓")
                 console.print(f"  {status_emoji} {record['date']}: {record['message']}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"获取状态失败：{e}"))
         raise typer.Exit(1)
 
@@ -119,7 +120,7 @@ def enable_reminder(
         console.print("\n  💡 提示：提醒将在Gateway服务启动后生效")
         console.print("     运行 nanobotrun gateway start 启动服务")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"启用失败：{e}"))
         raise typer.Exit(1)
 
@@ -145,7 +146,7 @@ def disable_reminder() -> None:
 
         print_status("训练提醒已禁用", "success")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"禁用失败：{e}"))
         raise typer.Exit(1)
 
@@ -206,7 +207,7 @@ def trigger_reminder(
                 reminder_manager.schedule.do_not_disturb_start = original_dnd_start
                 reminder_manager.schedule.do_not_disturb_end = original_dnd_end
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"触发失败：{e}"))
         raise typer.Exit(1)
 
@@ -263,6 +264,6 @@ def show_history(
             if record.get("executed_at"):
                 console.print(f"   执行时间: {record['executed_at']}")
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.execution_record_failed(f"获取历史失败：{e}"))
         raise typer.Exit(1)

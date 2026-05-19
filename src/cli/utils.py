@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+from src.core.base.exceptions import NanobotRunnerError
+
 
 def sync_custom_templates(workspace: Path) -> list[str]:
     """
@@ -44,7 +46,7 @@ def sync_custom_templates(workspace: Path) -> list[str]:
 
             shutil.copy2(src_file, dst_file)
             synced.append(template_name)
-        except Exception:
+        except NanobotRunnerError:
             continue
 
     return synced

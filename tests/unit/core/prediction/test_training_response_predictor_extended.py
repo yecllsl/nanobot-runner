@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.baselines.banister_ir import BanisterIRModel
 from src.core.prediction.training_response_predictor import TrainingResponsePredictor
 
@@ -29,7 +30,7 @@ class TestTrainingResponsePredictorTSB:
 
     def test_get_current_tsb_exception(self):
         analyzer = MagicMock()
-        analyzer.get_ctl.side_effect = Exception("error")
+        analyzer.get_ctl.side_effect = NanobotRunnerError("error")
         predictor = TrainingResponsePredictor(
             banister_model=BanisterIRModel(),
             base_vdot=45.0,
@@ -66,7 +67,7 @@ class TestTrainingResponsePredictorRecentTss:
 
     def test_get_recent_tss_7d_exception(self):
         session_repo = MagicMock()
-        session_repo.get_recent_sessions.side_effect = Exception("error")
+        session_repo.get_recent_sessions.side_effect = NanobotRunnerError("error")
         predictor = TrainingResponsePredictor(
             banister_model=BanisterIRModel(),
             base_vdot=45.0,

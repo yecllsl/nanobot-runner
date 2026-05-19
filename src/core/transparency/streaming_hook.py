@@ -9,6 +9,8 @@ from nanobot.agent.hook import AgentHook, AgentHookContext
 from nanobot.bus import MessageBus
 from rich.console import Console
 
+from src.core.base.exceptions import NanobotRunnerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -83,7 +85,7 @@ class StreamingHook(AgentHook):
                         metadata={"stream_delta": True},
                     )
                 )
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.warning(f"Gateway流式输出失败: {e}")
 
     async def on_stream_end(self, context: AgentHookContext) -> None:

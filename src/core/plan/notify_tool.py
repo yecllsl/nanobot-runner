@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import DailyPlan, NotifyResult, UserContext, WeatherInfo
 from src.notify.feishu import FeishuBot
 
@@ -206,7 +207,7 @@ class NotifyTool:
                     weather_info=weather_info,
                 )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"发送训练提醒异常：{e}", exc_info=True)
             return NotifyResult(
                 sent=False,

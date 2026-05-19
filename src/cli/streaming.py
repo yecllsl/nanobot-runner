@@ -12,6 +12,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.spinner import Spinner
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.transparency.streaming_hook import StreamingHook
 
 logger = logging.getLogger(__name__)
@@ -189,7 +190,7 @@ def stream_agent_response(
             manager.on_complete(final_text)
             return final_text
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"Agent流式输出异常: {e}", exc_info=True)
             manager.on_complete(f"执行异常: {e}")
             raise

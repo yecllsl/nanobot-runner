@@ -1,3 +1,4 @@
+import tarfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -338,6 +339,6 @@ class TestBackupManager:
         source_dir.mkdir()
         (source_dir / "test.txt").write_text("test", encoding="utf-8")
 
-        with patch("tarfile.open", side_effect=OSError("tar error")):
+        with patch("tarfile.open", side_effect=tarfile.TarError("tar error")):
             result = BackupManager._compress_backup(source_dir)
             assert result is None

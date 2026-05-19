@@ -2,17 +2,13 @@
 # 计算训练压力分数(TSS)、急性训练负荷(ATL)、慢性训练负荷(CTL)
 
 import math
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
 
-# TSS 计算常量
-DEFAULT_LTHR = 180
-
-# 训练负荷计算常量
-ATL_TIME_CONSTANT = 7.0
-CTL_TIME_CONSTANT = 42.0
+from src.core.base.exceptions import NanobotRunnerError
+from src.core.constants import ATL_TIME_CONSTANT, CTL_TIME_CONSTANT, DEFAULT_LTHR
 
 
 class TrainingLoadAnalyzer:
@@ -46,11 +42,11 @@ class TrainingLoadAnalyzer:
             raise ValueError("心率数据不能为空且时长必须为正数")
 
         try:
-            avg_hr: float = float(heart_rate_data.mean())  # type: ignore[arg-type]
+            avg_hr: float = float(cast(float, heart_rate_data.mean()))
             intensity_factor = avg_hr / DEFAULT_LTHR
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise ValueError(f"TSS计算失败: {e}") from e
 
     def calculate_tss_for_run(
@@ -88,7 +84,7 @@ class TrainingLoadAnalyzer:
 
             tss = (intensity_factor**2) * (duration_s / 3600) * 100
             return round(tss, 2)
-        except Exception:
+        except NanobotRunnerError:
             return 0.0
 
     def calculate_tss_batch(

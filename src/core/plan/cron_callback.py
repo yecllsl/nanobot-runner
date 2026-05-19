@@ -6,6 +6,7 @@ from typing import Any
 
 from nanobot.cron.types import CronJob
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.plan.training_reminder_manager import TrainingReminderManager
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,7 @@ class CronCallbackHandler:
                 # 默认处理：记录日志
                 return await self._handle_default(job)
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"Cron任务处理异常: {job.name} - {e}", exc_info=True)
             raise  # 抛出异常让 CronService 记录错误状态
 

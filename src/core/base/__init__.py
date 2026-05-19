@@ -14,7 +14,7 @@ from src.core.base.decorators import (
 )
 from src.core.base.exceptions import (
     ConfigError,
-    ImportError,
+    DataImportError,
     IndexStoreError,
     LLMError,
     NanobotRunnerError,
@@ -32,7 +32,6 @@ from src.core.base.logger import (
     setup_logging,
 )
 from src.core.base.profile import (
-    AnomalyFilterRule,
     ProfileEngine,
     ProfileStaleStatus,
     ProfileStorageManager,
@@ -44,6 +43,7 @@ from src.core.base.schema import (
     create_activity_id,
     create_schema_dataframe,
 )
+from src.core.models.anomaly_schema import ANOMALY_FILTER_RULES, AnomalyFilterRule
 
 __all__ = [
     "NanobotRunnerError",
@@ -52,7 +52,7 @@ __all__ = [
     "ConfigError",
     "ValidationError",
     "IndexStoreError",
-    "ImportError",
+    "DataImportError",
     "LLMError",
     "JsonFormatter",
     "TextFormatter",
@@ -78,6 +78,7 @@ __all__ = [
     "ProfileStorageManager",
     "ProfileStaleStatus",
     "AnomalyFilterRule",
+    "ANOMALY_FILTER_RULES",
     "RunnerProfile",
     "ProfileEngine",
 ]

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -231,7 +233,7 @@ class RacePredictionEngine:
             # 限制在合理范围内
             return max(20.0, min(85.0, predicted_vdot))
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"VDOT 趋势预测失败：{e}，使用当前 VDOT")
             return current_vdot
 
@@ -283,7 +285,7 @@ class RacePredictionEngine:
 
             return max(0.0, min(1.0, confidence))
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"置信度计算失败：{e}")
             return 0.5
 

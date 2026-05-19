@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.core.base.exceptions import LLMError, ValidationError
+from src.core.base.exceptions import LLMError, NanobotRunnerError, ValidationError
 from src.core.base.profile import RunnerProfile
 from src.core.models import (
     TrainingLoad,
@@ -117,7 +117,9 @@ class TestPlanGenerator:
 
     def test_generate_plan_llm_failure(self):
         """测试LLM调用失败"""
-        self.mock_llm.generate.side_effect = Exception("LLM service unavailable")
+        self.mock_llm.generate.side_effect = NanobotRunnerError(
+            "LLM service unavailable"
+        )
 
         with pytest.raises(LLMError):
             self.generator.generate(
@@ -145,7 +147,9 @@ class TestPlanGenerator:
 
     def test_generate_plan_max_retries_exceeded(self):
         """测试超过最大重试次数"""
-        self.mock_llm.generate.side_effect = Exception("LLM service unavailable")
+        self.mock_llm.generate.side_effect = NanobotRunnerError(
+            "LLM service unavailable"
+        )
 
         with pytest.raises(LLMError, match="最大重试次数"):
             self.generator.generate(

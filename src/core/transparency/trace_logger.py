@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.transparency.models import (
     AIDecision,
     DecisionExplanation,
@@ -259,5 +260,5 @@ class TraceLogger:
                 log_file.read_text(encoding="utf-8") + line + "\n",
                 encoding="utf-8",
             )
-        except Exception as e:
+        except (NanobotRunnerError, OSError, TypeError) as e:
             logger.warning(f"日志持久化失败: {e}")

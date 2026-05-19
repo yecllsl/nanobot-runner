@@ -6,6 +6,7 @@ from pathlib import Path
 import typer
 
 from src.cli.common import console
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="系统管理命令")
 
@@ -58,7 +59,7 @@ def init(
 
         engine = MigrationEngine(config=config)
         version_info = engine.detect_old_version()
-    except Exception:
+    except NanobotRunnerError:
         pass
 
     if version_info:
@@ -134,7 +135,7 @@ def migrate(
         try:
             backup_info = engine.create_backup()
             console.print(f"[green]✓[/green] 备份已创建: {backup_info.backup_path}")
-        except Exception as e:
+        except NanobotRunnerError as e:
             console.print(f"[yellow]![/yellow] 备份失败: {e}")
             if not auto and not typer.confirm("备份失败，是否继续迁移？"):
                 return

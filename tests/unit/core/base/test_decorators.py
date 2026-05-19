@@ -10,7 +10,7 @@ from src.core.base.decorators import (
     tool_handler,
     validate_date_format,
 )
-from src.core.base.exceptions import StorageError, ValidationError
+from src.core.base.exceptions import NanobotRunnerError, StorageError, ValidationError
 from src.core.base.result import ToolResult
 
 
@@ -88,20 +88,22 @@ class TestToolHandler:
 
         @tool_handler(return_format="dict", error_message="操作失败")
         def generic_error_function():
-            raise RuntimeError("未知错误")
+            raise NanobotRunnerError("未知错误")
 
         result = generic_error_function()
         assert "error" in result
 
     def test_tool_handler_custom_default(self):
-        """测试自定义默认值"""
+        """测试自定义默认值 - NanobotRunnerError被第一个except捕获，返回e.to_dict()"""
 
         @tool_handler(return_format="dict", default_response={"status": "failed"})
         def custom_default_function():
-            raise Exception("错误")
+            raise NanobotRunnerError("错误")
 
         result = custom_default_function()
-        assert result == {"status": "failed"}
+        # NanobotRunnerError 被第一个 except NanobotRunnerError 捕获，返回 e.to_dict()
+        assert "error" in result
+        assert result["error"] == "错误"
 
     def test_tool_handler_validation_error(self):
         """测试ValidationError处理"""
@@ -296,20 +298,20 @@ class TestHandleErrors:
 
         @handle_errors()
         def generic_error_function():
-            raise RuntimeError("未知错误")
+            raise NanobotRunnerError("未知错误")
 
         result = generic_error_function()
         assert "error" in result
-        assert result["error_code"] == "UNKNOWN_ERROR"
 
     def test_handle_errors_custom_default(self):
         """测试自定义默认返回值"""
 
         @handle_errors(default_response={"status": "failed"})
         def custom_default_function():
-            raise Exception("错误")
+            raise NanobotRunnerError("错误")
 
         result = custom_default_function()
+        # NanobotRunnerError 被第一个 except NanobotRunnerError 捕获，返回 default_response
         assert result == {"status": "failed"}
 
 

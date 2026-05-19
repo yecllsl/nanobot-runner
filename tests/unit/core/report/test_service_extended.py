@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from unittest.mock import MagicMock
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import (
     MonthlyReportData,
     OperationResult,
@@ -302,7 +303,7 @@ class TestReportServiceBuildVdotChart:
 
     def test_build_vdot_chart_exception(self):
         service = _make_service_with_runs()
-        service.analytics.calculate_vdot.side_effect = Exception("error")
+        service.analytics.calculate_vdot.side_effect = NanobotRunnerError("error")
         chart = service._build_vdot_chart([])
         assert isinstance(chart, ChartData)
 
@@ -342,7 +343,9 @@ class TestReportServiceBuildLoadChart:
 
     def test_build_load_chart_exception(self):
         service = _make_service_with_runs()
-        service.analytics.get_training_load_trend.side_effect = Exception("error")
+        service.analytics.get_training_load_trend.side_effect = NanobotRunnerError(
+            "error"
+        )
         report = WeeklyReportData(type="weekly", date_range="05.01-05.07")
         chart = service._build_load_chart(report)
         assert isinstance(chart, ChartData)
@@ -376,7 +379,7 @@ class TestReportServiceBuildVolumeChart:
 
     def test_build_volume_chart_exception(self):
         service = _make_service_with_runs()
-        service.storage.query_by_date_range.side_effect = Exception("error")
+        service.storage.query_by_date_range.side_effect = NanobotRunnerError("error")
         report = MonthlyReportData(type="monthly", month="2026年05月")
         chart = service._build_volume_chart(report)
         assert isinstance(chart, ChartData)
@@ -410,7 +413,7 @@ class TestReportServiceBuildHrZonesChart:
 
     def test_build_hr_zones_chart_exception(self):
         service = _make_service_with_runs()
-        service.storage.query_by_date_range.side_effect = Exception("error")
+        service.storage.query_by_date_range.side_effect = NanobotRunnerError("error")
         report = MonthlyReportData(type="monthly", month="2026年05月")
         chart = service._build_hr_zones_chart(report)
         assert isinstance(chart, ChartData)
@@ -440,7 +443,7 @@ class TestReportServiceEnableSchedule:
     def test_enable_schedule_exception(self):
         service = _make_service_with_runs()
         mock_cron = MagicMock()
-        mock_cron.list_jobs.side_effect = Exception("error")
+        mock_cron.list_jobs.side_effect = NanobotRunnerError("error")
         service.cron_service = mock_cron
         result = service.enable_schedule(True, ReportType.DAILY)
         assert result.success is False
@@ -472,7 +475,7 @@ class TestReportServiceGetScheduleStatus:
     def test_get_schedule_status_exception(self):
         service = _make_service_with_runs()
         mock_cron = MagicMock()
-        mock_cron.list_jobs.side_effect = Exception("error")
+        mock_cron.list_jobs.side_effect = NanobotRunnerError("error")
         service.cron_service = mock_cron
         status = service.get_schedule_status(ReportType.DAILY)
         assert status.configured is False
@@ -503,7 +506,9 @@ class TestReportServiceRunReportNow:
 
     def test_run_report_now_exception(self):
         service = _make_service_with_runs()
-        service.analytics.generate_daily_report.side_effect = Exception("error")
+        service.analytics.generate_daily_report.side_effect = NanobotRunnerError(
+            "error"
+        )
         result = service.run_report_now(
             push=False, age=30, report_type=ReportType.DAILY
         )
@@ -531,7 +536,7 @@ class TestReportServiceMonthlyReportExtended:
 
     def test_monthly_report_exception(self):
         service = _make_service_with_runs()
-        service.storage.query_by_date_range.side_effect = Exception("db error")
+        service.storage.query_by_date_range.side_effect = NanobotRunnerError("db error")
         result = service.generate_report(ReportType.MONTHLY, age=30)
         assert result.type == "monthly"
         assert hasattr(result, "error")

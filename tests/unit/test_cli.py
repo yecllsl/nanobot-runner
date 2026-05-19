@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 from src.cli.app import app
 from src.cli.common import CLIError, print_error, print_status
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import OperationResult, ScheduleStatus
 
 runner = CliRunner()
@@ -359,7 +360,7 @@ class TestCLIChat:
     def test_chat_handles_exception(self):
         """测试chat命令异常处理"""
         with patch("src.cli.commands.agent._run_chat") as mock_run_chat:
-            mock_run_chat.side_effect = Exception("测试异常")
+            mock_run_chat.side_effect = NanobotRunnerError("测试异常")
             result = runner.invoke(app, ["agent", "chat"])
             assert result.exit_code != 0
 
@@ -1090,7 +1091,9 @@ class TestCLIProfileShow:
             "src.core.base.profile.ProfileStorageManager"
         ) as mock_profile_storage:
             mock_storage_instance = Mock()
-            mock_storage_instance.load_profile_json.side_effect = Exception("测试异常")
+            mock_storage_instance.load_profile_json.side_effect = NanobotRunnerError(
+                "测试异常"
+            )
             mock_profile_storage.return_value = mock_storage_instance
 
             result = runner.invoke(app, ["report", "profile", "show"])
@@ -1310,7 +1313,7 @@ class TestCLIVdot:
         """测试 vdot 异常处理"""
         with patch("src.agents.tools.RunnerTools") as mock_tools_class:
             mock_tools = Mock()
-            mock_tools.get_vdot_trend.side_effect = Exception("测试异常")
+            mock_tools.get_vdot_trend.side_effect = NanobotRunnerError("测试异常")
             mock_tools_class.return_value = mock_tools
 
             result = runner.invoke(app, ["analysis", "vdot"])
@@ -1370,7 +1373,7 @@ class TestCLITrainingLoad:
         """测试 training-load 异常处理"""
         with patch("src.core.analytics.AnalyticsEngine") as mock_engine_class:
             mock_engine = Mock()
-            mock_engine.get_training_load.side_effect = Exception("测试异常")
+            mock_engine.get_training_load.side_effect = NanobotRunnerError("测试异常")
             mock_engine_class.return_value = mock_engine
 
             result = runner.invoke(app, ["analysis", "load"])
@@ -1422,7 +1425,9 @@ class TestCLIHrDrift:
         """测试 hr-drift 异常处理"""
         with patch("src.agents.tools.RunnerTools") as mock_tools_class:
             mock_tools = Mock()
-            mock_tools.get_hr_drift_analysis.side_effect = Exception("测试异常")
+            mock_tools.get_hr_drift_analysis.side_effect = NanobotRunnerError(
+                "测试异常"
+            )
             mock_tools_class.return_value = mock_tools
 
             result = runner.invoke(app, ["analysis", "hr-drift"])

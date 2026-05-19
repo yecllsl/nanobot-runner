@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from src.core.base.exceptions import StorageError
+from src.core.base.exceptions import NanobotRunnerError, StorageError
 from src.core.export.csv_exporter import CsvExporter
 from src.core.export.json_exporter import JsonExporter
 from src.core.export.models import ExportConfig, ExportResult
@@ -292,7 +292,7 @@ class ExportEngine:
                 start_date=config.start_date,
                 end_date=config.end_date,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise StorageError(
                 message=f"查询活动数据失败：{e}",
                 error_code="EXPORT_QUERY_ERROR",
@@ -331,7 +331,7 @@ class ExportEngine:
                     try:
                         vdot = self.analytics.calculate_vdot(distance, duration)
                         enriched_session["session_vdot"] = round(vdot, 2)
-                    except Exception:
+                    except NanobotRunnerError:
                         enriched_session["session_vdot"] = None
 
                 # 计算 TSS
@@ -343,7 +343,7 @@ class ExportEngine:
                             avg_heart_rate=avg_hr,
                         )
                         enriched_session["session_training_stress_score"] = tss
-                    except Exception:
+                    except NanobotRunnerError:
                         enriched_session["session_training_stress_score"] = None
 
                 result_data.append(enriched_session)

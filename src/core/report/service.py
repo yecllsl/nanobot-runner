@@ -2,11 +2,12 @@
 # 封装晨报、周报、月报生成、推送和定时调度逻辑
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from nanobot.cron.service import CronService
 from nanobot.cron.types import CronSchedule
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.models import (
     DailyReportData,
@@ -159,7 +160,7 @@ class ReportService:
                     runs, training_load
                 ),
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"生成周报失败：{e}", exc_info=True)
             return WeeklyReportData(
                 type="weekly",
@@ -246,7 +247,7 @@ class ReportService:
                     runs, training_load
                 ),
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"生成月报失败：{e}", exc_info=True)
             return MonthlyReportData(
                 type="monthly",
@@ -607,7 +608,7 @@ class ReportService:
         try:
             if isinstance(report_data, WeeklyReportData | MonthlyReportData):
                 self._render_and_append_charts(report_data, console)
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"图表渲染失败，已静默降级：{e}")
 
     def _render_and_append_charts(
@@ -638,7 +639,7 @@ class ReportService:
                     chart_str = renderer.render_line_chart(vdot_chart, config)
                     console.print("\n[bold]VDOT 趋势[/bold]")
                     console.print(chart_str)
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.warning(f"VDOT图表渲染失败：{e}")
 
             load_chart = self._build_load_chart(report_data)
@@ -647,7 +648,7 @@ class ReportService:
                     chart_str = renderer.render_multi_line_chart(load_chart, config)
                     console.print("\n[bold]训练负荷状态[/bold]")
                     console.print(chart_str)
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.warning(f"训练负荷图表渲染失败：{e}")
 
         elif isinstance(report_data, MonthlyReportData):
@@ -658,7 +659,7 @@ class ReportService:
                     chart_str = renderer.render_bar_chart(volume_chart, config)
                     console.print("\n[bold]跑量趋势[/bold]")
                     console.print(chart_str)
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.warning(f"跑量图表渲染失败：{e}")
 
             hr_chart = self._build_hr_zones_chart(report_data)
@@ -667,7 +668,7 @@ class ReportService:
                     chart_str = renderer.render_stacked_bar_chart(hr_chart, config)
                     console.print("\n[bold]心率区间分布[/bold]")
                     console.print(chart_str)
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.warning(f"心率区间图表渲染失败：{e}")
 
     def _build_vdot_chart(
@@ -728,7 +729,7 @@ class ReportService:
                     DataSeries(name="VDOT", labels=labels, values=values, color="blue")
                 ],
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"构建VDOT图表数据失败：{e}")
             return ChartData(title="VDOT 趋势", x_label="", y_label="", series=[])
 
@@ -779,7 +780,7 @@ class ReportService:
                     ),
                 ],
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"构建训练负荷图表数据失败：{e}")
             return ChartData(title="训练负荷", x_label="", y_label="", series=[])
 
@@ -832,7 +833,7 @@ class ReportService:
                     DataSeries(name="跑量", labels=labels, values=values, color="cyan")
                 ],
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"构建跑量图表数据失败：{e}")
             return ChartData(title="跑量趋势", x_label="", y_label="", series=[])
 
@@ -921,7 +922,7 @@ class ReportService:
                 y_label="时间 (分钟)",
                 series=series,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.warning(f"构建心率区间图表数据失败：{e}")
             return ChartData(title="心率区间分布", x_label="", y_label="", series=[])
 
@@ -1008,7 +1009,7 @@ class ReportService:
         except ValueError as e:
             logger.error(f"时间格式错误：{e}")
             return OperationResult(success=False, error=f"时间格式错误：{e}")
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"配置定时推送失败：{e}")
             return OperationResult(success=False, error=f"配置失败：{e}")
 
@@ -1051,7 +1052,7 @@ class ReportService:
                 success=True, message=f"定时{report_type.value}推送{status}"
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"操作失败：{e}")
             return OperationResult(success=False, error=f"操作失败：{e}")
 
@@ -1107,7 +1108,7 @@ class ReportService:
                 job_id=job.id,
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"获取定时{report_type.value}推送状态失败：{e}")
             return ScheduleStatus(
                 enabled=False,
@@ -1144,7 +1145,7 @@ class ReportService:
             logger.info(f"定时{report_type.value}推送执行完成（仅生成）")
             return True
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"定时{report_type.value}推送执行失败：{e}")
             return False
 
@@ -1174,7 +1175,7 @@ class ReportService:
             if hasattr(report_data, "to_dict"):
                 report_dict = report_data.to_dict()
             else:
-                report_dict = report_data  # type: ignore[assignment]
+                report_dict = cast(dict[str, Any], report_data)
 
             result = {
                 "success": True,
@@ -1190,6 +1191,6 @@ class ReportService:
 
             return result
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"生成{report_type.value}报告失败：{e}")
             return {"success": False, "error": str(e)}

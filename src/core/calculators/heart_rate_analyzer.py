@@ -2,10 +2,11 @@
 # 分析心率漂移、心率区间、训练效果等
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.models import HRDriftResult, HRZoneResult
 
 if TYPE_CHECKING:
@@ -84,7 +85,7 @@ class HeartRateAnalyzer:
                 correlation=round(correlation, 3) if correlation else 0,
                 assessment=assessment,
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             return HRDriftResult(error=f"分析失败: {str(e)}")
 
     def analyze_hr_drift_vectorized(
@@ -128,12 +129,12 @@ class HeartRateAnalyzer:
             first_half_hr = hr_series.slice(0, first_half_end)
             second_half_hr = hr_series.slice(first_half_end, n - first_half_end)
 
-            first_half_mean = float(first_half_hr.mean())  # type: ignore[arg-type]
-            second_half_mean = float(second_half_hr.mean())  # type: ignore[arg-type]
+            first_half_mean = float(cast(float, first_half_hr.mean()))
+            second_half_mean = float(cast(float, second_half_hr.mean()))
 
             drift = second_half_mean - first_half_mean
 
-            overall_mean = float(hr_series.mean())  # type: ignore[arg-type]
+            overall_mean = float(cast(float, hr_series.mean()))
             drift_rate = (drift / overall_mean) * 100 if overall_mean > 0 else 0
 
             if drift_rate > 5:
@@ -149,7 +150,7 @@ class HeartRateAnalyzer:
                 "correlation": round(correlation, 3) if correlation else 0,
                 "assessment": assessment,
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             return {"error": f"分析失败: {str(e)}"}
 
     def analyze_hr_drift_batch(
@@ -688,5 +689,5 @@ class HeartRateAnalyzer:
                 message=f"年龄: {age}",
             )
 
-        except Exception as e:
+        except NanobotRunnerError as e:
             raise RuntimeError(f"心率区间分析失败: {e}") from e

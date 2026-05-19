@@ -9,6 +9,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.config import ConfigManager
 from src.core.plan.notify_tool import NotifyTool, SkipReason
 
@@ -108,7 +109,7 @@ class TrainingReminderManager:
             context = get_context()
             if hasattr(context, "config") and hasattr(context.config, "data_dir"):
                 return Path(context.config.data_dir)
-        except Exception:
+        except (NanobotRunnerError, Exception):
             pass
 
         # 默认目录
@@ -133,7 +134,7 @@ class TrainingReminderManager:
                 ),
                 do_not_disturb_end=reminder_config.get("do_not_disturb_end", "07:00"),
             )
-        except Exception as e:
+        except (NanobotRunnerError, json.JSONDecodeError, OSError, KeyError) as e:
             logger.warning(f"加载提醒配置失败: {e}，使用默认配置")
             return ReminderSchedule()
 
@@ -160,11 +161,11 @@ class TrainingReminderManager:
                         executed_at=item.get("executed_at"),
                     )
                     records.append(record)
-                except Exception as e:
+                except (NanobotRunnerError, KeyError, TypeError, ValueError) as e:
                     logger.warning(f"解析历史记录失败: {e}")
 
             return records
-        except Exception as e:
+        except (NanobotRunnerError, json.JSONDecodeError, OSError) as e:
             logger.warning(f"加载提醒历史失败: {e}")
             return []
 
@@ -192,7 +193,7 @@ class TrainingReminderManager:
             with open(self.history_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"保存提醒历史失败: {e}")
 
     def on_reminder_trigger(self, **kwargs: Any) -> dict[str, Any]:
@@ -303,7 +304,7 @@ class TrainingReminderManager:
                     "record": result,
                 }
 
-        except Exception as e:
+        except (NanobotRunnerError, Exception) as e:
             logger.error(f"发送提醒异常: {e}", exc_info=True)
             result = self._create_record(
                 record_id=record_id,
@@ -343,7 +344,7 @@ class TrainingReminderManager:
             logger.debug("未找到今日训练计划")
             return None
 
-        except Exception as e:
+        except (NanobotRunnerError, Exception) as e:
             logger.warning(f"获取今日计划失败: {e}")
             return None
 

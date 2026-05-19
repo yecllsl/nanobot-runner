@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
@@ -180,9 +181,9 @@ class VerifyManager:
                 import polars as pl
 
                 pl.scan_parquet(str(file_path)).collect()
-            except Exception as e:
+            except (NanobotRunnerError, Exception) as e:
                 errors.append(f"Parquet 文件损坏: {file_path} - {e}")
-        except Exception as e:
+        except (NanobotRunnerError, Exception) as e:
             errors.append(f"Parquet 文件损坏: {file_path} - {e}")
 
         return errors

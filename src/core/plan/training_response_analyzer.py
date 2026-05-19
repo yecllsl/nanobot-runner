@@ -3,6 +3,7 @@
 
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.models import (
     PlanExecutionStats,
@@ -59,7 +60,7 @@ class TrainingResponseAnalyzer:
                 },
                 "message": "训练响应分析完成",
             }
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"训练响应分析失败：{e}")
             return {
                 "success": False,

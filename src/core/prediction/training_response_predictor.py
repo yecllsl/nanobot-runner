@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.baselines.banister_ir import BanisterIRModel
 from src.core.prediction.models import TrainingResponse
 
@@ -146,7 +147,7 @@ class TrainingResponsePredictor:
                 atl = self._training_load_analyzer.get_atl()
                 if isinstance(ctl, (int, float)) and isinstance(atl, (int, float)):
                     return float(ctl) - float(atl)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"TSB获取失败: {e}")
         return 0.0
 
@@ -157,6 +158,6 @@ class TrainingResponsePredictor:
                 sessions = self._session_repo.get_recent_sessions(limit=21)
                 if sessions:
                     return sum(float(getattr(s, "tss", 0) or 0) for s in sessions)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"近7天TSS获取失败: {e}")
         return 0.0

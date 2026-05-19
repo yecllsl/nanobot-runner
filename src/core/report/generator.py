@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.models import ReportData, ReportType, VdotTrendItem
 
@@ -188,7 +189,7 @@ class TemplateEngine:
         if self.template_path and self.template_path.exists():
             try:
                 return self.template_path.read_text(encoding="utf-8")
-            except Exception as e:
+            except (NanobotRunnerError, OSError) as e:
                 logger.warning(f"读取自定义模板失败，使用默认模板：{e}")
 
         # 使用内置模板
@@ -215,7 +216,7 @@ class TemplateEngine:
             logger.warning(f"模板变量缺失：{e}")
             # 保留未替换的变量标记
             return template
-        except Exception as e:
+        except (NanobotRunnerError, TypeError, AttributeError, ValueError) as e:
             logger.error(f"模板渲染失败：{e}")
             return f"模板渲染失败：{e}"
 
@@ -330,7 +331,7 @@ class ReportGenerator:
                 report_type=report_type.value if report_type else None,
                 error=f"参数错误：{e}",
             )
-        except Exception as e:
+        except (NanobotRunnerError, Exception) as e:
             logger.error(f"报告生成失败：{e}")
             return ReportData(
                 success=False,
@@ -560,7 +561,7 @@ class ReportGenerator:
 
             return total_tss
 
-        except Exception as e:
+        except (NanobotRunnerError, TypeError, ValueError, ZeroDivisionError) as e:
             logger.warning(f"计算总 TSS 失败：{e}")
             return 0.0
 
@@ -934,7 +935,7 @@ class ReportGenerator:
                 "message": f"报告已保存至 {file_path}",
             }
 
-        except Exception as e:
+        except (NanobotRunnerError, OSError) as e:
             logger.error(f"保存报告失败：{e}")
             return {"success": False, "error": f"保存失败：{e}"}
 

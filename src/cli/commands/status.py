@@ -6,6 +6,7 @@ from rich.panel import Panel
 
 from src.cli.common import CLIError, console, print_error
 from src.cli.handlers.status_handler import StatusHandler
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="身体状态查看命令")
 
@@ -55,7 +56,7 @@ def today() -> None:
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -105,6 +106,6 @@ def weekly() -> None:
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

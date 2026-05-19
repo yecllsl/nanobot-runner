@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.models import (
     ModelTrainingResult,
     PredictionStatusReport,
@@ -199,7 +200,7 @@ class TestPredictionEngineManageModel:
 
     def test_manage_model_rollback_exception(self):
         mm = _make_model_manager()
-        mm.rollback.side_effect = Exception("rollback error")
+        mm.rollback.side_effect = NanobotRunnerError("rollback error")
         engine = PredictionEngine(
             vdot_predictor=_make_vdot_predictor(),
             race_predictor=_make_race_predictor(),

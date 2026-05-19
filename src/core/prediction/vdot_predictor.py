@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.prediction.baselines.banister_ir import BanisterIRModel
 from src.core.prediction.feature_engine import VDOT_FEATURE_NAMES
 from src.core.prediction.models import (
@@ -178,7 +179,7 @@ class VDOTPredictor:
                 success=True,
                 message=f"VDOT预测模型训练完成: {len(y)}条样本, 3个分位数GBDT",
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.error(f"VDOT模型训练失败: {e}")
             return ModelTrainingResult(
                 model_type="vdot_predictor",
@@ -233,7 +234,7 @@ class VDOTPredictor:
                     reference_date=s_date
                 )
                 feat = matrix.features.flatten().tolist()
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"VDOT特征提取失败({s_date}): {e}")
                 continue
 
@@ -291,7 +292,7 @@ class VDOTPredictor:
                     )
                     for n, w in zip(top_names, weights)
                 ]
-        except Exception as e:
+        except (NanobotRunnerError, AttributeError, TypeError, KeyError) as e:
             logger.warning(f"特征重要性分析失败: {e}")
         return []
 
@@ -355,7 +356,7 @@ class VDOTPredictor:
                     for name, weight in pairs
                     if weight > 0
                 ]
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"sklearn feature_importances_提取失败: {e}")
 
         return []
@@ -369,7 +370,7 @@ class VDOTPredictor:
                 if model is not None:
                     try:
                         return self._run_ml_inference(model, days)
-                    except Exception as e:
+                    except NanobotRunnerError as e:
                         logger.warning(f"ML推理失败，尝试重训: {e}")
                         train_result = self.train_model()
                         if train_result.success:
@@ -377,7 +378,7 @@ class VDOTPredictor:
                             if retrained is not None:
                                 try:
                                     return self._run_ml_inference(retrained, days)
-                                except Exception as e2:
+                                except NanobotRunnerError as e2:
                                     logger.warning(f"重训后推理仍失败: {e2}")
 
         logger.info("无已训练ML模型，尝试自动训练")
@@ -387,7 +388,7 @@ class VDOTPredictor:
             if model is not None:
                 try:
                     return self._run_ml_inference(model, days)
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.warning(f"自动训练后推理失败: {e}")
 
         logger.info("ML训练/推理失败，降级到参数化预测")
@@ -442,7 +443,7 @@ class VDOTPredictor:
                             recent.append(calc.calculate_vdot(d, t))
                     if len(recent) >= 2:
                         trend_slope = (recent[0] - recent[-1]) / len(recent)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"VDOT趋势计算失败: {e}")
 
         return VDOTPrediction(
@@ -475,7 +476,7 @@ class VDOTPredictor:
             predicted = self._banister_model.predict(
                 training_stress, base_vdot=self._base_vdot, days_ahead=days
             )
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"Banister模型预测失败: {e}")
             predicted = self._base_vdot + 0.03 * days * 0.01
 
@@ -537,6 +538,6 @@ class VDOTPredictor:
                 return []
             sorted_dates = sorted(tss_map.keys())
             return [tss_map[d] for d in sorted_dates]
-        except Exception as e:
+        except NanobotRunnerError as e:
             logger.debug(f"TSS序列获取失败: {e}")
             return []

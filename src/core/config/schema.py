@@ -88,8 +88,7 @@ class AppConfig:
                     # 检查值是否为元组中的任一类型
                     if not any(isinstance(value, t) for t in expected_type):
                         type_names = " | ".join(
-                            t.__name__ if hasattr(t, "__name__") else str(t)  # type: ignore[arg-type]
-                            for t in expected_type
+                            getattr(t, "__name__", str(t)) for t in expected_type
                         )
                         errors.append(
                             f"字段 '{field_name}' 类型错误，期望 {type_names}，实际 {type(value).__name__}"

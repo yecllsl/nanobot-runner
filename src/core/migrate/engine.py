@@ -2,7 +2,7 @@ import json
 import time
 from pathlib import Path
 
-from src.core.base.exceptions import StorageError
+from src.core.base.exceptions import NanobotRunnerError, StorageError
 from src.core.base.logger import get_logger
 from src.core.config.backup_manager import BackupManager
 from src.core.config.manager import ConfigManager
@@ -189,7 +189,7 @@ class MigrationEngine:
                 warnings=all_warnings,
             )
 
-        except Exception as e:
+        except (NanobotRunnerError, RuntimeError, OSError) as e:
             logger.error(f"迁移执行失败: {e}")
             return MigrationResult(
                 success=False,

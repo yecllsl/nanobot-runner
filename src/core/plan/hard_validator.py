@@ -7,6 +7,7 @@
 from datetime import datetime
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.models import TrainingPlan, ValidationResult, Violation
 
@@ -64,7 +65,7 @@ class HardValidator:
                 result = rule_func(plan, current_weekly_distance_km, goal_distance_km)
                 if not result.passed:
                     violations.extend(result.violations)
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.error(f"规则{rule_name}校验失败: {e}")
                 violations.append(
                     Violation(

@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
+
 
 class IndexManager:
     """去重索引管理器"""
@@ -33,7 +35,7 @@ class IndexManager:
                     data = json.load(f)
                     self._fingerprints = set(data.get("fingerprints", []))
                     return data
-            except Exception:
+            except (NanobotRunnerError, json.JSONDecodeError, OSError, TypeError):
                 self._fingerprints = set()
                 return {"fingerprints": [], "metadata": {}}
         self._fingerprints = set()

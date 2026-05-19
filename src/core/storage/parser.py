@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import fitparse
 import polars as pl
@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 _original_parse_definition_message = fitparse.base.FitFile._parse_definition_message
 
 
-def _patched_parse_definition_message(self, header) -> None:  # type: ignore[no-untyped-def]
+def _patched_parse_definition_message(self, header: Any) -> None:
     from fitparse.records import BASE_TYPE_BYTE, BASE_TYPES, FieldDefinition
 
     endian = ">" if self._read_struct("xB") else "<"
@@ -374,7 +374,9 @@ class FitParser:
                         avg_gap = time_diffs.mean()
                         # time_diffs 是 Series，直接对 Series 进行过滤
                         # 使用 float 乘法避免类型问题
-                        threshold = avg_gap * 2.0 if avg_gap is not None else 0.0  # type: ignore[operator]
+                        threshold = (
+                            cast(float, avg_gap) * 2.0 if avg_gap is not None else 0.0
+                        )
                         time_gaps = time_diffs.filter(time_diffs > threshold).len()
 
             return {

@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
+
 
 @pytest.fixture
 def config_with_health_tools(tmp_path: Path) -> Path:
@@ -91,7 +93,7 @@ class TestHealthAgentToolIntegration:
     ):
         """测试健康工具连接失败的优雅降级"""
         with patch("nanobot.agent.tools.mcp.connect_mcp_servers") as mock_connect:
-            mock_connect.side_effect = Exception("Connection failed")
+            mock_connect.side_effect = NanobotRunnerError("Connection failed")
 
             from src.core.tools.mcp_connector import connect_mcp_tools_from_config
 

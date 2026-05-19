@@ -4,6 +4,8 @@ import logging
 import math
 from typing import TYPE_CHECKING
 
+from src.core.base.exceptions import NanobotRunnerError
+from src.core.constants import ATL_TIME_CONSTANT, CTL_TIME_CONSTANT
 from src.core.twin.models import (
     BodySignalDimension,
     FitnessDimension,
@@ -44,9 +46,6 @@ TSS_INTENSITY_FACTORS: dict[str, float] = {
     "interval": 1.1,
     "long": 0.65,
 }
-
-ATL_TIME_CONSTANT = 7.0
-CTL_TIME_CONSTANT = 42.0
 
 
 class WhatIfSimulator:
@@ -265,7 +264,7 @@ class WhatIfSimulator:
                     result = self._prediction_engine.predict_vdot_trend(days=7)
                     if hasattr(result, "trend_slope"):
                         return float(result.trend_slope) * 7.0
-                except Exception as e:
+                except NanobotRunnerError as e:
                     logger.debug(f"ML增强VDOT预测失败，降级: {e}")
             if trend_slope != 0.0:
                 return trend_slope * 7.0
@@ -280,7 +279,7 @@ class WhatIfSimulator:
                     stress_array, base_vdot=0.0, days_ahead=0
                 )
                 return float(predicted) * 0.1
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.debug(f"Banister IR模型预测失败，降级: {e}")
 
         if current_ctl <= 0:

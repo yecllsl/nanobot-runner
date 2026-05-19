@@ -4,11 +4,11 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 
-from src.core.base.exceptions import StorageError, ValidationError
+from src.core.base.exceptions import NanobotRunnerError, StorageError, ValidationError
 from src.core.base.logger import get_logger
 from src.core.base.schema import ParquetSchema
 
@@ -31,7 +31,7 @@ class StorageManager:
 
                     config_manager = ConfigManager()
                     self.data_dir = config_manager.data_dir
-                except Exception:
+                except (NanobotRunnerError, Exception):
                     # 如果读取配置失败，使用默认路径
                     self.data_dir = Path(config_dir) / "data"
             else:
@@ -207,7 +207,7 @@ class StorageManager:
                             pass  # 保持现有的更宽泛类型
                         else:
                             # 对于不兼容的类型，统一转换为字符串类型
-                            all_schemas[col_name] = pl.Utf8  # type: ignore
+                            all_schemas[col_name] = cast(pl.DataType, pl.Utf8)
 
         all_columns = sorted(all_schemas.keys())
 

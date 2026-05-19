@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.transparency.streaming_hook import StreamingHook
 
 
@@ -113,7 +114,7 @@ class TestStreamingHook:
     @pytest.mark.asyncio
     async def test_on_stream_gateway_failure_ignored(self, mock_bus, mock_context):
         """测试Gateway推送失败不中断"""
-        mock_bus.publish_outbound.side_effect = Exception("推送失败")
+        mock_bus.publish_outbound.side_effect = NanobotRunnerError("推送失败")
         hook = StreamingHook(
             bus=mock_bus,
             channel="feishu",

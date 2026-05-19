@@ -4,6 +4,7 @@
 from src.core.base.exceptions import (
     ConfigError,
     LLMError,
+    NanobotRunnerError,
     ParseError,
     StorageError,
     ValidationError,
@@ -85,7 +86,7 @@ class TestErrorClassifier:
 
     def test_classify_unknown_error(self):
         """测试未知错误分类"""
-        error = Exception("未知错误")
+        error = NanobotRunnerError("未知错误")
         result = ErrorClassifier.classify(error)
 
         assert result.category == ErrorCategory.UNKNOWN

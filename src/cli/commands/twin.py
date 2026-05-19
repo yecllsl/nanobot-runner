@@ -8,6 +8,7 @@ from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error
 from src.cli.handlers.twin_handler import TwinHandler
+from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="数字孪生引擎命令", no_args_is_help=True)
 
@@ -54,7 +55,7 @@ def get_snapshot() -> None:
         )
         console.print(panel)
 
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -168,7 +169,7 @@ def simulate(
     except json.JSONDecodeError:
         print_error(CLIError.storage_error("weeks JSON格式错误，请检查输入"))
         raise typer.Exit(1)
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
 
@@ -245,6 +246,6 @@ def compare_plans(
     except json.JSONDecodeError:
         print_error(CLIError.storage_error("plans JSON格式错误，请检查输入"))
         raise typer.Exit(1)
-    except Exception as e:
+    except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)

@@ -9,6 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.schema import AppConfig
 
@@ -87,7 +88,13 @@ class ConfigManager:
                     self.index_file = self.data_dir / "index.json"
                 # 读取 user_id，如果没有则使用默认值
                 self.user_id = config.get("user_id", "default_user")
-            except Exception as e:
+            except (
+                NanobotRunnerError,
+                json.JSONDecodeError,
+                ValueError,
+                AttributeError,
+                TypeError,
+            ) as e:
                 logger.debug(f"读取配置文件失败，使用默认路径: {e}")
                 self.user_id = "default_user"
         else:
@@ -168,7 +175,7 @@ class ConfigManager:
             try:
                 shutil.copy2(old_cron_store, new_cron_store)
                 logger.info(f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}")
-            except Exception as e:
+            except NanobotRunnerError as e:
                 logger.warning(f"迁移定时任务配置失败：{e}")
 
     def _ensure_config(self) -> None:
@@ -365,7 +372,7 @@ class ConfigManager:
             config = self.load_config()
             if field in config:
                 return ConfigSource.FILE
-        except Exception:
+        except NanobotRunnerError:
             pass
 
         return ConfigSource.DEFAULT
@@ -385,7 +392,7 @@ class ConfigManager:
 
         try:
             file_config = self.load_config()
-        except Exception:
+        except NanobotRunnerError:
             return inconsistencies
 
         for config_key, env_key in ENV_KEY_MAPPING.items():

@@ -3,7 +3,7 @@
 # 学习速率可配置，避免过度拟合
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from src.core.personality.models import (
     FeedbackRecord,
@@ -304,7 +304,7 @@ class PreferenceLearner:
         if category in self._category_votes:
             votes = self._category_votes[category]
             if votes:
-                winner = max(votes, key=votes.get)  # type: ignore[arg-type]
+                winner = max(votes, key=cast(Any, votes.get))
                 category_to_field = {
                     "training_time": "training_time",
                     "training_intensity": "training_intensity",

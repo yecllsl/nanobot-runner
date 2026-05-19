@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.plan.notify_tool import NotifyTool, SkipReason
 from src.core.plan.training_reminder_manager import (
     ReminderRecord,
@@ -263,7 +264,9 @@ class TestOnReminderTrigger:
 
             with patch.object(manager, "_get_today_plan", return_value=mock_plan):
                 with patch.object(
-                    manager, "_send_reminder", side_effect=Exception("发送异常")
+                    manager,
+                    "_send_reminder",
+                    side_effect=NanobotRunnerError("发送异常"),
                 ):
                     result = manager.on_reminder_trigger()
 
