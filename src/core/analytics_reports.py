@@ -72,6 +72,10 @@ def get_yesterday_run(
     try:
         lf = storage.read_parquet()
 
+        # 处理空数据情况（无数据文件时返回空LazyFrame）
+        if lf.collect_schema().names() == []:
+            return None
+
         # 过滤昨日的数据
         start_of_yesterday = datetime.combine(yesterday, datetime.min.time())
         end_of_yesterday = datetime.combine(yesterday, datetime.max.time())

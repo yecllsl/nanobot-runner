@@ -218,24 +218,29 @@ def test_report_generation_baseline():
     """晨报生成基准测试 - 验证基础性能"""
     from unittest.mock import MagicMock
 
-    storage = StorageManager()
-    analytics = AnalyticsEngine(storage)
-    mock_config = MagicMock()
-    mock_config.data_dir = storage.data_dir
-    context = create_mock_context(
-        config=mock_config, storage=storage, analytics=analytics
-    )
-    report_service = ReportService(context)
+    temp_dir = Path(tempfile.mkdtemp())
+    try:
+        storage = StorageManager(data_dir=temp_dir)
+        analytics = AnalyticsEngine(storage)
+        mock_config = MagicMock()
+        mock_config.data_dir = temp_dir
+        context = create_mock_context(
+            config=mock_config, storage=storage, analytics=analytics
+        )
+        report_service = ReportService(context)
 
-    # 测试空数据生成性能
-    start_time = time.time()
-    result = report_service.generate_report(age=30)
-    elapsed = time.time() - start_time
+        # 测试空数据生成性能
+        start_time = time.time()
+        result = report_service.generate_report(age=30)
+        elapsed = time.time() - start_time
 
-    print(f"📊 空数据晨报生成基准性能: {elapsed:.3f}秒")
-    assert elapsed < 1.0, f"空数据晨报生成耗时 {elapsed:.3f}秒，超过基准限制"
+        print(f"📊 空数据晨报生成基准性能: {elapsed:.3f}秒")
+        assert elapsed < 1.0, f"空数据晨报生成耗时 {elapsed:.3f}秒，超过基准限制"
 
-    print("✅ 晨报生成基准测试通过")
+        print("✅ 晨报生成基准测试通过")
+    finally:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":
