@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-2570%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.22.0 - 质量收口版本，UAT验证通过，缺陷全面修复，Phase A数字孪生跑者阶段收官
+> **最新版本**: v0.22.1 - 代码质量重构版本，代码审查问题修复，架构优化，类型安全提升
 
 ## 项目简介
 
