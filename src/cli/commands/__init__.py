@@ -5,6 +5,7 @@ from src.cli.commands.agent import app as agent_app
 from src.cli.commands.analysis import app as analysis_app
 from src.cli.commands.cron import app as cron_app
 from src.cli.commands.data import app as data_app
+from src.cli.commands.evolution import app as evolution_app
 from src.cli.commands.export import app as export_app
 from src.cli.commands.gateway import app as gateway_app
 from src.cli.commands.plan import app as plan_app
@@ -39,4 +40,5 @@ __all__ = [
     "status_app",
     "prediction_app",
     "twin_app",
+    "evolution_app",
 ]

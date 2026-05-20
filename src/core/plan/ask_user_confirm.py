@@ -29,6 +29,7 @@ class ConfirmScenario(Enum):
     TRAINING_PLAN = "training_plan"
     RPE_FEEDBACK = "rpe_feedback"
     INJURY_RISK_ADJUSTMENT = "injury_risk_adjustment"
+    DECISION_FEEDBACK = "decision_feedback"
     GENERIC = "generic"
 
 
@@ -348,6 +349,53 @@ class AskUserConfirmManager:
 
         self._pending_confirms[plan_id] = prompt
         logger.info(f"创建伤病风险调整确认提示: plan_id={plan_id}, risk={risk_level}")
+        return prompt
+
+    def create_decision_feedback_prompt(
+        self,
+        decision_id: str,
+        recommendation_summary: str,
+    ) -> ConfirmPrompt:
+        """创建决策反馈确认提示（v0.23.0新增）
+
+        用于决策追踪模块中，向用户展示AI建议并收集反馈态度。
+
+        Args:
+            decision_id: 决策ID
+            recommendation_summary: AI建议摘要
+
+        Returns:
+            ConfirmPrompt: 决策反馈确认提示
+        """
+        prompt = ConfirmPrompt(
+            scenario=ConfirmScenario.DECISION_FEEDBACK,
+            title=f"决策反馈 - {decision_id[:8]}",
+            message=f"AI建议：{recommendation_summary}\n\n请确认您对本次建议的态度：",
+            options=[
+                ConfirmOption(
+                    key="accept",
+                    label="接受建议",
+                    description="按照AI建议执行",
+                    value=True,
+                ),
+                ConfirmOption(
+                    key="modify",
+                    label="部分接受",
+                    description="接受部分建议并调整",
+                    value="modify",
+                ),
+                ConfirmOption(
+                    key="reject",
+                    label="不接受",
+                    description="不采纳AI建议",
+                    value=False,
+                ),
+            ],
+            default_key="accept",
+            metadata={"decision_id": decision_id},
+        )
+        self._pending_confirms[decision_id] = prompt
+        logger.info(f"创建决策反馈确认提示: decision_id={decision_id}")
         return prompt
 
     def parse_user_response(

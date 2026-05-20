@@ -9,6 +9,58 @@
 
 ---
 
+## [0.23.0] - 2026-05-20
+
+### 版本主题
+**决策追踪模块** —— AI决策自动记录、结果回填、用户反馈收集、自适应进化引擎基础
+
+> **⚠️ 版本说明**: v0.23.0 是Phase C（自适应进化引擎）的首个版本，新增决策追踪模块，实现AI决策自动记录与结果回填，为v0.24个性化学习和v0.25自适应进化奠定基础。
+
+**本版本已实现**:
+- ✅ 决策日志自动记录（DecisionLogHook无侵入接入）
+- ✅ 结果回填机制（执行忠实度、预测准确度）
+- ✅ 用户反馈收集（评分/文本/采纳状态）
+- ✅ CLI命令组（evolution status/history/feedback/accuracy/fidelity）
+- ✅ Agent工具集成（check_plan_execution/check_prediction_accuracy）
+- ✅ 按月分片Parquet存储（decisions/outcomes）
+- ✅ EvolutionConfig配置Schema（环境变量覆盖支持）
+
+### 新增功能
+
+#### 决策追踪模块（Evolution Engine）
+- **DecisionLog**: 冻结数据类，10个字段，记录AI决策完整上下文
+- **OutcomeRecord**: 冻结数据类，11个字段，记录决策执行结果
+- **DecisionLogHook**: 继承AgentHook，无侵入接入Agent生命周期
+- **EvolutionStore**: 按月分片Parquet存储，支持决策/结果配对查询
+- **OutcomeCollector**: 执行忠实度计算、预测准确度评估、反馈收集
+- **EvolutionEngine**: 决策追踪引擎编排层，统一接口
+
+#### CLI命令组
+- `uv run nanobotrun evolution status` - 查看进化状态
+- `uv run nanobotrun evolution history [--start] [--end] [--type]` - 查询决策历史
+- `uv run nanobotrun evolution feedback <decision_id> --score [--text] [--accepted]` - 提交反馈
+- `uv run nanobotrun evolution accuracy [--days 30]` - 查看预测准确度
+- `uv run nanobotrun evolution fidelity [--days 30]` - 查看执行忠实度
+
+#### Agent工具
+- `check_plan_execution()` - 检查计划执行忠实度
+- `check_prediction_accuracy()` - 检查预测准确度
+
+### 技术改进
+
+#### 架构优化
+- **Hook独立注册**: DecisionLogHook独立继承AgentHook，避免与ObservabilityHook状态竞争
+- **依赖注入扩展**: AppContext新增evolution_engine属性
+- **配置驱动**: EvolutionConfig遵循Pydantic-Settings模式，支持环境变量覆盖
+- **执行忠实度公式**: 简化为`fidelity = 1 - (0.55 * 体积偏差 + 0.45 * 时间偏差)`
+
+#### 数据模型
+- **execution_status**: 统一为5种状态（pending/executed/skipped/modified/failed）
+- **prediction_direction**: 新增字段（overestimate/underestimate/accurate/None）
+- **runner_state摘要**: 5个关键指标（vdot/ctl/atl/tsb/fatigue_score）
+
+---
+
 ## [0.22.1] - 2026-05-19
 
 ### 版本主题

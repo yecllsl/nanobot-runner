@@ -2,13 +2,13 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
-> **文档版本**: v0.22.0 | **更新日期**: 2026-05-18
-> **当前基线**: v0.22.0 | **规划版本**: v0.23.0
+> **文档版本**: v0.23.0 | **更新日期**: 2026-05-20
+> **当前基线**: v0.23.0 | **规划版本**: v0.24.0
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
 > **v0.19.0 重要变更**: 新增身体信号分析模块(HRV/疲劳度/恢复评估)
 > **v0.20.0 重要变更**: 新增ML增强预测模块(VDOT/比赛成绩/伤病风险预测)
 > **v0.21.0 重要变更**: 新增数字孪生引擎(What-If推演/计划对比)
-> **v0.22.0 当前基线**: 质量收口版本，多视角验证(条件性)
+> **v0.23.0 重要变更**: 新增自适应进化引擎(决策追踪/结果回填/用户反馈)
 
 ---
 
@@ -559,3 +559,239 @@ summary = interpreter.get_body_signal_summary(period="daily")
 | `check_body_signals` | 检查身体异常信号 |
 | `get_training_readiness` | 获取训练准备度评估 |
 ```
+
+---
+
+## 自适应进化引擎模块 (v0.23.0)
+
+### DecisionLog
+
+决策日志数据模型，记录AI决策完整上下文。
+
+```python
+from src.core.evolution.models import DecisionLog
+from src.core.transparency import DecisionType
+
+# 创建决策日志
+log = DecisionLog(
+    decision_id="abc123...",
+    timestamp=datetime.now(),
+    runner_state={"vdot": 45.2, "ctl": 58, "atl": 65, "tsb": -7, "fatigue_score": 42},
+    decision_type=DecisionType.PLAN_ADJUSTMENT,
+    tool_call_chain=[{"tool": "check_plan_execution", "output": "..."}],
+    prediction_snapshot={"vdot_trend": "+0.3", "injury_risk": "28%"},
+    recommendation_text="减少本周跑量10%，注意休息",
+    execution_status="pending",
+    recommendation_accepted=None,
+    session_key="session_001"
+)
+
+# 序列化为dict
+data = log.to_dict()
+
+# 从dict反序列化
+log = DecisionLog.from_dict(data)
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `decision_id` | str | 决策唯一ID (UUID4) |
+| `timestamp` | datetime | 决策时间 |
+| `runner_state` | dict | 跑者状态摘要 (5维度) |
+| `decision_type` | DecisionType | 决策类型枚举 |
+| `tool_call_chain` | list | 工具调用链 |
+| `prediction_snapshot` | dict | 预测快照 |
+| `recommendation_text` | str | 建议文本 |
+| `execution_status` | str | 执行状态 (pending/executed/skipped/modified/failed) |
+| `recommendation_accepted` | bool \| None | 是否采纳 |
+| `session_key` | str | 会话标识 |
+
+---
+
+### OutcomeRecord
+
+结果记录数据模型，记录决策执行结果。
+
+```python
+from src.core.evolution.models import OutcomeRecord
+
+# 创建结果记录
+outcome = OutcomeRecord(
+    outcome_id="out_001",
+    decision_id="abc123...",
+    outcome_timestamp=datetime.now(),
+    actual_vdot=45.5,
+    actual_injury=False,
+    execution_fidelity=0.82,
+    user_feedback_score=4,
+    user_feedback_text="建议很实用",
+    prediction_error=3.2,
+    prediction_direction="accurate",
+    session_id="session_001"
+)
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `outcome_id` | str | 结果唯一ID |
+| `decision_id` | str | 关联决策ID |
+| `outcome_timestamp` | datetime | 结果记录时间 |
+| `actual_vdot` | float | 实际VDOT值 |
+| `actual_injury` | bool | 是否发生伤病 |
+| `execution_fidelity` | float | 执行忠实度 (0-1) |
+| `user_feedback_score` | int | 用户评分 (1-5) |
+| `user_feedback_text` | str | 用户文本反馈 |
+| `prediction_error` | float | 预测误差百分比 |
+| `prediction_direction` | str | 偏差方向 (overestimate/underestimate/accurate/None) |
+| `session_id` | str | 会话标识 |
+
+---
+
+### EvolutionConfig
+
+进化模块配置Schema。
+
+```python
+from src.core.evolution.config import EvolutionConfig
+
+# 使用默认配置
+config = EvolutionConfig()
+
+# 自定义配置
+config = EvolutionConfig(
+    data_dir="~/.nanobot-runner",
+    async_write_enabled=False,
+    runner_state_fields=["vdot", "ctl", "atl", "tsb", "fatigue_score"]
+)
+```
+
+**配置项说明**:
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `data_dir` | str | ~/.nanobot-runner | 数据存储路径 |
+| `async_write_enabled` | bool | False | 是否启用异步写入 |
+| `async_write_queue_size` | int | 100 | 异步写入队列容量 |
+| `async_write_max_retries` | int | 3 | 最大重试次数 |
+| `async_write_retry_backoff` | float | 1.0 | 重试退避时间(秒) |
+| `feedback_prompt_frequency` | int | 5 | 反馈提示频率 |
+| `runner_state_fields` | list | [vdot,ctl,atl,tsb,fatigue_score] | 状态摘要字段 |
+
+---
+
+### EvolutionStore
+
+决策与结果存储层。
+
+```python
+from src.core.evolution.evolution_store import EvolutionStore
+from src.core.evolution.config import EvolutionConfig
+
+# 创建存储实例
+store = EvolutionStore(config=EvolutionConfig())
+
+# 保存决策日志
+store.save_decision(decision_log)
+
+# 保存结果记录
+store.save_outcome(outcome_record)
+
+# 查询决策历史
+decisions = store.query_decisions(start_date="2026-04-01", end_date="2026-05-01")
+
+# 查询结果记录
+outcomes = store.query_outcomes(decision_ids=["abc123"])
+
+# 获取决策-结果配对数据
+pairs = store.get_decision_outcome_pairs(days=30)
+```
+
+**核心方法**:
+
+| 方法 | 说明 |
+|------|------|
+| `save_decision(decision)` | 保存决策日志到按月分片Parquet |
+| `save_outcome(outcome)` | 保存结果记录到按月分片Parquet |
+| `query_decisions(...)` | 按日期/类型过滤查询决策 |
+| `query_outcomes(...)` | 按decision_id查询结果 |
+| `get_decision_by_id(id)` | 按ID精确查询单条决策 |
+| `get_decision_outcome_pairs(...)` | 获取决策-结果配对数据 |
+
+---
+
+### EvolutionEngine
+
+进化引擎编排层。
+
+```python
+from src.core.evolution import EvolutionEngine
+from src.core.base import get_context
+
+# 通过依赖注入获取
+context = get_context()
+engine = context.evolution_engine
+
+# 获取进化状态
+status = engine.get_evolution_status()
+
+# 查询决策历史
+history = engine.query_history(days=30)
+
+# 提交用户反馈
+engine.submit_feedback(decision_id, score=4, text="很好", accepted=True)
+```
+
+**核心方法**:
+
+| 方法 | 说明 |
+|------|------|
+| `get_evolution_status()` | 获取进化状态摘要 |
+| `query_history(...)` | 查询决策历史 |
+| `submit_feedback(...)` | 提交用户反馈 |
+| `get_accuracy_stats(...)` | 获取预测准确度统计 |
+| `get_fidelity_stats(...)` | 获取执行忠实度统计 |
+
+---
+
+### DecisionLogHook
+
+Agent生命周期钩子，无侵入接入决策记录。
+
+```python
+from src.core.evolution.decision_log_hook import DecisionLogHook
+from src.core.evolution.evolution_store import EvolutionStore
+from src.core.evolution.config import EvolutionConfig
+
+# 创建Hook实例
+hook = DecisionLogHook(
+    store=EvolutionStore(),
+    config=EvolutionConfig()
+)
+
+# 钩子方法（由Agent自动调用）
+hook.before_iteration(runner_state)  # 捕获状态快照
+hook.before_execute_tools(tool_name, tool_output)  # 记录工具调用
+hook.finalize_content(decision, content)  # 完成决策日志记录
+```
+
+**钩子方法**:
+
+| 方法 | 说明 |
+|------|------|
+| `before_iteration(state)` | 捕获runner_state摘要 |
+| `before_execute_tools(name, output)` | 记录工具调用链 |
+| `finalize_content(decision, content)` | 完成决策日志写入 |
+
+---
+
+### Agent工具 (v0.23.0)
+
+| 工具名称 | 说明 |
+|---------|------|
+| `check_plan_execution` | 检查计划执行忠实度 |
+| `check_prediction_accuracy` | 检查预测准确度 |
+

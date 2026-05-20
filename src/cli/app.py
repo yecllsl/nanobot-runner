@@ -8,6 +8,7 @@ from src.cli.commands import (
     analysis_app,
     cron_app,
     data_app,
+    evolution_app,
     export_app,
     gateway_app,
     plan_app,
@@ -46,6 +47,7 @@ app.add_typer(cron_app, name="cron")
 app.add_typer(status_app, name="status")
 app.add_typer(prediction_app, name="predict")
 app.add_typer(twin_app, name="twin")
+app.add_typer(evolution_app, name="evolution")
 
 if __name__ == "__main__":
     app()

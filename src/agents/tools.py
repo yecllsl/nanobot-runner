@@ -2257,6 +2257,195 @@ class RunnerTools:
             logger.error(f"数字孪生计划对比失败: {e}")
             return {"success": False, "error": str(e)}
 
+    # ----------------------------------------------------------------
+    # 决策追踪方法
+    # ----------------------------------------------------------------
+
+    def record_decision_feedback(
+        self,
+        decision_id: str,
+        score: int,
+        text: str | None = None,
+        accepted: bool | None = None,
+    ) -> dict[str, Any]:
+        """记录用户对AI决策的反馈 - v0.23.0新增
+
+        Args:
+            decision_id: 决策唯一标识
+            score: 用户反馈评分（1-5）
+            text: 用户反馈文本（可选）
+            accepted: 推荐是否被采纳（可选）
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.evolution_engine
+            outcome = engine.record_feedback(decision_id, score, text, accepted)
+            return {"success": True, "data": outcome.to_dict()}
+        except NanobotRunnerError as e:
+            logger.error(f"记录决策反馈失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"记录决策反馈未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def check_plan_execution(self, decision_id: str) -> dict[str, Any]:
+        """检查计划执行忠实度 - v0.23.0新增
+
+        输出含execution_fidelity/volume_deviation/time_deviation，
+        不含intensity_deviation（评审遗留NP-02）。
+
+        Args:
+            decision_id: 决策唯一标识
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.evolution_engine
+            outcome = engine.check_plan_execution(decision_id)
+            data = outcome.to_dict()
+            # 不含intensity_deviation（评审遗留NP-02）
+            return {"success": True, "data": data}
+        except NanobotRunnerError as e:
+            logger.error(f"检查计划执行失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"检查计划执行未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def check_prediction_accuracy(
+        self, decision_id: str, actual_vdot: float = 0.0
+    ) -> dict[str, Any]:
+        """检查预测准确度 - v0.23.0新增
+
+        输出含prediction_error/prediction_direction/mae，
+        使用prediction_direction（非error_direction，评审遗留NP-03）。
+
+        Args:
+            decision_id: 决策唯一标识
+            actual_vdot: 实际VDOT值（默认0.0，0.0时尝试从最新session获取）
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            engine = context.evolution_engine
+
+            # actual_vdot为0.0时，尝试从最新session获取
+            if actual_vdot == 0.0:
+                actual_vdot = self._get_latest_vdot()
+
+            outcome, stats = engine.check_prediction_accuracy(decision_id, actual_vdot)
+            data = {
+                **outcome.to_dict(),
+                "mae": stats.mae,
+                "total_pairs": stats.total_pairs,
+            }
+            return {"success": True, "data": data}
+        except NanobotRunnerError as e:
+            logger.error(f"检查预测准确度失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"检查预测准确度未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def get_decision_history(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        decision_type_str: str | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """查询决策历史 - v0.23.0新增
+
+        Args:
+            start_date: 起始日期（可选，格式：YYYY-MM-DD）
+            end_date: 结束日期（可选，格式：YYYY-MM-DD）
+            decision_type_str: 决策类型过滤（可选）
+            limit: 返回数量限制（默认50）
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from datetime import datetime as dt
+
+            from src.core.base.context import get_context
+            from src.core.transparency.models import DecisionType
+
+            context = get_context()
+            engine = context.evolution_engine
+
+            # 解析日期字符串
+            parsed_start: dt | None = None
+            parsed_end: dt | None = None
+            if start_date:
+                try:
+                    parsed_start = dt.strptime(start_date, "%Y-%m-%d")
+                except ValueError:
+                    return {
+                        "success": False,
+                        "error": f"起始日期格式错误: {start_date}",
+                    }
+            if end_date:
+                try:
+                    parsed_end = dt.strptime(end_date, "%Y-%m-%d")
+                except ValueError:
+                    return {"success": False, "error": f"结束日期格式错误: {end_date}"}
+
+            # 解析决策类型
+            decision_type: DecisionType | None = None
+            if decision_type_str:
+                try:
+                    decision_type = DecisionType(decision_type_str)
+                except ValueError:
+                    return {
+                        "success": False,
+                        "error": f"无效的决策类型: {decision_type_str}",
+                    }
+
+            history = engine.get_decision_history(
+                start_date=parsed_start,
+                end_date=parsed_end,
+                decision_type=decision_type,
+                limit=limit,
+            )
+            return {
+                "success": True,
+                "data": [d.to_dict() for d in history],
+            }
+        except NanobotRunnerError as e:
+            logger.error(f"查询决策历史失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"查询决策历史未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def _get_latest_vdot(self) -> float:
+        """从最新session获取VDOT值
+
+        Returns:
+            float: 最新VDOT值，获取失败返回0.0
+        """
+        try:
+            vdot_trend = self.get_vdot_trend(limit=1)
+            if vdot_trend and vdot_trend[0].get("vdot") is not None:
+                return float(vdot_trend[0]["vdot"])
+        except Exception as e:
+            logger.warning(f"获取最新VDOT失败: {e}")
+        return 0.0
+
 
 # ============================================================================
 # Re-exports: 从子模块导入所有工具类，保持向后兼容
@@ -2287,6 +2476,16 @@ from .tools_data import (  # noqa: E402
     TraceDataSourcesTool,
     UpdateMemoryTool,
     UpdateUserPreferencesTool,
+)
+
+# 决策追踪工具
+from .tools_evolution import (  # noqa: E402
+    CheckPlanExecutionTool,
+    CheckPredictionAccuracyTool,
+    GetDecisionHistoryTool,
+)
+from .tools_evolution import (  # noqa: E402
+    RecordFeedbackTool as RecordDecisionFeedbackTool,
 )
 
 # 训练计划工具
@@ -2383,6 +2582,11 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         GetTwinSnapshotTool(runner_tools),
         SimulateTwinTool(runner_tools),
         CompareTwinPlansTool(runner_tools),
+        # 决策追踪工具
+        RecordDecisionFeedbackTool(runner_tools),
+        CheckPlanExecutionTool(runner_tools),
+        CheckPredictionAccuracyTool(runner_tools),
+        GetDecisionHistoryTool(runner_tools),
     ]
 
 
@@ -2694,6 +2898,37 @@ TOOL_DESCRIPTIONS = {
             "prediction_type": "预测模式（basic/parametric/ml_enhanced，默认parametric）",
         },
     },
+    "record_decision_feedback": {
+        "description": "记录用户对AI决策的反馈评分。当用户表达对训练建议的满意度或反馈时使用此工具。返回JSON格式：{success: true, data: {outcome_id, decision_id, user_feedback_score, user_feedback_text, ...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "decision_id": "决策唯一标识（必填）",
+            "score": "用户反馈评分（1-5，必填）",
+            "text": "用户反馈文本（可选）",
+            "accepted": "推荐是否被采纳（可选）",
+        },
+    },
+    "check_plan_execution": {
+        "description": "检查训练计划的执行忠实度。当需要评估用户是否按计划执行训练时使用此工具。返回JSON格式：{success: true, data: {execution_fidelity, volume_deviation, time_deviation, ...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "decision_id": "决策唯一标识（必填）",
+        },
+    },
+    "check_prediction_accuracy": {
+        "description": "检查VDOT预测的准确度。当需要评估AI预测与实际表现的偏差时使用此工具。返回JSON格式：{success: true, data: {prediction_error, prediction_direction, mae, total_pairs, ...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "decision_id": "决策唯一标识（必填）",
+            "actual_vdot": "实际VDOT值（可选，默认从最新session获取）",
+        },
+    },
+    "get_decision_history": {
+        "description": "查询AI决策历史记录。当用户询问过去的训练建议或决策记录时使用此工具。返回JSON格式：{success: true, data: [{decision_id, timestamp, decision_type, execution_status, ...}]} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "start_date": "起始日期（可选，格式：YYYY-MM-DD）",
+            "end_date": "结束日期（可选，格式：YYYY-MM-DD）",
+            "type": "决策类型过滤（可选）",
+            "limit": "返回数量限制（默认50）",
+        },
+    },
 }
 
 __all__ = [
@@ -2746,6 +2981,11 @@ __all__ = [
     "SimulateTwinTool",
     "CompareTwinPlansTool",
     "SpawnSubagentTool",
+    # 决策追踪工具
+    "RecordDecisionFeedbackTool",
+    "CheckPlanExecutionTool",
+    "CheckPredictionAccuracyTool",
+    "GetDecisionHistoryTool",
     # 数据管理/系统工具
     "UpdateMemoryTool",
     "DiagnoseSuggestionTool",

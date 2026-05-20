@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.14.0 | **更新日期**: 2026-05-18
-> **当前基线**: v0.22.0
+> **版本**: v5.15.0 | **更新日期**: 2026-05-20
+> **当前基线**: v0.23.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -70,18 +70,28 @@ src/
 │   │   ├── hrv.py              # 心率变异分析
 │   │   ├── fatigue.py          # 疲劳度评估
 │   │   └── body_signals.py     # 身体信号解读
-│   └── prediction/             # ML预测模块 (v0.20.0)
-│       ├── models.py           # 预测数据模型
-│       ├── vdot_predictor.py   # VDOT趋势预测
-│       ├── race_predictor.py   # 比赛成绩预测
-│       ├── injury_predictor.py # 伤病风险预测
-│       └── model_manager.py    # 模型生命周期管理
-│   └── twin/                   # 数字孪生引擎 (v0.21.0)
-│       ├── models.py           # 状态向量数据模型
-│       ├── twin_engine.py      # 数字孪生引擎编排层
-│       ├── state_vector_builder.py # 5维度状态向量构建器
-│       └── whatif_simulator.py # What-If推演器
-├── agents/tools.py             # Agent 工具集
+│   ├── prediction/             # ML预测模块 (v0.20.0)
+│   │   ├── models.py           # 预测数据模型
+│   │   ├── vdot_predictor.py   # VDOT趋势预测
+│   │   ├── race_predictor.py   # 比赛成绩预测
+│   │   ├── injury_predictor.py # 伤病风险预测
+│   │   └── model_manager.py    # 模型生命周期管理
+│   ├── twin/                   # 数字孪生引擎 (v0.21.0)
+│   │   ├── models.py           # 状态向量数据模型
+│   │   ├── twin_engine.py      # 数字孪生引擎编排层
+│   │   ├── state_vector_builder.py # 5维度状态向量构建器
+│   │   └── whatif_simulator.py # What-If推演器
+│   └── evolution/              # 自适应进化引擎 (v0.23.0)
+│       ├── models.py           # 决策/结果数据模型
+│       ├── config.py           # 进化配置Schema
+│       ├── evolution_store.py  # 决策/结果存储层
+│       ├── decision_logger.py  # 决策记录器
+│       ├── outcome_collector.py # 结果收集器
+│       ├── evolution_engine.py # 进化引擎编排层
+│       └── decision_log_hook.py # Agent生命周期钩子
+├── agents/
+│   ├── tools.py                # Agent 工具集
+│   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0)
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块
     ├── commands/               # 命令模块
@@ -107,6 +117,7 @@ AppContext
     ├── session_repo: SessionRepository
     ├── config: ConfigManager
     ├── plan_manager: PlanManager
+    ├── evolution_engine: EvolutionEngine  # v0.23.0新增
     └── ... (其他组件)
     ↓
 CLI Handlers / Agent Tools
@@ -254,6 +265,16 @@ uv run nanobotrun status today      # 今日身体状态
 uv run nanobotrun status weekly     # 本周身体状态摘要
 ```
 
+### 自适应进化 (v0.23.0)
+
+```bash
+uv run nanobotrun evolution status                      # 查看进化状态
+uv run nanobotrun evolution history [--days 30]         # 查询决策历史
+uv run nanobotrun evolution feedback <id> --score 4     # 提交用户反馈
+uv run nanobotrun evolution accuracy [--days 30]        # 查看预测准确度
+uv run nanobotrun evolution fidelity [--days 30]        # 查看执行忠实度
+```
+
 ### 系统管理
 
 ```bash
@@ -298,6 +319,10 @@ uv run pytest tests/unit/
 | **CTL** | 慢性训练负荷，42天EWMA | CTL 65 表示体能基础扎实 |
 | **TSB** | 训练压力平衡，CTL - ATL | TSB +10 表示体能充沛 |
 | **RPE** | 主观疲劳度，1-10分 | RPE 7 表示较累 |
+| **DecisionLog** | AI决策日志记录 | 包含决策类型、建议、执行状态等 |
+| **OutcomeRecord** | 决策执行结果记录 | 包含忠实度、预测误差、用户反馈等 |
+| **Execution Fidelity** | 执行忠实度(0-1) | 衡量计划执行与AI建议的匹配程度 |
+| **Prediction MAE** | 预测平均绝对误差 | 衡量AI预测准确度 |
 
 > 完整术语表与数据结构定义见：[API文档](docs/api/api_reference.md) 和源码 Docstring
 
