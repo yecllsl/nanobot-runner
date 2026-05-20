@@ -83,6 +83,7 @@ git checkout v0.9.0 -- docs/
 docs/archive/
 ├── .gitignore           # 排除.zip文件
 ├── README.md            # 本文件（归档索引）
+├── v0.23.0-archive.zip # v0.23.0版本归档（本地备份，不提交）
 ├── v0.22.1-archive.zip # v0.22.1版本归档（本地备份，不提交）
 ├── v0.22.0-archive.zip # v0.22.0版本归档（本地备份，不提交）
 ├── v0.21.0-archive.zip # v0.21.0版本归档（本地备份，不提交）
@@ -127,6 +128,40 @@ docs/archive/
 **质量门禁**：
 - 代码评审：完成
 - 整改计划：已制定
+
+---
+
+### v0.23.0 (2026-05-20)
+
+**归档内容**（共11个文档）：
+- **测试文档**（2个）：回归报告_v0.23.0.md、strategy_v0.23.0.md
+- **运维文档**（1个）：发布报告_v0.23.0.md
+- **评审文档**（6个）：代码评审报告_v0.23.0_2026-05-20.md、代码评审报告_v0.23.0_复评_2026-05-20.md、代码评审报告_v0.23.0_复评_第三轮_2026-05-20.md、代码评审整改报告_v0.23.0_2026-05-20.md、代码评审整改报告_v0.23.0_复评_2026-05-20.md、代码评审整改报告_v0.23.0_复评_第三轮_2026-05-20.md
+- **规划文档**（1个）：task_list_v0.23.0.md
+- **架构文档**（1个）：架构评审报告_v0.23.0.md
+
+**版本特性**：
+
+**自适应进化引擎**：
+- 决策日志记录器：Agent决策全链路追踪、结构化日志持久化、多类型决策支持
+- 结果收集器：执行结果收集、预测误差计算、执行忠实度评估
+- 进化引擎编排层：学习循环编排、自适应校准、决策-结果闭环
+- Agent生命周期钩子：自动日志记录、无侵入式集成
+- 进化CLI命令：`evolution status/history/feedback/accuracy/fidelity`
+
+**核心组件**：
+- `src/core/evolution/evolution_engine.py` - 进化引擎编排层
+- `src/core/evolution/evolution_store.py` - 决策/结果存储层
+- `src/core/evolution/decision_logger.py` - 决策记录器
+- `src/core/evolution/outcome_collector.py` - 结果收集器
+- `src/core/evolution/decision_log_hook.py` - Agent生命周期钩子
+- `src/core/evolution/models.py` - 数据模型
+- `src/core/evolution/config.py` - 进化配置Schema
+- `src/agents/tools_evolution.py` - Agent工具集
+
+**质量门禁**：
+- 代码评审：3轮评审通过
+- 回归测试：全部通过
 
 ---
 
@@ -746,4 +781,4 @@ docs/archive/
 
 ---
 
-**最后更新**: 2026-05-19 by DevOps Team (v0.22.1 代码评审文档归档)
+**最后更新**: 2026-05-20 by DevOps Team (v0.23.0 自适应进化引擎文档归档)
