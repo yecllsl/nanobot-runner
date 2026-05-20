@@ -75,11 +75,14 @@ def create_composite_hook(
     channel: str | None = None,
     chat_id: str | None = None,
     verbose: bool = False,
+    evolution_engine: Any | None = None,  # v0.23.0新增
+    session_key: str = "",  # v0.23.0新增
 ) -> list[AgentHook]:
     """创建组合Hook列表
 
     工厂函数，统一创建并注册所有Hook。
-    Hook注册顺序: StreamingHook -> ErrorHandlingHook -> ProgressDisplayHook -> ObservabilityHook
+    Hook注册顺序: StreamingHook -> ErrorHandlingHook -> ProgressDisplayHook
+                   -> ObservabilityHook -> DecisionLogHook
 
     Args:
         console: Rich控制台实例
@@ -89,6 +92,8 @@ def create_composite_hook(
         channel: 通道名称
         chat_id: 聊天ID
         verbose: 是否显示详细错误信息
+        evolution_engine: 进化引擎实例，传入时注册DecisionLogHook（v0.23.0新增）
+        session_key: 会话标识，用于关联决策日志（v0.23.0新增）
 
     Returns:
         list[AgentHook]: Hook实例列表
@@ -123,6 +128,17 @@ def create_composite_hook(
             ObservabilityHook(
                 manager=observability_manager,
                 engine=engine,
+            )
+        )
+
+    # 5. DecisionLogHook - 决策日志（v0.23.0新增）
+    if evolution_engine is not None:
+        from src.core.evolution.decision_log_hook import DecisionLogHook
+
+        hooks.append(
+            DecisionLogHook(
+                evolution_engine=evolution_engine,
+                session_key=session_key,
             )
         )
 

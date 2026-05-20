@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from src.core.calculators.race_prediction import RacePredictionEngine
     from src.core.calculators.training_load_analyzer import TrainingLoadAnalyzer
     from src.core.calculators.vdot_calculator import VDOTCalculator
+    from src.core.evolution.evolution_engine import EvolutionEngine
     from src.core.export.engine import ExportEngine
     from src.core.plan.ask_user_confirm import AskUserConfirmManager
     from src.core.plan.cron_callback import CronCallbackHandler
@@ -446,6 +447,54 @@ class AppContext:
                 cache_dir=self.config.data_dir,
             )
             self.set_extension("digital_twin_engine", engine)
+        return engine
+
+    @property
+    def evolution_engine(self) -> EvolutionEngine:
+        """获取决策追踪引擎（v0.23.0新增）
+
+        依赖注入模式：创建共享EvolutionStore实例，构建DecisionLogger和
+        OutcomeCollector后注入EvolutionEngine。若plan_manager可用，
+        同时构建PlanExecutionDataAdapter注入OutcomeCollector。
+        """
+        from src.core.evolution.config import EvolutionConfig
+        from src.core.evolution.decision_logger import DecisionLogger
+        from src.core.evolution.evolution_engine import EvolutionEngine
+        from src.core.evolution.evolution_store import EvolutionStore
+        from src.core.evolution.outcome_collector import (
+            OutcomeCollector,
+            PlanExecutionDataAdapter,
+        )
+
+        engine = self.get_extension("evolution_engine")
+        if engine is None:
+            config = EvolutionConfig(data_dir=str(self.config.data_dir))
+            store = EvolutionStore(Path(self.config.data_dir))
+            decision_logger = DecisionLogger(store, config=config)
+
+            plan_adapter: PlanExecutionDataAdapter | None = None
+            if hasattr(self, "plan_manager") and self.plan_manager is not None:
+                from src.core.plan.plan_execution_repository import (
+                    PlanExecutionRepository,
+                )
+
+                execution_repo = PlanExecutionRepository(self.plan_manager)
+                plan_adapter = PlanExecutionDataAdapter(
+                    plan_manager=self.plan_manager,
+                    execution_repo=execution_repo,
+                )
+
+            outcome_collector = OutcomeCollector(
+                store=store,
+                decision_logger=decision_logger,
+                plan_adapter=plan_adapter,
+                config=config,
+            )
+            engine = EvolutionEngine(
+                decision_logger=decision_logger,
+                outcome_collector=outcome_collector,
+            )
+            self.set_extension("evolution_engine", engine)
         return engine
 
 
