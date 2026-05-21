@@ -451,11 +451,12 @@ class AppContext:
 
     @property
     def evolution_engine(self) -> EvolutionEngine:
-        """获取决策追踪引擎（v0.23.0新增）
+        """获取决策追踪引擎（v0.23.0新增，v0.24.0扩展）
 
         依赖注入模式：创建共享EvolutionStore实例，构建DecisionLogger和
         OutcomeCollector后注入EvolutionEngine。若plan_manager可用，
         同时构建PlanExecutionDataAdapter注入OutcomeCollector。
+        v0.24.0新增：注入ResponseAnalyzer/CalibrationEngine/ModelEvolver。
         """
         from src.core.evolution.config import EvolutionConfig
         from src.core.evolution.decision_logger import DecisionLogger
@@ -490,9 +491,21 @@ class AppContext:
                 plan_adapter=plan_adapter,
                 config=config,
             )
+            # v0.24: 注入个性化学习组件
+            from src.core.evolution.calibration_engine import CalibrationEngine
+            from src.core.evolution.model_evolver import ModelEvolver
+            from src.core.evolution.response_analyzer import ResponseAnalyzer
+
+            response_analyzer = ResponseAnalyzer(store, config)
+            calibration_engine = CalibrationEngine(store, config)
+            model_evolver = ModelEvolver(calibration_engine, store, config=config)
+
             engine = EvolutionEngine(
                 decision_logger=decision_logger,
                 outcome_collector=outcome_collector,
+                response_analyzer=response_analyzer,
+                calibration_engine=calibration_engine,
+                model_evolver=model_evolver,
             )
             self.set_extension("evolution_engine", engine)
         return engine

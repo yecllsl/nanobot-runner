@@ -302,3 +302,212 @@ def get_status() -> None:
     except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
+
+
+@app.command(name="calibrate")
+def run_calibration(
+    model_type: str = typer.Option(
+        "vdot",
+        "--model",
+        "-m",
+        help="模型类型 (vdot/injury/training_response)",
+    ),
+) -> None:
+    """执行预测校准
+
+    基于预测-实际配对数据，检测模型偏差方向和幅度，通过EMA更新scale因子。
+
+    Examples:
+        nanobotrun evolution calibrate
+        nanobotrun evolution calibrate --model injury
+    """
+    try:
+        handler = EvolutionHandler()
+        result = handler.run_calibration(model_type=model_type)
+
+        direction = result.get("direction", "none")
+        magnitude = result.get("magnitude", 0.0)
+        scale_before = result.get("scale_before", 1.0)
+        scale_after = result.get("scale_after", 1.0)
+        mae_before = result.get("mae_before", 0.0)
+        mae_after = result.get("mae_after", 0.0)
+        improvement = result.get("improvement_pct", 0.0)
+
+        # 偏差方向可视化
+        direction_labels = {
+            "overestimate": "[red]高估[/red]",
+            "underestimate": "[yellow]低估[/yellow]",
+            "none": "[green]准确[/green]",
+        }
+        direction_text = direction_labels.get(direction, direction)
+
+        # 改善方向
+        if improvement > 0:
+            improvement_text = f"[green]{improvement:.1f}%[/green]"
+        else:
+            improvement_text = f"[dim]{improvement:.1f}%[/dim]"
+
+        console.print(
+            Panel(
+                f"[bold]模型类型:[/bold] {model_type}\n\n"
+                f"[bold]偏差方向:[/bold] {direction_text}\n"
+                f"[bold]偏差幅度:[/bold] {magnitude:.1%}\n\n"
+                f"[bold]Scale修正:[/bold] {scale_before:.4f} → {scale_after:.4f}\n"
+                f"[bold]MAE:[/bold] {mae_before:.4f} → {mae_after:.4f}\n"
+                f"[bold]改善幅度:[/bold] {improvement_text}\n"
+                f"[bold]样本数:[/bold] {result.get('sample_count', 0)}",
+                title="[Evolution] 预测校准报告",
+                border_style="cyan",
+            )
+        )
+
+    except ValueError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+    except NanobotRunnerError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="response")
+def analyze_training_response(
+    months: int = typer.Option(6, "--months", "-m", help="分析月数"),
+) -> None:
+    """分析训练响应性
+
+    分析不同训练类型对跑者VDOT变化的响应效果，识别最佳/最差训练类型。
+
+    Examples:
+        nanobotrun evolution response
+        nanobotrun evolution response --months 12
+    """
+    try:
+        handler = EvolutionHandler()
+        result = handler.analyze_training_response(months=months)
+
+        total_pairs = result.get("total_pairs", 0)
+        eligible_pairs = result.get("eligible_pairs", 0)
+        responses = result.get("training_responses", [])
+        best_type = result.get("best_type")
+        worst_type = result.get("worst_type")
+        data_sufficient = result.get("data_sufficient", False)
+
+        # 数据充足性
+        sufficient_text = (
+            "[green]充足[/green]" if data_sufficient else "[yellow]不足[/yellow]"
+        )
+
+        # 训练类型响应表格
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("训练类型", width=15)
+        table.add_column("样本数", width=10)
+        table.add_column("平均VDOT变化", width=15)
+        table.add_column("平均忠实度", width=12)
+        table.add_column("响应性评分", width=12)
+
+        for r in responses:
+            training_type = r.get("training_type", "")
+            sample_count = r.get("sample_count", 0)
+            avg_delta = r.get("avg_vdot_delta", 0.0)
+            avg_fidelity = r.get("avg_fidelity", 0.0)
+            response_score = r.get("response_score", 0.0)
+
+            # 评分颜色
+            if response_score >= 0.7:
+                score_color = "green"
+            elif response_score >= 0.4:
+                score_color = "yellow"
+            else:
+                score_color = "red"
+
+            table.add_row(
+                training_type,
+                str(sample_count),
+                f"{avg_delta:+.4f}",
+                f"{avg_fidelity:.1%}",
+                f"[{score_color}]{response_score:.1%}[/{score_color}]",
+            )
+
+        console.print(
+            Panel(
+                f"[bold]分析周期:[/bold] 最近{months}个月\n"
+                f"[bold]总配对数:[/bold] {total_pairs}\n"
+                f"[bold]合格配对数:[/bold] {eligible_pairs}\n"
+                f"[bold]数据充足性:[/bold] {sufficient_text}\n"
+                f"[bold]最佳训练类型:[/bold] {best_type or 'N/A'}\n"
+                f"[bold]最差训练类型:[/bold] {worst_type or 'N/A'}",
+                title="[Evolution] 训练响应性分析",
+                border_style="cyan",
+            )
+        )
+        if responses:
+            console.print(table)
+
+    except NanobotRunnerError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="calibration-status")
+def get_calibration_status(
+    model_type: str = typer.Option(
+        "",
+        "--model",
+        "-m",
+        help="模型类型 (vdot/injury/training_response)，空则显示全部",
+    ),
+) -> None:
+    """查看校准状态
+
+    展示预测校准的当前状态，包括scale因子、样本数、MAE等。
+
+    Examples:
+        nanobotrun evolution calibration-status
+        nanobotrun evolution calibration-status --model vdot
+    """
+    try:
+        handler = EvolutionHandler()
+        result = handler.get_calibration_status(model_type=model_type or None)
+
+        if "model_type" in result:
+            # 单个模型状态
+            _print_calibration_profile(result)
+        else:
+            # 所有模型状态
+            for mt, profile_data in result.items():
+                console.print(f"\n[bold]{mt}[/bold]")
+                _print_calibration_profile(profile_data)
+
+    except NanobotRunnerError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+def _print_calibration_profile(data: dict) -> None:
+    """格式化输出单个校准配置"""
+    scale = data.get("scale", 1.0)
+    sample_count = data.get("sample_count", 0)
+    mae_before = data.get("mae_before")
+    mae_after = data.get("mae_after")
+    last_updated = data.get("last_updated", "")
+
+    # Scale方向
+    if scale < 1.0:
+        scale_text = f"[red]{scale:.4f} (高估修正)[/red]"
+    elif scale > 1.0:
+        scale_text = f"[yellow]{scale:.4f} (低估修正)[/yellow]"
+    else:
+        scale_text = f"[green]{scale:.4f} (无修正)[/green]"
+
+    lines = [
+        f"  Scale: {scale_text}",
+        f"  样本数: {sample_count}",
+    ]
+    if mae_before is not None:
+        lines.append(f"  校准前MAE: {mae_before:.4f}")
+    if mae_after is not None:
+        lines.append(f"  校准后MAE: {mae_after:.4f}")
+    if last_updated:
+        lines.append(f"  最后更新: {last_updated}")
+
+    console.print("\n".join(lines))

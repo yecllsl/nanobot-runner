@@ -45,6 +45,17 @@ class PlanExecutionData:
     planned_duration_min: int
     actual_duration_min: int
     completion_rate: float
+    planned_intensity_factor: float = 0.0
+    actual_intensity_factor: float = 0.0
+
+
+INTENSITY_FACTOR_TABLE: dict[str, float] = {
+    "interval": 1.1,
+    "threshold": 0.9,
+    "long": 0.65,
+    "recovery": 0.45,
+    "easy": 0.50,
+}
 
 
 class PlanExecutionDataAdapter:
@@ -120,18 +131,10 @@ class PlanExecutionDataAdapter:
 
 
 def calculate_fidelity(data: PlanExecutionData) -> float:
-    """计算执行忠实度
+    """计算执行忠实度（v0.24三维度升级）
 
-    公式: fidelity = 1 - (0.55 * |actual_volume - planned_volume|/planned_volume
-                          + 0.45 * |actual_duration - planned_duration|/planned_duration)
-
-    结果限制在[0, 1]范围内。计划值为0时返回1.0（无偏差）。
-
-    Args:
-        data: 计划执行数据
-
-    Returns:
-        float: 执行忠实度，范围[0, 1]
+    三维度: fidelity = 1 - (0.40*体积偏差 + 0.30*强度偏差 + 0.30*时间偏差)
+    向后兼容: planned_intensity_factor为0时回退v0.23双维度(0.55+0.45)
     """
     if data.planned_volume_km == 0 or data.planned_duration_min == 0:
         return 1.0
@@ -143,7 +146,20 @@ def calculate_fidelity(data: PlanExecutionData) -> float:
         abs(data.actual_duration_min - data.planned_duration_min)
         / data.planned_duration_min
     )
-    fidelity = 1.0 - (0.55 * volume_deviation + 0.45 * duration_deviation)
+
+    if data.planned_intensity_factor > 0.0:
+        intensity_deviation = (
+            abs(data.actual_intensity_factor - data.planned_intensity_factor)
+            / data.planned_intensity_factor
+        )
+        fidelity = 1.0 - (
+            0.40 * volume_deviation
+            + 0.30 * intensity_deviation
+            + 0.30 * duration_deviation
+        )
+    else:
+        fidelity = 1.0 - (0.55 * volume_deviation + 0.45 * duration_deviation)
+
     return max(0.0, min(1.0, fidelity))
 
 

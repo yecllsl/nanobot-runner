@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from src.core.evolution.evolution_store import EvolutionStore
-from src.core.evolution.models import DecisionLog, OutcomeRecord
+from src.core.evolution.models import CalibrationProfile, DecisionLog, OutcomeRecord
 from src.core.transparency.models import DecisionType
 
 
@@ -469,3 +469,120 @@ class TestPersistence:
         assert len(result.tool_call_chain) == 2
         assert result.tool_call_chain[0]["tool"] == "get_vdot"
         assert result.tool_call_chain[1]["arguments"] == {"type": "easy"}
+
+
+class TestEvolutionStoreV024:
+    """EvolutionStore v0.24校准/参数持久化方法测试"""
+
+    def test_save_and_load_calibration_profile(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        profile = CalibrationProfile(
+            model_type="vdot",
+            scale=0.95,
+            last_updated=datetime(2026, 5, 20, 10, 0, 0),
+            sample_count=15,
+            mae_before=2.5,
+            mae_after=1.8,
+        )
+        store.save_calibration_profile(profile)
+        loaded = store.load_calibration_profile("vdot")
+        assert loaded is not None
+        assert loaded.model_type == "vdot"
+        assert loaded.scale == 0.95
+        assert loaded.sample_count == 15
+
+    def test_load_calibration_profile_not_found(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        result = store.load_calibration_profile("nonexistent")
+        assert result is None
+
+    def test_save_calibration_creates_directory(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        profile = CalibrationProfile(model_type="vdot")
+        store.save_calibration_profile(profile)
+        assert (tmp_path / "calibrations").exists()
+
+    def test_get_prediction_actual_pairs_vdot(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        decision = DecisionLog(
+            decision_id="dec_001",
+            timestamp=datetime(2026, 5, 1, 10, 0, 0),
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot={"predicted_vdot": 46.0},
+            recommendation_text=None,
+            execution_status="executed",
+            recommendation_accepted=None,
+            session_key="",
+        )
+        outcome = OutcomeRecord(
+            outcome_id="out_001",
+            decision_id="dec_001",
+            outcome_timestamp=datetime(2026, 5, 8, 10, 0, 0),
+            actual_vdot=46.5,
+            actual_injury=False,
+            execution_fidelity=0.85,
+            user_feedback_score=None,
+            user_feedback_text=None,
+            prediction_error=None,
+            prediction_direction=None,
+            session_id=None,
+        )
+        store.save_decision(decision)
+        store.save_outcome(outcome)
+        pairs = store.get_prediction_actual_pairs("vdot", min_count=1)
+        assert len(pairs) == 1
+        assert pairs[0] == (46.0, 46.5)
+
+    def test_get_prediction_actual_pairs_insufficient_data(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        pairs = store.get_prediction_actual_pairs("vdot", min_count=10)
+        assert pairs == []
+
+    def test_get_prediction_actual_pairs_injury(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        decision = DecisionLog(
+            decision_id="dec_002",
+            timestamp=datetime(2026, 5, 1, 10, 0, 0),
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.RECOVERY_SUGGESTION,
+            tool_call_chain=[],
+            prediction_snapshot={"injury_risk_probability": 0.3},
+            recommendation_text=None,
+            execution_status="executed",
+            recommendation_accepted=None,
+            session_key="",
+        )
+        outcome = OutcomeRecord(
+            outcome_id="out_002",
+            decision_id="dec_002",
+            outcome_timestamp=datetime(2026, 5, 8, 10, 0, 0),
+            actual_vdot=None,
+            actual_injury=True,
+            execution_fidelity=None,
+            user_feedback_score=None,
+            user_feedback_text=None,
+            prediction_error=None,
+            prediction_direction=None,
+            session_id=None,
+        )
+        store.save_decision(decision)
+        store.save_outcome(outcome)
+        pairs = store.get_prediction_actual_pairs("injury", min_count=1)
+        assert len(pairs) == 1
+        assert pairs[0] == (0.3, 1.0)
+
+    def test_save_and_load_model_params(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        params = {"tau_fitness": 44.0, "k1": 0.00361}
+        store.save_model_params("vdot", params)
+        loaded = store.load_model_params("vdot")
+        assert loaded is not None
+        assert loaded["tau_fitness"] == 44.0
+        assert loaded["k1"] == 0.00361
+
+    def test_load_model_params_not_found(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        result = store.load_model_params("nonexistent")
+        assert result is None

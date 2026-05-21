@@ -144,3 +144,44 @@ class EvolutionHandler:
         """
         engine = self._get_engine()
         return engine.get_evolution_status()
+
+    def analyze_training_response(self, months: int = 6) -> dict[str, Any]:
+        """分析训练响应性
+
+        Args:
+            months: 分析月数，默认6个月
+
+        Returns:
+            dict: 训练响应性报告字典
+        """
+        engine = self._get_engine()
+        report = engine.analyze_training_response(months=months)
+        return report.to_dict()
+
+    def run_calibration(self, model_type: str = "vdot") -> dict[str, Any]:
+        """执行预测校准
+
+        Args:
+            model_type: 模型类型，默认vdot
+
+        Returns:
+            dict: 校准报告字典
+        """
+        engine = self._get_engine()
+        report = engine.run_calibration(model_type)
+        return report.to_dict()
+
+    def get_calibration_status(self, model_type: str | None = None) -> dict[str, Any]:
+        """获取校准状态
+
+        Args:
+            model_type: 模型类型，None时返回所有模型状态
+
+        Returns:
+            dict: 校准状态字典
+        """
+        engine = self._get_engine()
+        result = engine.get_calibration_status(model_type)
+        if isinstance(result, dict):
+            return result
+        return result.to_dict()

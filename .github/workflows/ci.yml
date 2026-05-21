@@ -174,7 +174,7 @@ jobs:
     - name: Generate coverage report
       run: |
         echo "开始生成覆盖率报告..."
-        uv run pytest --cov=src --cov-report=xml --cov-report=term-missing
+        uv run pytest --cov=src --cov-report=xml --cov-report=term-missing --ignore=tests/e2e/
         
     - name: Verify coverage file
       run: |

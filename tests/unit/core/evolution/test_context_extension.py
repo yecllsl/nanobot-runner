@@ -130,3 +130,45 @@ class TestEvolutionEngineExtension:
             # 构造参数应包含decision_logger和outcome_collector
             assert "decision_logger" in call_kwargs.kwargs
             assert "outcome_collector" in call_kwargs.kwargs
+
+
+class TestEvolutionEngineV024Extension:
+    """AppContext evolution_engine v0.24组件注入测试"""
+
+    def test_v024_components_injected(self, mock_context):
+        """v0.24组件应被注入到EvolutionEngine"""
+        from src.core.evolution.calibration_engine import CalibrationEngine
+        from src.core.evolution.model_evolver import ModelEvolver
+        from src.core.evolution.response_analyzer import ResponseAnalyzer
+
+        engine = mock_context.evolution_engine
+
+        assert isinstance(engine._response_analyzer, ResponseAnalyzer)
+        assert isinstance(engine._calibration_engine, CalibrationEngine)
+        assert isinstance(engine._model_evolver, ModelEvolver)
+
+    def test_v024_methods_callable(self, mock_context):
+        """v0.24方法应可正常调用"""
+        engine = mock_context.evolution_engine
+
+        # analyze_training_response 不应抛RuntimeError
+        report = engine.analyze_training_response(months=6)
+        assert report is not None
+
+        # apply_calibration_to_prediction 不应抛RuntimeError
+        corrected = engine.apply_calibration_to_prediction("vdot", 46.0)
+        assert corrected == 46.0  # 默认scale=1.0
+
+    def test_v024_components_share_store(self, mock_context):
+        """v0.24组件应与v0.23组件共享同一EvolutionStore"""
+        engine = mock_context.evolution_engine
+
+        store_v023 = engine.decision_logger._store
+        store_v024 = engine._calibration_engine._store
+        assert store_v023 is store_v024
+
+    def test_get_evolution_status_includes_calibration(self, mock_context):
+        """get_evolution_status应包含calibration_status"""
+        engine = mock_context.evolution_engine
+        status = engine.get_evolution_status()
+        assert "calibration_status" in status
