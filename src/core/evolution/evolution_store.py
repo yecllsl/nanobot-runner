@@ -14,7 +14,7 @@ from typing import Any
 import polars as pl
 
 from src.core.base.logger import get_logger
-from src.core.evolution.models import DecisionLog, OutcomeRecord
+from src.core.evolution.models import CalibrationProfile, DecisionLog, OutcomeRecord
 from src.core.transparency.models import DecisionType
 
 logger = get_logger(__name__)
@@ -236,6 +236,7 @@ class EvolutionStore:
         self._data_dir = data_dir
         self._decisions_dir = data_dir / "decisions"
         self._outcomes_dir = data_dir / "outcomes"
+        self._calibrations_dir = data_dir / "calibrations"
 
     @property
     def data_dir(self) -> Path:
@@ -643,3 +644,122 @@ class EvolutionStore:
         pairs.sort(key=lambda x: x[0].timestamp, reverse=True)
 
         return pairs
+
+    def save_calibration_profile(self, profile: CalibrationProfile) -> None:
+        """保存校准配置到JSON文件
+
+        使用原子写入确保数据安全。
+
+        Args:
+            profile: 校准配置对象
+        """
+        self._calibrations_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self._calibrations_dir / f"{profile.model_type}_calibration.json"
+        tmp_path = file_path.with_suffix(".json.tmp")
+        try:
+            tmp_path.write_text(
+                json.dumps(profile.to_dict(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            tmp_path.replace(file_path)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
+
+    def load_calibration_profile(self, model_type: str) -> CalibrationProfile | None:
+        """从JSON文件加载校准配置
+
+        Args:
+            model_type: 模型类型（vdot/injury/training_response）
+
+        Returns:
+            CalibrationProfile | None: 校准配置对象，未找到返回None
+        """
+        file_path = self._calibrations_dir / f"{model_type}_calibration.json"
+        if not file_path.exists():
+            return None
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+        return CalibrationProfile.from_dict(data)
+
+    def get_prediction_actual_pairs(
+        self, model_type: str, min_count: int = 10
+    ) -> list[tuple[float, float]]:
+        """从DecisionLog/OutcomeRecord提取预测-实际配对
+
+        按model_type从prediction_snapshot提取predicted值，从OutcomeRecord提取actual值。
+        配对数 < min_count时返回空列表。
+
+        Args:
+            model_type: 模型类型（vdot/injury/training_response）
+            min_count: 最小配对数阈值，低于此值返回空列表
+
+        Returns:
+            list[tuple[float, float]]: (预测值, 实际值)配对列表
+        """
+        all_pairs = self.get_decision_outcome_pairs()
+        result: list[tuple[float, float]] = []
+        prediction_keys: dict[str, str] = {
+            "vdot": "predicted_vdot",
+            "injury": "injury_risk_probability",
+            "training_response": "predicted_vdot_impact",
+        }
+        pred_key = prediction_keys.get(model_type)
+        if pred_key is None:
+            return []
+        for decision, outcome in all_pairs:
+            if decision.prediction_snapshot is None:
+                continue
+            predicted = decision.prediction_snapshot.get(pred_key)
+            if predicted is None:
+                continue
+            actual: float | None = None
+            if model_type == "vdot":
+                actual = outcome.actual_vdot
+            elif model_type == "injury":
+                actual = float(outcome.actual_injury)
+            elif model_type == "training_response" and outcome.actual_vdot is not None:
+                actual = outcome.actual_vdot - decision.runner_state.get("vdot", 0)
+            if actual is None:
+                continue
+            result.append((float(predicted), actual))
+        if len(result) < min_count:
+            return []
+        return result
+
+    def save_model_params(self, model_type: str, params: dict[str, Any]) -> None:
+        """保存模型参数到JSON文件
+
+        使用原子写入确保数据安全。
+
+        Args:
+            model_type: 模型类型
+            params: 模型参数字典
+        """
+        self._calibrations_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self._calibrations_dir / f"{model_type}_params.json"
+        tmp_path = file_path.with_suffix(".json.tmp")
+        try:
+            tmp_path.write_text(
+                json.dumps(params, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            tmp_path.replace(file_path)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
+
+    def load_model_params(self, model_type: str) -> dict[str, Any] | None:
+        """从JSON文件加载模型参数
+
+        Args:
+            model_type: 模型类型
+
+        Returns:
+            dict[str, Any] | None: 模型参数字典，未找到返回None
+        """
+        file_path = self._calibrations_dir / f"{model_type}_params.json"
+        if not file_path.exists():
+            return None
+        return json.loads(file_path.read_text(encoding="utf-8"))

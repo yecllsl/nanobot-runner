@@ -1,7 +1,7 @@
 # CLI 使用指南
 
-> **文档版本**: v0.23.0 | **更新日期**: 2026-05-20
-> **当前基线**: v0.23.0 | **规划版本**: v0.24.0
+> **文档版本**: v0.24.0 | **更新日期**: 2026-05-21
+> **当前基线**: v0.24.0 | **规划版本**: v0.25.0
 
 ## 1. 概述
 
@@ -965,6 +965,64 @@ uv run nanobotrun evolution fidelity --days 90 --json
   时间偏差: 6.2%
 
 💡 建议: 您的执行忠实度较高，训练计划执行良好。
+```
+
+#### 查看校准状态 (v0.24.0)
+
+**v0.24.0 新增**: 基于决策日志和结果记录，校准预测模型的系统性偏差。
+
+```bash
+# 查看VDOT预测校准状态
+uv run nanobotrun evolution calibration --model-type vdot
+
+# 查看伤病风险校准状态
+uv run nanobotrun evolution calibration --model-type injury
+
+# 以JSON格式输出
+uv run nanobotrun evolution calibration --model-type vdot --json
+```
+
+**输出示例**:
+```
+📊 预测校准状态
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 模型: VDOT预测
+  bias: +0.3
+  scale: 0.97
+  配对数据: 15条
+  触发阈值: 10条 (已触发)
+  校准前MAE: 4.2%
+  校准后MAE: 3.5%
+
+💡 建议: 模型存在轻微高估偏差 (+0.3)，已应用偏差修正。
+```
+
+#### 训练响应性分析 (v0.24.0)
+
+**v0.24.0 新增**: 分析用户对不同训练刺激的反应，识别最有效的训练类型。
+
+```bash
+# 分析最近6个月的训练响应性
+uv run nanobotrun evolution response --months 6
+
+# 分析最近3个月
+uv run nanobotrun evolution response --months 3
+
+# 以JSON格式输出
+uv run nanobotrun evolution response --months 6 --json
+```
+
+**输出示例**:
+```
+📈 训练响应性分析 (最近6个月)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏃 训练类型效果排名
+  1. 间歇训练   VDOT提升: +1.2  样本数: 8
+  2. 阈值训练   VDOT提升: +0.9  样本数: 12
+  3. 长距离跑   VDOT提升: +0.5  样本数: 15
+  4. 恢复跑     VDOT提升: +0.1  样本数: 20
+
+💡 建议: 您对间歇训练响应性最强，建议在训练计划中适当增加间歇训练比例。
 ```
 
 ---

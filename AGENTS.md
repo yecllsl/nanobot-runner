@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.15.0 | **更新日期**: 2026-05-20
-> **当前基线**: v0.23.0
+> **版本**: v5.16.0 | **更新日期**: 2026-05-21
+> **当前基线**: v0.24.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -265,7 +265,7 @@ uv run nanobotrun status today      # 今日身体状态
 uv run nanobotrun status weekly     # 本周身体状态摘要
 ```
 
-### 自适应进化 (v0.23.0)
+### 自适应进化 (v0.23.0+)
 
 ```bash
 uv run nanobotrun evolution status                      # 查看进化状态
@@ -273,6 +273,10 @@ uv run nanobotrun evolution history [--days 30]         # 查询决策历史
 uv run nanobotrun evolution feedback <id> --score 4     # 提交用户反馈
 uv run nanobotrun evolution accuracy [--days 30]        # 查看预测准确度
 uv run nanobotrun evolution fidelity [--days 30]        # 查看执行忠实度
+
+# v0.24.0 - 个性化学习
+uv run nanobotrun evolution calibration [--model-type TYPE]  # 查看校准状态
+uv run nanobotrun evolution response [--months 6]            # 训练响应性分析
 ```
 
 ### 系统管理

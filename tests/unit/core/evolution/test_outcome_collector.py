@@ -15,6 +15,7 @@ from src.core.evolution.models import (
     PredictionAccuracyStats,
 )
 from src.core.evolution.outcome_collector import (
+    INTENSITY_FACTOR_TABLE,
     OutcomeCollector,
     PlanExecutionData,
     PlanExecutionDataAdapter,
@@ -582,3 +583,100 @@ class TestGetOutcomeByDecisionId:
 
         outcome = collector.get_outcome_by_decision_id("nonexistent")
         assert outcome is None
+
+
+# ============================================================
+# Fidelity三维度计算测试
+# ============================================================
+
+
+class TestFidelityThreeDimensions:
+    """Fidelity三维度计算测试"""
+
+    def test_plan_execution_data_with_intensity(self):
+        data = PlanExecutionData(
+            planned_volume_km=40.0,
+            actual_volume_km=38.0,
+            planned_duration_min=300,
+            actual_duration_min=290,
+            completion_rate=0.95,
+            planned_intensity_factor=0.9,
+            actual_intensity_factor=0.85,
+        )
+        assert data.planned_intensity_factor == 0.9
+        assert data.actual_intensity_factor == 0.85
+
+    def test_plan_execution_data_intensity_defaults_zero(self):
+        data = PlanExecutionData(
+            planned_volume_km=40.0,
+            actual_volume_km=38.0,
+            planned_duration_min=300,
+            actual_duration_min=290,
+            completion_rate=0.95,
+        )
+        assert data.planned_intensity_factor == 0.0
+        assert data.actual_intensity_factor == 0.0
+
+    def test_three_dimension_fidelity(self):
+        """三维度: 1 - (0.40*体积 + 0.30*强度 + 0.30*时间)"""
+        data = PlanExecutionData(
+            planned_volume_km=40.0,
+            actual_volume_km=38.0,
+            planned_duration_min=300,
+            actual_duration_min=290,
+            completion_rate=0.95,
+            planned_intensity_factor=0.9,
+            actual_intensity_factor=0.85,
+        )
+        fidelity = calculate_fidelity(data)
+        # 体积偏差: |38-40|/40 = 0.05
+        # 强度偏差: |0.85-0.9|/0.9 ≈ 0.0556
+        # 时间偏差: |290-300|/300 ≈ 0.0333
+        # fidelity = 1 - (0.40*0.05 + 0.30*0.0556 + 0.30*0.0333) ≈ 0.951
+        assert 0.94 < fidelity < 0.96
+
+    def test_fidelity_backward_compatible_no_intensity(self):
+        """无强度因子时回退v0.23双维度(0.55+0.45)"""
+        data = PlanExecutionData(
+            planned_volume_km=40.0,
+            actual_volume_km=38.0,
+            planned_duration_min=300,
+            actual_duration_min=290,
+            completion_rate=0.95,
+            planned_intensity_factor=0.0,
+            actual_intensity_factor=0.0,
+        )
+        fidelity = calculate_fidelity(data)
+        assert 0.95 < fidelity < 0.97
+
+    def test_intensity_factor_table(self):
+        assert INTENSITY_FACTOR_TABLE["interval"] == 1.1
+        assert INTENSITY_FACTOR_TABLE["threshold"] == 0.9
+        assert INTENSITY_FACTOR_TABLE["long"] == 0.65
+        assert INTENSITY_FACTOR_TABLE["recovery"] == 0.45
+        assert INTENSITY_FACTOR_TABLE["easy"] == 0.50
+
+    def test_perfect_fidelity_three_dimensions(self):
+        data = PlanExecutionData(
+            planned_volume_km=40.0,
+            actual_volume_km=40.0,
+            planned_duration_min=300,
+            actual_duration_min=300,
+            completion_rate=1.0,
+            planned_intensity_factor=0.9,
+            actual_intensity_factor=0.9,
+        )
+        assert calculate_fidelity(data) == 1.0
+
+    def test_zero_planned_intensity_skips_intensity(self):
+        data = PlanExecutionData(
+            planned_volume_km=40.0,
+            actual_volume_km=36.0,
+            planned_duration_min=300,
+            actual_duration_min=280,
+            completion_rate=0.9,
+            planned_intensity_factor=0.0,
+            actual_intensity_factor=0.5,
+        )
+        fidelity = calculate_fidelity(data)
+        assert fidelity > 0.0

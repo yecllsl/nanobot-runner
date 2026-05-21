@@ -235,3 +235,79 @@ class TestEvolutionConfigValidation:
         """测试async_write_max_retries=0是合法的（不重试）"""
         config = EvolutionConfig(async_write_max_retries=0)
         assert config.async_write_max_retries == 0
+
+
+class TestEvolutionConfigV024:
+    """EvolutionConfig v0.24校准配置扩展测试"""
+
+    def test_default_calibration_fields(self):
+        config = EvolutionConfig()
+        assert config.calibration_alpha == 0.7
+        assert config.calibration_max_amplitude == 0.10
+        assert config.calibration_min_samples == 10
+        assert config.response_min_fidelity == 0.7
+        assert config.response_min_samples_per_type == 5
+        assert config.window_min_months == 6
+
+    def test_custom_calibration_fields(self):
+        config = EvolutionConfig(
+            calibration_alpha=0.5,
+            calibration_max_amplitude=0.15,
+            calibration_min_samples=20,
+            response_min_fidelity=0.8,
+            response_min_samples_per_type=8,
+            window_min_months=3,
+        )
+        assert config.calibration_alpha == 0.5
+        assert config.calibration_max_amplitude == 0.15
+
+    def test_calibration_alpha_validation(self):
+        with pytest.raises(ValueError, match="calibration_alpha"):
+            EvolutionConfig(calibration_alpha=0.0)
+        with pytest.raises(ValueError, match="calibration_alpha"):
+            EvolutionConfig(calibration_alpha=1.1)
+
+    def test_calibration_max_amplitude_validation(self):
+        with pytest.raises(ValueError, match="calibration_max_amplitude"):
+            EvolutionConfig(calibration_max_amplitude=0.0)
+        with pytest.raises(ValueError, match="calibration_max_amplitude"):
+            EvolutionConfig(calibration_max_amplitude=1.5)
+
+    def test_calibration_min_samples_validation(self):
+        with pytest.raises(ValueError, match="calibration_min_samples"):
+            EvolutionConfig(calibration_min_samples=0)
+
+    def test_response_min_fidelity_validation(self):
+        with pytest.raises(ValueError, match="response_min_fidelity"):
+            EvolutionConfig(response_min_fidelity=0.0)
+        with pytest.raises(ValueError, match="response_min_fidelity"):
+            EvolutionConfig(response_min_fidelity=1.5)
+
+    def test_response_min_samples_per_type_validation(self):
+        with pytest.raises(ValueError, match="response_min_samples_per_type"):
+            EvolutionConfig(response_min_samples_per_type=0)
+
+    def test_window_min_months_validation(self):
+        with pytest.raises(ValueError, match="window_min_months"):
+            EvolutionConfig(window_min_months=0)
+
+    def test_to_dict_includes_v024_fields(self):
+        config = EvolutionConfig()
+        d = config.to_dict()
+        assert "calibration_alpha" in d
+        assert "calibration_max_amplitude" in d
+        assert "calibration_min_samples" in d
+        assert "response_min_fidelity" in d
+        assert "response_min_samples_per_type" in d
+        assert "window_min_months" in d
+
+    def test_from_dict_compatible_with_v023(self):
+        v023_data = {
+            "data_dir": "~/.nanobot-runner",
+            "async_write_enabled": False,
+            "feedback_prompt_frequency": 5,
+            "some_unknown_field": "ignored",
+        }
+        config = EvolutionConfig.from_dict(v023_data)
+        assert config.feedback_prompt_frequency == 5
+        assert config.calibration_alpha == 0.7

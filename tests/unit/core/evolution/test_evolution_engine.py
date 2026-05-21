@@ -5,18 +5,23 @@
 from __future__ import annotations
 
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 
+from src.core.evolution.calibration_engine import CalibrationEngine
+from src.core.evolution.config import EvolutionConfig
 from src.core.evolution.decision_logger import DecisionLogger
 from src.core.evolution.evolution_engine import EvolutionEngine
 from src.core.evolution.evolution_store import EvolutionStore
+from src.core.evolution.model_evolver import ModelEvolver
 from src.core.evolution.models import (
     DecisionLog,
     OutcomeRecord,
     PredictionAccuracyStats,
 )
 from src.core.evolution.outcome_collector import OutcomeCollector
+from src.core.evolution.response_analyzer import ResponseAnalyzer
 from src.core.plan.ask_user_confirm import ConfirmPrompt
 from src.core.transparency.models import DecisionType
 
@@ -353,3 +358,126 @@ class TestProperties:
 
         assert engine.decision_logger is logger
         assert engine.outcome_collector is collector
+
+
+class TestEvolutionEngineV024:
+    """EvolutionEngine v0.24编排方法扩展测试"""
+
+    def test_analyze_training_response(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path))
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+        response_analyzer = ResponseAnalyzer(store, config)
+        calibration_engine = CalibrationEngine(store, config)
+        model_evolver = ModelEvolver(calibration_engine, store, config=config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+            response_analyzer=response_analyzer,
+            calibration_engine=calibration_engine,
+            model_evolver=model_evolver,
+        )
+        report = engine.analyze_training_response(months=6)
+        assert report is not None
+        assert report.analysis_months == 6
+
+    def test_analyze_training_response_without_component(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path))
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+        )
+        with pytest.raises(RuntimeError, match="请先初始化v0.24组件"):
+            engine.analyze_training_response()
+
+    def test_run_calibration(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path), calibration_min_samples=3)
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+        calibration_engine = CalibrationEngine(store, config)
+        model_evolver = ModelEvolver(calibration_engine, store, config=config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+            calibration_engine=calibration_engine,
+            model_evolver=model_evolver,
+        )
+        override_pairs = [(48.0, 45.0), (47.0, 44.5), (49.0, 46.0)]
+        report = engine.run_calibration("vdot", override_pairs=override_pairs)
+        assert report.model_type == "vdot"
+        assert report.direction == "overestimate"
+
+    def test_get_calibration_status(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path))
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+        calibration_engine = CalibrationEngine(store, config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+            calibration_engine=calibration_engine,
+        )
+        profile = engine.get_calibration_status("vdot")
+        assert profile.model_type == "vdot"
+        assert profile.scale == 1.0
+
+    def test_evolve_model(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path), calibration_min_samples=3)
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+        calibration_engine = CalibrationEngine(store, config)
+        model_evolver = ModelEvolver(calibration_engine, store, config=config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+            calibration_engine=calibration_engine,
+            model_evolver=model_evolver,
+        )
+        override_pairs = [(48.0, 45.0), (47.0, 44.5), (49.0, 46.0)]
+        with patch.object(
+            store, "get_prediction_actual_pairs", return_value=override_pairs
+        ):
+            result = engine.evolve_model("vdot")
+        assert result.model_type == "vdot"
+
+    def test_apply_calibration_to_prediction(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path))
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+        calibration_engine = CalibrationEngine(store, config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+            calibration_engine=calibration_engine,
+        )
+        corrected = engine.apply_calibration_to_prediction("vdot", 46.0)
+        assert corrected == 46.0  # 默认scale=1.0
+
+    def test_get_evolution_status_includes_calibration(self, tmp_path):
+        store = EvolutionStore(tmp_path)
+        config = EvolutionConfig(data_dir=str(tmp_path))
+        decision_logger = DecisionLogger(store, config)
+        outcome_collector = OutcomeCollector(store, decision_logger, config=config)
+        calibration_engine = CalibrationEngine(store, config)
+
+        engine = EvolutionEngine(
+            decision_logger=decision_logger,
+            outcome_collector=outcome_collector,
+            calibration_engine=calibration_engine,
+        )
+        status = engine.get_evolution_status()
+        assert "calibration_status" in status

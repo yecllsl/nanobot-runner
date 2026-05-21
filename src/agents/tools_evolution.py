@@ -190,3 +190,110 @@ class GetDecisionHistoryTool(BaseTool):
             decision_type,
             limit,
         )
+
+
+class AnalyzeTrainingResponseV2Tool(BaseTool):
+    """训练响应性分析工具 - v0.24.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "analyze_training_response"
+
+    @property
+    def description(self) -> str:
+        return (
+            "分析不同训练类型对跑者VDOT变化的响应效果，识别最佳/最差训练类型。"
+            "当用户询问'哪种训练最有效'、'训练效果分析'、'个性化训练建议'时使用此工具。"
+            "返回JSON格式：{success: true, data: {...}} 或 {success: false, error: ...}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "months": {
+                    "type": "integer",
+                    "description": "分析月数（默认6）",
+                    "default": 6,
+                },
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        months = kwargs.get("months", 6)
+        return self._run_sync(
+            self.runner_tools.analyze_training_response_v2,
+            months,
+        )
+
+
+class RunCalibrationTool(BaseTool):
+    """预测校准工具 - v0.24.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "run_calibration"
+
+    @property
+    def description(self) -> str:
+        return (
+            "执行预测校准，检测模型偏差方向和幅度，通过EMA更新scale因子。"
+            "当需要校准VDOT/伤病/训练响应预测模型时使用此工具。"
+            "返回JSON格式：{success: true, data: {...}} 或 {success: false, error: ...}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "model_type": {
+                    "type": "string",
+                    "description": "模型类型（vdot/injury/training_response，默认vdot）",
+                    "default": "vdot",
+                },
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        model_type = kwargs.get("model_type", "vdot")
+        return self._run_sync(
+            self.runner_tools.run_calibration,
+            model_type,
+        )
+
+
+class GetCalibrationStatusTool(BaseTool):
+    """校准状态查询工具 - v0.24.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_calibration_status"
+
+    @property
+    def description(self) -> str:
+        return (
+            "查询预测校准的当前状态，包括scale因子、样本数、MAE等。"
+            "当用户询问'校准状态'、'模型修正情况'时使用此工具。"
+            "返回JSON格式：{success: true, data: {...}} 或 {success: false, error: ...}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "model_type": {
+                    "type": "string",
+                    "description": "模型类型（可选，空则返回所有模型状态）",
+                },
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        model_type = kwargs.get("model_type")
+        return self._run_sync(
+            self.runner_tools.get_calibration_status,
+            model_type,
+        )

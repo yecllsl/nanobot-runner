@@ -34,6 +34,14 @@ class EvolutionConfig:
         default_factory=lambda: ["vdot", "ctl", "atl", "tsb", "fatigue_score"]
     )
 
+    # v0.24 校准配置
+    calibration_alpha: float = 0.7
+    calibration_max_amplitude: float = 0.10
+    calibration_min_samples: int = 10
+    response_min_fidelity: float = 0.7
+    response_min_samples_per_type: int = 5
+    window_min_months: int = 6
+
     def __post_init__(self) -> None:
         """验证配置参数合法性"""
         if self.feedback_prompt_frequency < 1:
@@ -47,6 +55,35 @@ class EvolutionConfig:
         if self.async_write_max_retries < 0:
             raise ValueError(
                 f"async_write_max_retries必须>=0，当前为{self.async_write_max_retries}"
+            )
+
+        # v0.24 校准参数校验
+        if self.calibration_alpha <= 0.0 or self.calibration_alpha > 1.0:
+            raise ValueError(
+                f"calibration_alpha必须在(0, 1]范围内，当前为{self.calibration_alpha}"
+            )
+        if (
+            self.calibration_max_amplitude <= 0.0
+            or self.calibration_max_amplitude > 1.0
+        ):
+            raise ValueError(
+                f"calibration_max_amplitude必须在(0, 1]范围内，当前为{self.calibration_max_amplitude}"
+            )
+        if self.calibration_min_samples < 1:
+            raise ValueError(
+                f"calibration_min_samples必须>=1，当前为{self.calibration_min_samples}"
+            )
+        if self.response_min_fidelity <= 0.0 or self.response_min_fidelity > 1.0:
+            raise ValueError(
+                f"response_min_fidelity必须在(0, 1]范围内，当前为{self.response_min_fidelity}"
+            )
+        if self.response_min_samples_per_type < 1:
+            raise ValueError(
+                f"response_min_samples_per_type必须>=1，当前为{self.response_min_samples_per_type}"
+            )
+        if self.window_min_months < 1:
+            raise ValueError(
+                f"window_min_months必须>=1，当前为{self.window_min_months}"
             )
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,6 +100,12 @@ class EvolutionConfig:
             "async_write_retry_backoff": self.async_write_retry_backoff,
             "feedback_prompt_frequency": self.feedback_prompt_frequency,
             "runner_state_fields": list(self.runner_state_fields),
+            "calibration_alpha": self.calibration_alpha,
+            "calibration_max_amplitude": self.calibration_max_amplitude,
+            "calibration_min_samples": self.calibration_min_samples,
+            "response_min_fidelity": self.response_min_fidelity,
+            "response_min_samples_per_type": self.response_min_samples_per_type,
+            "window_min_months": self.window_min_months,
         }
 
     @classmethod

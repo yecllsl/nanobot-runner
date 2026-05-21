@@ -1,20 +1,29 @@
 # 决策追踪引擎（薄编排层）
 # 委托DecisionLogger和OutcomeCollector完成决策记录与结果回填
-# 提供统一的对外接口，降低上层调用方的依赖复杂度
+# v0.24新增: 委托ResponseAnalyzer/CalibrationEngine/ModelEvolver完成个性化学习
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.core.base.logger import get_logger
 from src.core.evolution.decision_logger import DecisionLogger
 from src.core.evolution.models import (
+    CalibrationProfile,
+    CalibrationReport,
     DecisionLog,
+    ModelEvolutionResult,
     OutcomeRecord,
     PredictionAccuracyStats,
+    TrainingResponseReport,
 )
 from src.core.evolution.outcome_collector import OutcomeCollector
 from src.core.plan.ask_user_confirm import ConfirmPrompt
+
+if TYPE_CHECKING:
+    from src.core.evolution.calibration_engine import CalibrationEngine
+    from src.core.evolution.model_evolver import ModelEvolver
+    from src.core.evolution.response_analyzer import ResponseAnalyzer
 
 logger = get_logger(__name__)
 
@@ -22,84 +31,53 @@ logger = get_logger(__name__)
 class EvolutionEngine:
     """决策追踪引擎（薄编排层）
 
-    作为决策追踪模块的统一入口，接收外部注入的DecisionLogger和
-    OutcomeCollector实例，委托完成具体业务逻辑。
-    上层调用方只需依赖Engine即可完成决策记录、结果回填、反馈收集等操作。
-
-    采用依赖注入模式（与架构设计Section 8.2.5一致），
-    子组件由外部构建后注入，提高可测试性和灵活性。
-
-    Attributes:
-        decision_logger: 决策日志记录器（只读）
-        outcome_collector: 结果回填收集器（只读）
+    v0.24新增: ResponseAnalyzer/CalibrationEngine/ModelEvolver可选注入，
+    未注入时调用v0.24方法抛RuntimeError。
     """
 
     def __init__(
         self,
         decision_logger: DecisionLogger,
         outcome_collector: OutcomeCollector,
+        response_analyzer: ResponseAnalyzer | None = None,
+        calibration_engine: CalibrationEngine | None = None,
+        model_evolver: ModelEvolver | None = None,
     ) -> None:
-        """初始化决策追踪引擎
-
-        接收外部构建的子组件实例，遵循依赖注入原则。
-
-        Args:
-            decision_logger: 决策日志记录器实例
-            outcome_collector: 结果回填收集器实例
-        """
         self._decision_logger = decision_logger
         self._outcome_collector = outcome_collector
+        self._response_analyzer = response_analyzer
+        self._calibration_engine = calibration_engine
+        self._model_evolver = model_evolver
 
     @property
     def decision_logger(self) -> DecisionLogger:
-        """获取决策日志记录器（只读）"""
         return self._decision_logger
 
     @property
     def outcome_collector(self) -> OutcomeCollector:
-        """获取结果回填收集器（只读）"""
         return self._outcome_collector
 
+    def _require_v024_component(self, component_name: str) -> None:
+        """校验v0.24组件是否已注入"""
+        component_map = {
+            "response_analyzer": self._response_analyzer,
+            "calibration_engine": self._calibration_engine,
+            "model_evolver": self._model_evolver,
+        }
+        if component_map.get(component_name) is None:
+            raise RuntimeError("请先初始化v0.24组件")
+
+    # ---- v0.23 方法（保持不变） ----
+
     def log_decision(self, decision: DecisionLog) -> str:
-        """记录决策日志
-
-        委托DecisionLogger.log_decision完成决策持久化。
-
-        Args:
-            decision: 决策日志对象
-
-        Returns:
-            str: 决策唯一标识decision_id
-        """
         return self._decision_logger.log_decision(decision)
 
     def check_plan_execution(self, decision_id: str) -> OutcomeRecord:
-        """检查计划执行忠实度
-
-        委托OutcomeCollector.check_plan_execution计算执行忠实度。
-
-        Args:
-            decision_id: 决策唯一标识
-
-        Returns:
-            OutcomeRecord: 包含执行忠实度的结果记录
-        """
         return self._outcome_collector.check_plan_execution(decision_id)
 
     def check_prediction_accuracy(
         self, decision_id: str, actual_vdot: float
     ) -> tuple[OutcomeRecord, PredictionAccuracyStats]:
-        """检查预测精度
-
-        委托OutcomeCollector.check_prediction_accuracy计算预测误差和全局统计。
-
-        Args:
-            decision_id: 决策唯一标识
-            actual_vdot: 实际VDOT值
-
-        Returns:
-            tuple[OutcomeRecord, PredictionAccuracyStats]: (结果记录, 精度统计)
-        """
         return self._outcome_collector.check_prediction_accuracy(
             decision_id, actual_vdot
         )
@@ -111,19 +89,6 @@ class EvolutionEngine:
         text: str | None = None,
         accepted: bool | None = None,
     ) -> OutcomeRecord:
-        """记录用户反馈
-
-        委托OutcomeCollector.record_feedback保存用户评分和文本反馈。
-
-        Args:
-            decision_id: 决策唯一标识
-            score: 用户反馈评分（1-5）
-            text: 用户反馈文本（可选）
-            accepted: 推荐是否被采纳（可选）
-
-        Returns:
-            OutcomeRecord: 包含用户反馈的结果记录
-        """
         return self._outcome_collector.record_feedback(
             decision_id, score, text=text, accepted=accepted
         )
@@ -135,19 +100,6 @@ class EvolutionEngine:
         decision_type: Any = None,
         limit: int = 100,
     ) -> list[DecisionLog]:
-        """获取决策历史记录
-
-        委托DecisionLogger.get_decision_history按条件查询。
-
-        Args:
-            start_date: 起始日期过滤（可选）
-            end_date: 结束日期过滤（可选）
-            decision_type: 决策类型过滤（可选）
-            limit: 返回数量限制，默认100
-
-        Returns:
-            list[DecisionLog]: 符合条件的决策日志列表
-        """
         return self._decision_logger.get_decision_history(
             start_date=start_date,
             end_date=end_date,
@@ -155,17 +107,67 @@ class EvolutionEngine:
             limit=limit,
         )
 
+    def generate_feedback_prompt(self, decision_id: str) -> ConfirmPrompt:
+        return self._outcome_collector.generate_feedback_prompt(decision_id)
+
+    # ---- v0.24 新增方法 ----
+
+    def analyze_training_response(self, months: int = 6) -> TrainingResponseReport:
+        """分析训练响应性"""
+        self._require_v024_component("response_analyzer")
+        assert self._response_analyzer is not None
+        return self._response_analyzer.analyze(months)
+
+    def run_calibration(
+        self,
+        model_type: str,
+        override_pairs: list[tuple[float, float]] | None = None,
+    ) -> CalibrationReport:
+        """执行校准"""
+        self._require_v024_component("calibration_engine")
+        assert self._calibration_engine is not None
+        return self._calibration_engine.run_calibration(
+            model_type, override_pairs=override_pairs
+        )
+
+    def get_calibration_status(
+        self, model_type: str | None = None
+    ) -> CalibrationProfile | dict[str, Any]:
+        """获取校准状态"""
+        self._require_v024_component("calibration_engine")
+        assert self._calibration_engine is not None
+        if model_type is not None:
+            return self._calibration_engine.get_profile(model_type)
+        status: dict[str, Any] = {}
+        for mt in ["vdot", "injury", "training_response"]:
+            profile = self._calibration_engine.get_profile(mt)
+            status[mt] = profile.to_dict()
+        return status
+
+    def evolve_model(self, model_type: str) -> ModelEvolutionResult:
+        """进化模型"""
+        self._require_v024_component("model_evolver")
+        assert self._model_evolver is not None
+        evolve_methods = {
+            "vdot": self._model_evolver.evolve_vdot_model,
+            "injury": self._model_evolver.evolve_injury_model,
+            "training_response": self._model_evolver.evolve_training_response_model,
+        }
+        method = evolve_methods.get(model_type)
+        if method is None:
+            raise ValueError(f"不支持的模型类型: {model_type}")
+        return method()
+
+    def apply_calibration_to_prediction(
+        self, model_type: str, raw_value: float
+    ) -> float:
+        """应用校准到预测值: corrected = raw_value * scale"""
+        self._require_v024_component("calibration_engine")
+        assert self._calibration_engine is not None
+        return self._calibration_engine.apply_calibration(model_type, raw_value)
+
     def get_evolution_status(self) -> dict[str, Any]:
-        """获取决策追踪整体状态
-
-        汇总总决策数、执行状态分布、决策类型分布、回填率、
-        平均忠实度、平均预测误差、反馈收集率等统计信息。
-
-        Returns:
-            dict[str, Any]: 包含total_decisions、status_distribution、
-                type_distribution、outcome_fill_rate、avg_fidelity、
-                avg_prediction_error、feedback_collection_rate的字典
-        """
+        """获取决策追踪整体状态（v0.24新增calibration_status字段）"""
         all_decisions = self._decision_logger.get_decision_history(limit=10000)
 
         status_dist: dict[str, int] = {}
@@ -178,7 +180,6 @@ class EvolutionEngine:
             dtype = d.decision_type.value
             type_dist[dtype] = type_dist.get(dtype, 0) + 1
 
-        # 计算回填率、平均忠实度、平均预测误差、反馈收集率
         pairs = self._outcome_collector.get_decision_outcome_pairs()
         total_decisions = len(all_decisions)
 
@@ -209,6 +210,13 @@ class EvolutionEngine:
             len(feedback_scores) / total_decisions if total_decisions > 0 else 0.0
         )
 
+        # v0.24新增: calibration_status
+        calibration_status: dict[str, Any] = {}
+        if self._calibration_engine is not None:
+            for mt in ["vdot", "injury", "training_response"]:
+                profile = self._calibration_engine.get_profile(mt)
+                calibration_status[mt] = profile.to_dict()
+
         return {
             "total_decisions": total_decisions,
             "status_distribution": status_dist,
@@ -217,17 +225,5 @@ class EvolutionEngine:
             "avg_fidelity": round(avg_fidelity, 4),
             "avg_prediction_error": round(avg_prediction_error, 4),
             "feedback_collection_rate": round(feedback_collection_rate, 4),
+            "calibration_status": calibration_status,
         }
-
-    def generate_feedback_prompt(self, decision_id: str) -> ConfirmPrompt:
-        """生成反馈提示
-
-        委托OutcomeCollector.generate_feedback_prompt生成用户反馈确认提示。
-
-        Args:
-            decision_id: 决策唯一标识
-
-        Returns:
-            ConfirmPrompt: 反馈确认提示
-        """
-        return self._outcome_collector.generate_feedback_prompt(decision_id)

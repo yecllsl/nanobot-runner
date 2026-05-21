@@ -2446,6 +2446,44 @@ class RunnerTools:
             logger.warning(f"获取最新VDOT失败: {e}")
         return 0.0
 
+    def analyze_training_response_v2(self, months: int = 6) -> dict[str, Any]:
+        """分析训练响应性 - v0.24.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            report = context.evolution_engine.analyze_training_response(months=months)
+            return {"success": True, "data": report.to_dict()}
+        except Exception as e:
+            logger.error(f"分析训练响应性失败: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def run_calibration(self, model_type: str = "vdot") -> dict[str, Any]:
+        """执行预测校准 - v0.24.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            report = context.evolution_engine.run_calibration(model_type)
+            return {"success": True, "data": report.to_dict()}
+        except Exception as e:
+            logger.error(f"执行预测校准失败: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def get_calibration_status(self, model_type: str | None = None) -> dict[str, Any]:
+        """获取校准状态 - v0.24.0新增"""
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            result = context.evolution_engine.get_calibration_status(model_type)
+            if isinstance(result, dict):
+                return {"success": True, "data": result}
+            return {"success": True, "data": result.to_dict()}
+        except Exception as e:
+            logger.error(f"获取校准状态失败: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
 
 # ============================================================================
 # Re-exports: 从子模块导入所有工具类，保持向后兼容
@@ -2480,9 +2518,12 @@ from .tools_data import (  # noqa: E402
 
 # 决策追踪工具
 from .tools_evolution import (  # noqa: E402
+    AnalyzeTrainingResponseV2Tool,
     CheckPlanExecutionTool,
     CheckPredictionAccuracyTool,
+    GetCalibrationStatusTool,
     GetDecisionHistoryTool,
+    RunCalibrationTool,
 )
 from .tools_evolution import (  # noqa: E402
     RecordFeedbackTool as RecordDecisionFeedbackTool,
@@ -2587,6 +2628,10 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         CheckPlanExecutionTool(runner_tools),
         CheckPredictionAccuracyTool(runner_tools),
         GetDecisionHistoryTool(runner_tools),
+        # v0.24.0 个性化学习工具
+        AnalyzeTrainingResponseV2Tool(runner_tools),
+        RunCalibrationTool(runner_tools),
+        GetCalibrationStatusTool(runner_tools),
     ]
 
 
@@ -2659,12 +2704,6 @@ TOOL_DESCRIPTIONS = {
     },
     "get_plan_execution_stats": {
         "description": "获取训练计划执行统计，包括完成率、平均体感评分、总距离等。返回JSON格式：{success: true, data: {plan_id, total_planned_days, completed_days, completion_rate, avg_effort_score, total_distance_km, total_duration_min, avg_hr, avg_hr_drift}} 或 {success: false, error: 错误信息}",
-        "parameters": {
-            "plan_id": "训练计划ID（必填）",
-        },
-    },
-    "analyze_training_response": {
-        "description": "分析训练响应模式，识别用户最适应和最不适应的训练类型。返回JSON格式：{success: true, data: {plan_id, stats, patterns, overall_assessment, weak_types, strong_types}} 或 {success: false, error: 错误信息}",
         "parameters": {
             "plan_id": "训练计划ID（必填）",
         },
@@ -2929,6 +2968,24 @@ TOOL_DESCRIPTIONS = {
             "limit": "返回数量限制（默认50）",
         },
     },
+    "analyze_training_response": {
+        "description": "分析不同训练类型对跑者VDOT变化的响应效果，识别最佳/最差训练类型。当用户询问'哪种训练最有效'、'训练效果分析'、'个性化训练建议'时使用此工具。返回JSON格式：{success: true, data: {training_responses, best_type, worst_type, ...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "months": "分析月数（默认6）",
+        },
+    },
+    "run_calibration": {
+        "description": "执行预测校准，检测模型偏差方向和幅度，通过EMA更新scale因子。当需要校准VDOT/伤病/训练响应预测模型时使用此工具。返回JSON格式：{success: true, data: {direction, scale_before, scale_after, mae_before, mae_after, ...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "model_type": "模型类型（vdot/injury/training_response，默认vdot）",
+        },
+    },
+    "get_calibration_status": {
+        "description": "查询预测校准的当前状态，包括scale因子、样本数、MAE等。当用户询问'校准状态'、'模型修正情况'时使用此工具。返回JSON格式：{success: true, data: {...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "model_type": "模型类型（可选，空则返回所有模型状态）",
+        },
+    },
 }
 
 __all__ = [
@@ -2986,6 +3043,9 @@ __all__ = [
     "CheckPlanExecutionTool",
     "CheckPredictionAccuracyTool",
     "GetDecisionHistoryTool",
+    "AnalyzeTrainingResponseV2Tool",
+    "GetCalibrationStatusTool",
+    "RunCalibrationTool",
     # 数据管理/系统工具
     "UpdateMemoryTool",
     "DiagnoseSuggestionTool",
