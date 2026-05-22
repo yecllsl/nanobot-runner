@@ -820,3 +820,104 @@ class TestPromptTuningParams:
         params = PromptTuningParams.default()
         with pytest.raises(AttributeError):
             params.tone_intensity = 0.8  # type: ignore[misc]
+
+
+class TestEvolutionReport:
+    """EvolutionReport数据模型测试"""
+
+    def test_create_evolution_report(self) -> None:
+        """测试创建EvolutionReport实例"""
+        from src.core.evolution.models import EvolutionReport
+
+        now = datetime.now()
+        report = EvolutionReport(
+            report_id="rpt_001",
+            month="2026-05",
+            generated_at=now,
+            total_decisions=42,
+            prediction_accuracy_trend=[{"date": "2026-05-01", "mae": 0.05}],
+            decision_acceptance_rate=0.75,
+            model_versions={"vdot": "v1.2", "injury": "v1.0"},
+            personalization_degree=0.35,
+            evolution_actions_count=3,
+            last_evolution_time=now,
+            calibration_summary={"vdot": {"scale": 0.97}},
+            prompt_tuning_summary={"tone_intensity": 0.6},
+            recommendations=["建议增加VDOT预测校准频率"],
+        )
+        assert report.report_id == "rpt_001"
+        assert report.month == "2026-05"
+        assert report.total_decisions == 42
+        assert report.personalization_degree == 0.35
+        assert len(report.recommendations) == 1
+
+    def test_evolution_report_to_dict(self) -> None:
+        """测试EvolutionReport序列化"""
+        from src.core.evolution.models import EvolutionReport
+
+        now = datetime.now()
+        report = EvolutionReport(
+            report_id="rpt_002",
+            month="2026-04",
+            generated_at=now,
+            total_decisions=0,
+            prediction_accuracy_trend=[],
+            decision_acceptance_rate=0.0,
+            model_versions={},
+            personalization_degree=0.0,
+            evolution_actions_count=0,
+            last_evolution_time=None,
+            calibration_summary={},
+            prompt_tuning_summary={},
+            recommendations=[],
+        )
+        d = report.to_dict()
+        assert d["report_id"] == "rpt_002"
+        assert d["month"] == "2026-04"
+        assert d["last_evolution_time"] is None
+
+    def test_evolution_report_from_dict(self) -> None:
+        """测试EvolutionReport反序列化"""
+        from src.core.evolution.models import EvolutionReport
+
+        now = datetime.now()
+        data = {
+            "report_id": "rpt_003",
+            "month": "2026-03",
+            "generated_at": now.isoformat(),
+            "total_decisions": 10,
+            "prediction_accuracy_trend": [],
+            "decision_acceptance_rate": 0.5,
+            "model_versions": {},
+            "personalization_degree": 0.1,
+            "evolution_actions_count": 1,
+            "last_evolution_time": now.isoformat(),
+            "calibration_summary": {},
+            "prompt_tuning_summary": {},
+            "recommendations": [],
+        }
+        report = EvolutionReport.from_dict(data)
+        assert report.report_id == "rpt_003"
+        assert report.total_decisions == 10
+
+    def test_evolution_report_frozen(self) -> None:
+        """测试EvolutionReport不可变性"""
+        from src.core.evolution.models import EvolutionReport
+
+        report = EvolutionReport(
+            report_id="rpt_004",
+            month="2026-05",
+            generated_at=datetime.now(),
+            total_decisions=0,
+            prediction_accuracy_trend=[],
+            decision_acceptance_rate=0.0,
+            model_versions={},
+            personalization_degree=0.0,
+            evolution_actions_count=0,
+            last_evolution_time=None,
+            calibration_summary={},
+            prompt_tuning_summary={},
+            recommendations=[],
+        )
+        with pytest.raises(AttributeError):
+            report.total_decisions = 100  # type: ignore[misc]

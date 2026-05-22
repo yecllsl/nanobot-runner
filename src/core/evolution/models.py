@@ -677,3 +677,87 @@ class PromptTuningParams:
             last_updated=datetime.now(),
             update_count=self.update_count + 1,
         )
+
+
+@dataclass(frozen=True)
+class EvolutionReport:
+    """月度进化报告（不可变数据类）
+
+    汇总指定月份的进化引擎运行状态和效果。
+
+    Attributes:
+        report_id: 报告唯一标识
+        month: 报告月份 (YYYY-MM格式)
+        generated_at: 报告生成时间
+        total_decisions: 决策记录总数
+        prediction_accuracy_trend: 预测准确率趋势
+        decision_acceptance_rate: 决策接受率
+        model_versions: 各模型版本信息
+        personalization_degree: 个性化程度 (0.0-1.0)
+        evolution_actions_count: 进化动作执行数
+        last_evolution_time: 上次进化时间
+        calibration_summary: 校准摘要
+        prompt_tuning_summary: 提示调优摘要
+        recommendations: 进化建议列表
+    """
+
+    report_id: str
+    month: str
+    generated_at: datetime
+    total_decisions: int
+    prediction_accuracy_trend: list[dict[str, Any]]
+    decision_acceptance_rate: float
+    model_versions: dict[str, str]
+    personalization_degree: float
+    evolution_actions_count: int
+    last_evolution_time: datetime | None
+    calibration_summary: dict[str, Any]
+    prompt_tuning_summary: dict[str, Any]
+    recommendations: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "report_id": self.report_id,
+            "month": self.month,
+            "generated_at": self.generated_at.isoformat(),
+            "total_decisions": self.total_decisions,
+            "prediction_accuracy_trend": self.prediction_accuracy_trend,
+            "decision_acceptance_rate": self.decision_acceptance_rate,
+            "model_versions": self.model_versions,
+            "personalization_degree": self.personalization_degree,
+            "evolution_actions_count": self.evolution_actions_count,
+            "last_evolution_time": (
+                self.last_evolution_time.isoformat()
+                if self.last_evolution_time is not None
+                else None
+            ),
+            "calibration_summary": self.calibration_summary,
+            "prompt_tuning_summary": self.prompt_tuning_summary,
+            "recommendations": self.recommendations,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EvolutionReport:
+        """从字典创建实例"""
+        generated_at = data["generated_at"]
+        if isinstance(generated_at, str):
+            generated_at = datetime.fromisoformat(generated_at)
+        last_evolution_time = data.get("last_evolution_time")
+        if isinstance(last_evolution_time, str):
+            last_evolution_time = datetime.fromisoformat(last_evolution_time)
+        return cls(
+            report_id=data["report_id"],
+            month=data["month"],
+            generated_at=generated_at,
+            total_decisions=data.get("total_decisions", 0),
+            prediction_accuracy_trend=data.get("prediction_accuracy_trend", []),
+            decision_acceptance_rate=data.get("decision_acceptance_rate", 0.0),
+            model_versions=data.get("model_versions", {}),
+            personalization_degree=data.get("personalization_degree", 0.0),
+            evolution_actions_count=data.get("evolution_actions_count", 0),
+            last_evolution_time=last_evolution_time,
+            calibration_summary=data.get("calibration_summary", {}),
+            prompt_tuning_summary=data.get("prompt_tuning_summary", {}),
+            recommendations=data.get("recommendations", []),
+        )
