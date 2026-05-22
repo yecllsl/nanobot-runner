@@ -637,42 +637,46 @@ class PromptTuningParams:
         detail: float | None = None,
         aggressive: float | None = None,
         data_driven: float | None = None,
+        min_bounds: dict[str, float] | None = None,
     ) -> PromptTuningParams:
         """创建更新后的参数副本（保持不可变性）
 
         每个参数被clamp到[0.0, 1.0]范围。
+        可选min_bounds参数为指定维度设置下限保护（H-03整改）。
 
         Args:
             tone: 新的语气强度（None保持不变）
             detail: 新的信息密度（None保持不变）
             aggressive: 新的推荐激进程度（None保持不变）
             data_driven: 新的数据驱动权重（None保持不变）
+            min_bounds: 可选参数下限映射，如 {"recommendation_aggressiveness": 0.1}
 
         Returns:
             PromptTuningParams: 更新后的参数副本
         """
+        bounds = min_bounds or {}
+
+        def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+            return max(lower, min(upper, value))
+
         return PromptTuningParams(
-            tone_intensity=max(
-                0.0, min(1.0, tone if tone is not None else self.tone_intensity)
+            tone_intensity=_clamp(
+                tone if tone is not None else self.tone_intensity,
+                lower=bounds.get("tone_intensity", 0.0),
             ),
-            detail_level_score=max(
-                0.0, min(1.0, detail if detail is not None else self.detail_level_score)
+            detail_level_score=_clamp(
+                detail if detail is not None else self.detail_level_score,
+                lower=bounds.get("detail_level_score", 0.0),
             ),
-            recommendation_aggressiveness=max(
-                0.0,
-                min(
-                    1.0,
-                    aggressive
-                    if aggressive is not None
-                    else self.recommendation_aggressiveness,
-                ),
+            recommendation_aggressiveness=_clamp(
+                aggressive
+                if aggressive is not None
+                else self.recommendation_aggressiveness,
+                lower=bounds.get("recommendation_aggressiveness", 0.0),
             ),
-            data_driven_weight=max(
-                0.0,
-                min(
-                    1.0,
-                    data_driven if data_driven is not None else self.data_driven_weight,
-                ),
+            data_driven_weight=_clamp(
+                data_driven if data_driven is not None else self.data_driven_weight,
+                lower=bounds.get("data_driven_weight", 0.0),
             ),
             last_updated=datetime.now(),
             update_count=self.update_count + 1,

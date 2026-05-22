@@ -13,8 +13,6 @@ logger = get_logger(__name__)
 # 默认调整步长和最大调整幅度
 _DEFAULT_TUNING_STEP: float = 0.05
 _DEFAULT_TUNING_MAX_ADJUSTMENT: float = 0.1
-# 拒绝调整步长（aggressive用标准步长，data_driven用半步长）
-_REJECTION_DATA_DRIVEN_STEP: float = 0.025
 
 
 class PromptTuner:
@@ -145,8 +143,8 @@ class PromptTuner:
             # 低接受率：降低推荐激进程度
             aggressive_delta = -min(step, max_adj)
         elif acceptance_rate > 0.7:
-            # 高接受率：微幅提高推荐激进程度
-            aggressive_delta = min(step, max_adj)
+            # 高接受率：反弹机制，恢复步长为标准步长的1.6倍（H-03整改）
+            aggressive_delta = min(step * 1.6, max_adj)
 
         detail_delta = 0.0
         if avg_score < 3.0:
@@ -186,25 +184,44 @@ class PromptTuner:
         return updated
 
     def auto_adjust_on_rejection(self) -> PromptTuningParams:
-        """连续拒绝时自动调整参数
+        """连续拒绝推荐时降低激进程度，同时降低数据驱动权重
 
-        降低推荐激进程度（标准步长0.05）和数据驱动权重（半步长0.025），
-        使后续推荐更保守、更贴近用户偏好。
+        H-03整改: 添加参数下限保护
+        - aggressive最低0.1
+        - data_driven最低0.2
+        - 接近下限时输出warning日志
 
         Returns:
             PromptTuningParams: 调整后的参数
         """
         current = self.get_params()
         step = self._tuning_step
-        max_adj = self._tuning_max_adjustment
 
-        # 降低aggressive（标准步长）和data_driven（半步长）
-        aggressive_delta = -min(step, max_adj)
-        data_driven_delta = -min(_REJECTION_DATA_DRIVEN_STEP, max_adj)
+        new_aggressive = current.recommendation_aggressiveness - step
+        new_data_driven = current.data_driven_weight - step * 0.5
+
+        # 参数下限保护
+        min_bounds = {
+            "recommendation_aggressiveness": 0.1,
+            "data_driven_weight": 0.2,
+        }
+
+        # 接近下限时输出warning
+        if new_aggressive < 0.15:
+            logger.warning(
+                "recommendation_aggressiveness接近下限: %.3f (下限0.1)",
+                new_aggressive,
+            )
+        if new_data_driven < 0.25:
+            logger.warning(
+                "data_driven_weight接近下限: %.3f (下限0.2)",
+                new_data_driven,
+            )
 
         updated = current.with_updates(
-            aggressive=current.recommendation_aggressiveness + aggressive_delta,
-            data_driven=current.data_driven_weight + data_driven_delta,
+            aggressive=new_aggressive,
+            data_driven=new_data_driven,
+            min_bounds=min_bounds,
         )
         self._save_params(updated)
         self._params = updated

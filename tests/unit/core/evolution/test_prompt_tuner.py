@@ -154,3 +154,84 @@ class TestResetToDefault:
         assert result.detail_level_score == 0.5
         assert result.data_driven_weight == 0.5
         assert result.update_count == 0
+
+
+class TestParameterFloorProtection:
+    """参数下限保护测试（H-03整改）"""
+
+    def test_aggressive_floor_on_rejection(
+        self, tuner: PromptTuner, mock_store: MagicMock
+    ) -> None:
+        """连续拒绝后aggressive不低于0.1"""
+        for _ in range(10):
+            tuner.auto_adjust_on_rejection()
+
+        params = tuner.get_params()
+        assert params.recommendation_aggressiveness >= 0.1
+
+    def test_data_driven_floor_on_rejection(
+        self, tuner: PromptTuner, mock_store: MagicMock
+    ) -> None:
+        """连续拒绝后data_driven不低于0.2"""
+        for _ in range(10):
+            tuner.auto_adjust_on_rejection()
+
+        params = tuner.get_params()
+        assert params.data_driven_weight >= 0.2
+
+    def test_warning_on_approaching_floor(
+        self,
+        tuner: PromptTuner,
+        mock_store: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """接近下限时输出warning日志"""
+        import logging
+
+        tuner.update_params(aggressive=0.12)
+        tuner.auto_adjust_on_rejection()
+
+        assert any(
+            "接近下限" in r.message or "aggressive" in r.message.lower()
+            for r in caplog.records
+            if r.levelno >= logging.WARNING
+        )
+
+    def test_bounce_back_mechanism(
+        self, tuner: PromptTuner, mock_store: MagicMock
+    ) -> None:
+        """反弹机制：接受推荐后aggressive恢复步长(0.08)大于降低步长(0.05)"""
+        tuner.update_params(aggressive=0.3)
+        result = tuner.auto_adjust_on_feedback(avg_score=4.0, acceptance_rate=0.8)
+        assert result.recommendation_aggressiveness == pytest.approx(
+            0.3 + 0.08, abs=0.01
+        )
+
+    def test_with_updates_min_bounds(self, mock_store: MagicMock) -> None:
+        """with_updates支持min_bounds参数"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams(
+            recommendation_aggressiveness=0.08,
+            data_driven_weight=0.15,
+        )
+        updated = params.with_updates(
+            aggressive=0.05,
+            data_driven=0.1,
+            min_bounds={
+                "recommendation_aggressiveness": 0.1,
+                "data_driven_weight": 0.2,
+            },
+        )
+        assert updated.recommendation_aggressiveness == 0.1
+        assert updated.data_driven_weight == 0.2
+
+    def test_with_updates_no_min_bounds_backward_compat(
+        self, mock_store: MagicMock
+    ) -> None:
+        """with_updates不传min_bounds时保持向后兼容"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams.default()
+        updated = params.with_updates(aggressive=0.0)
+        assert updated.recommendation_aggressiveness == 0.0
