@@ -56,7 +56,7 @@ class ResponseAnalyzer:
     def analyze(self, months: int = 6) -> TrainingResponseReport:
         """执行训练响应性分析"""
         eligible_pairs = self._get_eligible_pairs(months)
-        all_pairs = self._store.get_decision_outcome_pairs()
+        all_pairs = self._store.get_decision_outcome_pairs(days=months * 30)
 
         # 按训练类型分组
         type_groups: dict[str, list[tuple[DecisionLog, OutcomeRecord]]] = {}
