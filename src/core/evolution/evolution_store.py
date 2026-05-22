@@ -7,14 +7,19 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 
 from src.core.base.logger import get_logger
-from src.core.evolution.models import CalibrationProfile, DecisionLog, OutcomeRecord
+from src.core.evolution.models import (
+    CalibrationProfile,
+    DecisionLog,
+    OutcomeRecord,
+    PromptTuningParams,
+)
 from src.core.transparency.models import DecisionType
 
 logger = get_logger(__name__)
@@ -237,6 +242,7 @@ class EvolutionStore:
         self._decisions_dir = data_dir / "decisions"
         self._outcomes_dir = data_dir / "outcomes"
         self._calibrations_dir = data_dir / "calibrations"
+        self._tuning_dir = data_dir / "tuning"
 
     @property
     def data_dir(self) -> Path:
@@ -592,6 +598,7 @@ class EvolutionStore:
         self,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
+        days: int = 90,
     ) -> list[tuple[DecisionLog, OutcomeRecord]]:
         """获取决策-结果配对列表
 
@@ -601,10 +608,14 @@ class EvolutionStore:
         Args:
             start_date: 起始日期（可选），基于决策的timestamp
             end_date: 结束日期（可选），基于决策的timestamp
+            days: 查询天数范围（默认90天），仅当start_date为None时生效
 
         Returns:
             list[tuple[DecisionLog, OutcomeRecord]]: 决策-结果配对列表
         """
+        # v0.25: days参数限制查询范围
+        if start_date is None and days > 0:
+            start_date = datetime.now() - timedelta(days=days)
         decisions_lf = self._scan_decisions(start_date, end_date)
 
         if start_date is not None:
@@ -683,7 +694,7 @@ class EvolutionStore:
         return CalibrationProfile.from_dict(data)
 
     def get_prediction_actual_pairs(
-        self, model_type: str, min_count: int = 10
+        self, model_type: str, min_count: int = 10, days: int = 90
     ) -> list[tuple[float, float]]:
         """从DecisionLog/OutcomeRecord提取预测-实际配对
 
@@ -693,11 +704,12 @@ class EvolutionStore:
         Args:
             model_type: 模型类型（vdot/injury/training_response）
             min_count: 最小配对数阈值，低于此值返回空列表
+            days: 查询天数范围（默认90天），传递给get_decision_outcome_pairs
 
         Returns:
             list[tuple[float, float]]: (预测值, 实际值)配对列表
         """
-        all_pairs = self.get_decision_outcome_pairs()
+        all_pairs = self.get_decision_outcome_pairs(days=days)
         result: list[tuple[float, float]] = []
         prediction_keys: dict[str, str] = {
             "vdot": "predicted_vdot",
@@ -763,3 +775,114 @@ class EvolutionStore:
         if not file_path.exists():
             return None
         return json.loads(file_path.read_text(encoding="utf-8"))
+
+    # ---- v0.25 新增方法 ----
+
+    def save_prompt_tuning_params(self, params: PromptTuningParams) -> None:
+        """保存提示调优参数到JSON文件
+
+        使用原子写入确保数据安全。
+
+        Args:
+            params: 提示调优参数对象
+        """
+        self._tuning_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self._tuning_dir / "prompt_params.json"
+        tmp_path = file_path.with_suffix(".json.tmp")
+        try:
+            tmp_path.write_text(
+                json.dumps(params.to_dict(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            tmp_path.replace(file_path)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
+
+    def load_prompt_tuning_params(self) -> PromptTuningParams | None:
+        """从JSON文件加载提示调优参数
+
+        Returns:
+            PromptTuningParams | None: 提示调优参数对象，文件不存在或损坏返回None
+        """
+        file_path = self._tuning_dir / "prompt_params.json"
+        if not file_path.exists():
+            return None
+        try:
+            data = json.loads(file_path.read_text(encoding="utf-8"))
+            return PromptTuningParams.from_dict(data)
+        except Exception:
+            logger.warning("提示调优参数文件损坏，返回None")
+            return None
+
+    def save_trigger_state(self, key: str, value: Any) -> None:
+        """保存触发器状态到JSON文件
+
+        合并写入：读取已有状态，更新指定key后原子写入。
+
+        Args:
+            key: 触发器状态键
+            value: 触发器状态值
+        """
+        self._tuning_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self._tuning_dir / "trigger_state.json"
+        state: dict[str, Any] = {}
+        if file_path.exists():
+            try:
+                state = json.loads(file_path.read_text(encoding="utf-8"))
+            except Exception:
+                state = {}
+        state[key] = value
+        tmp_path = file_path.with_suffix(".json.tmp")
+        try:
+            tmp_path.write_text(
+                json.dumps(state, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            tmp_path.replace(file_path)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
+
+    def load_trigger_state(self, key: str) -> Any | None:
+        """加载触发器状态
+
+        Args:
+            key: 触发器状态键
+
+        Returns:
+            Any | None: 触发器状态值，键不存在或文件不存在返回None
+        """
+        file_path = self._tuning_dir / "trigger_state.json"
+        if not file_path.exists():
+            return None
+        try:
+            state = json.loads(file_path.read_text(encoding="utf-8"))
+            return state.get(key)
+        except Exception:
+            return None
+
+    def count_decisions(self) -> int:
+        """轻量计数决策记录总数
+
+        使用LazyFrame扫描Parquet文件，仅计算行数而不加载全部数据。
+
+        Returns:
+            int: 决策记录总数
+        """
+        decisions_dir = self._data_dir / "decisions"
+        if not decisions_dir.exists():
+            return 0
+        total = 0
+        for month_dir in sorted(decisions_dir.iterdir()):
+            if not month_dir.is_dir():
+                continue
+            for parquet_file in month_dir.glob("*.parquet"):
+                try:
+                    lf = pl.scan_parquet(parquet_file)
+                    total += lf.select(pl.len()).collect().item()
+                except Exception:
+                    continue
+        return total
