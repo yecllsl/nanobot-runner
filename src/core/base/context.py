@@ -451,12 +451,13 @@ class AppContext:
 
     @property
     def evolution_engine(self) -> EvolutionEngine:
-        """获取决策追踪引擎（v0.23.0新增，v0.24.0扩展）
+        """获取决策追踪引擎（v0.23.0新增，v0.24.0/v0.25.0扩展）
 
         依赖注入模式：创建共享EvolutionStore实例，构建DecisionLogger和
         OutcomeCollector后注入EvolutionEngine。若plan_manager可用，
         同时构建PlanExecutionDataAdapter注入OutcomeCollector。
         v0.24.0新增：注入ResponseAnalyzer/CalibrationEngine/ModelEvolver。
+        v0.25.0新增：注入EvolutionController/PromptTuner/EvolutionReporter。
         """
         from src.core.evolution.config import EvolutionConfig
         from src.core.evolution.decision_logger import DecisionLogger
@@ -500,15 +501,55 @@ class AppContext:
             calibration_engine = CalibrationEngine(store, config)
             model_evolver = ModelEvolver(calibration_engine, store, config=config)
 
+            # v0.25: 注入自适应进化组件
+            from src.core.evolution.evolution_controller import EvolutionController
+            from src.core.evolution.evolution_reporter import EvolutionReporter
+            from src.core.evolution.prompt_tuner import PromptTuner
+
+            prompt_tuner = PromptTuner(store=store, config=config)
+            evolution_reporter = EvolutionReporter(
+                store=store,
+                calibration_engine=calibration_engine,
+                prompt_tuner=prompt_tuner,
+                config=config,
+            )
+            evolution_controller = EvolutionController(
+                store=store,
+                calibration_engine=calibration_engine,
+                model_evolver=model_evolver,  # type: ignore[arg-type]
+                prompt_tuner=prompt_tuner,
+                evolution_reporter=evolution_reporter,
+                config=config,
+            )
+
             engine = EvolutionEngine(
                 decision_logger=decision_logger,
                 outcome_collector=outcome_collector,
                 response_analyzer=response_analyzer,
                 calibration_engine=calibration_engine,
                 model_evolver=model_evolver,
+                evolution_controller=evolution_controller,
+                prompt_tuner=prompt_tuner,
+                evolution_reporter=evolution_reporter,
             )
             self.set_extension("evolution_engine", engine)
         return engine
+
+    @property
+    def prompt_tuner(self) -> Any:
+        """获取提示调优器（v0.25.0新增）"""
+        engine = self.evolution_engine
+        if engine is not None and hasattr(engine, "_prompt_tuner"):
+            return engine._prompt_tuner
+        return None
+
+    @property
+    def prompt_tuner_params(self) -> Any:
+        """获取当前提示调优参数（v0.25.0新增）"""
+        tuner = self.prompt_tuner
+        if tuner is not None:
+            return tuner.get_params()
+        return None
 
 
 class AppContextFactory:
