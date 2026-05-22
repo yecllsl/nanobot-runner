@@ -255,10 +255,11 @@ class EvolutionController:
             return None
 
         # 检查最近2次是否全部被拒绝
+        # recommendation_accepted字段在DecisionLog上，而非OutcomeRecord
         recent_pairs = pairs[:_REJECTION_MIN_COUNT]
         all_rejected = all(
-            getattr(outcome, "recommendation_accepted", None) is False
-            for _, outcome in recent_pairs
+            decision.recommendation_accepted is False
+            for decision, _outcome in recent_pairs
         )
 
         if not all_rejected:

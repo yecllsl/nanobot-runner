@@ -123,11 +123,12 @@ class TestCheckTriggers:
     ) -> None:
         """连续2次拒绝推荐时触发adjust_strategy"""
         mock_store.get_prediction_actual_pairs.return_value = []
-        mock_outcome_1 = MagicMock(recommendation_accepted=False)
-        mock_outcome_2 = MagicMock(recommendation_accepted=False)
+        # recommendation_accepted字段在DecisionLog上，而非OutcomeRecord
+        mock_decision_1 = MagicMock(recommendation_accepted=False)
+        mock_decision_2 = MagicMock(recommendation_accepted=False)
         mock_store.get_decision_outcome_pairs.return_value = [
-            (MagicMock(), mock_outcome_1),
-            (MagicMock(), mock_outcome_2),
+            (mock_decision_1, MagicMock()),
+            (mock_decision_2, MagicMock()),
         ]
 
         result = controller.check_triggers()
