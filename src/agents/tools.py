@@ -2484,6 +2484,96 @@ class RunnerTools:
             logger.error(f"获取校准状态失败: {e}", exc_info=True)
             return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
 
+    # ----------------------------------------------------------------
+    # v0.25 进化方法
+    # ----------------------------------------------------------------
+
+    def check_evolution_triggers(self) -> dict[str, Any]:
+        """检查进化触发条件 - v0.25.0新增
+
+        检查4条触发规则，返回触发的进化动作列表。
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            result = context.evolution_engine.check_evolution_triggers()
+            return {"success": True, "data": result.to_dict()}
+        except RuntimeError as e:
+            # v0.25组件未注入时优雅处理
+            logger.warning(f"进化触发条件检查失败（组件未初始化）: {e}")
+            return {"success": False, "error": str(e)}
+        except NanobotRunnerError as e:
+            logger.error(f"进化触发条件检查失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"进化触发条件检查未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def get_evolution_report(self, month: str | None = None) -> dict[str, Any]:
+        """获取月度进化报告 - v0.25.0新增
+
+        Args:
+            month: 报告月份（可选，YYYY-MM格式，默认当月）
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            report = context.evolution_engine.get_evolution_report(month)
+            return {"success": True, "data": report.to_dict()}
+        except RuntimeError as e:
+            logger.warning(f"获取进化报告失败（组件未初始化）: {e}")
+            return {"success": False, "error": str(e)}
+        except NanobotRunnerError as e:
+            logger.error(f"获取进化报告失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"获取进化报告未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    def adjust_prompt_params(
+        self,
+        tone: float | None = None,
+        detail: float | None = None,
+        aggressive: float | None = None,
+        data_driven: float | None = None,
+    ) -> dict[str, Any]:
+        """手动调整提示参数 - v0.25.0新增
+
+        Args:
+            tone: 语气强度（0.0=温和 ~ 1.0=严厉，可选）
+            detail: 信息密度（0.0=简洁 ~ 1.0=详细，可选）
+            aggressive: 推荐激进程度（0.0=保守 ~ 1.0=激进，可选）
+            data_driven: 数据驱动权重（0.0=纯经验驱动 ~ 1.0=纯数据驱动，可选）
+
+        Returns:
+            dict: 包含success/data或error的字典
+        """
+        try:
+            from src.core.base.context import get_context
+
+            context = get_context()
+            params = context.evolution_engine.adjust_prompt_params(
+                tone=tone, detail=detail, aggressive=aggressive, data_driven=data_driven
+            )
+            return {"success": True, "data": params.to_dict()}
+        except RuntimeError as e:
+            logger.warning(f"调整提示参数失败（组件未初始化）: {e}")
+            return {"success": False, "error": str(e)}
+        except NanobotRunnerError as e:
+            logger.error(f"调整提示参数失败: {e}")
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"调整提示参数未预期异常: {e}", exc_info=True)
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+
 
 # ============================================================================
 # Re-exports: 从子模块导入所有工具类，保持向后兼容
@@ -2518,11 +2608,14 @@ from .tools_data import (  # noqa: E402
 
 # 决策追踪工具
 from .tools_evolution import (  # noqa: E402
+    AdjustPromptParamsTool,
     AnalyzeTrainingResponseV2Tool,
+    CheckEvolutionTriggersTool,
     CheckPlanExecutionTool,
     CheckPredictionAccuracyTool,
     GetCalibrationStatusTool,
     GetDecisionHistoryTool,
+    GetEvolutionReportTool,
     RunCalibrationTool,
 )
 from .tools_evolution import (  # noqa: E402
@@ -2632,6 +2725,10 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         AnalyzeTrainingResponseV2Tool(runner_tools),
         RunCalibrationTool(runner_tools),
         GetCalibrationStatusTool(runner_tools),
+        # v0.25.0 进化工具
+        CheckEvolutionTriggersTool(runner_tools),
+        GetEvolutionReportTool(runner_tools),
+        AdjustPromptParamsTool(runner_tools),
     ]
 
 
@@ -2986,6 +3083,25 @@ TOOL_DESCRIPTIONS = {
             "model_type": "模型类型（可选，空则返回所有模型状态）",
         },
     },
+    "check_evolution_triggers": {
+        "description": "检查进化触发条件，判断是否需要执行模型重训练、策略调整、增量学习等进化动作。4条触发规则：VDOT预测误差连续3次>5%→重训练、连续2次拒绝推荐→策略调整、新数据积累>=50条→增量学习、当月未生成报告→生成报告。当需要评估AI系统是否需要自我进化时使用此工具。返回JSON格式：{success: true, data: {checked_at, triggered_actions, skipped_conditions}} 或 {success: false, error: 错误信息}",
+        "parameters": {},
+    },
+    "get_evolution_report": {
+        "description": "获取月度进化报告，汇总进化引擎运行状态和效果，包括决策总数、预测准确率趋势、决策接受率、模型版本、个性化程度等。当用户询问'进化报告'、'AI进化效果'、'月度进化总结'时使用此工具。返回JSON格式：{success: true, data: {report_id, month, total_decisions, prediction_accuracy_trend, decision_acceptance_rate, model_versions, personalization_degree, ...}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "month": "报告月份（可选，YYYY-MM格式，默认当月）",
+        },
+    },
+    "adjust_prompt_params": {
+        "description": "手动调整AI提示参数，控制LLM输出风格。4维参数空间：tone(语气强度0-1)、detail(信息密度0-1)、aggressive(推荐激进程度0-1)、data_driven(数据驱动权重0-1)。当用户要求调整AI建议风格、如'更温和'、'更详细'、'更激进'时使用此工具。返回JSON格式：{success: true, data: {tone_intensity, detail_level_score, recommendation_aggressiveness, data_driven_weight, last_updated, update_count}} 或 {success: false, error: 错误信息}",
+        "parameters": {
+            "tone": "语气强度（0.0=温和 ~ 1.0=严厉，可选）",
+            "detail": "信息密度（0.0=简洁 ~ 1.0=详细，可选）",
+            "aggressive": "推荐激进程度（0.0=保守 ~ 1.0=激进，可选）",
+            "data_driven": "数据驱动权重（0.0=纯经验驱动 ~ 1.0=纯数据驱动，可选）",
+        },
+    },
 }
 
 __all__ = [
@@ -3046,6 +3162,9 @@ __all__ = [
     "AnalyzeTrainingResponseV2Tool",
     "GetCalibrationStatusTool",
     "RunCalibrationTool",
+    "CheckEvolutionTriggersTool",
+    "GetEvolutionReportTool",
+    "AdjustPromptParamsTool",
     # 数据管理/系统工具
     "UpdateMemoryTool",
     "DiagnoseSuggestionTool",
