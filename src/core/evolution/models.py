@@ -469,3 +469,211 @@ class ModelEvolutionResult:
             improvement_pct=data["improvement_pct"],
             calibration_report=cal_report,
         )
+
+
+# === v0.25 自适应进化数据模型 ===
+
+
+@dataclass(frozen=True)
+class EvolutionAction:
+    """进化动作（不可变数据类）
+
+    表示一个待执行的进化动作，由EvolutionController检测触发条件后生成。
+
+    Attributes:
+        action_id: 动作唯一标识
+        action_type: 动作类型 (retrain_model/adjust_strategy/incremental_learn/generate_report)
+        trigger_reason: 触发原因描述
+        trigger_condition: 触发条件详情
+        target_model_type: 目标模型类型 (vdot/injury/training_response/prompt/all/none)
+        priority: 优先级 (high/medium/low)
+        created_at: 创建时间
+        executed: 是否已执行
+        executed_at: 执行时间 (可选)
+        execution_result: 执行结果摘要 (可选，str或dict类型)
+    """
+
+    action_id: str
+    action_type: str
+    trigger_reason: str
+    trigger_condition: dict[str, Any]
+    target_model_type: str
+    priority: str
+    created_at: datetime
+    executed: bool = False
+    executed_at: datetime | None = None
+    execution_result: str | dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        result: dict[str, Any] = {
+            "action_id": self.action_id,
+            "action_type": self.action_type,
+            "trigger_reason": self.trigger_reason,
+            "trigger_condition": self.trigger_condition,
+            "target_model_type": self.target_model_type,
+            "priority": self.priority,
+            "created_at": self.created_at.isoformat(),
+            "executed": self.executed,
+        }
+        if self.executed_at is not None:
+            result["executed_at"] = self.executed_at.isoformat()
+        if self.execution_result is not None:
+            result["execution_result"] = self.execution_result
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EvolutionAction:
+        """从字典创建实例"""
+        created_at = data["created_at"]
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+        executed_at = data.get("executed_at")
+        if isinstance(executed_at, str):
+            executed_at = datetime.fromisoformat(executed_at)
+        return cls(
+            action_id=data["action_id"],
+            action_type=data["action_type"],
+            trigger_reason=data["trigger_reason"],
+            trigger_condition=data.get("trigger_condition", {}),
+            target_model_type=data["target_model_type"],
+            priority=data["priority"],
+            created_at=created_at,
+            executed=data.get("executed", False),
+            executed_at=executed_at,
+            execution_result=data.get("execution_result"),
+        )
+
+
+@dataclass(frozen=True)
+class TriggerCheckResult:
+    """触发条件检查结果（不可变数据类）
+
+    Attributes:
+        checked_at: 检查时间
+        triggered_actions: 触发的进化动作列表
+        skipped_conditions: 跳过的条件及原因
+    """
+
+    checked_at: datetime
+    triggered_actions: list[EvolutionAction]
+    skipped_conditions: list[dict[str, Any]]
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "checked_at": self.checked_at.isoformat(),
+            "triggered_actions": [a.to_dict() for a in self.triggered_actions],
+            "skipped_conditions": self.skipped_conditions,
+        }
+
+
+@dataclass(frozen=True)
+class PromptTuningParams:
+    """提示调优参数（不可变数据类）
+
+    4维连续参数空间，控制LLM输出风格。
+    每个参数范围0.0-1.0，默认0.5（中性）。
+
+    Attributes:
+        tone_intensity: 语气强度 (0.0=温和/1.0=严厉)
+        detail_level_score: 信息密度 (0.0=简洁/1.0=详细)
+        recommendation_aggressiveness: 推荐激进程度 (0.0=保守/1.0=激进)
+        data_driven_weight: 数据驱动权重 (0.0=纯经验驱动/1.0=纯数据驱动)
+        last_updated: 最后更新时间
+        update_count: 累计更新次数
+    """
+
+    tone_intensity: float = 0.5
+    detail_level_score: float = 0.5
+    recommendation_aggressiveness: float = 0.5
+    data_driven_weight: float = 0.5
+    last_updated: datetime = field(default_factory=datetime.now)
+    update_count: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "tone_intensity": self.tone_intensity,
+            "detail_level_score": self.detail_level_score,
+            "recommendation_aggressiveness": self.recommendation_aggressiveness,
+            "data_driven_weight": self.data_driven_weight,
+            "last_updated": self.last_updated.isoformat(),
+            "update_count": self.update_count,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PromptTuningParams:
+        """从字典创建实例"""
+        last_updated = data.get("last_updated", datetime.now().isoformat())
+        if isinstance(last_updated, str):
+            last_updated = datetime.fromisoformat(last_updated)
+        return cls(
+            tone_intensity=data.get("tone_intensity", 0.5),
+            detail_level_score=data.get("detail_level_score", 0.5),
+            recommendation_aggressiveness=data.get(
+                "recommendation_aggressiveness", 0.5
+            ),
+            data_driven_weight=data.get("data_driven_weight", 0.5),
+            last_updated=last_updated,
+            update_count=data.get("update_count", 0),
+        )
+
+    @classmethod
+    def default(cls) -> PromptTuningParams:
+        """创建默认提示调优参数（全部0.5，中性）"""
+        return cls(
+            tone_intensity=0.5,
+            detail_level_score=0.5,
+            recommendation_aggressiveness=0.5,
+            data_driven_weight=0.5,
+            last_updated=datetime.now(),
+            update_count=0,
+        )
+
+    def with_updates(
+        self,
+        tone: float | None = None,
+        detail: float | None = None,
+        aggressive: float | None = None,
+        data_driven: float | None = None,
+    ) -> PromptTuningParams:
+        """创建更新后的参数副本（保持不可变性）
+
+        每个参数被clamp到[0.0, 1.0]范围。
+
+        Args:
+            tone: 新的语气强度（None保持不变）
+            detail: 新的信息密度（None保持不变）
+            aggressive: 新的推荐激进程度（None保持不变）
+            data_driven: 新的数据驱动权重（None保持不变）
+
+        Returns:
+            PromptTuningParams: 更新后的参数副本
+        """
+        return PromptTuningParams(
+            tone_intensity=max(
+                0.0, min(1.0, tone if tone is not None else self.tone_intensity)
+            ),
+            detail_level_score=max(
+                0.0, min(1.0, detail if detail is not None else self.detail_level_score)
+            ),
+            recommendation_aggressiveness=max(
+                0.0,
+                min(
+                    1.0,
+                    aggressive
+                    if aggressive is not None
+                    else self.recommendation_aggressiveness,
+                ),
+            ),
+            data_driven_weight=max(
+                0.0,
+                min(
+                    1.0,
+                    data_driven if data_driven is not None else self.data_driven_weight,
+                ),
+            ),
+            last_updated=datetime.now(),
+            update_count=self.update_count + 1,
+        )

@@ -588,3 +588,235 @@ class TestModelEvolutionResult:
         assert result.model_type == "vdot"
         assert len(result.parameter_changes) == 1
         assert result.parameter_changes[0].name == "tau_fitness"
+
+
+# === v0.25 数据模型测试 ===
+
+
+class TestEvolutionAction:
+    """EvolutionAction数据模型测试"""
+
+    def test_create_evolution_action(self) -> None:
+        """测试创建EvolutionAction实例"""
+        from src.core.evolution.models import EvolutionAction
+
+        now = datetime.now()
+        action = EvolutionAction(
+            action_id="test_001",
+            action_type="retrain_model",
+            trigger_reason="VDOT预测误差连续3次>5%",
+            trigger_condition={"consecutive_errors": 3, "threshold": 0.05},
+            target_model_type="vdot",
+            priority="high",
+            created_at=now,
+        )
+        assert action.action_id == "test_001"
+        assert action.action_type == "retrain_model"
+        assert action.trigger_reason == "VDOT预测误差连续3次>5%"
+        assert action.trigger_condition == {"consecutive_errors": 3, "threshold": 0.05}
+        assert action.target_model_type == "vdot"
+        assert action.priority == "high"
+        assert action.created_at == now
+        assert action.executed is False
+        assert action.executed_at is None
+        assert action.execution_result is None
+
+    def test_evolution_action_to_dict(self) -> None:
+        """测试EvolutionAction序列化"""
+        from src.core.evolution.models import EvolutionAction
+
+        now = datetime.now()
+        action = EvolutionAction(
+            action_id="test_002",
+            action_type="adjust_strategy",
+            trigger_reason="用户连续2次拒绝推荐",
+            trigger_condition={"consecutive_rejections": 2},
+            target_model_type="prompt",
+            priority="medium",
+            created_at=now,
+            executed=True,
+            executed_at=now,
+            execution_result="推荐策略已调整",
+        )
+        d = action.to_dict()
+        assert d["action_id"] == "test_002"
+        assert d["action_type"] == "adjust_strategy"
+        assert d["executed"] is True
+        assert d["execution_result"] == "推荐策略已调整"
+        assert d["created_at"] == now.isoformat()
+
+    def test_evolution_action_from_dict(self) -> None:
+        """测试EvolutionAction反序列化"""
+        from src.core.evolution.models import EvolutionAction
+
+        now = datetime.now()
+        data = {
+            "action_id": "test_003",
+            "action_type": "incremental_learn",
+            "trigger_reason": "新数据积累50条>=50",
+            "trigger_condition": {"new_count": 50, "threshold": 50},
+            "target_model_type": "all",
+            "priority": "medium",
+            "created_at": now.isoformat(),
+            "executed": False,
+            "executed_at": None,
+            "execution_result": None,
+        }
+        action = EvolutionAction.from_dict(data)
+        assert action.action_id == "test_003"
+        assert action.action_type == "incremental_learn"
+        assert action.executed is False
+
+    def test_evolution_action_frozen(self) -> None:
+        """测试EvolutionAction不可变性"""
+        from src.core.evolution.models import EvolutionAction
+
+        action = EvolutionAction(
+            action_id="test_004",
+            action_type="generate_report",
+            trigger_reason="月度复盘",
+            trigger_condition={},
+            target_model_type="none",
+            priority="low",
+            created_at=datetime.now(),
+        )
+        with pytest.raises(AttributeError):
+            action.executed = True  # type: ignore[misc]
+
+    def test_evolution_action_execution_result_dict_type(self) -> None:
+        """测试EvolutionAction.execution_result支持dict类型（H-02整改）"""
+        from src.core.evolution.models import EvolutionAction
+
+        result_data = {"vdot": {"success": True, "mae_before": 0.05, "mae_after": 0.03}}
+        action = EvolutionAction(
+            action_id="test_005",
+            action_type="incremental_learn",
+            trigger_reason="新数据积累",
+            trigger_condition={},
+            target_model_type="all",
+            priority="medium",
+            created_at=datetime.now(),
+            executed=True,
+            execution_result=result_data,
+        )
+        assert isinstance(action.execution_result, dict)
+        assert action.execution_result["vdot"]["success"] is True
+
+
+class TestTriggerCheckResult:
+    """TriggerCheckResult数据模型测试"""
+
+    def test_create_trigger_check_result(self) -> None:
+        """测试创建TriggerCheckResult实例"""
+        from src.core.evolution.models import EvolutionAction, TriggerCheckResult
+
+        now = datetime.now()
+        action = EvolutionAction(
+            action_id="test_010",
+            action_type="retrain_model",
+            trigger_reason="VDOT误差",
+            trigger_condition={},
+            target_model_type="vdot",
+            priority="high",
+            created_at=now,
+        )
+        result = TriggerCheckResult(
+            checked_at=now,
+            triggered_actions=[action],
+            skipped_conditions=[{"rule": "TR-03", "reason": "新数据不足50条"}],
+        )
+        assert result.checked_at == now
+        assert len(result.triggered_actions) == 1
+        assert len(result.skipped_conditions) == 1
+
+    def test_trigger_check_result_to_dict(self) -> None:
+        """测试TriggerCheckResult序列化"""
+        from src.core.evolution.models import TriggerCheckResult
+
+        now = datetime.now()
+        result = TriggerCheckResult(
+            checked_at=now,
+            triggered_actions=[],
+            skipped_conditions=[],
+        )
+        d = result.to_dict()
+        assert d["checked_at"] == now.isoformat()
+        assert d["triggered_actions"] == []
+        assert d["skipped_conditions"] == []
+
+
+class TestPromptTuningParams:
+    """PromptTuningParams数据模型测试"""
+
+    def test_default_params(self) -> None:
+        """测试默认参数（全部0.5）"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams.default()
+        assert params.tone_intensity == 0.5
+        assert params.detail_level_score == 0.5
+        assert params.recommendation_aggressiveness == 0.5
+        assert params.data_driven_weight == 0.5
+        assert params.update_count == 0
+
+    def test_with_updates_basic(self) -> None:
+        """测试with_updates基本更新"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams.default()
+        updated = params.with_updates(tone=0.7, aggressive=0.3)
+        assert updated.tone_intensity == 0.7
+        assert updated.recommendation_aggressiveness == 0.3
+        assert updated.detail_level_score == 0.5  # 未修改
+        assert updated.data_driven_weight == 0.5  # 未修改
+        assert updated.update_count == 1
+
+    def test_with_updates_clamp_to_range(self) -> None:
+        """测试with_updates将参数clamp到[0.0, 1.0]"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams.default()
+        # 超上限
+        updated = params.with_updates(tone=1.5, aggressive=2.0)
+        assert updated.tone_intensity == 1.0
+        assert updated.recommendation_aggressiveness == 1.0
+        # 超下限
+        updated2 = params.with_updates(detail=-0.5, data_driven=-1.0)
+        assert updated2.detail_level_score == 0.0
+        assert updated2.data_driven_weight == 0.0
+
+    def test_with_updates_none_preserves(self) -> None:
+        """测试with_updates传入None保持原值"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams(tone_intensity=0.7, detail_level_score=0.3)
+        updated = params.with_updates(tone=None, detail=None)
+        assert updated.tone_intensity == 0.7
+        assert updated.detail_level_score == 0.3
+
+    def test_to_dict_from_dict_roundtrip(self) -> None:
+        """测试序列化/反序列化往返"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams(
+            tone_intensity=0.6,
+            detail_level_score=0.4,
+            recommendation_aggressiveness=0.7,
+            data_driven_weight=0.3,
+            update_count=5,
+        )
+        d = params.to_dict()
+        restored = PromptTuningParams.from_dict(d)
+        assert restored.tone_intensity == 0.6
+        assert restored.detail_level_score == 0.4
+        assert restored.recommendation_aggressiveness == 0.7
+        assert restored.data_driven_weight == 0.3
+        assert restored.update_count == 5
+
+    def test_frozen_immutability(self) -> None:
+        """测试不可变性"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = PromptTuningParams.default()
+        with pytest.raises(AttributeError):
+            params.tone_intensity = 0.8  # type: ignore[misc]
