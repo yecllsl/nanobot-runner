@@ -921,3 +921,54 @@ class TestEvolutionReport:
         )
         with pytest.raises(AttributeError):
             report.total_decisions = 100  # type: ignore[misc]
+
+
+class TestIncrementalLearnResult:
+    """IncrementalLearnResult数据模型测试（H-02整改）"""
+
+    def test_create_success_result(self) -> None:
+        """测试创建成功的增量学习结果"""
+        from src.core.evolution.models import IncrementalLearnResult
+
+        result = IncrementalLearnResult(
+            model_type="vdot",
+            success=True,
+            mae_before=0.05,
+            mae_after=0.03,
+            error=None,
+        )
+        assert result.model_type == "vdot"
+        assert result.success is True
+        assert result.mae_before == 0.05
+        assert result.mae_after == 0.03
+        assert result.error is None
+
+    def test_create_failure_result(self) -> None:
+        """测试创建失败的增量学习结果"""
+        from src.core.evolution.models import IncrementalLearnResult
+
+        result = IncrementalLearnResult(
+            model_type="injury",
+            success=False,
+            mae_before=None,
+            mae_after=None,
+            error="数据不足",
+        )
+        assert result.success is False
+        assert result.error == "数据不足"
+
+    def test_to_dict(self) -> None:
+        """测试序列化"""
+        from src.core.evolution.models import IncrementalLearnResult
+
+        result = IncrementalLearnResult(
+            model_type="vdot",
+            success=True,
+            mae_before=0.05,
+            mae_after=0.03,
+            error=None,
+        )
+        d = result.to_dict()
+        assert d["model_type"] == "vdot"
+        assert d["success"] is True
+        assert d["mae_before"] == 0.05

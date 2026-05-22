@@ -15,6 +15,7 @@ from typing import Any, Protocol
 from src.core.evolution.config import EvolutionConfig
 from src.core.evolution.models import (
     EvolutionAction,
+    IncrementalLearnResult,
     TriggerCheckResult,
 )
 
@@ -511,13 +512,14 @@ class EvolutionController:
         )
 
     def _execute_incremental_learn(self, action: EvolutionAction) -> EvolutionAction:
-        """执行incremental_learn动作（persist-first语义）
+        """执行incremental_learn动作（persist-first语义，H-02整改：结构化部分失败追踪）
 
         对所有模型类型依次执行增量学习:
         1. 调用model_evolver.evolve_model()获取进化结果
         2. 先持久化参数（persist-first）
         3. 持久化成功后修改运行时实例属性
-        4. 完成后更新trigger_state中的last_incremental_count
+        4. 使用IncrementalLearnResult记录每个模型的结果（含部分失败）
+        5. 完成后更新trigger_state中的last_incremental_count
 
         Args:
             action: incremental_learn动作
@@ -526,7 +528,7 @@ class EvolutionController:
             EvolutionAction: 执行后的动作
         """
         model_types = ["vdot", "injury", "training_response"]
-        results: list[dict[str, Any]] = []
+        results: dict[str, dict[str, Any]] = {}
 
         for model_type in model_types:
             try:
@@ -552,22 +554,50 @@ class EvolutionController:
                             model_type,
                             exc,
                         )
-                        results.append(
-                            {"model_type": model_type, "persist_error": str(exc)}
+                        learn_result = IncrementalLearnResult(
+                            model_type=model_type,
+                            success=False,
+                            mae_before=None,
+                            mae_after=None,
+                            error=f"持久化失败: {exc}",
                         )
+                        results[model_type] = learn_result.to_dict()
                         continue
 
-                results.append(
-                    {
-                        "model_type": model_type,
-                        "mae_before": getattr(result, "mae_before", None),
-                        "mae_after": getattr(result, "mae_after", None),
-                        "persisted": True,
-                    }
+                # 进化成功
+                learn_result = IncrementalLearnResult(
+                    model_type=model_type,
+                    success=True,
+                    mae_before=getattr(result, "mae_before", None),
+                    mae_after=getattr(result, "mae_after", None),
+                    error=None,
                 )
+                results[model_type] = learn_result.to_dict()
+            except ValueError as exc:
+                # 数据不足，记录为失败并跳过
+                logger.warning(
+                    "增量学习数据不足跳过: model_type=%s, error=%s",
+                    model_type,
+                    exc,
+                )
+                learn_result = IncrementalLearnResult(
+                    model_type=model_type,
+                    success=False,
+                    mae_before=None,
+                    mae_after=None,
+                    error="数据不足跳过",
+                )
+                results[model_type] = learn_result.to_dict()
             except Exception as exc:
                 logger.error("增量学习失败: model_type=%s, error=%s", model_type, exc)
-                results.append({"model_type": model_type, "error": str(exc)})
+                learn_result = IncrementalLearnResult(
+                    model_type=model_type,
+                    success=False,
+                    mae_before=None,
+                    mae_after=None,
+                    error=str(exc),
+                )
+                results[model_type] = learn_result.to_dict()
 
         # 更新trigger_state
         current_count = self._store.count_decisions()
@@ -577,7 +607,7 @@ class EvolutionController:
             action,
             executed=True,
             executed_at=datetime.now(),
-            execution_result={"model_results": results},
+            execution_result=results,
         )
 
     def _execute_generate_report(self, action: EvolutionAction) -> EvolutionAction:

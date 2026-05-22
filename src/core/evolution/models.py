@@ -761,3 +761,34 @@ class EvolutionReport:
             prompt_tuning_summary=data.get("prompt_tuning_summary", {}),
             recommendations=data.get("recommendations", []),
         )
+
+
+@dataclass(frozen=True)
+class IncrementalLearnResult:
+    """增量学习单模型结果（不可变数据类，H-02整改）
+
+    记录单个模型在增量学习中的进化结果，支持部分失败场景追溯。
+
+    Attributes:
+        model_type: 模型类型 (vdot/injury/training_response)
+        success: 是否进化成功
+        mae_before: 进化前MAE（失败时为None）
+        mae_after: 进化后MAE（失败时为None）
+        error: 错误信息（成功时为None）
+    """
+
+    model_type: str
+    success: bool
+    mae_before: float | None
+    mae_after: float | None
+    error: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            "model_type": self.model_type,
+            "success": self.success,
+            "mae_before": self.mae_before,
+            "mae_after": self.mae_after,
+            "error": self.error,
+        }

@@ -277,6 +277,43 @@ class TestExecuteAction:
         assert result.executed is True
         mock_store.save_trigger_state.assert_called_with("last_incremental_count", 100)
 
+    def test_incremental_learn_partial_failure(
+        self,
+        controller: EvolutionController,
+        mock_model_evolver: MagicMock,
+        mock_store: MagicMock,
+    ) -> None:
+        """incremental_learn部分失败场景：vdot成功、injury数据不足、training_response异常"""
+        mock_store.count_decisions.return_value = 100
+
+        def mock_evolve(model_type: str) -> MagicMock:
+            if model_type == "injury":
+                raise ValueError("数据不足")
+            if model_type == "training_response":
+                raise RuntimeError("模型加载失败")
+            return MagicMock(
+                mae_before=0.05, mae_after=0.03, _raw_param_changes={"tau": 42}
+            )
+
+        mock_model_evolver.evolve_model.side_effect = mock_evolve
+
+        action = EvolutionAction(
+            action_id="test_partial_001",
+            action_type="incremental_learn",
+            trigger_reason="新数据积累",
+            trigger_condition={},
+            target_model_type="all",
+            priority="medium",
+            created_at=datetime.now(),
+        )
+
+        result = controller.execute_action(action)
+        assert result.executed is True
+        assert isinstance(result.execution_result, dict)
+        assert result.execution_result["vdot"]["success"] is True
+        assert result.execution_result["injury"]["success"] is False
+        assert result.execution_result["training_response"]["success"] is False
+
     def test_execute_generate_report(
         self,
         controller: EvolutionController,
