@@ -299,6 +299,32 @@ def get_status() -> None:
             )
         )
 
+        # v0.25新增字段
+        evolution_status = result.get("evolution_status", {})
+        if evolution_status:
+            v025_lines = []
+            if "personalization_degree" in evolution_status:
+                v025_lines.append(
+                    f"个性化程度: {evolution_status['personalization_degree']:.2f}"
+                )
+            if "prompt_tuning" in evolution_status:
+                pt = evolution_status["prompt_tuning"]
+                v025_lines.append(
+                    f"提示调优: 语气={pt.get('tone_intensity', 0.5):.2f} 激进={pt.get('recommendation_aggressiveness', 0.5):.2f}"
+                )
+            if "evolution_actions_count" in evolution_status:
+                v025_lines.append(
+                    f"进化动作数: {evolution_status['evolution_actions_count']}"
+                )
+            if v025_lines:
+                console.print(
+                    Panel(
+                        "\n".join(v025_lines),
+                        title="v0.25 进化状态",
+                        border_style="magenta",
+                    )
+                )
+
     except NanobotRunnerError as e:
         print_error(CLIError.storage_error(str(e)))
         raise typer.Exit(1)
@@ -511,3 +537,263 @@ def _print_calibration_profile(data: dict) -> None:
         lines.append(f"  最后更新: {last_updated}")
 
     console.print("\n".join(lines))
+
+
+@app.command(name="triggers")
+def check_triggers() -> None:
+    """检查进化触发条件
+
+    检查当前是否满足进化触发条件，展示触发的进化动作和跳过的条件。
+
+    Examples:
+        nanobotrun evolution triggers
+    """
+    try:
+        handler = EvolutionHandler()
+        result = handler.check_triggers()
+
+        if not result["success"]:
+            print_error(CLIError.storage_error(result.get("message", "未知错误")))
+            raise typer.Exit(1)
+
+        data = result["data"]
+        triggered = data.get("triggered_actions", [])
+        skipped = data.get("skipped_conditions", [])
+        checked_at = data.get("checked_at", "")
+
+        # 触发的动作表格
+        if triggered:
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("动作类型", width=20)
+            table.add_column("触发条件", width=30)
+            table.add_column("优先级", width=10)
+
+            for action in triggered:
+                table.add_row(
+                    action.get("action_type", ""),
+                    action.get("trigger_condition", ""),
+                    str(action.get("priority", "")),
+                )
+            console.print(table)
+        else:
+            console.print("[green]当前无触发的进化动作[/green]")
+
+        # 跳过的条件
+        if skipped:
+            skip_lines = []
+            for s in skipped:
+                skip_lines.append(
+                    f"  {s.get('condition', 'N/A')}: {s.get('reason', 'N/A')}"
+                )
+            console.print(
+                Panel(
+                    "\n".join(skip_lines),
+                    title="跳过的条件",
+                    border_style="yellow",
+                )
+            )
+
+        console.print(f"\n[bold]检查时间:[/bold] {checked_at}")
+        console.print(result["message"])
+
+    except NanobotRunnerError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="report")
+def get_evolution_report(
+    month: str = typer.Option(
+        "",
+        "--month",
+        "-m",
+        help="报告月份 (YYYY-MM格式)，空则使用当前月",
+    ),
+) -> None:
+    """生成月度进化报告
+
+    汇总指定月份的进化引擎运行状态和效果，包括决策数、预测准确率、个性化程度等。
+
+    Examples:
+        nanobotrun evolution report
+        nanobotrun evolution report --month 2025-05
+    """
+    try:
+        handler = EvolutionHandler()
+        result = handler.get_evolution_report(month=month or None)
+
+        if not result["success"]:
+            print_error(CLIError.storage_error(result.get("message", "未知错误")))
+            raise typer.Exit(1)
+
+        data = result["data"]
+
+        # 个性化程度等级判定
+        personalization = data.get("personalization_degree", 0.0)
+        if personalization >= 0.7:
+            level = "[green]高[/green]"
+        elif personalization >= 0.4:
+            level = "[yellow]中[/yellow]"
+        else:
+            level = "[dim]低[/dim]"
+
+        # 决策接受率
+        acceptance_rate = data.get("decision_acceptance_rate", 0.0)
+
+        # 校准摘要
+        cal_summary = data.get("calibration_summary", {})
+        cal_lines = []
+        for model_name, info in cal_summary.items():
+            scale = info.get("scale", 1.0)
+            cal_lines.append(f"  {model_name}: scale={scale:.4f}")
+
+        # 提示调优摘要
+        pt_summary = data.get("prompt_tuning_summary", {})
+        pt_lines = []
+        if pt_summary:
+            pt_lines.append(f"  语气强度: {pt_summary.get('tone_intensity', 0.5):.2f}")
+            pt_lines.append(
+                f"  信息密度: {pt_summary.get('detail_level_score', 0.5):.2f}"
+            )
+            pt_lines.append(
+                f"  激进程度: {pt_summary.get('recommendation_aggressiveness', 0.5):.2f}"
+            )
+            pt_lines.append(
+                f"  数据驱动: {pt_summary.get('data_driven_weight', 0.5):.2f}"
+            )
+
+        # 建议
+        recommendations = data.get("recommendations", [])
+
+        console.print(
+            Panel(
+                f"[bold]报告月份:[/bold] {data.get('month', 'N/A')}\n"
+                f"[bold]生成时间:[/bold] {data.get('generated_at', 'N/A')}\n\n"
+                f"[bold]决策总数:[/bold] {data.get('total_decisions', 0)}\n"
+                f"[bold]决策接受率:[/bold] {acceptance_rate:.1%}\n"
+                f"[bold]个性化程度:[/bold] {personalization:.2f} ({level})\n"
+                f"[bold]进化动作数:[/bold] {data.get('evolution_actions_count', 0)}\n"
+                f"[bold]上次进化时间:[/bold] {data.get('last_evolution_time', 'N/A')}",
+                title="[Evolution] 月度进化报告",
+                border_style="cyan",
+            )
+        )
+
+        if cal_lines:
+            console.print(
+                Panel(
+                    "\n".join(cal_lines),
+                    title="校准摘要",
+                    border_style="blue",
+                )
+            )
+
+        if pt_lines:
+            console.print(
+                Panel(
+                    "\n".join(pt_lines),
+                    title="提示调优摘要",
+                    border_style="magenta",
+                )
+            )
+
+        if recommendations:
+            rec_lines = [f"  {i + 1}. {r}" for i, r in enumerate(recommendations)]
+            console.print(
+                Panel(
+                    "\n".join(rec_lines),
+                    title="进化建议",
+                    border_style="green",
+                )
+            )
+
+    except NanobotRunnerError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)
+
+
+@app.command(name="tune")
+def adjust_prompt_params(
+    tone: float = typer.Option(
+        None,
+        "--tone",
+        "-t",
+        help="语气强度 (0.0=温和 ~ 1.0=严厉)",
+    ),
+    detail: float = typer.Option(
+        None,
+        "--detail",
+        "-d",
+        help="信息密度 (0.0=简洁 ~ 1.0=详细)",
+    ),
+    aggressive: float = typer.Option(
+        None,
+        "--aggressive",
+        "-a",
+        help="推荐激进程度 (0.0=保守 ~ 1.0=激进)",
+    ),
+    data_driven: float = typer.Option(
+        None,
+        "--data-driven",
+        help="数据驱动权重 (0.0=经验驱动 ~ 1.0=数据驱动)",
+    ),
+) -> None:
+    """手动调整提示参数
+
+    调整LLM输出的4维风格参数，控制语气、信息密度、推荐激进程度和数据驱动权重。
+
+    Examples:
+        nanobotrun evolution tune --tone 0.7 --detail 0.8
+        nanobotrun evolution tune --aggressive 0.3 --data-driven 0.9
+    """
+    try:
+        # 参数范围校验
+        for name, value in [
+            ("tone", tone),
+            ("detail", detail),
+            ("aggressive", aggressive),
+            ("data_driven", data_driven),
+        ]:
+            if value is not None and (value < 0.0 or value > 1.0):
+                print_error(
+                    CLIError.storage_error(
+                        f"参数 {name} 必须在0.0-1.0之间，当前值: {value}"
+                    )
+                )
+                raise typer.Exit(1)
+
+        handler = EvolutionHandler()
+        result = handler.adjust_prompt_params(
+            tone=tone,
+            detail=detail,
+            aggressive=aggressive,
+            data_driven=data_driven,
+        )
+
+        if not result["success"]:
+            print_error(CLIError.storage_error(result.get("message", "未知错误")))
+            raise typer.Exit(1)
+
+        data = result["data"]
+
+        # 参数可视化：进度条风格
+        def _bar(val: float, width: int = 20) -> str:
+            filled = int(val * width)
+            return f"[{'#' * filled}{'-' * (width - filled)}] {val:.2f}"
+
+        console.print(
+            Panel(
+                f"[bold]语气强度:[/bold] {_bar(data.get('tone_intensity', 0.5))}\n"
+                f"[bold]信息密度:[/bold] {_bar(data.get('detail_level_score', 0.5))}\n"
+                f"[bold]激进程度:[/bold] {_bar(data.get('recommendation_aggressiveness', 0.5))}\n"
+                f"[bold]数据驱动:[/bold] {_bar(data.get('data_driven_weight', 0.5))}\n\n"
+                f"[bold]累计更新次数:[/bold] {data.get('update_count', 0)}\n"
+                f"[bold]最后更新时间:[/bold] {data.get('last_updated', 'N/A')}",
+                title="[Evolution] 提示参数已调整",
+                border_style="magenta",
+            )
+        )
+
+    except NanobotRunnerError as e:
+        print_error(CLIError.storage_error(str(e)))
+        raise typer.Exit(1)

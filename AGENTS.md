@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.16.0 | **更新日期**: 2026-05-21
-> **当前基线**: v0.24.0
+> **版本**: v5.17.0 | **更新日期**: 2026-05-22
+> **当前基线**: v0.25.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -88,7 +88,10 @@ src/
 │       ├── decision_logger.py  # 决策记录器
 │       ├── outcome_collector.py # 结果收集器
 │       ├── evolution_engine.py # 进化引擎编排层
-│       └── decision_log_hook.py # Agent生命周期钩子
+│       ├── decision_log_hook.py # Agent生命周期钩子
+│       ├── evolution_controller.py # 进化触发控制器 (v0.25.0)
+│       ├── prompt_tuner.py     # 提示参数调优器 (v0.25.0)
+│       └── evolution_reporter.py # 进化报告生成器 (v0.25.0)
 ├── agents/
 │   ├── tools.py                # Agent 工具集
 │   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0)
@@ -277,6 +280,11 @@ uv run nanobotrun evolution fidelity [--days 30]        # 查看执行忠实度
 # v0.24.0 - 个性化学习
 uv run nanobotrun evolution calibration [--model-type TYPE]  # 查看校准状态
 uv run nanobotrun evolution response [--months 6]            # 训练响应性分析
+
+# v0.25.0 - 自适应进化控制
+uv run nanobotrun evolution triggers                # 检查进化触发条件
+uv run nanobotrun evolution report [--month YYYY-MM] # 生成月度进化报告
+uv run nanobotrun evolution tune [--tone 0.7] [--detail 0.5] [--aggressive 0.3] [--data-driven 0.5]  # 调整提示参数
 ```
 
 ### 系统管理

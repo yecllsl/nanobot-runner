@@ -161,6 +161,41 @@ class DecisionLogHook(AgentHook):
 
         return content
 
+    def after_iteration(self, context: Any) -> None:
+        """Agent迭代完成后回调（v0.25扩展：触发进化检查）
+
+        通过EvolutionEngine编排层间接调用EvolutionController，
+        确保所有进化操作通过编排层进行（H-01整改）。
+        """
+        if not self._decision_logged:
+            return
+
+        # v0.25: 触发进化检查
+        try:
+            result = self._evolution_engine.check_evolution_triggers()
+            if result.triggered_actions:
+                # 异步执行进化动作（daemon线程，不阻塞主流程）
+                import threading
+
+                def _execute_actions() -> None:
+                    for action in result.triggered_actions:
+                        try:
+                            self._evolution_engine.execute_evolution_action(action)
+                        except Exception as e:
+                            logger.error("异步执行进化动作失败: %s", e)
+
+                thread = threading.Thread(
+                    target=_execute_actions,
+                    daemon=True,
+                    name="evolution-action-executor",
+                )
+                thread.start()
+        except RuntimeError:
+            # v0.25组件未注入，graceful降级
+            pass
+        except Exception as e:
+            logger.warning("进化触发检查异常（不影响主流程）: %s", e)
+
     def _infer_decision_type(self, content: str) -> DecisionType:
         """根据content关键词推断决策类型
 

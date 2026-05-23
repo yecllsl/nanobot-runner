@@ -14,6 +14,12 @@ from src.agents.tools import (
     create_tools,
 )
 from src.agents.tools_evolution import (
+    AdjustPromptParamsTool as AdjustPromptParamsToolDirect,
+)
+from src.agents.tools_evolution import (
+    CheckEvolutionTriggersTool as CheckEvolutionTriggersToolDirect,
+)
+from src.agents.tools_evolution import (
     CheckPlanExecutionTool as CheckPlanExecutionToolDirect,
 )
 from src.agents.tools_evolution import (
@@ -23,12 +29,19 @@ from src.agents.tools_evolution import (
     GetDecisionHistoryTool as GetDecisionHistoryToolDirect,
 )
 from src.agents.tools_evolution import (
+    GetEvolutionReportTool as GetEvolutionReportToolDirect,
+)
+from src.agents.tools_evolution import (
     RecordFeedbackTool,
 )
+from src.core.base.exceptions import NanobotRunnerError
 from src.core.evolution.models import (
     DecisionLog,
+    EvolutionReport,
     OutcomeRecord,
     PredictionAccuracyStats,
+    PromptTuningParams,
+    TriggerCheckResult,
 )
 from src.core.transparency.models import DecisionType
 
@@ -606,3 +619,407 @@ class TestGetLatestVdot:
         runner_tools.get_vdot_trend = MagicMock(side_effect=Exception("存储错误"))
         result = runner_tools._get_latest_vdot()
         assert result == 0.0
+
+
+# ---------------------------------------------------------------------------
+# v0.25 工具类属性测试
+# ---------------------------------------------------------------------------
+
+
+class TestV025ToolProperties:
+    """v0.25工具类属性测试"""
+
+    def test_check_evolution_triggers_tool_name(self, runner_tools):
+        """测试 CheckEvolutionTriggersTool 名称"""
+        tool = CheckEvolutionTriggersToolDirect(runner_tools)
+        assert tool.name == "check_evolution_triggers"
+
+    def test_check_evolution_triggers_tool_description(self, runner_tools):
+        """测试 CheckEvolutionTriggersTool 描述"""
+        tool = CheckEvolutionTriggersToolDirect(runner_tools)
+        assert "进化触发条件" in tool.description
+
+    def test_check_evolution_triggers_tool_parameters(self, runner_tools):
+        """测试 CheckEvolutionTriggersTool 参数（无必填参数）"""
+        tool = CheckEvolutionTriggersToolDirect(runner_tools)
+        params = tool.parameters
+        assert "properties" in params
+        # 无必填参数
+        assert "required" not in params or len(params.get("required", [])) == 0
+
+    def test_get_evolution_report_tool_name(self, runner_tools):
+        """测试 GetEvolutionReportTool 名称"""
+        tool = GetEvolutionReportToolDirect(runner_tools)
+        assert tool.name == "get_evolution_report"
+
+    def test_get_evolution_report_tool_description(self, runner_tools):
+        """测试 GetEvolutionReportTool 描述"""
+        tool = GetEvolutionReportToolDirect(runner_tools)
+        assert "进化报告" in tool.description
+
+    def test_get_evolution_report_tool_parameters(self, runner_tools):
+        """测试 GetEvolutionReportTool 参数"""
+        tool = GetEvolutionReportToolDirect(runner_tools)
+        params = tool.parameters
+        assert "month" in params["properties"]
+
+    def test_adjust_prompt_params_tool_name(self, runner_tools):
+        """测试 AdjustPromptParamsTool 名称"""
+        tool = AdjustPromptParamsToolDirect(runner_tools)
+        assert tool.name == "adjust_prompt_params"
+
+    def test_adjust_prompt_params_tool_description(self, runner_tools):
+        """测试 AdjustPromptParamsTool 描述"""
+        tool = AdjustPromptParamsToolDirect(runner_tools)
+        assert "提示参数" in tool.description
+
+    def test_adjust_prompt_params_tool_parameters(self, runner_tools):
+        """测试 AdjustPromptParamsTool 参数"""
+        tool = AdjustPromptParamsToolDirect(runner_tools)
+        params = tool.parameters
+        assert "tone" in params["properties"]
+        assert "detail" in params["properties"]
+        assert "aggressive" in params["properties"]
+        assert "data_driven" in params["properties"]
+
+
+# ---------------------------------------------------------------------------
+# v0.25 RunnerTools 方法测试
+# ---------------------------------------------------------------------------
+
+
+def _make_trigger_check_result() -> TriggerCheckResult:
+    """构造测试用 TriggerCheckResult"""
+    return TriggerCheckResult(
+        checked_at=datetime(2026, 5, 22, 10, 0, 0),
+        triggered_actions=[],
+        skipped_conditions=[{"condition": "vdot_error", "reason": "数据不足"}],
+    )
+
+
+def _make_evolution_report() -> EvolutionReport:
+    """构造测试用 EvolutionReport"""
+    return EvolutionReport(
+        report_id="rpt_test001",
+        month="2026-05",
+        generated_at=datetime(2026, 5, 22, 10, 0, 0),
+        total_decisions=42,
+        prediction_accuracy_trend=[],
+        decision_acceptance_rate=0.75,
+        model_versions={"vdot": "v1.0"},
+        personalization_degree=0.6,
+        evolution_actions_count=3,
+        last_evolution_time=None,
+        calibration_summary={},
+        prompt_tuning_summary={},
+        recommendations=["继续积累数据"],
+    )
+
+
+def _make_prompt_tuning_params() -> PromptTuningParams:
+    """构造测试用 PromptTuningParams"""
+    return PromptTuningParams(
+        tone_intensity=0.7,
+        detail_level_score=0.8,
+        recommendation_aggressiveness=0.3,
+        data_driven_weight=0.6,
+        last_updated=datetime(2026, 5, 22, 10, 0, 0),
+        update_count=1,
+    )
+
+
+class TestCheckEvolutionTriggers:
+    """check_evolution_triggers 方法测试"""
+
+    @patch("src.core.base.context.get_context")
+    def test_success(self, mock_get_ctx, runner_tools, mock_evolution_engine):
+        """测试检查进化触发条件成功"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        trigger_result = _make_trigger_check_result()
+        mock_evolution_engine.check_evolution_triggers.return_value = trigger_result
+
+        result = runner_tools.check_evolution_triggers()
+
+        assert result["success"] is True
+        assert "checked_at" in result["data"]
+        assert result["data"]["skipped_conditions"] == [
+            {"condition": "vdot_error", "reason": "数据不足"}
+        ]
+        mock_evolution_engine.check_evolution_triggers.assert_called_once()
+
+    @patch("src.core.base.context.get_context")
+    def test_runtime_error_component_not_injected(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试v0.25组件未注入时优雅处理"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        mock_evolution_engine.check_evolution_triggers.side_effect = RuntimeError(
+            "请先初始化v0.25组件"
+        )
+
+        result = runner_tools.check_evolution_triggers()
+
+        assert result["success"] is False
+        assert "v0.25组件" in result["error"]
+
+    @patch("src.core.base.context.get_context")
+    def test_nanobot_runner_error(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试NanobotRunnerError异常"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        mock_evolution_engine.check_evolution_triggers.side_effect = NanobotRunnerError(
+            "存储错误"
+        )
+
+        result = runner_tools.check_evolution_triggers()
+
+        assert result["success"] is False
+        assert "存储错误" in result["error"]
+
+
+class TestGetEvolutionReport:
+    """get_evolution_report 方法测试"""
+
+    @patch("src.core.base.context.get_context")
+    def test_success_default_month(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试获取当月进化报告成功"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        report = _make_evolution_report()
+        mock_evolution_engine.get_evolution_report.return_value = report
+
+        result = runner_tools.get_evolution_report()
+
+        assert result["success"] is True
+        assert result["data"]["report_id"] == "rpt_test001"
+        assert result["data"]["month"] == "2026-05"
+        assert result["data"]["total_decisions"] == 42
+        mock_evolution_engine.get_evolution_report.assert_called_once_with(None)
+
+    @patch("src.core.base.context.get_context")
+    def test_success_specific_month(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试获取指定月份进化报告"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        report = _make_evolution_report()
+        mock_evolution_engine.get_evolution_report.return_value = report
+
+        result = runner_tools.get_evolution_report(month="2026-04")
+
+        assert result["success"] is True
+        mock_evolution_engine.get_evolution_report.assert_called_once_with("2026-04")
+
+    @patch("src.core.base.context.get_context")
+    def test_runtime_error_component_not_injected(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试v0.25组件未注入时优雅处理"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        mock_evolution_engine.get_evolution_report.side_effect = RuntimeError(
+            "请先初始化v0.25组件"
+        )
+
+        result = runner_tools.get_evolution_report()
+
+        assert result["success"] is False
+        assert "v0.25组件" in result["error"]
+
+
+class TestAdjustPromptParams:
+    """adjust_prompt_params 方法测试"""
+
+    @patch("src.core.base.context.get_context")
+    def test_success_all_params(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试调整所有提示参数成功"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        params = _make_prompt_tuning_params()
+        mock_evolution_engine.adjust_prompt_params.return_value = params
+
+        result = runner_tools.adjust_prompt_params(
+            tone=0.7, detail=0.8, aggressive=0.3, data_driven=0.6
+        )
+
+        assert result["success"] is True
+        assert result["data"]["tone_intensity"] == 0.7
+        assert result["data"]["detail_level_score"] == 0.8
+        assert result["data"]["recommendation_aggressiveness"] == 0.3
+        assert result["data"]["data_driven_weight"] == 0.6
+        mock_evolution_engine.adjust_prompt_params.assert_called_once_with(
+            tone=0.7, detail=0.8, aggressive=0.3, data_driven=0.6
+        )
+
+    @patch("src.core.base.context.get_context")
+    def test_success_partial_params(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试仅调整部分提示参数"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        params = _make_prompt_tuning_params()
+        mock_evolution_engine.adjust_prompt_params.return_value = params
+
+        result = runner_tools.adjust_prompt_params(tone=0.9)
+
+        assert result["success"] is True
+        mock_evolution_engine.adjust_prompt_params.assert_called_once_with(
+            tone=0.9, detail=None, aggressive=None, data_driven=None
+        )
+
+    @patch("src.core.base.context.get_context")
+    def test_runtime_error_component_not_injected(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试v0.25组件未注入时优雅处理"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        mock_evolution_engine.adjust_prompt_params.side_effect = RuntimeError(
+            "请先初始化v0.25组件"
+        )
+
+        result = runner_tools.adjust_prompt_params(tone=0.5)
+
+        assert result["success"] is False
+        assert "v0.25组件" in result["error"]
+
+    @patch("src.core.base.context.get_context")
+    def test_nanobot_runner_error(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试NanobotRunnerError异常"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        mock_evolution_engine.adjust_prompt_params.side_effect = NanobotRunnerError(
+            "参数无效"
+        )
+
+        result = runner_tools.adjust_prompt_params(tone=0.5)
+
+        assert result["success"] is False
+        assert "参数无效" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# v0.25 工具类 execute 测试
+# ---------------------------------------------------------------------------
+
+
+class TestV025ToolExecute:
+    """v0.25工具类 execute 方法测试"""
+
+    @patch("src.core.base.context.get_context")
+    def test_check_evolution_triggers_execute(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试 CheckEvolutionTriggersTool 执行"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        trigger_result = _make_trigger_check_result()
+        mock_evolution_engine.check_evolution_triggers.return_value = trigger_result
+
+        tool = CheckEvolutionTriggersToolDirect(runner_tools)
+
+        result = asyncio.run(tool.execute())
+        parsed = json.loads(result)
+
+        assert parsed["success"] is True
+        assert "checked_at" in parsed["data"]
+
+    @patch("src.core.base.context.get_context")
+    def test_get_evolution_report_execute(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试 GetEvolutionReportTool 执行"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        report = _make_evolution_report()
+        mock_evolution_engine.get_evolution_report.return_value = report
+
+        tool = GetEvolutionReportToolDirect(runner_tools)
+
+        result = asyncio.run(tool.execute(month="2026-05"))
+        parsed = json.loads(result)
+
+        assert parsed["success"] is True
+        assert parsed["data"]["report_id"] == "rpt_test001"
+        assert parsed["data"]["month"] == "2026-05"
+
+    @patch("src.core.base.context.get_context")
+    def test_adjust_prompt_params_execute(
+        self, mock_get_ctx, runner_tools, mock_evolution_engine
+    ):
+        """测试 AdjustPromptParamsTool 执行"""
+        mock_ctx = MagicMock()
+        mock_ctx.evolution_engine = mock_evolution_engine
+        mock_get_ctx.return_value = mock_ctx
+
+        params = _make_prompt_tuning_params()
+        mock_evolution_engine.adjust_prompt_params.return_value = params
+
+        tool = AdjustPromptParamsToolDirect(runner_tools)
+
+        result = asyncio.run(tool.execute(tone=0.7, detail=0.8))
+        parsed = json.loads(result)
+
+        assert parsed["success"] is True
+        assert parsed["data"]["tone_intensity"] == 0.7
+        assert parsed["data"]["detail_level_score"] == 0.8
+
+
+# ---------------------------------------------------------------------------
+# v0.25 create_tools 注册测试
+# ---------------------------------------------------------------------------
+
+
+class TestV025CreateToolsRegistration:
+    """v0.25 create_tools 工厂函数注册测试"""
+
+    def test_v025_tools_registered(self, runner_tools):
+        """测试v0.25进化工具已注册到 create_tools"""
+        tools = create_tools(runner_tools)
+        tool_names = [t.name for t in tools]
+
+        assert "check_evolution_triggers" in tool_names
+        assert "get_evolution_report" in tool_names
+        assert "adjust_prompt_params" in tool_names
+
+    def test_v025_tool_descriptions_exist(self):
+        """测试v0.25进化工具描述已添加"""
+        assert "check_evolution_triggers" in TOOL_DESCRIPTIONS
+        assert "get_evolution_report" in TOOL_DESCRIPTIONS
+        assert "adjust_prompt_params" in TOOL_DESCRIPTIONS

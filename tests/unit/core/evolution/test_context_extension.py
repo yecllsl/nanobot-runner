@@ -1,4 +1,4 @@
-# AppContext evolution_engine 扩展属性单元测试 - v0.23.0
+# AppContext evolution_engine 扩展属性单元测试 - v0.23.0/v0.24.0/v0.25.0
 # 测试决策追踪引擎的懒加载、缓存行为和依赖注入构造
 
 import tempfile
@@ -172,3 +172,114 @@ class TestEvolutionEngineV024Extension:
         engine = mock_context.evolution_engine
         status = engine.get_evolution_status()
         assert "calibration_status" in status
+
+
+class TestAppContextV025:
+    """AppContext v0.25扩展属性测试"""
+
+    def test_evolution_engine_includes_v025_components(self) -> None:
+        """EvolutionEngine应包含v0.25子组件"""
+        from src.core.evolution.evolution_engine import EvolutionEngine
+
+        mock_logger = MagicMock()
+        mock_collector = MagicMock()
+        mock_controller = MagicMock()
+        mock_tuner = MagicMock()
+        mock_reporter = MagicMock()
+
+        engine = EvolutionEngine(
+            decision_logger=mock_logger,
+            outcome_collector=mock_collector,
+            evolution_controller=mock_controller,
+            prompt_tuner=mock_tuner,
+            evolution_reporter=mock_reporter,
+        )
+
+        mock_tuner.get_params.return_value = MagicMock(
+            to_dict=lambda: {"tone_intensity": 0.5}
+        )
+        params = engine.get_prompt_tuning_params()
+        assert params is not None
+
+    def test_evolution_engine_v025_not_injected_raises(self) -> None:
+        """v0.25组件未注入时调用方法抛出RuntimeError"""
+        from src.core.evolution.evolution_engine import EvolutionEngine
+
+        engine = EvolutionEngine(
+            decision_logger=MagicMock(),
+            outcome_collector=MagicMock(),
+        )
+
+        with pytest.raises(RuntimeError, match="请先初始化v0.25组件"):
+            engine.check_evolution_triggers()
+
+        with pytest.raises(RuntimeError, match="请先初始化v0.25组件"):
+            engine.get_prompt_tuning_params()
+
+    def test_get_evolution_status_includes_v025_fields(self) -> None:
+        """get_evolution_status()包含v0.25字段"""
+        from src.core.evolution.evolution_engine import EvolutionEngine
+        from src.core.evolution.models import PromptTuningParams
+
+        mock_tuner = MagicMock()
+        mock_tuner.get_params.return_value = PromptTuningParams.default()
+
+        engine = EvolutionEngine(
+            decision_logger=MagicMock(),
+            outcome_collector=MagicMock(),
+            prompt_tuner=mock_tuner,
+        )
+
+        engine._decision_logger.get_decision_history.return_value = []
+
+        status = engine.get_evolution_status()
+        assert "evolution_status" in status
+        assert "prompt_tuning" in status["evolution_status"]
+
+    def test_v025_components_injected_via_context(self, mock_context) -> None:
+        """通过AppContext注入的EvolutionEngine应包含v0.25组件"""
+        from src.core.evolution.evolution_controller import EvolutionController
+        from src.core.evolution.evolution_reporter import EvolutionReporter
+        from src.core.evolution.prompt_tuner import PromptTuner
+
+        engine = mock_context.evolution_engine
+
+        assert isinstance(engine._evolution_controller, EvolutionController)
+        assert isinstance(engine._prompt_tuner, PromptTuner)
+        assert isinstance(engine._evolution_reporter, EvolutionReporter)
+
+    def test_v025_methods_callable_via_context(self, mock_context) -> None:
+        """通过AppContext注入的v0.25方法应可正常调用"""
+        engine = mock_context.evolution_engine
+
+        # get_prompt_tuning_params 不应抛RuntimeError
+        params = engine.get_prompt_tuning_params()
+        assert params is not None
+
+        # check_evolution_triggers 不应抛RuntimeError
+        result = engine.check_evolution_triggers()
+        assert result is not None
+
+    def test_prompt_tuner_convenience_property(self, mock_context) -> None:
+        """prompt_tuner便利属性应返回PromptTuner实例"""
+        from src.core.evolution.prompt_tuner import PromptTuner
+
+        tuner = mock_context.prompt_tuner
+        assert isinstance(tuner, PromptTuner)
+
+    def test_prompt_tuner_params_convenience_property(self, mock_context) -> None:
+        """prompt_tuner_params便利属性应返回PromptTuningParams"""
+        from src.core.evolution.models import PromptTuningParams
+
+        params = mock_context.prompt_tuner_params
+        assert isinstance(params, PromptTuningParams)
+
+    def test_v025_components_share_store(self, mock_context) -> None:
+        """v0.25组件应与v0.23/v0.24组件共享同一EvolutionStore"""
+        engine = mock_context.evolution_engine
+
+        store_v023 = engine.decision_logger._store
+        store_v024 = engine._calibration_engine._store
+        store_v025 = engine._prompt_tuner._store
+        assert store_v023 is store_v024
+        assert store_v024 is store_v025

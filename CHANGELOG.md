@@ -9,6 +9,41 @@
 
 ---
 
+## [0.25.0] - 2026-05-22
+
+### 版本主题
+**自适应进化控制** —— 进化触发规则引擎、提示参数调优、月度进化报告
+
+> **版本说明**: v0.25.0 是Phase C（自适应进化引擎）的第三个版本，新增进化触发控制器、提示参数调优器和月度进化报告生成器，实现AI决策的自适应进化闭环。
+
+**本版本已实现**:
+- ✅ EvolutionController: 4触发规则(VDOT误差/连续拒绝/新数据积累/月度复盘) + persist-first执行
+- ✅ PromptTuner: 4维参数空间(tone/detail/aggressive/data_driven) + 地板保护 + 弹回机制
+- ✅ EvolutionReporter: 月度进化报告生成
+- ✅ 5个新数据模型: EvolutionAction/TriggerCheckResult/PromptTuningParams/EvolutionReport/IncrementalLearnResult
+- ✅ 3条CLI命令: evolution triggers/report/tune
+- ✅ 3个Agent工具: check_evolution_triggers/get_evolution_report/adjust_prompt_params
+- ✅ DecisionLogHook after_iteration回调: 自动检查进化触发条件
+
+### Added
+- EvolutionController: 4 trigger rules (VDOT误差/连续拒绝/新数据积累/月度复盘) with persist-first execution
+- PromptTuner: 4-dim parameter space (tone/detail/aggressive/data_driven) with floor protection and bounce-back
+- EvolutionReporter: Monthly evolution report generation
+- EvolutionAction, TriggerCheckResult, PromptTuningParams, EvolutionReport, IncrementalLearnResult data models
+- CLI commands: `evolution triggers`, `evolution report`, `evolution tune`
+- Agent tools: check_evolution_triggers, get_evolution_report, adjust_prompt_params
+- DecisionLogHook after_iteration callback for automatic evolution trigger checking
+
+### Fixed
+- H-01: DecisionLogHook holds EvolutionEngine reference (orchestration layer consistency)
+- H-02: IncrementalLearnResult for structured partial failure tracking
+- H-03: Parameter floor protection (aggressive>=0.1, data_driven>=0.2) with bounce-back mechanism
+- PromptTuningParams.with_updates() data_driven logic bug fix
+- EvolutionController rejection trigger checking wrong field (outcome vs decision)
+- ResponseAnalyzer missing days parameter in get_decision_outcome_pairs call
+
+---
+
 ## [0.24.0] - 2026-05-21
 
 ### 版本主题

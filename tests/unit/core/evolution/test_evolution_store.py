@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 from src.core.evolution.evolution_store import EvolutionStore
 from src.core.evolution.models import CalibrationProfile, DecisionLog, OutcomeRecord
@@ -586,3 +587,185 @@ class TestEvolutionStoreV024:
         store = EvolutionStore(tmp_path)
         result = store.load_model_params("nonexistent")
         assert result is None
+
+
+class TestEvolutionStoreV025:
+    """EvolutionStore v0.25扩展方法测试"""
+
+    def test_save_and_load_prompt_tuning_params(self, tmp_path: Path) -> None:
+        """测试提示调优参数读写"""
+        from src.core.evolution.evolution_store import EvolutionStore
+        from src.core.evolution.models import PromptTuningParams
+
+        store = EvolutionStore(tmp_path)
+        params = PromptTuningParams(
+            tone_intensity=0.6,
+            detail_level_score=0.4,
+            recommendation_aggressiveness=0.7,
+            data_driven_weight=0.3,
+            update_count=3,
+        )
+        store.save_prompt_tuning_params(params)
+        loaded = store.load_prompt_tuning_params()
+        assert loaded is not None
+        assert loaded.tone_intensity == 0.6
+        assert loaded.recommendation_aggressiveness == 0.7
+        assert loaded.update_count == 3
+
+    def test_load_prompt_tuning_params_file_not_exist(self, tmp_path: Path) -> None:
+        """测试加载不存在的提示调优参数返回None"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        result = store.load_prompt_tuning_params()
+        assert result is None
+
+    def test_save_and_load_trigger_state(self, tmp_path: Path) -> None:
+        """测试触发器状态读写"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        store.save_trigger_state("last_incremental_count", 156)
+        store.save_trigger_state("last_monthly_report", "2026-05")
+        value = store.load_trigger_state("last_incremental_count")
+        assert value == 156
+        month = store.load_trigger_state("last_monthly_report")
+        assert month == "2026-05"
+
+    def test_load_trigger_state_key_not_exist(self, tmp_path: Path) -> None:
+        """测试加载不存在的触发器状态键返回None"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        store.save_trigger_state("some_key", "some_value")
+        result = store.load_trigger_state("nonexistent_key")
+        assert result is None
+
+    def test_load_trigger_state_file_not_exist(self, tmp_path: Path) -> None:
+        """测试trigger_state.json不存在时返回None"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        result = store.load_trigger_state("last_incremental_count")
+        assert result is None
+
+    def test_count_decisions_empty(self, tmp_path: Path) -> None:
+        """测试空数据目录下count_decisions返回0"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        assert store.count_decisions() == 0
+
+    def test_count_decisions_with_data(self, tmp_path: Path) -> None:
+        """测试有数据时count_decisions返回正确计数"""
+        from src.core.evolution.evolution_store import EvolutionStore
+        from src.core.evolution.models import DecisionLog
+        from src.core.transparency.models import DecisionType
+
+        store = EvolutionStore(tmp_path)
+        now = datetime.now()
+        for i in range(5):
+            decision = DecisionLog(
+                decision_id=f"dec_{i:03d}",
+                timestamp=now,
+                runner_state={"vdot": 45.0},
+                decision_type=DecisionType.TRAINING_ADVICE,
+                tool_call_chain=[],
+                prediction_snapshot=None,
+                recommendation_text="test",
+                execution_status="executed",
+                recommendation_accepted=True,
+                session_key="test_session",
+            )
+            store.save_decision(decision)
+        assert store.count_decisions() == 5
+
+    def test_get_decision_outcome_pairs_days_parameter(self, tmp_path: Path) -> None:
+        """测试get_decision_outcome_pairs的days参数限制查询范围"""
+        from src.core.evolution.evolution_store import EvolutionStore
+        from src.core.evolution.models import DecisionLog, OutcomeRecord
+        from src.core.transparency.models import DecisionType
+
+        store = EvolutionStore(tmp_path)
+        now = datetime.now()
+        decision = DecisionLog(
+            decision_id="dec_days_001",
+            timestamp=now,
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot=None,
+            recommendation_text="test",
+            execution_status="executed",
+            recommendation_accepted=True,
+            session_key="test_session",
+        )
+        store.save_decision(decision)
+        outcome = OutcomeRecord(
+            outcome_id="out_days_001",
+            decision_id="dec_days_001",
+            outcome_timestamp=now,
+            actual_vdot=45.5,
+            actual_injury=False,
+            execution_fidelity=0.9,
+            user_feedback_score=4,
+            user_feedback_text=None,
+            prediction_error=0.01,
+            prediction_direction="over",
+            session_id="test_session",
+        )
+        store.save_outcome(outcome)
+        pairs = store.get_decision_outcome_pairs(days=90)
+        assert len(pairs) >= 1
+        pairs_recent = store.get_decision_outcome_pairs(days=1)
+        assert len(pairs_recent) >= 1
+
+    def test_get_prediction_actual_pairs_days_parameter(self, tmp_path: Path) -> None:
+        """测试get_prediction_actual_pairs的days参数"""
+        from src.core.evolution.evolution_store import EvolutionStore
+        from src.core.evolution.models import DecisionLog, OutcomeRecord
+        from src.core.transparency.models import DecisionType
+
+        store = EvolutionStore(tmp_path)
+        now = datetime.now()
+        decision = DecisionLog(
+            decision_id="dec_pred_001",
+            timestamp=now,
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot={"predicted_vdot": 45.2},
+            recommendation_text="test",
+            execution_status="executed",
+            recommendation_accepted=True,
+            session_key="test_session",
+        )
+        store.save_decision(decision)
+        outcome = OutcomeRecord(
+            outcome_id="out_pred_001",
+            decision_id="dec_pred_001",
+            outcome_timestamp=now,
+            actual_vdot=45.5,
+            actual_injury=False,
+            execution_fidelity=0.9,
+            user_feedback_score=4,
+            user_feedback_text=None,
+            prediction_error=0.01,
+            prediction_direction="over",
+            session_id="test_session",
+        )
+        store.save_outcome(outcome)
+        pairs = store.get_prediction_actual_pairs("vdot", min_count=1, days=90)
+        assert len(pairs) >= 1
+
+    def test_tuning_dir_auto_created(self, tmp_path: Path) -> None:
+        """测试tuning/目录在首次写入时自动创建"""
+        from src.core.evolution.evolution_store import EvolutionStore
+        from src.core.evolution.models import PromptTuningParams
+
+        store = EvolutionStore(tmp_path)
+        tuning_dir = tmp_path / "tuning"
+        assert not tuning_dir.exists()
+        params = PromptTuningParams.default()
+        store.save_prompt_tuning_params(params)
+        assert tuning_dir.exists()

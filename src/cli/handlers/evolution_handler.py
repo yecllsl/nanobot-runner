@@ -185,3 +185,71 @@ class EvolutionHandler:
         if isinstance(result, dict):
             return result
         return result.to_dict()
+
+    def check_triggers(self) -> dict[str, Any]:
+        """检查进化触发条件
+
+        Returns:
+            dict: 包含success/data/message的结果字典
+        """
+        engine = self._get_engine()
+        try:
+            result = engine.check_evolution_triggers()
+            return {
+                "success": True,
+                "data": result.to_dict(),
+                "message": f"检查完成: {len(result.triggered_actions)}个触发, {len(result.skipped_conditions)}个跳过",
+            }
+        except RuntimeError as e:
+            return {"success": False, "message": str(e)}
+
+    def get_evolution_report(self, month: str | None = None) -> dict[str, Any]:
+        """生成月度进化报告
+
+        Args:
+            month: 月份字符串（YYYY-MM格式），None时使用当前月
+
+        Returns:
+            dict: 包含success/data/message的结果字典
+        """
+        engine = self._get_engine()
+        try:
+            report = engine.get_evolution_report(month)
+            return {
+                "success": True,
+                "data": report.to_dict(),
+                "message": f"进化报告已生成: {report.month}",
+            }
+        except RuntimeError as e:
+            return {"success": False, "message": str(e)}
+
+    def adjust_prompt_params(
+        self,
+        tone: float | None = None,
+        detail: float | None = None,
+        aggressive: float | None = None,
+        data_driven: float | None = None,
+    ) -> dict[str, Any]:
+        """手动调整提示参数
+
+        Args:
+            tone: 语气强度 (0.0-1.0)，可选
+            detail: 信息密度 (0.0-1.0)，可选
+            aggressive: 推荐激进程度 (0.0-1.0)，可选
+            data_driven: 数据驱动权重 (0.0-1.0)，可选
+
+        Returns:
+            dict: 包含success/data/message的结果字典
+        """
+        engine = self._get_engine()
+        try:
+            params = engine.adjust_prompt_params(
+                tone=tone, detail=detail, aggressive=aggressive, data_driven=data_driven
+            )
+            return {
+                "success": True,
+                "data": params.to_dict(),
+                "message": "提示参数已调整",
+            }
+        except RuntimeError as e:
+            return {"success": False, "message": str(e)}

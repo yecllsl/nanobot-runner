@@ -297,3 +297,123 @@ class GetCalibrationStatusTool(BaseTool):
             self.runner_tools.get_calibration_status,
             model_type,
         )
+
+
+class CheckEvolutionTriggersTool(BaseTool):
+    """进化触发条件检查工具 - v0.25.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "check_evolution_triggers"
+
+    @property
+    def description(self) -> str:
+        return (
+            "检查进化触发条件，判断是否需要执行模型重训练、策略调整、增量学习等进化动作。"
+            "当需要评估AI系统是否需要自我进化时使用此工具。"
+            "返回JSON格式：{success: true, data: {checked_at, triggered_actions, skipped_conditions}} "
+            "或 {success: false, error: ...}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {},
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return self._run_sync(
+            self.runner_tools.check_evolution_triggers,
+        )
+
+
+class GetEvolutionReportTool(BaseTool):
+    """月度进化报告工具 - v0.25.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "get_evolution_report"
+
+    @property
+    def description(self) -> str:
+        return (
+            "获取月度进化报告，汇总进化引擎运行状态和效果，包括决策总数、预测准确率趋势、"
+            "决策接受率、模型版本、个性化程度等。当用户询问'进化报告'、'AI进化效果'时使用此工具。"
+            "返回JSON格式：{success: true, data: {report_id, month, total_decisions, ...}} "
+            "或 {success: false, error: ...}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "month": {
+                    "type": "string",
+                    "description": "报告月份（可选，YYYY-MM格式，默认当月）",
+                },
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        month = kwargs.get("month")
+        return self._run_sync(
+            self.runner_tools.get_evolution_report,
+            month,
+        )
+
+
+class AdjustPromptParamsTool(BaseTool):
+    """提示参数调整工具 - v0.25.0新增"""
+
+    @property
+    def name(self) -> str:
+        return "adjust_prompt_params"
+
+    @property
+    def description(self) -> str:
+        return (
+            "手动调整AI提示参数，控制LLM输出风格。4维参数空间："
+            "tone(语气强度0-1)、detail(信息密度0-1)、aggressive(推荐激进程度0-1)、"
+            "data_driven(数据驱动权重0-1)。当用户要求调整AI建议风格时使用此工具。"
+            "返回JSON格式：{success: true, data: {tone_intensity, detail_level_score, ...}} "
+            "或 {success: false, error: ...}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "tone": {
+                    "type": "number",
+                    "description": "语气强度（0.0=温和 ~ 1.0=严厉，可选）",
+                },
+                "detail": {
+                    "type": "number",
+                    "description": "信息密度（0.0=简洁 ~ 1.0=详细，可选）",
+                },
+                "aggressive": {
+                    "type": "number",
+                    "description": "推荐激进程度（0.0=保守 ~ 1.0=激进，可选）",
+                },
+                "data_driven": {
+                    "type": "number",
+                    "description": "数据驱动权重（0.0=纯经验驱动 ~ 1.0=纯数据驱动，可选）",
+                },
+            },
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        tone = kwargs.get("tone")
+        detail = kwargs.get("detail")
+        aggressive = kwargs.get("aggressive")
+        data_driven = kwargs.get("data_driven")
+        return self._run_sync(
+            self.runner_tools.adjust_prompt_params,
+            tone,
+            detail,
+            aggressive,
+            data_driven,
+        )

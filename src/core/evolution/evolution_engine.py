@@ -12,10 +12,14 @@ from src.core.evolution.models import (
     CalibrationProfile,
     CalibrationReport,
     DecisionLog,
+    EvolutionAction,
+    EvolutionReport,
     ModelEvolutionResult,
     OutcomeRecord,
     PredictionAccuracyStats,
+    PromptTuningParams,
     TrainingResponseReport,
+    TriggerCheckResult,
 )
 from src.core.evolution.outcome_collector import OutcomeCollector
 from src.core.plan.ask_user_confirm import ConfirmPrompt
@@ -42,12 +46,18 @@ class EvolutionEngine:
         response_analyzer: ResponseAnalyzer | None = None,
         calibration_engine: CalibrationEngine | None = None,
         model_evolver: ModelEvolver | None = None,
+        evolution_controller: Any = None,
+        prompt_tuner: Any = None,
+        evolution_reporter: Any = None,
     ) -> None:
         self._decision_logger = decision_logger
         self._outcome_collector = outcome_collector
         self._response_analyzer = response_analyzer
         self._calibration_engine = calibration_engine
         self._model_evolver = model_evolver
+        self._evolution_controller = evolution_controller
+        self._prompt_tuner = prompt_tuner
+        self._evolution_reporter = evolution_reporter
 
     @property
     def decision_logger(self) -> DecisionLogger:
@@ -167,7 +177,7 @@ class EvolutionEngine:
         return self._calibration_engine.apply_calibration(model_type, raw_value)
 
     def get_evolution_status(self) -> dict[str, Any]:
-        """获取决策追踪整体状态（v0.24新增calibration_status字段）"""
+        """获取决策追踪整体状态（v0.24新增calibration_status字段，v0.25新增evolution_status字段）"""
         all_decisions = self._decision_logger.get_decision_history(limit=10000)
 
         status_dist: dict[str, int] = {}
@@ -217,6 +227,20 @@ class EvolutionEngine:
                 profile = self._calibration_engine.get_profile(mt)
                 calibration_status[mt] = profile.to_dict()
 
+        # v0.25新增: evolution_status
+        evolution_status: dict[str, Any] = {}
+        if self._evolution_controller is not None:
+            evolution_status["evolution_actions_count"] = 0
+        if self._prompt_tuner is not None:
+            params = self._prompt_tuner.get_params()
+            evolution_status["prompt_tuning"] = params.to_dict()
+            tuning_degree = (
+                abs(params.tone_intensity - 0.5)
+                + abs(params.detail_level_score - 0.5)
+                + abs(params.recommendation_aggressiveness - 0.5)
+            ) / 3.0
+            evolution_status["personalization_degree"] = round(tuning_degree, 4)
+
         return {
             "total_decisions": total_decisions,
             "status_distribution": status_dist,
@@ -226,4 +250,61 @@ class EvolutionEngine:
             "avg_prediction_error": round(avg_prediction_error, 4),
             "feedback_collection_rate": round(feedback_collection_rate, 4),
             "calibration_status": calibration_status,
+            "evolution_status": evolution_status,
         }
+
+    # ---- v0.25 新增方法 ----
+
+    def _require_v025_component(self, component_name: str) -> None:
+        """校验v0.25组件是否已注入"""
+        component_map = {
+            "evolution_controller": self._evolution_controller,
+            "prompt_tuner": self._prompt_tuner,
+            "evolution_reporter": self._evolution_reporter,
+        }
+        if component_map.get(component_name) is None:
+            raise RuntimeError("请先初始化v0.25组件")
+
+    def check_evolution_triggers(self) -> TriggerCheckResult:
+        """检查进化触发条件（委托给EvolutionController）"""
+        self._require_v025_component("evolution_controller")
+        assert self._evolution_controller is not None
+        return self._evolution_controller.check_triggers()
+
+    def execute_evolution_action(self, action: EvolutionAction) -> EvolutionAction:
+        """执行进化动作（委托给EvolutionController）"""
+        self._require_v025_component("evolution_controller")
+        assert self._evolution_controller is not None
+        return self._evolution_controller.execute_action(action)
+
+    def get_evolution_report(self, month: str | None = None) -> EvolutionReport:
+        """获取月度进化报告（委托给EvolutionReporter）"""
+        self._require_v025_component("evolution_reporter")
+        assert self._evolution_reporter is not None
+        return self._evolution_reporter.generate_report(month)
+
+    def adjust_prompt_params(
+        self,
+        tone: float | None = None,
+        detail: float | None = None,
+        aggressive: float | None = None,
+        data_driven: float | None = None,
+    ) -> PromptTuningParams:
+        """手动调整提示参数（委托给PromptTuner）"""
+        self._require_v025_component("prompt_tuner")
+        assert self._prompt_tuner is not None
+        return self._prompt_tuner.update_params(
+            tone=tone, detail=detail, aggressive=aggressive, data_driven=data_driven
+        )
+
+    def get_prompt_tuning_params(self) -> PromptTuningParams:
+        """获取当前提示调优参数（委托给PromptTuner）"""
+        self._require_v025_component("prompt_tuner")
+        assert self._prompt_tuner is not None
+        return self._prompt_tuner.get_params()
+
+    def reset_prompt_tuning(self) -> PromptTuningParams:
+        """重置提示调优参数为默认值（委托给PromptTuner）"""
+        self._require_v025_component("prompt_tuner")
+        assert self._prompt_tuner is not None
+        return self._prompt_tuner.reset_to_default()

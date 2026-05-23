@@ -520,3 +520,83 @@ class TestDecisionLogHookLifecycle:
 
         decisions = engine.get_decision_history(limit=10)
         assert len(decisions) == 2
+
+
+class TestDecisionLogHookV025Integration:
+    """DecisionLogHook v0.25编排层一致性测试（H-01整改）"""
+
+    def test_hook_holds_evolution_engine_reference(self) -> None:
+        """DecisionLogHook应持有EvolutionEngine引用（非EvolutionController）"""
+        from src.core.evolution.decision_log_hook import DecisionLogHook
+
+        mock_engine = MagicMock()
+        hook = DecisionLogHook(
+            evolution_engine=mock_engine,
+        )
+        assert hook._evolution_engine is mock_engine
+
+    def test_after_iteration_calls_engine_check_evolution_triggers(self) -> None:
+        """after_iteration应调用EvolutionEngine.check_evolution_triggers()"""
+        from datetime import datetime
+
+        from src.core.evolution.decision_log_hook import DecisionLogHook
+        from src.core.evolution.models import TriggerCheckResult
+
+        mock_engine = MagicMock()
+        mock_engine.check_evolution_triggers.return_value = TriggerCheckResult(
+            checked_at=datetime.now(),
+            triggered_actions=[],
+            skipped_conditions=[],
+        )
+        hook = DecisionLogHook(evolution_engine=mock_engine)
+        hook._decision_logged = True
+
+        hook.after_iteration(MagicMock())
+        mock_engine.check_evolution_triggers.assert_called_once()
+
+    def test_after_iteration_triggers_async_execution_via_engine(self) -> None:
+        """after_iteration应通过EvolutionEngine.execute_evolution_action()异步执行"""
+        import time
+        from datetime import datetime
+
+        from src.core.evolution.decision_log_hook import DecisionLogHook
+        from src.core.evolution.models import EvolutionAction, TriggerCheckResult
+
+        action = EvolutionAction(
+            action_id="async_test_001",
+            action_type="retrain_model",
+            trigger_reason="VDOT误差",
+            trigger_condition={},
+            target_model_type="vdot",
+            priority="high",
+            created_at=datetime.now(),
+        )
+        mock_engine = MagicMock()
+        mock_engine.check_evolution_triggers.return_value = TriggerCheckResult(
+            checked_at=datetime.now(),
+            triggered_actions=[action],
+            skipped_conditions=[],
+        )
+        hook = DecisionLogHook(evolution_engine=mock_engine)
+        hook._decision_logged = True
+
+        hook.after_iteration(MagicMock())
+
+        # 等待daemon线程执行
+        time.sleep(0.5)
+
+        mock_engine.execute_evolution_action.assert_called()
+
+    def test_v025_component_not_injected_graceful_degradation(self) -> None:
+        """v0.25组件未注入时after_iteration不报错"""
+        from src.core.evolution.decision_log_hook import DecisionLogHook
+
+        mock_engine = MagicMock()
+        mock_engine.check_evolution_triggers.side_effect = RuntimeError(
+            "请先初始化v0.25组件"
+        )
+        hook = DecisionLogHook(evolution_engine=mock_engine)
+        hook._decision_logged = True
+
+        # 不应抛出异常
+        hook.after_iteration(MagicMock())
