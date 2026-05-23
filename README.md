@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-2570%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.24.0 - 测试验证体系升级，质量门禁全面达标
+> **最新版本**: v0.25.0 - 自适应进化控制，进化触发规则引擎、提示参数调优、月度进化报告
 
 ## 项目简介
 
@@ -491,5 +491,5 @@ uv cache clean && uv sync --reinstall           # Linux/macOS
 
 ---
 
-**版本**: v0.24.0
-**最后更新**: 2026-05-21
+**版本**: v0.25.0
+**最后更新**: 2026-05-23
