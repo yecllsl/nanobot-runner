@@ -83,6 +83,7 @@ git checkout v0.9.0 -- docs/
 docs/archive/
 ├── .gitignore           # 排除.zip文件
 ├── README.md            # 本文件（归档索引）
+├── v0.25.0-archive.zip # v0.25.0版本归档（本地备份，不提交）
 ├── v0.24.0-archive.zip # v0.24.0版本归档（本地备份，不提交）
 ├── v0.23.0-archive.zip # v0.23.0版本归档（本地备份，不提交）
 ├── v0.22.1-archive.zip # v0.22.1版本归档（本地备份，不提交）
@@ -129,6 +130,39 @@ docs/archive/
 **质量门禁**：
 - 代码评审：完成
 - 整改计划：已制定
+
+---
+
+### v0.25.0 (2026-05-23)
+
+**归档内容**（共18个文档）：
+- **测试文档**（4个）：测试报告_v0.25.0.md、回归报告_v0.25.0.md、上线结论_v0.25.0.md、strategy_v0.25.0.md
+- **运维文档**（2个）：发布报告_v0.25.0.md、流水线执行报告_v0.25.0.md
+- **开发文档**（1个）：交付报告_v0.25.0.md
+- **评审文档**（1个）：代码评审报告_v0.25.0.md
+- **架构文档**（1个）：架构评审报告_v0.25.0.md
+- **规划文档**（1个）：task_list_v0.25.0.md
+- **产品文档**（1个）：Phase_C_基线测量报告.md
+- **开发计划**（4个）：phase-c-v023-implementation.md、baseline-measurement.md、v0.23-decision-tracking.md、v025-adaptive-evolution.md
+- **设计规格**（3个）：phase-c-evolution-design.md、baseline-measurement-design.md、phase-c-design-spec.md
+
+**版本特性 - 自适应进化引擎 v0.25.0**：
+- 进化触发控制器：5维度触发条件（VDOT趋势、HRV恢复、伤病风险、执行忠实度、用户反馈），自适应频率调节
+- 提示参数调优器：5维度提示参数（tone/detail/aggressiveness/data_driven/context_length），贝叶斯优化驱动
+- 进化报告生成器：月度进化报告，包含决策统计、调优历史、触发记录、可操作洞察
+- 个性化学习校准：运动能力、训练响应、生理信号3大模型类型，36个校准参数
+- 训练响应性分析：6种训练类型效率趋势，效率排名与建议
+- 决策日志持久化增强：支持分页浏览、目标达成关联、类型过滤
+
+**核心组件**：
+- `src/core/evolution/evolution_controller.py` - 进化触发控制器
+- `src/core/evolution/prompt_tuner.py` - 提示参数调优器
+- `src/core/evolution/evolution_reporter.py` - 进化报告生成器
+
+**质量门禁**：
+- 回归测试：全部通过
+- mypy 类型检查：通过
+- ruff 代码检查：通过
 
 ---
 
@@ -782,4 +816,4 @@ docs/archive/
 
 ---
 
-**最后更新**: 2026-05-21 by DevOps Team (v0.24.0 个性化学习模块文档归档)
+**最后更新**: 2026-05-23 by DevOps Team (v0.25.0 自适应进化引擎文档归档)
