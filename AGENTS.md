@@ -1,6 +1,6 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v5.17.0 | **更新日期**: 2026-05-22
+> **版本**: v6.0.0 | **更新日期**: 2026-05-23
 > **当前基线**: v0.25.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
@@ -81,20 +81,23 @@ src/
 │   │   ├── twin_engine.py      # 数字孪生引擎编排层
 │   │   ├── state_vector_builder.py # 5维度状态向量构建器
 │   │   └── whatif_simulator.py # What-If推演器
-│   └── evolution/              # 自适应进化引擎 (v0.23.0)
-│       ├── models.py           # 决策/结果数据模型
+│   └── evolution/              # 自适应进化引擎 (v0.23.0-v0.25.0)
+│       ├── models.py           # 决策/结果/进化数据模型
 │       ├── config.py           # 进化配置Schema
 │       ├── evolution_store.py  # 决策/结果存储层
-│       ├── decision_logger.py  # 决策记录器
-│       ├── outcome_collector.py # 结果收集器
+│       ├── decision_logger.py  # 决策记录器 (v0.23.0)
+│       ├── outcome_collector.py # 结果收集器 (v0.23.0)
 │       ├── evolution_engine.py # 进化引擎编排层
-│       ├── decision_log_hook.py # Agent生命周期钩子
+│       ├── decision_log_hook.py # Agent生命周期钩子 (v0.23.0)
+│       ├── response_analyzer.py # 训练响应性分析器 (v0.24.0)
+│       ├── calibration_engine.py # 校准引擎 (v0.24.0)
+│       ├── model_evolver.py    # 模型进化器 (v0.24.0)
 │       ├── evolution_controller.py # 进化触发控制器 (v0.25.0)
 │       ├── prompt_tuner.py     # 提示参数调优器 (v0.25.0)
 │       └── evolution_reporter.py # 进化报告生成器 (v0.25.0)
 ├── agents/
 │   ├── tools.py                # Agent 工具集
-│   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0)
+│   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块
     ├── commands/               # 命令模块
@@ -120,7 +123,7 @@ AppContext
     ├── session_repo: SessionRepository
     ├── config: ConfigManager
     ├── plan_manager: PlanManager
-    ├── evolution_engine: EvolutionEngine  # v0.23.0新增
+    ├── evolution_engine: EvolutionEngine  # v0.23.0-v0.25.0
     └── ... (其他组件)
     ↓
 CLI Handlers / Agent Tools
