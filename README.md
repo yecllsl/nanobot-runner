@@ -114,6 +114,9 @@ uv run nanobotrun system backup
 
 # AI 交互
 uv run nanobotrun agent chat
+
+# 模型预设管理
+uv run nanobotrun model list
 ```
 
 ## 项目结构
@@ -220,4 +223,4 @@ uv run mypy src/ --ignore-missing-imports        # 类型检查
 
 ---
 
-**版本**: v0.25.0 | **最后更新**: 2026-05-23
+**版本**: v0.26.0 | **最后更新**: 2026-05-24
