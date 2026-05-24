@@ -20,6 +20,7 @@ class AppConfig:
         feishu_receive_id: 飞书接收者 ID
         feishu_receive_id_type: 飞书接收者 ID 类型
         tools: 工具生态配置（v0.13.0新增），包含mcp_servers等
+        model_presets: 模型预设配置（v0.26.0新增），包含provider/model/temperature等
     """
 
     version: str
@@ -33,6 +34,7 @@ class AppConfig:
     llm_model: str | None = None
     llm_base_url: str | None = None
     tools: dict[str, Any] | None = None
+    model_presets: dict[str, dict[str, Any]] | None = None
 
     REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
 
@@ -48,6 +50,7 @@ class AppConfig:
         "llm_model": (str, type(None)),
         "llm_base_url": (str, type(None)),
         "tools": (dict, type(None)),
+        "model_presets": (dict, type(None)),
     }
 
     @classmethod
@@ -171,6 +174,7 @@ class AppConfig:
             "llm_model": self.llm_model,
             "llm_base_url": self.llm_base_url,
             "tools": self.tools,
+            "model_presets": self.model_presets,
         }
 
     def __post_init__(self) -> None:

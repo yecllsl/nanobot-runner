@@ -8,6 +8,7 @@ from src.cli.commands.data import app as data_app
 from src.cli.commands.evolution import app as evolution_app
 from src.cli.commands.export import app as export_app
 from src.cli.commands.gateway import app as gateway_app
+from src.cli.commands.model import app as model_app
 from src.cli.commands.plan import app as plan_app
 from src.cli.commands.prediction import app as prediction_app
 from src.cli.commands.preference import app as preference_app
@@ -41,4 +42,5 @@ __all__ = [
     "prediction_app",
     "twin_app",
     "evolution_app",
+    "model_app",
 ]

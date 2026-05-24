@@ -11,6 +11,7 @@ from src.cli.commands import (
     evolution_app,
     export_app,
     gateway_app,
+    model_app,
     plan_app,
     prediction_app,
     preference_app,
@@ -48,6 +49,7 @@ app.add_typer(status_app, name="status")
 app.add_typer(prediction_app, name="predict")
 app.add_typer(twin_app, name="twin")
 app.add_typer(evolution_app, name="evolution")
+app.add_typer(model_app, name="model")
 
 if __name__ == "__main__":
     app()
