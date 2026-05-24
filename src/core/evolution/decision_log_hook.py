@@ -78,6 +78,7 @@ class DecisionLogHook(AgentHook):
         self._session_key = session_key
         self._tool_call_chain: list[dict[str, Any]] = []
         self._decision_logged: bool = False
+        self._current_goal_state: str | None = None
 
     async def before_iteration(self, context: AgentHookContext) -> None:
         """迭代开始前重置状态
@@ -87,6 +88,7 @@ class DecisionLogHook(AgentHook):
         """
         self._tool_call_chain = []
         self._decision_logged = False
+        self._current_goal_state = None
 
     async def before_execute_tools(self, context: AgentHookContext) -> None:
         """工具执行前捕获工具调用到_tool_call_chain
@@ -133,6 +135,12 @@ class DecisionLogHook(AgentHook):
 
         self._decision_logged = True
 
+        # v0.26: 从 context.metadata 读取 GoalState
+        metadata = getattr(context, "metadata", None)
+        goal_state = self.goal_state_raw(metadata)
+        if goal_state is not None:
+            self._current_goal_state = goal_state
+
         decision_type = self._infer_decision_type(content)
         runner_state = self._build_runner_state()
 
@@ -147,6 +155,7 @@ class DecisionLogHook(AgentHook):
             execution_status="pending",
             recommendation_accepted=None,
             session_key=self._session_key,
+            goal_state=self._current_goal_state,
         )
 
         try:
@@ -162,11 +171,13 @@ class DecisionLogHook(AgentHook):
         return content
 
     def after_iteration(self, context: Any) -> None:
-        """Agent迭代完成后回调（v0.25扩展：触发进化检查）
+        """Agent迭代完成后回调（v0.26扩展：读取GoalState + 触发进化检查）"""
+        # v0.26: 读取 GoalState
+        metadata = getattr(context, "metadata", None)
+        goal_state = self.goal_state_raw(metadata)
+        if goal_state is not None:
+            self._current_goal_state = goal_state
 
-        通过EvolutionEngine编排层间接调用EvolutionController，
-        确保所有进化操作通过编排层进行（H-01整改）。
-        """
         if not self._decision_logged:
             return
 
@@ -195,6 +206,20 @@ class DecisionLogHook(AgentHook):
             pass
         except Exception as e:
             logger.warning("进化触发检查异常（不影响主流程）: %s", e)
+
+    @staticmethod
+    def goal_state_raw(metadata: dict[str, Any] | None) -> str | None:
+        """从 context.metadata 提取当前活跃目标
+
+        Args:
+            metadata: AgentHookContext.metadata 字典
+
+        Returns:
+            str | None: 目标字符串，无目标时返回 None
+        """
+        if metadata is None:
+            return None
+        return metadata.get("goal_state")
 
     def _infer_decision_type(self, content: str) -> DecisionType:
         """根据content关键词推断决策类型

@@ -357,6 +357,7 @@ class EvolutionController:
             trigger_condition={
                 "current_month": current_month,
                 "last_report_month": last_report_month,
+                "goal_state_active": True,
             },
             target_model_type="none",
             priority="low",

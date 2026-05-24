@@ -124,6 +124,39 @@ class TestDecisionLog:
             )
             assert log.execution_status == status
 
+    def test_decision_log_goal_state_default_none(self):
+        """DecisionLog goal_state 字段默认为 None"""
+        log = DecisionLog(
+            decision_id="dec_gs01",
+            timestamp=datetime(2026, 5, 24, 10, 0, 0),
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.PLAN_ADJUSTMENT,
+            tool_call_chain=[],
+            prediction_snapshot=None,
+            recommendation_text=None,
+            execution_status="pending",
+            recommendation_accepted=None,
+            session_key="",
+            goal_state="全马破4",
+        )
+        assert log.goal_state == "全马破4"
+
+    def test_decision_log_goal_state_none_when_omitted(self):
+        """DecisionLog goal_state 省略时为 None"""
+        log = DecisionLog(
+            decision_id="dec_gs02",
+            timestamp=datetime(2026, 5, 24, 10, 0, 0),
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot=None,
+            recommendation_text=None,
+            execution_status="pending",
+            recommendation_accepted=None,
+            session_key="",
+        )
+        assert log.goal_state is None
+
 
 class TestOutcomeRecord:
     """OutcomeRecord 数据模型测试"""

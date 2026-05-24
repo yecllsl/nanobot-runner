@@ -36,6 +36,7 @@ _DECISIONS_PARQUET_SCHEMA = pl.Schema(
         "execution_status": pl.String(),
         "recommendation_accepted": pl.String(),
         "session_key": pl.String(),
+        "goal_state": pl.String(),
     }
 )
 
@@ -84,6 +85,7 @@ def _decision_to_row(decision: DecisionLog) -> dict[str, str | None]:
             else None
         ),
         "session_key": decision.session_key,
+        "goal_state": decision.goal_state,
     }
 
 
@@ -127,6 +129,7 @@ def _row_to_decision(row: dict[str, Any]) -> DecisionLog:
         execution_status=row["execution_status"],
         recommendation_accepted=recommendation_accepted,
         session_key=row.get("session_key", ""),
+        goal_state=row.get("goal_state"),
     )
 
 

@@ -28,6 +28,7 @@ class DecisionLog:
         execution_status: 执行状态（字符串：pending/executed/skipped/modified/failed）
         recommendation_accepted: 推荐是否被采纳（可选）
         session_key: 会话标识
+        goal_state: 当前活跃目标（v0.26，来自nanobot-ai GoalState）
     """
 
     decision_id: str
@@ -40,6 +41,7 @@ class DecisionLog:
     execution_status: str
     recommendation_accepted: bool | None
     session_key: str
+    goal_state: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
@@ -54,6 +56,7 @@ class DecisionLog:
             "execution_status": self.execution_status,
             "recommendation_accepted": self.recommendation_accepted,
             "session_key": self.session_key,
+            "goal_state": self.goal_state,
         }
 
     @classmethod
@@ -76,6 +79,7 @@ class DecisionLog:
             execution_status=data["execution_status"],
             recommendation_accepted=data.get("recommendation_accepted"),
             session_key=data.get("session_key", ""),
+            goal_state=data.get("goal_state"),
         )
 
 
