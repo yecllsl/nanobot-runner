@@ -79,6 +79,8 @@ class DecisionLogHook(AgentHook):
         self._tool_call_chain: list[dict[str, Any]] = []
         self._decision_logged: bool = False
         self._current_goal_state: str | None = None
+        self._reasoning_buffer: list[str] = []
+        self._reasoning_complete: bool = False
 
     async def before_iteration(self, context: AgentHookContext) -> None:
         """迭代开始前重置状态
@@ -89,6 +91,8 @@ class DecisionLogHook(AgentHook):
         self._tool_call_chain = []
         self._decision_logged = False
         self._current_goal_state = None
+        self._reasoning_buffer = []
+        self._reasoning_complete = False
 
     async def before_execute_tools(self, context: AgentHookContext) -> None:
         """工具执行前捕获工具调用到_tool_call_chain
@@ -150,7 +154,7 @@ class DecisionLogHook(AgentHook):
             runner_state=runner_state,
             decision_type=decision_type,
             tool_call_chain=self._tool_call_chain,
-            prediction_snapshot=None,
+            prediction_snapshot=self._build_reasoning_snapshot(),
             recommendation_text=content[:500] if content else None,
             execution_status="pending",
             recommendation_accepted=None,
@@ -220,6 +224,50 @@ class DecisionLogHook(AgentHook):
         if metadata is None:
             return None
         return metadata.get("goal_state")
+
+    def emit_reasoning(self, context: AgentHookContext, reasoning_text: str) -> None:
+        """推理片段回调（v0.26：推理可见化适配）
+
+        将 Agent 推理片段追加到内部缓冲区，在 finalize_content 时
+        写入 DecisionLog 的 prediction_snapshot。
+
+        Args:
+            context: Hook上下文
+            reasoning_text: 推理片段文本
+        """
+        if reasoning_text:
+            self._reasoning_buffer.append(reasoning_text)
+
+    def emit_reasoning_end(self, context: AgentHookContext) -> None:
+        """推理结束回调（v0.26：推理可见化适配）
+
+        标记推理过程结束。
+
+        Args:
+            context: Hook上下文
+        """
+        self._reasoning_complete = True
+
+    def _build_reasoning_snapshot(self) -> dict[str, Any] | None:
+        """构建推理快照
+
+        将推理缓冲区内容组装为 prediction_snapshot 字典。
+        finalize 后清空缓冲区。
+
+        Returns:
+            dict[str, Any] | None: 推理快照字典，无推理内容时返回 None
+        """
+        if not self._reasoning_buffer:
+            return None
+
+        snapshot: dict[str, Any] = {
+            "reasoning": "\n".join(self._reasoning_buffer),
+        }
+
+        self._reasoning_buffer = []
+        self._reasoning_complete = False
+
+        return snapshot
 
     def _infer_decision_type(self, content: str) -> DecisionType:
         """根据content关键词推断决策类型
