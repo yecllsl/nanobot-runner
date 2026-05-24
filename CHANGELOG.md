@@ -9,6 +9,46 @@
 
 ---
 
+## [0.26.0] - 2026-05-24
+
+### 版本主题
+**Phase D 底座升级与推理可见化** —— nanobot-ai 0.2.0底座升级、GoalState适配、推理过程流式可见化、Model Presets预设管理
+
+> v0.26.0 是Phase D（底座升级与平台增强）的首个版本，完成nanobot-ai从0.1.5.post2到0.2.0的底座升级，新增GoalState决策目标状态追踪、推理过程流式可见化（reasoning visibility）和Model Presets多模型预设管理，为后续Agent能力增强奠定基础。
+
+**本版本已实现**:
+- ✅ nanobot-ai 0.2.0 底座升级（兼容性100%验证）
+- ✅ GoalState适配：DecisionLog新增goal_state字段，追踪每次决策的目标状态
+- ✅ 推理可见化：emit_reasoning/emit_reasoning_end/finalize_content三段式推理流
+- ✅ Model Presets：AppConfig.model_presets字段，支持多模型预设列表管理
+- ✅ CLI命令: `model list` - 查看可用模型预设列表
+- ✅ 全量回归5075用例零失败，覆盖率82.63%
+
+### Added
+- DecisionLog.goal_state 字段，记录决策时的5维度目标状态
+- goal_state_raw() 方法，从metadata提取goal_state
+- after_iteration() 回调，自动读取metadata并写入DecisionLog
+- emit_reasoning() 追加推理片段到缓冲区
+- emit_reasoning_end() 标记推理完成
+- finalize_content() 将推理写入prediction_snapshot
+- before_iteration() 重置推理状态
+- AppConfig.model_presets 字段，支持模型预设配置
+- `model list` CLI命令，查看可用模型预设列表
+- ModelHandler.list_presets 返回预设列表
+- ADR-012 GoalState适配决策记录
+- ADR-013 推理可见化适配决策记录
+- ADR-014 Model Presets适配决策记录
+
+### Changed
+- nanobot-ai 底座从0.1.5.post2升级至0.2.0
+- 底座兼容性：ruff/mypy/pytest全量验证通过
+- 依赖版本：nanobot-ai>=0.2.0
+
+### Fixed
+- 测试隔离性优化：偶发flaky test（test_memory_version_list_and_restore）已记录跟踪（优化级，不影响发布）
+
+---
+
 ## [0.25.0] - 2026-05-22
 
 ### 版本主题
