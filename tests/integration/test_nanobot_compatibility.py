@@ -243,6 +243,7 @@ class TestNanobotProviderCompatibility:
         测试 Provider 可以正常创建
 
         Bug历史：_make_provider 需要 API 密钥，CI 环境缺少配置导致失败
+        v0.26.0: _make_provider 从 nanobot.cli.commands 迁移到 nanobot.providers.factory.make_provider
         """
         from unittest.mock import MagicMock
 
@@ -250,7 +251,7 @@ class TestNanobotProviderCompatibility:
 
         config = load_config()
 
-        with patch("nanobot.cli.commands._make_provider") as mock_provider:
+        with patch("nanobot.providers.factory.make_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
             provider = mock_provider(config)
 
@@ -267,6 +268,7 @@ class TestNanobotAgentLoopCompatibility:
 
         Bug历史：context_window_tokens 为 None 导致 Consolidator 报错
                  _make_provider 需要 API 密钥，CI 环境缺少配置导致失败
+        v0.26.0: _make_provider 从 nanobot.cli.commands 迁移到 nanobot.providers.factory.make_provider
         """
         from pathlib import Path
         from unittest.mock import MagicMock
@@ -281,7 +283,7 @@ class TestNanobotAgentLoopCompatibility:
         workspace = Path.home() / ".nanobot-runner"
         defaults = AgentDefaults()
 
-        with patch("nanobot.cli.commands._make_provider") as mock_provider:
+        with patch("nanobot.providers.factory.make_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
             provider = mock_provider(config)
 

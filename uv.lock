@@ -177,6 +177,34 @@ wheels = [
 ]
 
 [[package]]
+name = "boto3"
+version = "1.43.14"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "botocore" },
+    { name = "jmespath" },
+    { name = "s3transfer" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/79/4b/616367e871ce3f1cb3e8545a97736b6331b9fb081497f2d44c5b2aa6959d/boto3-1.43.14.tar.gz", hash = "sha256:5c0a994b3182061ee101812e721100717a4d664f9f4ceaf4a86b6d032ce9fc2d" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/cb/00/59cb9329c18e2d3aa23062ceaa87d065f2e81e7d2931df24d64e9a7815aa/boto3-1.43.14-py3-none-any.whl", hash = "sha256:574335744656cfed0b362a0a0467aaf2eb2bf15526edcd02d31d3c661f4b09e4" },
+]
+
+[[package]]
+name = "botocore"
+version = "1.43.14"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "jmespath" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/78/3c/798d2f7deb118241930c7c6bcfb0b970d3f0245bf580700663199aeed2c3/botocore-1.43.14.tar.gz", hash = "sha256:b9e500737e43d2f147c9d4e23b54360335e77d4c0ba90a318f51b65e06cb8516" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/27/7e/6e64821077cd2efc4aa51b7d638fb6d48e1c7c450201c529fbaf1de8bfd3/botocore-1.43.14-py3-none-any.whl", hash = "sha256:1f4a2a95ea78c10398e78431e98c1fe47adb54a7b10a32975144c1f541186658" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.2.25"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
@@ -717,6 +745,15 @@ wheels = [
 ]
 
 [[package]]
+name = "jmespath"
+version = "1.1.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/d3/59/322338183ecda247fb5d1763a6cbe46eff7222eaeebafd9fa65d4bf5cb11/jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64" },
+]
+
+[[package]]
 name = "joblib"
 version = "1.5.3"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
@@ -1089,10 +1126,11 @@ wheels = [
 
 [[package]]
 name = "nanobot-ai"
-version = "0.1.5.post2"
+version = "0.2.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
     { name = "anthropic" },
+    { name = "boto3" },
     { name = "chardet" },
     { name = "croniter" },
     { name = "ddgs" },
@@ -1131,9 +1169,9 @@ dependencies = [
     { name = "websocket-client" },
     { name = "websockets" },
 ]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/bd/2e/247922784187ab2bbbd0ba493f68d3ae5ac90e649e0c3fc304e29bd69e38/nanobot_ai-0.1.5.post2.tar.gz", hash = "sha256:558b7e49130dcf95646009ac807eaa5f196489a95bbf72655a82402908923e1a" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/db/3b/72773cdb8981b154b63d31b728ddd44463086a9fb2ccaba17919ab281025/nanobot_ai-0.2.0.tar.gz", hash = "sha256:80b2a600975f5091bd7470d79bb532af9bf3effd7d108817598c2ea3773748c7" }
 wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/ae/16/19367cc0866d7b87962d6cec0dd52fdaeb909770a4837f05f89ae383b368/nanobot_ai-0.1.5.post2-py3-none-any.whl", hash = "sha256:8d14b0c4029fbed18e8a18af5228819ab17ed0a5bb0d5864ca2185589853ff05" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/17/78/ea141634e6ad516789e5c93ae5ca0a42ef2faf344c7df3c5c197a9d7a885/nanobot_ai-0.2.0-py3-none-any.whl", hash = "sha256:922d49d3c70c1967bccc18b6d459472ed0cd2c6bff64a9b1d39feda7cc4a77ce" },
 ]
 
 [[package]]
@@ -1199,7 +1237,7 @@ requires-dist = [
     { name = "fitparse", specifier = ">=1.1.0" },
     { name = "joblib", specifier = ">=1.3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0,<2.0.0" },
-    { name = "nanobot-ai", specifier = ">=0.1.5.post2" },
+    { name = "nanobot-ai", specifier = ">=0.2.0" },
     { name = "numba", specifier = ">=0.60.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "plotext", specifier = ">=5.0.0" },
@@ -2227,6 +2265,18 @@ wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/e4/46/602938f030adfa043e67112b73821024dc79f3ab4df5474c25fa4c1d2d14/ruff-0.15.10-py3-none-win32.whl", hash = "sha256:d4272e87e801e9a27a2e8df7b21011c909d9ddd82f4f3281d269b6ba19789ca5" },
     { url = "https://mirrors.aliyun.com/pypi/packages/25/b6/261225b875d7a13b33a6d02508c39c28450b2041bb01d0f7f1a83d569512/ruff-0.15.10-py3-none-win_amd64.whl", hash = "sha256:28cb32d53203242d403d819fd6983152489b12e4a3ae44993543d6fe62ab42ed" },
     { url = "https://mirrors.aliyun.com/pypi/packages/58/ed/dea90a65b7d9e69888890fb14c90d7f51bf0c1e82ad800aeb0160e4bacfd/ruff-0.15.10-py3-none-win_arm64.whl", hash = "sha256:601d1610a9e1f1c2165a4f561eeaa2e2ea1e97f3287c5aa258d3dab8b57c6188" },
+]
+
+[[package]]
+name = "s3transfer"
+version = "0.17.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+dependencies = [
+    { name = "botocore" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/9b/ec/7c692cde9125b77e84b307354d4fb705f98b8ccad59a036d5957ca75bfc3/s3transfer-0.17.0.tar.gz", hash = "sha256:9edeb6d1c3c2f89d6050348548834ad8289610d886e5bf7b7207728bd43ce33a" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/87/72/c6c32d2b657fa3dad1de340254e14390b1e334ce38268b7ad51abda3c8c2/s3transfer-0.17.0-py3-none-any.whl", hash = "sha256:ce3801712acf4ad3e89fb9990df97b4972e93f4b3b0004d214be5bce12814c20" },
 ]
 
 [[package]]

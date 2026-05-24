@@ -5,7 +5,7 @@ description = "Nanobot Runner - 桌面端私人AI跑步助理"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "nanobot-ai>=0.1.5.post2",
+    "nanobot-ai>=0.2.0",
     "typer[all]>=0.12.0",
     "rich>=13.0.0",
     "polars>=0.20.0",
