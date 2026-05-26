@@ -1,11 +1,11 @@
 # 需求规格说明书
 
-> **文档版本**: v12.0
-> **最后更新**: 2026-05-24
-> **当前基线**: v0.25.0
+> **文档版本**: v12.1
+> **最后更新**: 2026-05-26
+> **当前基线**: v0.26.0
 > **覆盖版本**: v0.26.0 - v0.29.0
 > **对齐产品规划**: v11.0 (2026-05-23)
-> **对齐架构设计**: v14.0.0 (2026-05-24)
+> **对齐架构设计**: v15.0.0 (2026-05-24)
 
 ---
 
@@ -157,14 +157,42 @@ Phase C 已全部完成交付，形成决策→校准→优化闭环：v0.23 决
 
 **主题**：复用 nanobot-ai 原生 WebUI，实现 AI 对话交互 + 基础设置
 
+**前置依赖**：v0.26.0（nanobot-ai≥0.2.0 已升级，GoalState/推理可见化/Model Presets 已适配）
+
+#### 5.3.1 功能需求
+
 | 编号 | 需求 | 优先级 | 验收标准 |
 |------|------|--------|----------|
-| REQ-D-11 | WebUI 启动 | P0 | `nanobot gateway` 启动后，浏览器访问 WebUI 可正常对话 |
-| REQ-D-12 | 工具调用 | P0 | 所有 RunFlowAgent 工具在 WebUI 中可正常调用 |
-| REQ-D-13 | 流式输出 | P0 | Agent 回复逐字流式展示；推理展示正常 |
-| REQ-D-14 | 多会话管理 | P1 | 创建/切换/删除对话正常；会话标题自动生成 |
-| REQ-D-15 | 基础设置 | P1 | 模型切换、Provider 配置、时区等基础设置正常 |
-| REQ-D-16 | 品牌自定义 | P2 | bot_name/bot_icon 配置为 RunFlowAgent 品牌 |
+| REQ-D-11 | **WebUI 启动** | P0 | `nanobotrun gateway start` 启动后（含 WebSocket 通道），浏览器访问 `http://127.0.0.1:8765` 可正常加载 WebUI 页面并与 Agent 对话 |
+| REQ-D-12 | **工具调用** | P0 | 所有 RunFlowAgent 工具（含进化模块工具）在 WebUI 中可正常调用，返回结果与 CLI 一致 |
+| REQ-D-13 | **流式输出** | P0 | Agent 回复逐字流式展示（delta 间隔<200ms）；推理过程（reasoning_delta）在 WebUI 中可见 |
+| REQ-D-14 | **多会话管理** | P1 | WebUI 中可创建/切换/删除对话；会话标题自动生成；历史会话可回看 |
+| REQ-D-15 | **基础设置** | P1 | WebUI 设置面板中可切换模型（含 Model Presets）、查看 Provider 配置、查看时区设置 |
+| REQ-D-16 | **品牌自定义** | P2 | bot_name 配置为 "Nanobot-Runner"，bot_icon 配置为 "🏃‍♂️"，WebUI 中可见品牌标识 |
+| REQ-D-17 | **WebSocket 通道配置** | P0 | config.json 可配置 WebSocket 通道（host/port/token/streaming），未配置时使用默认值（127.0.0.1:8765） |
+| REQ-D-18 | **安全认证** | P0 | WebSocket 通道默认启用 token 认证（`websocket_requires_token=True`）；本地访问（127.0.0.1）时 token_issue_secret 可选；非本地访问时必须配置 token 或 token_issue_secret |
+| REQ-D-19 | **Gateway 命令增强** | P1 | `nanobotrun gateway start` 新增 `--webui` 标志，启用时自动配置 WebSocket 通道；不启用时行为与 v0.26.0 一致 |
+| REQ-D-20 | **统一会话模式** | P2 | 启用 `unified_session=True` 时，CLI/飞书/WebUI 共享同一会话，对话上下文一致 |
+
+#### 5.3.2 非功能需求
+
+| 编号 | 需求 | 标准 |
+|------|------|------|
+| NFR-D-11 | WebUI 首屏加载 | 浏览器首次访问 WebUI 页面加载时间 < 3s（本地网络） |
+| NFR-D-12 | WebSocket 连接延迟 | 客户端 WebSocket 握手到连接建立 < 100ms |
+| NFR-D-13 | 流式输出延迟 | Agent 生成 delta 到 WebUI 展示延迟 < 200ms |
+| NFR-D-14 | 工具调用兼容性 | WebUI 中工具调用成功率与飞书通道一致（≥99%） |
+| NFR-D-15 | 安全默认 | WebSocket 通道默认仅监听 127.0.0.1；token 认证默认启用 |
+| NFR-D-16 | 向后兼容 | 不启用 WebUI 时（不配置 WebSocket 通道），现有飞书/CLI 功能不受影响 |
+
+#### 5.3.3 不做的事
+
+- 不开发自定义 WebUI 组件（v0.28.0）
+- 不做跑步数据可视化图表（v0.28.0）
+- 不做训练计划管理/进化引擎控制台（v0.29.0）
+- 不修改 nanobot-ai WebUI 前端代码
+- 不新增后端 HTTP API 端点
+- 不修改现有 Agent 工具逻辑
 
 ### 5.4 v0.28.0 — WebUI 数据可视化
 
@@ -258,6 +286,10 @@ Phase A 及 Phase C 全部验收门禁已通过。Phase D 验收标准详见 §5
 | config.json Schema 不兼容 | 低 | 新增字段破坏旧配置 | 0.2.0 新增字段均有默认值，Pydantic 向后兼容 |
 | 原生 WebUI 不支持跑步数据可视化 | 中 | v0.27.0 无图表能力 | v0.27.0 先验证基础链路，v0.28.0 再扩展 |
 | 上游 WebUI 版本变更影响 | 低 | nanobot-ai WebUI 更新影响 RunFlowAgent | 锁定 nanobot-ai 版本；自定义组件独立维护 |
+| WebSocket 通道安全配置不当 | 中 | 未配置 token 时存在未授权访问风险 | 默认仅监听 127.0.0.1；token 认证默认启用；非本地访问强制要求 token |
+| WebSocket 通道与飞书通道资源竞争 | 低 | 两个通道同时运行时 Agent 资源争用 | nanobot-ai AgentLoop 天然支持多通道；单用户场景下并发极低 |
+| WebUI 首屏加载慢 | 低 | SPA 资源过大导致加载延迟 | WebUI 随 wheel 本地分发，无网络延迟；本地加载 < 3s |
+| 统一会话模式上下文混淆 | 低 | 多通道共享会话时上下文交错 | v0.27.0 默认不启用 unified_session；P2 级别按需启用 |
 
 ---
 
@@ -287,11 +319,15 @@ Phase A 及 Phase C 全部验收门禁已通过。Phase D 验收标准详见 §5
 | Model Presets | nanobot-ai 0.2.0 命名预设系统，快速切换模型+参数组合 |
 | 推理可见化 | nanobot-ai 0.2.0 Chain-of-Thought 流式展示能力 |
 | MCP Resources/Prompts | MCP 协议三要素中的资源和提示模板映射 |
+| WebSocket Channel | nanobot-ai 内置 WebSocket 服务器通道，提供 WebUI 所需的实时双向通信 |
+| WebSocketConfig | nanobot-ai WebSocket 通道配置 Schema（host/port/token/streaming 等） |
+| unified_session | nanobot-ai 统一会话模式，多通道共享同一会话上下文 |
 
 ## 附录B：变更记录
 
 | 版本 | 日期 | 变更内容 |
 |------|------|---------|
+| v12.1 | 2026-05-26 | **v0.27.0 需求细化**：①§5.3 v0.27.0 需求从6项扩展为10项功能需求+6项非功能需求；②新增 REQ-D-17~REQ-D-20（WebSocket通道配置/安全认证/Gateway命令增强/统一会话模式）；③新增 NFR-D-11~NFR-D-16（WebUI专属非功能需求）；④新增§5.3.3不做的事；⑤风险表新增4项v0.27.0相关风险；⑥当前基线更新为v0.26.0 |
 | v12.0 | 2026-05-24 | **Phase D 需求补充**：①新增 §5 Phase D 交互升级（v0.26-v0.29）完整需求规格；②v0.26.0 定义10项功能需求+4项非功能需求；③v0.27-v0.29 定义18项功能需求；④新增2项独立评估任务；⑤非功能需求新增NFR-08~NFR-10；⑥风险表新增5项Phase D相关风险；⑦术语表新增5项Phase D术语 |
 | v11.1 | 2026-05-23 | **第二次精简**：①Section 3/4 Phase详细设计合并为验收标准单表；②Section 7验收总览合并为单句；③删除4.1/4.2/4.3三级子节 |
 | v11.0 | 2026-05-23 | **v0.25.0发布修订**：①Phase C(v0.23-v0.25)标记为已完成并精简为摘要；②当前基线更新为v0.25.0；③精简冲突裁决为关键设计裁决；④删除已过时的详细验收标准和数据模型；⑤新增v0.24/v0.25功能摘要和成功标准 |
