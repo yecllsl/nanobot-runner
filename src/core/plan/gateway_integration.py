@@ -188,7 +188,7 @@ class GatewayIntegration:
                     reminder_job = {
                         "id": job.id,
                         "name": job.name,
-                        "cron": job.cron_expr,
+                        "cron": job.schedule.expr,
                         "enabled": job.enabled,
                     }
                     break

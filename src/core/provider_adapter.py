@@ -89,13 +89,17 @@ class RunnerProviderAdapter:
     2. nanobot配置（回退）：~/.nanobot/config.json
     """
 
-    def __init__(self, runner_config: ConfigManager) -> None:
+    def __init__(
+        self, runner_config: ConfigManager, *, webui_enabled: bool = False
+    ) -> None:
         """初始化配置注入器
 
         Args:
             runner_config: 项目配置管理器实例
+            webui_enabled: 是否启用 WebUI，启用时自动激活 WebSocket 通道
         """
         self._runner_config = runner_config
+        self._webui_enabled = webui_enabled
         self._nanobot_config: Any | None = None
         self._provider_instance: Any | None = None
 
@@ -228,41 +232,27 @@ class RunnerProviderAdapter:
                 },
             )
 
+            # 从 config.json 读取 WebSocket 配置节，支持环境变量覆盖
+            ws_config = self._runner_config.get_websocket_config()
+
+            # 品牌字段：从 config.json websocket 配置节读取，缺失时使用默认值
+            bot_name = ws_config.get("bot_name", "Nanobot-Runner")
+            bot_icon = ws_config.get("bot_icon", "🏃‍♂️")
+            # unified_session: 启用后 CLI/飞书/WebUI 共享同一会话，默认关闭
+            unified_session = ws_config.get("unified_session", False)
+
             agents = AgentsConfig(
-                defaults={"model": llm_dict.get("model", "gpt-4o-mini")},
+                defaults={
+                    "model": llm_dict.get("model", "gpt-4o-mini"),
+                    "bot_name": bot_name,
+                    "bot_icon": bot_icon,
+                    "unified_session": unified_session,
+                },
             )
 
             channels: dict[str, Any] = {}
-
-            feishu_app_id = os.getenv("NANOBOT_FEISHU_APP_ID")
-            feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
-            feishu_receive_id = os.getenv("NANOBOT_FEISHU_RECEIVE_ID")
-
-            if not (feishu_app_id and feishu_app_secret):
-                env_file = Path.home() / ".nanobot-runner" / ".env.local"
-                if env_file.exists():
-                    env_vars = self._parse_env_file(env_file)
-                    feishu_app_id = feishu_app_id or env_vars.get(
-                        "NANOBOT_FEISHU_APP_ID"
-                    )
-                    feishu_app_secret = feishu_app_secret or env_vars.get(
-                        "NANOBOT_FEISHU_APP_SECRET"
-                    )
-                    feishu_receive_id = feishu_receive_id or env_vars.get(
-                        "NANOBOT_FEISHU_RECEIVE_ID"
-                    )
-
-            if feishu_app_id and feishu_app_secret:
-                channels["feishu"] = {
-                    "enabled": True,
-                    "app_id": feishu_app_id,
-                    "app_secret": feishu_app_secret,
-                    "receive_id": feishu_receive_id or "",
-                    "receive_id_type": os.getenv(
-                        "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
-                    ),
-                    "allowFrom": ["*"],
-                }
+            self._build_feishu_channel_config(channels)
+            self._build_websocket_channel_config(channels, ws_config)
 
             config = Config(
                 providers=providers,
@@ -278,6 +268,78 @@ class RunnerProviderAdapter:
                 f"无法构建nanobot配置: {e}",
                 recovery_suggestion="请确认已安装nanobot-ai",
             ) from e
+
+    def _build_feishu_channel_config(self, channels: dict[str, Any]) -> None:
+        """构建飞书通道配置
+
+        从环境变量和 .env.local 文件读取飞书凭据，
+        配置有效时写入 channels["feishu"]。
+
+        Args:
+            channels: 通道配置字典，本方法会向其中写入 feishu 键
+        """
+        feishu_app_id = os.getenv("NANOBOT_FEISHU_APP_ID")
+        feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
+        feishu_receive_id = os.getenv("NANOBOT_FEISHU_RECEIVE_ID")
+
+        if not (feishu_app_id and feishu_app_secret):
+            env_file = Path.home() / ".nanobot-runner" / ".env.local"
+            if env_file.exists():
+                env_vars = self._parse_env_file(env_file)
+                feishu_app_id = feishu_app_id or env_vars.get("NANOBOT_FEISHU_APP_ID")
+                feishu_app_secret = feishu_app_secret or env_vars.get(
+                    "NANOBOT_FEISHU_APP_SECRET"
+                )
+                feishu_receive_id = feishu_receive_id or env_vars.get(
+                    "NANOBOT_FEISHU_RECEIVE_ID"
+                )
+
+        if feishu_app_id and feishu_app_secret:
+            channels["feishu"] = {
+                "enabled": True,
+                "app_id": feishu_app_id,
+                "app_secret": feishu_app_secret,
+                "receive_id": feishu_receive_id or "",
+                "receive_id_type": os.getenv(
+                    "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
+                ),
+                "allowFrom": ["*"],
+            }
+
+    def _build_websocket_channel_config(
+        self, channels: dict[str, Any], ws_config: dict[str, Any]
+    ) -> None:
+        """构建WebSocket通道配置
+
+        当 webui_enabled=True 或 config.json 中 websocket.enabled=True 时激活，
+        将配置写入 channels["websocket"]。
+
+        Args:
+            channels: 通道配置字典，本方法会向其中写入 websocket 键
+            ws_config: 从 config.json websocket 配置节读取的字典
+        """
+        ws_enabled_in_config = ws_config.get("enabled", False)
+        if self._webui_enabled or ws_enabled_in_config:
+            channels["websocket"] = {
+                "enabled": True,
+                "host": ws_config.get("host", "127.0.0.1"),
+                "port": ws_config.get("port", 8765),
+                "path": ws_config.get("path", "/"),
+                "token": ws_config.get("token", ""),
+                "token_issue_path": ws_config.get("token_issue_path", ""),
+                "token_issue_secret": ws_config.get("token_issue_secret", ""),
+                "token_ttl_s": ws_config.get("token_ttl_s", 300),
+                "websocket_requires_token": ws_config.get(
+                    "websocket_requires_token", True
+                ),
+                "allow_from": ws_config.get("allow_from", ["*"]),
+                "streaming": ws_config.get("streaming", True),
+                "max_message_bytes": ws_config.get("max_message_bytes", 37748736),
+                "ping_interval_s": ws_config.get("ping_interval_s", 20.0),
+                "ping_timeout_s": ws_config.get("ping_timeout_s", 20.0),
+                "ssl_certfile": ws_config.get("ssl_certfile", ""),
+                "ssl_keyfile": ws_config.get("ssl_keyfile", ""),
+            }
 
     @staticmethod
     def _parse_env_file(env_file: Path) -> dict[str, str]:

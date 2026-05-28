@@ -240,6 +240,7 @@ def start(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
     logs: bool = typer.Option(False, "--logs", "-l", help="启用日志输出"),
+    webui: bool = typer.Option(False, "--webui", help="启用WebUI（WebSocket通道）"),
 ) -> None:
     """
     启动飞书机器人Gateway服务
@@ -258,6 +259,9 @@ def start(
         我最近跑得怎么样？
         给我一个训练建议
         我的VDOT是多少？
+
+    WebUI模式:
+        使用 --webui 标志启用WebSocket通道，可通过浏览器访问WebUI界面。
     """
     from src.agents.tools import RunnerTools, create_tools
     from src.core.base.context import get_context
@@ -284,7 +288,8 @@ def start(
         runner_tools = RunnerTools(context)
 
         if context.config.has_llm_config():
-            adapter = RunnerProviderAdapter(context.config)
+            # v0.27.0: 传入 webui_enabled 标志，启用 WebSocket 通道
+            adapter = RunnerProviderAdapter(context.config, webui_enabled=webui)
     except NanobotRunnerError:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
         from pathlib import Path
@@ -373,6 +378,28 @@ def start(
         console.print(
             f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}"
         )
+        # v0.27.0: WebSocket 通道启用时，显示 WebUI 访问地址与安全提示
+        if "websocket" in channels.enabled_channels and context is not None:
+            ws_config = context.config.get_websocket_config()
+            ws_host = ws_config.get("host", "127.0.0.1")
+            ws_port = ws_config.get("port", 8765)
+            console.print(
+                f"[green]✓[/green] WebUI 访问地址: http://{ws_host}:{ws_port}"
+            )
+            # Token 获取方式提示
+            if ws_config.get("websocket_requires_token", True):
+                token_path = ws_config.get("token_issue_path") or "/token"
+                console.print(
+                    f"[dim]  Token获取: curl http://{ws_host}:{ws_port}{token_path}[/dim]"
+                )
+            # 非本地绑定时显示安全警告
+            if ws_host not in ("127.0.0.1", "localhost"):
+                console.print(
+                    "[yellow]⚠ 安全警告: WebUI 绑定到非本地地址，请确保网络环境安全[/yellow]"
+                )
+                console.print(
+                    "[dim]  建议设置 websocket_requires_token=true 并配置强密钥[/dim]"
+                )
     else:
         console.print("[yellow]警告: 未启用任何通道[/yellow]")
 
@@ -399,6 +426,24 @@ def start(
     console.print("  - /hr_drift - 查看心率漂移")
     console.print("  - /load - 查看训练负荷")
     console.print("  - /help - 显示帮助")
+
+    # v0.27.0: WebUI 交互信息区块（仅在 WebSocket 通道启用时显示）
+    if (
+        webui
+        and channels.enabled_channels
+        and "websocket" in channels.enabled_channels
+        and context is not None
+    ):
+        ws_config = context.config.get_websocket_config()
+        ws_host = ws_config.get("host", "127.0.0.1")
+        ws_port = ws_config.get("port", 8765)
+        token_path = ws_config.get("token_issue_path") or "/token"
+        console.print()
+        console.print("[bold cyan]WebUI 交互：[/bold cyan]")
+        console.print(f"  - 浏览器访问: http://{ws_host}:{ws_port}")
+        if ws_config.get("websocket_requires_token", True):
+            console.print(f"  - 获取Token: curl http://{ws_host}:{ws_port}{token_path}")
+
     console.print()
     console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
 

@@ -37,6 +37,21 @@ ENV_KEY_MAPPING: dict[str, str] = {
     "llm_base_url": "NANOBOT_LLM_BASE_URL",
 }
 
+# WebSocket 环境变量映射，支持 NANOBOT_WS_* 环境变量覆盖配置文件值
+WS_ENV_KEY_MAPPING: dict[str, str] = {
+    "enabled": "NANOBOT_WS_ENABLED",
+    "host": "NANOBOT_WS_HOST",
+    "port": "NANOBOT_WS_PORT",
+    "token": "NANOBOT_WS_TOKEN",
+    "token_issue_secret": "NANOBOT_WS_TOKEN_SECRET",
+}
+
+# 需要布尔类型转换的配置键
+BOOL_KEYS: set[str] = {"auto_push_feishu", "enabled"}
+
+# 需要整数类型转换的配置键
+INT_KEYS: set[str] = {"default_year", "port"}
+
 
 class ConfigManager:
     """配置管理器，管理项目配置和本地数据目录
@@ -327,6 +342,17 @@ class ConfigManager:
             if env_value is not None:
                 config[config_key] = self._cast_env_value(config_key, env_value)
 
+        # WebSocket 环境变量覆盖
+        ws_config = config.get("websocket", {})
+        if not isinstance(ws_config, dict):
+            ws_config = {}
+        for ws_key, env_key in WS_ENV_KEY_MAPPING.items():
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                ws_config[ws_key] = self._cast_env_value(ws_key, env_value)
+        if ws_config:
+            config["websocket"] = ws_config
+
         return config
 
     @staticmethod
@@ -340,12 +366,9 @@ class ConfigManager:
         Returns:
             Any: 类型转换后的值
         """
-        bool_keys = {"auto_push_feishu"}
-        int_keys = {"default_year"}
-
-        if key in bool_keys:
+        if key in BOOL_KEYS:
             return value.lower() in ("true", "1", "yes")
-        if key in int_keys:
+        if key in INT_KEYS:
             try:
                 return int(value)
             except ValueError:
@@ -427,6 +450,32 @@ class ConfigManager:
             "api_key": os.getenv("NANOBOT_LLM_API_KEY"),
             "base_url": os.getenv("NANOBOT_LLM_BASE_URL") or config.get("llm_base_url"),
         }
+
+    def get_websocket_config(self) -> dict[str, Any]:
+        """获取 WebSocket 配置
+
+        从 config.json 的 websocket 配置节读取，支持环境变量覆盖。
+        优先级：环境变量 > 配置文件 > 默认值
+
+        Returns:
+            dict[str, Any]: WebSocket 配置字典，配置节不存在时返回空 dict
+        """
+        config = self.load_config()
+
+        # 读取 websocket 配置节，不存在或类型异常时返回空 dict
+        ws_raw: Any = config.get("websocket", {})
+        if not isinstance(ws_raw, dict):
+            ws_config: dict[str, Any] = {}
+        else:
+            ws_config = dict(ws_raw)  # 浅拷贝，避免修改原始配置
+
+        # 环境变量覆盖配置文件值，类型转换复用 _cast_env_value
+        for ws_key, env_key in WS_ENV_KEY_MAPPING.items():
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                ws_config[ws_key] = self._cast_env_value(ws_key, env_value)
+
+        return ws_config
 
     def has_llm_config(self) -> bool:
         """检查是否配置了LLM
