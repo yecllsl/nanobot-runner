@@ -1,5 +1,6 @@
 from typing import Any
 
+from src import __version__
 from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +25,14 @@ class InitPrompts:
 
             provider = questionary.select(
                 "选择 LLM Provider:",
-                choices=["openai", "anthropic", "deepseek", "zhipu", "other"],
+                choices=[
+                    "openai",
+                    "anthropic",
+                    "deepseek",
+                    "zhipu",
+                    "siliconflow",
+                    "other",
+                ],
                 default="openai",
             ).ask()
 
@@ -45,12 +53,17 @@ class InitPrompts:
                 default="",
             ).ask()
 
-            return {
+            result = {
                 "NANOBOT_LLM_PROVIDER": provider,
                 "NANOBOT_LLM_MODEL": model or "gpt-4o-mini",
                 "NANOBOT_LLM_API_KEY": api_key or "",
                 "NANOBOT_LLM_BASE_URL": base_url or "",
             }
+
+            fallback_result = InitPrompts.run_fallback_wizard(provider or "openai")
+            result.update(fallback_result)
+
+            return result
 
         except ImportError:
             logger.warning("questionary 未安装，使用默认 LLM 配置")
@@ -136,7 +149,7 @@ class InitPrompts:
             feishu_env = InitPrompts.run_feishu_config_wizard()
 
         config: dict[str, Any] = {
-            "version": "0.9.5",
+            "version": __version__,
             **business_config,
             "auto_push_feishu": feishu_env.get("NANOBOT_AUTO_PUSH_FEISHU", "false")
             == "true",
@@ -148,6 +161,16 @@ class InitPrompts:
             base_url = llm_env.get("NANOBOT_LLM_BASE_URL", "")
             if base_url:
                 config["llm_base_url"] = base_url
+
+            # 注入 fallback 配置到 config.json
+            _fb_raw: list[str] | str = llm_env.pop("_fallback_models", [])
+            _mp_raw: dict[str, Any] | str = llm_env.pop("_model_presets", {})
+            fallback_models: list[str] = _fb_raw if isinstance(_fb_raw, list) else []
+            model_presets: dict[str, Any] = _mp_raw if isinstance(_mp_raw, dict) else {}
+            if fallback_models:
+                config["fallback_models"] = fallback_models
+            if model_presets:
+                config["model_presets"] = model_presets
 
             config["tools"] = InitPrompts._default_tools_config()
 
@@ -184,8 +207,126 @@ class InitPrompts:
             "anthropic": "claude-3-5-sonnet-20241022",
             "deepseek": "deepseek-chat",
             "zhipu": "glm-4.7-flash",
+            "siliconflow": "Qwen/Qwen3-235B-A22B",
         }
         return defaults.get(provider, "gpt-4o-mini")
+
+    @staticmethod
+    def _generate_preset_name(provider: str, model: str) -> str:
+        """生成预设名
+
+        格式: {provider}-{model简短标识}
+        取 model 的最后一段（按 / 分割），再截取前两个 - 分隔段。
+
+        Args:
+            provider: 供应商名称
+            model: 模型名称
+
+        Returns:
+            str: 预设名
+        """
+        short_model = model.split("/")[-1]
+        segments = short_model.split("-")
+        if len(segments) >= 3:
+            ident = "-".join(segments[:3])
+        elif len(segments) >= 2:
+            ident = "-".join(segments[:2])
+        else:
+            ident = segments[0]
+        return f"{provider}-{ident}"
+
+    @staticmethod
+    def run_fallback_wizard(primary_provider: str) -> dict[str, Any]:
+        """运行备选供应商配置向导
+
+        交互式引导用户添加一个或多个备选供应商，
+        当主供应商故障时自动故障转移。
+
+        Args:
+            primary_provider: 主供应商名称
+
+        Returns:
+            dict[str, Any]: 包含 _model_presets / _fallback_models / 环境变量
+        """
+        result: dict[str, Any] = {"_model_presets": {}, "_fallback_models": []}
+
+        try:
+            import questionary
+        except ImportError:
+            logger.warning("questionary 未安装，跳过备选供应商配置")
+            return result
+
+        add_fallback = questionary.confirm(
+            "是否配置备选供应商（主供应商故障时自动切换）？",
+            default=False,
+        ).ask()
+
+        if not add_fallback:
+            return result
+
+        available_providers = [
+            "nvidia",
+            "openrouter",
+            "zhipu",
+            "siliconflow",
+            "deepseek",
+            "other",
+        ]
+        filtered = [p for p in available_providers if p != primary_provider]
+
+        while True:
+            provider = questionary.select(
+                "选择备选供应商:",
+                choices=filtered,
+            ).ask()
+
+            if provider is None:
+                break
+
+            if provider == "other":
+                provider = questionary.text("输入供应商名称:").ask()
+                if not provider:
+                    break
+
+            model = questionary.text(
+                "输入模型名称:",
+                default=InitPrompts._default_model_for_provider(provider),
+            ).ask()
+
+            base_url = questionary.text(
+                "输入 Base URL（可选，留空使用默认）:",
+                default="",
+            ).ask()
+
+            api_key = questionary.password(
+                f"输入 {provider} API Key:",
+            ).ask()
+
+            if not api_key:
+                logger.warning("API Key 为空，跳过此备选供应商")
+                continue
+
+            preset_name = InitPrompts._generate_preset_name(
+                provider, model or "unknown"
+            )
+
+            result["_model_presets"][preset_name] = {
+                "provider": provider,
+                "model": model,
+                "base_url": base_url or None,
+            }
+            result["_fallback_models"].append(preset_name)
+            result[f"NANOBOT_LLM_API_KEY_{provider.upper()}"] = api_key
+
+            add_more = questionary.confirm(
+                "是否继续添加备选供应商？",
+                default=False,
+            ).ask()
+
+            if not add_more:
+                break
+
+        return result
 
     @staticmethod
     def _default_tools_config() -> dict[str, Any]:

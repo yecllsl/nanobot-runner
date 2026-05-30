@@ -146,6 +146,15 @@ class ConfigGenerator:
                 f"NANOBOT_AUTO_PUSH_FEISHU={env_vars.get('NANOBOT_AUTO_PUSH_FEISHU', 'false')}\n"
             )
 
+        fallback_prefix = "NANOBOT_LLM_API_KEY_"
+        fallback_keys = [
+            k for k in env_vars if k.startswith(fallback_prefix) and env_vars.get(k)
+        ]
+        if fallback_keys:
+            lines.append("\n# 备选供应商 API Key\n")
+            for key in fallback_keys:
+                lines.append(f"{key}={env_vars[key]}\n")
+
         return "".join(lines)
 
     def _copy_template_files(self, workspace_dir: Path) -> list[Path]:

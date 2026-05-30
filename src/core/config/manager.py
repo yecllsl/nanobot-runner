@@ -527,5 +527,60 @@ class ConfigManager:
                 env_vars["NANOBOT_LLM_BASE_URL"] = base_url
             env_manager.save_env_file(env_vars)
 
+    def get_fallback_api_key(self, provider: str) -> str | None:
+        """获取备选供应商 API Key
+
+        查找优先级：
+        1. NANOBOT_LLM_API_KEY_{PROVIDER_UPPER}
+        2. NANOBOT_LLM_API_KEY（主供应商 Key 兜底）
+
+        Args:
+            provider: 供应商名称
+
+        Returns:
+            str | None: API Key，未找到返回 None
+        """
+        provider_key = f"NANOBOT_LLM_API_KEY_{provider.upper()}"
+        key = os.getenv(provider_key)
+        if key:
+            return key
+        return os.getenv("NANOBOT_LLM_API_KEY")
+
+    def get_fallback_models(self) -> list[dict[str, Any]]:
+        """获取备选供应商配置列表
+
+        从 config.json 的 fallback_models 和 model_presets 中解析完整的备选供应商配置。
+
+        Returns:
+            list[dict[str, Any]]: 备选供应商配置列表，每个字典包含 provider/model/base_url/api_key
+        """
+        config = self.load_config()
+        fallback_names: list[str] = config.get("fallback_models") or []
+        presets: dict[str, dict[str, Any]] = config.get("model_presets") or {}
+
+        result: list[dict[str, Any]] = []
+        for name in fallback_names:
+            preset = presets.get(name)
+            if preset is None:
+                logger.warning(
+                    f"fallback_models 引用的预设 '{name}' 在 model_presets 中不存在，跳过"
+                )
+                continue
+            provider = preset.get("provider", "")
+            model = preset.get("model", "")
+            if not provider or not model:
+                logger.warning(f"预设 '{name}' 缺少 provider 或 model，跳过")
+                continue
+            api_key = self.get_fallback_api_key(provider)
+            result.append(
+                {
+                    "provider": provider,
+                    "model": model,
+                    "base_url": preset.get("base_url"),
+                    "api_key": api_key,
+                }
+            )
+        return result
+
 
 config = ConfigManager(allow_default=True)

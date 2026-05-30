@@ -265,7 +265,9 @@ class TestGatewayIntegration:
                 reminder_job = CronJob(
                     id="test-001",
                     name="training_reminder",
-                    schedule=CronSchedule(kind="cron", expr="0 7 * * *", tz="Asia/Shanghai"),
+                    schedule=CronSchedule(
+                        kind="cron", expr="0 7 * * *", tz="Asia/Shanghai"
+                    ),
                     enabled=True,
                 )
                 mock_cron.list_jobs.return_value = [reminder_job]

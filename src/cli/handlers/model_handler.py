@@ -26,14 +26,18 @@ class ModelHandler:
         """获取 Model Presets 列表
 
         从配置文件中读取 model_presets 字段，转换为列表格式返回。
+        同时标记 fallback_models 引用的预设。
 
         Returns:
-            list[dict]: 预设列表，每个预设包含 name/provider/model/temperature 等字段
+            list[dict]: 预设列表，每个预设包含 name/provider/model/temperature/is_fallback 等字段
         """
         config = self.context.config
-        presets = config.load_config().get("model_presets", {})
+        raw_config = config.load_config()
+        presets = raw_config.get("model_presets", {})
         if presets is None:
             return []
+
+        fallback_names = set(raw_config.get("fallback_models") or [])
 
         result: list[dict[str, Any]] = []
         for name, preset in presets.items():
@@ -43,6 +47,7 @@ class ModelHandler:
                     "provider": preset.get("provider", ""),
                     "model": preset.get("model", ""),
                     "temperature": preset.get("temperature"),
+                    "is_fallback": name in fallback_names,
                 }
             )
         return result

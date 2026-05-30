@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from src import __version__
 from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.manager import ConfigManager
@@ -199,7 +200,7 @@ class ConfigMigrator:
                 existing_config = self._runner_config._get_default_config()
 
             existing_config.update(llm_config)
-            existing_config["version"] = "0.9.5"
+            existing_config["version"] = __version__
 
             self._runner_config.save_config(existing_config)
             config_path = self._runner_config.config_file

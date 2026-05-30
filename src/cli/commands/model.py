@@ -38,15 +38,19 @@ def list_presets() -> None:
         table.add_column("Provider", width=15)
         table.add_column("模型", width=30)
         table.add_column("Temperature", width=12)
+        table.add_column("Fallback", width=10)
 
         for preset in presets:
             temp = preset.get("temperature")
             temp_str = f"{temp}" if temp is not None else "-"
+            is_fb = preset.get("is_fallback", False)
+            fb_str = "[green]✓[/green]" if is_fb else "-"
             table.add_row(
                 preset["name"],
                 preset["provider"],
                 preset["model"],
                 temp_str,
+                fb_str,
             )
 
         console.print(table)

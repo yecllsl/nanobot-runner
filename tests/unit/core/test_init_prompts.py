@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+from src import __version__
 from src.core.init.prompts import InitPrompts
 
 
@@ -36,13 +37,15 @@ class TestInitPrompts:
         mock_questionary.select.return_value.ask.return_value = "anthropic"
         mock_questionary.text.return_value.ask.return_value = "claude-3-5-sonnet"
         mock_questionary.password.return_value.ask.return_value = "sk-test-key"
-        mock_questionary.text.return_value.ask.return_value = (
-            "https://api.anthropic.com"
-        )
 
         with patch.dict("sys.modules", {"questionary": mock_questionary}):
-            result = InitPrompts.run_llm_provider_wizard()
-            assert result["NANOBOT_LLM_PROVIDER"] == "anthropic"
+            with patch.object(
+                InitPrompts,
+                "run_fallback_wizard",
+                return_value={"_model_presets": {}, "_fallback_models": []},
+            ):
+                result = InitPrompts.run_llm_provider_wizard()
+                assert result["NANOBOT_LLM_PROVIDER"] == "anthropic"
 
     def test_run_llm_provider_wizard_user_cancels(self) -> None:
         mock_questionary = MagicMock()
@@ -115,7 +118,7 @@ class TestInitPrompts:
                 result = InitPrompts.run_full_wizard(skip_optional=True)
                 assert "config" in result
                 assert "env_vars" in result
-                assert result["config"]["version"] == "0.9.5"
+                assert result["config"]["version"] == __version__
                 assert result["config"]["auto_push_feishu"] is False
 
     def test_run_full_wizard_with_optional(self) -> None:
@@ -142,3 +145,46 @@ class TestInitPrompts:
                     result = InitPrompts.run_full_wizard(skip_optional=False)
                     assert result["config"]["auto_push_feishu"] is True
                     assert "NANOBOT_FEISHU_APP_ID" in result["env_vars"]
+
+
+class TestInitPromptsFallback:
+    """备选供应商配置向导测试"""
+
+    def test_run_fallback_wizard_no_questionary(self):
+        with patch.dict("sys.modules", {"questionary": None}):
+            result = InitPrompts.run_fallback_wizard(primary_provider="siliconflow")
+            assert result["_model_presets"] == {}
+            assert result["_fallback_models"] == []
+
+    def test_run_fallback_wizard_user_declines(self):
+        mock_q = MagicMock()
+        mock_q.confirm.return_value.ask.return_value = False
+
+        with patch.dict("sys.modules", {"questionary": mock_q}):
+            result = InitPrompts.run_fallback_wizard(primary_provider="siliconflow")
+            assert result["_fallback_models"] == []
+
+    def test_run_fallback_wizard_adds_one_fallback(self):
+        mock_q = MagicMock()
+        mock_q.confirm.return_value.ask.side_effect = [True, False]
+        mock_q.select.return_value.ask.return_value = "nvidia"
+        mock_q.text.return_value.ask.side_effect = [
+            "meta/llama-4-maverick-17b-128e-instruct-maas",
+            "https://integrate.api.nvidia.com/v1",
+        ]
+        mock_q.password.return_value.ask.return_value = "nvapi-test"
+
+        with patch.dict("sys.modules", {"questionary": mock_q}):
+            result = InitPrompts.run_fallback_wizard(primary_provider="siliconflow")
+            assert len(result["_fallback_models"]) == 1
+            assert "nvidia" in result["_fallback_models"][0]
+            assert "NANOBOT_LLM_API_KEY_NVIDIA" in result
+            assert result["NANOBOT_LLM_API_KEY_NVIDIA"] == "nvapi-test"
+
+    def test_generate_preset_name(self):
+        name = InitPrompts._generate_preset_name("nvidia", "meta/llama-4-maverick")
+        assert name == "nvidia-llama-4-maverick"
+
+    def test_generate_preset_name_short_model(self):
+        name = InitPrompts._generate_preset_name("zhipu", "glm-4.7-flash")
+        assert name == "zhipu-glm-4.7-flash"

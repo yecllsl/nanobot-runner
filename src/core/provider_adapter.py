@@ -12,6 +12,50 @@ from src.core.config.manager import ConfigManager
 
 logger = get_logger(__name__)
 
+_BLOCKED_SETTINGS_PATHS: frozenset[str] = frozenset(
+    {
+        "/api/settings/update",
+        "/api/settings/provider/update",
+        "/api/settings/web-search/update",
+    }
+)
+
+_SETTINGS_UPDATE_BLOCKED_MESSAGE = (
+    "Settings updates are managed by nanobot-runner config. "
+    "Use 'nanobotrun system init' or edit ~/.nanobot-runner/config.json"
+)
+
+
+def _patch_websocket_settings_api() -> None:
+    """拦截 WebUI Settings 写操作，防止写入 ~/.nanobot/config.json
+
+    通过 monkey-patch WebSocketChannel._dispatch_http 方法，
+    拦截 3 个设置写端点，返回 403 Forbidden。
+    仅在 WebSocket 通道启用时调用。幂等：多次调用安全。
+    """
+    from nanobot.channels.websocket import (
+        WebSocketChannel,
+        _http_error,
+        _parse_request_path,
+    )
+
+    # 幂等保护：已 patch 过则跳过
+    if getattr(WebSocketChannel._dispatch_http, "_runner_patched", False):
+        return
+
+    _original_dispatch = WebSocketChannel._dispatch_http
+
+    async def _runner_dispatch_http(
+        self: WebSocketChannel, connection: Any, request: Any
+    ) -> Any:
+        got, _ = _parse_request_path(request.path)
+        if got in _BLOCKED_SETTINGS_PATHS:
+            return _http_error(403, _SETTINGS_UPDATE_BLOCKED_MESSAGE)
+        return await _original_dispatch(self, connection, request)
+
+    _runner_dispatch_http._runner_patched = True  # type: ignore[attr-defined]
+    WebSocketChannel._dispatch_http = _runner_dispatch_http
+
 
 @dataclass(frozen=True)
 class AgentDefaults:
@@ -126,10 +170,11 @@ class RunnerProviderAdapter:
     def get_provider_instance(self) -> Any:
         """获取Provider实例
 
-        使用nanobot-ai的Provider创建逻辑，从项目配置构建Provider。
+        支持 FallbackProvider 包装：当配置了 fallback_models 时，
+        自动创建主备链式故障转移。
 
         Returns:
-            Any: nanobot Provider实例
+            Any: nanobot Provider实例（可能是 FallbackProvider 包装）
 
         Raises:
             LLMError: Provider创建失败时抛出
@@ -138,19 +183,55 @@ class RunnerProviderAdapter:
             return self._provider_instance
 
         llm_config = self.get_llm_config()
+        primary = self._create_primary_provider(llm_config)
 
+        fallback_presets = self._resolve_fallback_presets()
+        if not fallback_presets:
+            self._provider_instance = primary
+            return primary
+
+        try:
+            from nanobot.providers.fallback_provider import FallbackProvider
+
+            self._provider_instance = FallbackProvider(
+                primary=primary,
+                fallback_presets=fallback_presets,
+                provider_factory=self._create_fallback_provider,
+            )
+            logger.info(
+                "FallbackProvider 已启用，主供应商: %s，备选: %d 个",
+                llm_config.provider,
+                len(fallback_presets),
+            )
+            return self._provider_instance
+        except ImportError:
+            logger.warning("nanobot-ai 未支持 FallbackProvider，降级为单供应商模式")
+            self._provider_instance = primary
+            return primary
+
+    def _create_primary_provider(self, llm_config: LLMConfig) -> Any:
+        """创建主 Provider 实例
+
+        Args:
+            llm_config: LLM 配置
+
+        Returns:
+            Any: nanobot Provider 实例
+
+        Raises:
+            LLMError: Provider 创建失败时抛出
+        """
         try:
             from nanobot.providers.openai_compat_provider import OpenAICompatProvider
             from nanobot.providers.registry import find_by_name
 
             spec = find_by_name(llm_config.provider)
-            self._provider_instance = OpenAICompatProvider(
+            return OpenAICompatProvider(
                 api_key=llm_config.api_key,
                 api_base=llm_config.base_url,
                 default_model=llm_config.model,
                 spec=spec,
             )
-            return self._provider_instance
         except ImportError as e:
             raise LLMError(
                 f"无法导入nanobot模块: {e}",
@@ -161,6 +242,76 @@ class RunnerProviderAdapter:
                 f"创建Provider失败: {e}",
                 recovery_suggestion="请检查LLM配置是否正确，特别是API Key和Base URL",
             ) from e
+
+    def _resolve_fallback_presets(self) -> list[Any]:
+        """解析 fallback 预设列表
+
+        从 ConfigManager 读取 fallback_models 配置，
+        转换为底座 ModelPresetConfig 格式。
+        跳过 API Key 缺失的条目。
+
+        Returns:
+            list[Any]: ModelPresetConfig 列表
+        """
+        try:
+            from nanobot.config.schema import ModelPresetConfig
+        except ImportError:
+            logger.warning("nanobot-ai 不支持 ModelPresetConfig，跳过 fallback 配置")
+            return []
+
+        fallback_list = self._runner_config.get_fallback_models()
+        if not fallback_list:
+            return []
+
+        presets: list[Any] = []
+        for fb in fallback_list:
+            api_key = fb.get("api_key")
+            if not api_key:
+                logger.warning(
+                    "备选供应商 '%s' API Key 缺失，跳过",
+                    fb.get("provider", "unknown"),
+                )
+                continue
+
+            preset = ModelPresetConfig(
+                model=fb["model"],
+                provider=fb["provider"],
+            )
+            presets.append(preset)
+
+        return presets
+
+    def _create_fallback_provider(self, preset: Any) -> Any:
+        """为 fallback 预设创建 Provider 实例
+
+        Args:
+            preset: ModelPresetConfig 实例
+
+        Returns:
+            Any: nanobot Provider 实例
+        """
+        from nanobot.providers.openai_compat_provider import OpenAICompatProvider
+        from nanobot.providers.registry import find_by_name
+
+        api_key = self._runner_config.get_fallback_api_key(preset.provider)
+        spec = find_by_name(preset.provider)
+
+        fb_config = self._runner_config.get_fallback_models()
+        base_url: str | None = None
+        for fb in fb_config:
+            if (
+                fb.get("provider") == preset.provider
+                and fb.get("model") == preset.model
+            ):
+                base_url = fb.get("base_url")
+                break
+
+        return OpenAICompatProvider(
+            api_key=api_key,
+            api_base=base_url,
+            default_model=preset.model,
+            spec=spec,
+        )
 
     def get_agent_defaults(self) -> AgentDefaults:
         """获取Agent默认配置
@@ -253,6 +404,37 @@ class RunnerProviderAdapter:
             channels: dict[str, Any] = {}
             self._build_feishu_channel_config(channels)
             self._build_websocket_channel_config(channels, ws_config)
+
+            # WebSocket 通道启用时，拦截 Settings 写操作以保持配置独立性
+            if "websocket" in channels:
+                _patch_websocket_settings_api()
+
+            # 注入 fallback_models 到 nanobot Config
+            runner_config = self._runner_config.load_config()
+            fallback_names = runner_config.get("fallback_models", [])
+            if fallback_names:
+                try:
+                    from nanobot.config.schema import InlineFallbackConfig
+
+                    presets_raw = runner_config.get("model_presets", {})
+                    fallback_candidates: list[Any] = []
+                    for name in fallback_names:
+                        preset_data = presets_raw.get(name, {})
+                        provider = preset_data.get("provider", "")
+                        model = preset_data.get("model", "")
+                        if provider and model:
+                            fallback_candidates.append(
+                                InlineFallbackConfig(
+                                    model=model,
+                                    provider=provider,
+                                )
+                            )
+                    if fallback_candidates:
+                        agents.defaults.fallback_models = fallback_candidates
+                except ImportError:
+                    logger.debug(
+                        "nanobot-ai 不支持 InlineFallbackConfig，跳过 fallback 注入"
+                    )
 
             config = Config(
                 providers=providers,
