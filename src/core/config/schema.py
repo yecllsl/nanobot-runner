@@ -21,6 +21,7 @@ class AppConfig:
         feishu_receive_id_type: 飞书接收者 ID 类型
         tools: 工具生态配置（v0.13.0新增），包含mcp_servers等
         model_presets: 模型预设配置（v0.26.0新增），包含provider/model/temperature等
+        websocket: WebSocket通道配置（v0.27.0新增），包含WebUI相关配置
     """
 
     version: str
@@ -35,6 +36,8 @@ class AppConfig:
     llm_base_url: str | None = None
     tools: dict[str, Any] | None = None
     model_presets: dict[str, dict[str, Any]] | None = None
+    fallback_models: list[str] | None = None
+    websocket: dict[str, Any] | None = None
 
     REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
 
@@ -51,6 +54,8 @@ class AppConfig:
         "llm_base_url": (str, type(None)),
         "tools": (dict, type(None)),
         "model_presets": (dict, type(None)),
+        "fallback_models": (list, type(None)),
+        "websocket": (dict, type(None)),
     }
 
     @classmethod
@@ -106,6 +111,17 @@ class AppConfig:
             version = config["version"]
             if not cls._is_valid_version(version):
                 errors.append(f"版本号格式错误：'{version}'，应为 x.y.z 格式")
+
+        # 检查 fallback_models 条目类型
+        if "fallback_models" in config and config["fallback_models"] is not None:
+            if not isinstance(config["fallback_models"], list):
+                errors.append("字段 'fallback_models' 类型错误，期望 list，实际非列表")
+            else:
+                for i, item in enumerate(config["fallback_models"]):
+                    if not isinstance(item, str):
+                        errors.append(
+                            f"fallback_models[{i}] 类型错误，期望 str，实际 {type(item).__name__}"
+                        )
 
         # 检查 feishu_receive_id_type 的枚举值
         if "feishu_receive_id_type" in config and config["feishu_receive_id_type"]:
@@ -175,6 +191,8 @@ class AppConfig:
             "llm_base_url": self.llm_base_url,
             "tools": self.tools,
             "model_presets": self.model_presets,
+            "fallback_models": self.fallback_models,
+            "websocket": self.websocket,
         }
 
     def __post_init__(self) -> None:

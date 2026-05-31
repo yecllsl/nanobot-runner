@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from src import __version__
 from src.core.init.migrate import ConfigMigrator, MigrationResult
 from src.core.init.models import InitMode
 from src.core.init.wizard import InitWizard
@@ -14,7 +15,7 @@ class TestConfigMigrator:
         mock.config_file = Path("/tmp/test_config.json")
         mock.base_dir = Path("/tmp/test_runner")
         mock._get_default_config.return_value = {
-            "version": "0.9.5",
+            "version": __version__,
             "data_dir": "/tmp/test_runner/data",
         }
         return mock
@@ -209,7 +210,7 @@ class TestInitWizardAgentMode:
     ) -> None:
         mock_detect.return_value = MagicMock(missing_dependencies=[])
         mock_guide.return_value = {
-            "config": {"version": "0.9.5", "data_dir": "/tmp/data"},
+            "config": {"version": __version__, "data_dir": "/tmp/data"},
             "env_vars": {},
         }
         mock_validate.return_value = MagicMock(is_valid=True, errors=[], warnings=[])
@@ -243,7 +244,7 @@ class TestInitWizardAgentMode:
         mock_detect.return_value = MagicMock(missing_dependencies=[])
         mock_guide.return_value = {
             "config": {
-                "version": "0.9.5",
+                "version": __version__,
                 "data_dir": "/tmp/data",
                 "llm_provider": "openai",
                 "llm_model": "gpt-4o-mini",

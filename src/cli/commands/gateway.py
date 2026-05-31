@@ -240,6 +240,7 @@ def start(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
     logs: bool = typer.Option(False, "--logs", "-l", help="启用日志输出"),
+    webui: bool = typer.Option(False, "--webui", help="启用WebUI（WebSocket通道）"),
 ) -> None:
     """
     启动飞书机器人Gateway服务
@@ -258,6 +259,9 @@ def start(
         我最近跑得怎么样？
         给我一个训练建议
         我的VDOT是多少？
+
+    WebUI模式:
+        使用 --webui 标志启用WebSocket通道，可通过浏览器访问WebUI界面。
     """
     from src.agents.tools import RunnerTools, create_tools
     from src.core.base.context import get_context
@@ -284,7 +288,8 @@ def start(
         runner_tools = RunnerTools(context)
 
         if context.config.has_llm_config():
-            adapter = RunnerProviderAdapter(context.config)
+            # v0.27.0: 传入 webui_enabled 标志，启用 WebSocket 通道
+            adapter = RunnerProviderAdapter(context.config, webui_enabled=webui)
     except NanobotRunnerError:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
         from pathlib import Path
@@ -303,9 +308,34 @@ def start(
     from nanobot.bus import MessageBus
     from nanobot.channels.manager import ChannelManager
     from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.session.manager import SessionManager
     from nanobot.utils.helpers import sync_workspace_templates
 
     sync_workspace_templates(workspace)
+
+    # v0.27.0: 自定义 WebUI 品牌配置
+    # 通过 monkey-patch 覆盖默认的 WebUI 静态文件路径
+    from pathlib import Path
+
+    import nanobot.channels.manager as manager_module
+
+    def _custom_webui_dist():
+        """返回项目自定义的 WebUI dist 目录"""
+        # 优先使用项目自定义的 webui 目录
+        custom_dist = Path(__file__).resolve().parent.parent.parent / "webui" / "dist"
+        if custom_dist.is_dir() and (custom_dist / "index.html").exists():
+            return custom_dist
+        # 回退到 nanobot 默认目录
+        try:
+            import nanobot.web as web_pkg
+
+            default_dist = Path(web_pkg.__file__).resolve().parent / "dist"
+            return default_dist if default_dist.is_dir() else None
+        except ImportError:
+            return None
+
+    # 保存原始函数并替换
+    manager_module._default_webui_dist = _custom_webui_dist
 
     bus = MessageBus()
 
@@ -327,7 +357,27 @@ def start(
 
     _connect_mcp_tools_sync(context, agent)
 
-    channels = ChannelManager(config=adapter._get_or_create_nanobot_config(), bus=bus)
+    # v0.27.0: 创建 SessionManager 以启用 WebUI 静态文件服务
+    session_manager = SessionManager(workspace=workspace)
+
+    # v0.27.0: 定义运行时模型名称回调，使WebUI显示实际使用的模型
+    def get_runtime_model_name():
+        """返回当前实际使用的模型名称"""
+        try:
+            # 优先从adapter获取实际配置的模型
+            if adapter and hasattr(adapter, "config"):
+                return adapter.config.llm_model
+        except Exception:
+            pass
+        # 回退到agent的模型
+        return agent.model if agent else None
+
+    channels = ChannelManager(
+        config=adapter._get_or_create_nanobot_config(),
+        bus=bus,
+        session_manager=session_manager,
+        webui_runtime_model_name=get_runtime_model_name,
+    )
 
     # v0.17.0: 使用 GatewayIntegration 集成 Cron + Hook
     from src.core.plan.gateway_integration import GatewayIntegration
@@ -373,6 +423,28 @@ def start(
         console.print(
             f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}"
         )
+        # v0.27.0: WebSocket 通道启用时，显示 WebUI 访问地址与安全提示
+        if "websocket" in channels.enabled_channels and context is not None:
+            ws_config = context.config.get_websocket_config()
+            ws_host = ws_config.get("host", "127.0.0.1")
+            ws_port = ws_config.get("port", 8765)
+            console.print(
+                f"[green]✓[/green] WebUI 访问地址: http://{ws_host}:{ws_port}"
+            )
+            # Token 获取方式提示
+            if ws_config.get("websocket_requires_token", True):
+                token_path = ws_config.get("token_issue_path") or "/token"
+                console.print(
+                    f"[dim]  Token获取: curl http://{ws_host}:{ws_port}{token_path}[/dim]"
+                )
+            # 非本地绑定时显示安全警告
+            if ws_host not in ("127.0.0.1", "localhost"):
+                console.print(
+                    "[yellow]⚠ 安全警告: WebUI 绑定到非本地地址，请确保网络环境安全[/yellow]"
+                )
+                console.print(
+                    "[dim]  建议设置 websocket_requires_token=true 并配置强密钥[/dim]"
+                )
     else:
         console.print("[yellow]警告: 未启用任何通道[/yellow]")
 
@@ -399,6 +471,24 @@ def start(
     console.print("  - /hr_drift - 查看心率漂移")
     console.print("  - /load - 查看训练负荷")
     console.print("  - /help - 显示帮助")
+
+    # v0.27.0: WebUI 交互信息区块（仅在 WebSocket 通道启用时显示）
+    if (
+        webui
+        and channels.enabled_channels
+        and "websocket" in channels.enabled_channels
+        and context is not None
+    ):
+        ws_config = context.config.get_websocket_config()
+        ws_host = ws_config.get("host", "127.0.0.1")
+        ws_port = ws_config.get("port", 8765)
+        token_path = ws_config.get("token_issue_path") or "/token"
+        console.print()
+        console.print("[bold cyan]WebUI 交互：[/bold cyan]")
+        console.print(f"  - 浏览器访问: http://{ws_host}:{ws_port}")
+        if ws_config.get("websocket_requires_token", True):
+            console.print(f"  - 获取Token: curl http://{ws_host}:{ws_port}{token_path}")
+
     console.print()
     console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
 

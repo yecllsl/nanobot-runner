@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from src import __version__
 from src.core.config.sync import NanobotConfigSync
 from src.core.init.migrate import ConfigMigrator
 
@@ -17,7 +18,7 @@ class TestMigrationIntegration:
         mock.config_file = Path("/tmp/test_config.json")
         mock.base_dir = Path("/tmp/test_runner")
         mock._get_default_config.return_value = {
-            "version": "0.9.5",
+            "version": __version__,
             "data_dir": "/tmp/test_runner/data",
         }
         mock.has_llm_config.return_value = True

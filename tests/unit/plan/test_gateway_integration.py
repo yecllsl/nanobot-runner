@@ -4,6 +4,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from nanobot.cron.types import CronJob, CronSchedule
+
 from src.core.plan.gateway_integration import GatewayIntegration
 
 
@@ -94,8 +96,8 @@ class TestGatewayIntegration:
                 cron = integration.setup_cron_service(auto_register_reminder=True)
 
                 # 验证训练提醒任务被注册
-                mock_cron.register_job.assert_called_once()
-                call_kwargs = mock_cron.register_job.call_args.kwargs
+                mock_cron.add_job.assert_called_once()
+                call_kwargs = mock_cron.add_job.call_args.kwargs
                 assert call_kwargs["name"] == "training_reminder"
         finally:
             import shutil
@@ -119,7 +121,7 @@ class TestGatewayIntegration:
                 cron = integration.setup_cron_service(auto_register_reminder=True)
 
                 # 验证没有重复注册
-                mock_cron.register_job.assert_not_called()
+                mock_cron.add_job.assert_not_called()
         finally:
             import shutil
 
@@ -247,6 +249,70 @@ class TestGatewayIntegration:
 
                 # 验证Cron服务已停止
                 mock_cron.stop.assert_called_once()
+        finally:
+            import shutil
+
+            shutil.rmtree(workspace, ignore_errors=True)
+
+    def test_get_cron_status_with_reminder_job(self):
+        """回归测试: get_cron_status 应通过 job.schedule.expr 获取 cron 表达式，而非 job.cron_expr"""
+        workspace = Path(tempfile.mkdtemp())
+
+        try:
+            with patch("src.core.plan.gateway_integration.CronService") as MockCron:
+                mock_cron = MagicMock()
+                mock_cron.status.return_value = {"jobs": 1}
+                reminder_job = CronJob(
+                    id="test-001",
+                    name="training_reminder",
+                    schedule=CronSchedule(
+                        kind="cron", expr="0 7 * * *", tz="Asia/Shanghai"
+                    ),
+                    enabled=True,
+                )
+                mock_cron.list_jobs.return_value = [reminder_job]
+                MockCron.return_value = mock_cron
+
+                integration = GatewayIntegration(workspace)
+                integration.setup_cron_service(auto_register_reminder=False)
+
+                status = integration.get_cron_status()
+
+                assert status["enabled"] is True
+                assert status["reminder_job"] is not None
+                assert status["reminder_job"]["cron"] == "0 7 * * *"
+                assert status["reminder_job"]["id"] == "test-001"
+                assert status["reminder_job"]["enabled"] is True
+        finally:
+            import shutil
+
+            shutil.rmtree(workspace, ignore_errors=True)
+
+    def test_get_cron_status_reminder_job_every_schedule(self):
+        """测试: reminder_job 使用 every 类型调度时 expr 为 None"""
+        workspace = Path(tempfile.mkdtemp())
+
+        try:
+            with patch("src.core.plan.gateway_integration.CronService") as MockCron:
+                mock_cron = MagicMock()
+                mock_cron.status.return_value = {"jobs": 1}
+                reminder_job = CronJob(
+                    id="test-002",
+                    name="training_reminder",
+                    schedule=CronSchedule(kind="every", every_ms=86400000),
+                    enabled=True,
+                )
+                mock_cron.list_jobs.return_value = [reminder_job]
+                MockCron.return_value = mock_cron
+
+                integration = GatewayIntegration(workspace)
+                integration.setup_cron_service(auto_register_reminder=False)
+
+                status = integration.get_cron_status()
+
+                assert status["enabled"] is True
+                assert status["reminder_job"] is not None
+                assert status["reminder_job"]["cron"] is None
         finally:
             import shutil
 

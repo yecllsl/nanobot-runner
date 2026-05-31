@@ -1,8 +1,8 @@
 # Agent 相关命令
 # 包含 chat 和 memory 命令
 
+import asyncio
 import contextlib
-from typing import Any
 
 import typer
 
@@ -12,30 +12,6 @@ from src.core.base.exceptions import NanobotRunnerError
 app = typer.Typer(help="Agent 交互命令")
 
 
-async def _connect_mcp_tools(context: Any, agent: Any) -> dict[str, Any]:
-    """连接MCP服务器工具到Agent
-
-    从config.json读取MCP服务器配置，连接并注册工具。
-
-    Args:
-        context: 应用上下文
-        agent: AgentLoop实例
-
-    Returns:
-        dict[str, Any]: 连接结果
-    """
-    from src.core.tools.mcp_connector import connect_mcp_tools_from_config
-
-    config_path = context.config.config_file
-    try:
-        return await connect_mcp_tools_from_config(config_path, agent.tools)
-    except NanobotRunnerError as e:
-        import logging
-
-        logging.getLogger(__name__).warning(f"连接MCP工具失败: {e}")
-        return {"connected_servers": [], "failed_servers": [], "exit_stacks": {}}
-
-
 @app.command()
 def chat() -> None:
     """
@@ -43,7 +19,27 @@ def chat() -> None:
     """
     import asyncio
 
-    asyncio.run(_run_chat())
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_run_chat())
+    finally:
+        _force_cleanup_loop(loop)
+        loop.close()
+
+
+def _force_cleanup_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """强制清理事件循环中残留的异步任务
+
+    MCP 连接已通过 AgentLoop 原生 close_mcp() 清理（内部捕获了
+    anyio cancel scope 跨 task 错误），此处仅取消残留任务并关闭执行器。
+    跳过 shutdown_asyncgens 以避免 anyio 内部 async generator 导致卡死。
+    """
+    pending = {t for t in asyncio.all_tasks(loop) if not t.done()}
+    for task in pending:
+        task.cancel()
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    loop.run_until_complete(loop.shutdown_default_executor())
 
 
 async def _run_chat() -> None:
@@ -67,6 +63,8 @@ async def _run_chat() -> None:
     console.print("  - 输入 [bold]exit[/bold] 或 [bold]q[/bold] 退出")
     console.print()
 
+    agent = None
+
     try:
         context = get_context()
 
@@ -88,6 +86,10 @@ async def _run_chat() -> None:
         from nanobot.bus import MessageBus
 
         workspace = context.config.base_dir
+        from src.core.tools.mcp_connector import load_mcp_servers_config
+
+        mcp_config = load_mcp_servers_config(context.config.config_file)
+
         runner_tools = RunnerTools(context)
 
         bus = MessageBus()
@@ -100,14 +102,15 @@ async def _run_chat() -> None:
             context_window_tokens=agent_defaults.context_window_tokens,
             context_block_limit=agent_defaults.context_block_limit,
             max_tool_result_chars=agent_defaults.max_tool_result_chars,
+            mcp_servers=mcp_config,
         )
 
         for tool in create_tools(runner_tools):
             agent.tools.register(tool)
 
-        mcp_result = await _connect_mcp_tools(context, agent)
-        mcp_connected = mcp_result.get("connected_servers", [])
-        mcp_failed = mcp_result.get("failed_servers", [])
+        await agent._connect_mcp()
+        mcp_connected = list(agent._mcp_stacks.keys())
+        mcp_failed = [name for name in mcp_config if name not in mcp_connected]
 
         console.print("[bold green][OK] Agent 已初始化[/bold green]")
         console.print(f"[dim]模型: {llm_config.model}[/dim]")
@@ -145,6 +148,14 @@ async def _run_chat() -> None:
         console.print("[yellow]请确保已正确配置本地模型[/yellow]")
     finally:
         with contextlib.suppress(Exception):
+            if agent is not None:
+                for task in list(agent._background_tasks):
+                    task.cancel()
+                try:  # noqa: SIM105
+                    await asyncio.wait_for(agent.close_mcp(), timeout=5.0)
+                except (TimeoutError, asyncio.CancelledError):
+                    pass
+                agent.stop()
             adapter.close()
 
 

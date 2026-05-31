@@ -9,6 +9,58 @@
 
 ---
 
+## [0.27.0] - 2026-05-31
+
+### 版本主题
+**WebUI 基础** —— 配置驱动启用 nanobot-ai 内置 WebUI，AI 对话交互 + 基础设置
+
+> v0.27.0 是 Phase D（交互升级）的第二个版本，通过配置驱动方式启用 nanobot-ai 原生 WebUI，实现浏览器端 AI 对话交互能力，从纯 CLI 进化到 Web 交互。
+
+**本版本已实现**:
+- ✅ WebSocket 通道配置：config.json 新增 `websocket` 配置节，支持环境变量覆盖
+- ✅ Gateway CLI 增强：`gateway start --webui` 标志启用 WebUI
+- ✅ 品牌自定义：bot_name="Nanobot-Runner", bot_icon="🏃‍♂️"
+- ✅ 安全认证：默认启用 token 认证，仅监听 127.0.0.1
+- ✅ 向后兼容：不启用 WebUI 时飞书/CLI 功能不受影响
+- ✅ 全量回归 4489 用例零失败，覆盖率 81%
+
+### Added
+- ConfigManager.get_websocket_config() 方法，读取 WebSocket 通道配置，支持环境变量覆盖（NANOBOT_WS_*）
+- RunnerProviderAdapter.webui_enabled 参数，接收 CLI `--webui` 标志
+- RunnerProviderAdapter._build_websocket_channel_config() 方法，构建 WebSocket 通道配置
+- Gateway CLI `--webui` 标志，启用时自动配置 WebSocket 通道
+- WebUI 访问地址显示（http://{host}:{port}）
+- Token 获取方式提示（curl http://{host}:{port}/token）
+- WebUI Settings API 拦截（防止写入 ~/.nanobot/config.json，保持配置独立性）
+- 品牌字段支持（bot_name/bot_icon/unified_session）写入 AgentsConfig.defaults
+- ADR-015 WebSocket 通道配置方式决策记录
+- ADR-016 WebUI 启用方式决策记录
+- ADR-017 安全认证策略决策记录
+
+### Changed
+- RunnerProviderAdapter._build_nanobot_config_from_runner() 新增 WebSocket 配置构建逻辑
+- gateway start 命令启动信息显示 WebUI 专属交互信息
+
+### Security
+- WebSocket 通道默认仅监听 127.0.0.1（本地访问）
+- 默认启用 token 认证（websocket_requires_token=True）
+- 采用 token_issue_path 短期令牌签发机制
+
+### 测试验证
+- 新增 25 个 WebSocket 配置单元测试（test_websocket_config.py）
+- 新增 19 个 ProviderAdapter WebSocket 配置构建单元测试
+- 新增 25 个 WebUI 启动集成测试
+- 单元测试 4134 passed (100% 通过率)
+- 集成测试 355 passed (100% 通过率)
+- 代码覆盖率 core 81% ≥ 80% 目标
+
+### 文档产出
+- `docs/test/strategy_v0.27.0.md` - 测试策略
+- `docs/test/测试报告_v0.27.0.md` - 测试报告
+- `docs/test/上线结论_v0.27.0.md` - 上线结论（建议上线）
+
+---
+
 ## [0.26.0] - 2026-05-24
 
 ### 版本主题
