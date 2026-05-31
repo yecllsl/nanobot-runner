@@ -166,6 +166,47 @@ docs/archive/
 
 ---
 
+### v0.27.0 (2026-05-31)
+
+**归档内容**（共7个文档）：
+- **测试文档**（4个）：测试报告_v0.27.0.md、回归报告_v0.27.0.md、上线结论_v0.27.0.md、strategy_v0.27.0.md
+- **运维文档**（1个）：发布报告_v0.27.0.md
+- **评审文档**（1个）：代码评审报告_v0.27.0.md
+- **规划文档**（1个）：task_list_v0.27.0.md
+
+**版本特性 - WebUI 基础 v0.27.0**：
+- WebSocket 通道：浏览器端 AI 对话交互，默认启用 token 认证
+- Fallback Provider：可靠的 AI 响应回退机制
+- Gateway --webui 标志：一键启用 WebUI 模式
+- WebSocket 配置 Schema：完整的配置验证和读取
+- 新增测试：test_websocket_config.py、test_webui_startup.py、test_fallback_config.py
+
+**质量门禁**：
+- 测试：4591 passed, 2 skipped
+- ruff 代码检查：0 errors
+- mypy 类型检查：0 errors, 225 源文件
+- bandit 安全扫描：0 issues
+
+---
+
+### v0.26.0 (2026-05-24)
+
+**归档内容**（共5个文档）：
+- **测试文档**（3个）：测试报告_v0.26.0.md、回归报告_v0.26.0.md、上线结论_v0.26.0.md
+- **运维文档**（1个）：发布报告_v0.26.0.md
+- **评审文档**（1个）：代码评审报告_v0.26.0.md
+
+**版本特性 - Phase D 架构评审与产品规划 v0.26.0**：
+- 架构评审报告：Phase D 架构设计审查
+- 产品规划更新：Phase D 相关文档更新
+- nanobot-ai 0.2.0 适配：Model Presets、Reasoning Visualization、GoalState
+
+**质量门禁**：
+- 回归测试：全部通过
+- 代码评审：通过
+
+---
+
 ### v0.23.0 (2026-05-20)
 
 **归档内容**（共11个文档）：
