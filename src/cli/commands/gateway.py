@@ -308,9 +308,34 @@ def start(
     from nanobot.bus import MessageBus
     from nanobot.channels.manager import ChannelManager
     from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.session.manager import SessionManager
     from nanobot.utils.helpers import sync_workspace_templates
 
     sync_workspace_templates(workspace)
+
+    # v0.27.0: 自定义 WebUI 品牌配置
+    # 通过 monkey-patch 覆盖默认的 WebUI 静态文件路径
+    from pathlib import Path
+
+    import nanobot.channels.manager as manager_module
+
+    def _custom_webui_dist():
+        """返回项目自定义的 WebUI dist 目录"""
+        # 优先使用项目自定义的 webui 目录
+        custom_dist = Path(__file__).resolve().parent.parent.parent / "webui" / "dist"
+        if custom_dist.is_dir() and (custom_dist / "index.html").exists():
+            return custom_dist
+        # 回退到 nanobot 默认目录
+        try:
+            import nanobot.web as web_pkg
+
+            default_dist = Path(web_pkg.__file__).resolve().parent / "dist"
+            return default_dist if default_dist.is_dir() else None
+        except ImportError:
+            return None
+
+    # 保存原始函数并替换
+    manager_module._default_webui_dist = _custom_webui_dist
 
     bus = MessageBus()
 
@@ -332,7 +357,27 @@ def start(
 
     _connect_mcp_tools_sync(context, agent)
 
-    channels = ChannelManager(config=adapter._get_or_create_nanobot_config(), bus=bus)
+    # v0.27.0: 创建 SessionManager 以启用 WebUI 静态文件服务
+    session_manager = SessionManager(workspace=workspace)
+
+    # v0.27.0: 定义运行时模型名称回调，使WebUI显示实际使用的模型
+    def get_runtime_model_name():
+        """返回当前实际使用的模型名称"""
+        try:
+            # 优先从adapter获取实际配置的模型
+            if adapter and hasattr(adapter, "config"):
+                return adapter.config.llm_model
+        except Exception:
+            pass
+        # 回退到agent的模型
+        return agent.model if agent else None
+
+    channels = ChannelManager(
+        config=adapter._get_or_create_nanobot_config(),
+        bus=bus,
+        session_manager=session_manager,
+        webui_runtime_model_name=get_runtime_model_name,
+    )
 
     # v0.17.0: 使用 GatewayIntegration 集成 Cron + Hook
     from src.core.plan.gateway_integration import GatewayIntegration

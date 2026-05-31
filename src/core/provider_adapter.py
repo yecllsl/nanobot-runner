@@ -392,12 +392,16 @@ class RunnerProviderAdapter:
             # unified_session: 启用后 CLI/飞书/WebUI 共享同一会话，默认关闭
             unified_session = ws_config.get("unified_session", False)
 
+            # v0.27.0: 设置 workspace 为项目目录，避免使用默认的 ~/.nanobot
+            workspace_path = str(self._runner_config.base_dir / "workspace")
+
             agents = AgentsConfig(
                 defaults={
                     "model": llm_dict.get("model", "gpt-4o-mini"),
                     "bot_name": bot_name,
                     "bot_icon": bot_icon,
                     "unified_session": unified_session,
+                    "workspace": workspace_path,
                 },
             )
 

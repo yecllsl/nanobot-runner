@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v6.0.0 | **更新日期**: 2026-05-24
-> **当前基线**: v0.26.0
+> **版本**: v7.0.0 | **更新日期**: 2026-05-31
+> **当前基线**: v0.27.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -23,9 +23,10 @@
 
 **仅处理单用户本地跑步数据**，明确不支持：
 - 多租户系统
-- Web UI
 - 云端存储
 - 实时流处理
+
+> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互，但仍是单用户本地运行。
 
 ---
 
@@ -302,6 +303,16 @@ uv run nanobotrun system init
 uv run nanobotrun system config
 uv run nanobotrun system backup
 ```
+
+### Gateway 服务 (v0.27.0)
+
+```bash
+uv run nanobotrun gateway start                     # 启动飞书Gateway
+uv run nanobotrun gateway start --webui             # 启动Gateway并启用WebUI
+uv run nanobotrun gateway start --webui --port 18790 # 指定端口
+```
+
+> WebUI 启用后访问 http://127.0.0.1:8765，默认启用 token 认证。
 
 ### 代码质量
 

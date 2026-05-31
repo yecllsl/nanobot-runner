@@ -28,6 +28,8 @@ def mock_runner_config():
     config.get.return_value = None
     # 默认返回空的 WebSocket 配置，表示未启用
     config.get_websocket_config.return_value = {}
+    # 添加 base_dir 属性，避免 _build_nanobot_config_from_runner 失败
+    config.base_dir = Path("/test/runner")
     return config
 
 
@@ -825,6 +827,7 @@ class TestRunnerProviderAdapterFallback:
             },
         ]
         config.get_fallback_api_key.return_value = "nvapi-test"
+        config.base_dir = Path("/test/runner")
         return config
 
     def test_no_fallback_returns_plain_provider(self, mock_runner_config):
