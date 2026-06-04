@@ -2,14 +2,15 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
-> **文档版本**: v0.24.0 | **更新日期**: 2026-05-21
-> **当前基线**: v0.24.0 | **规划版本**: v0.25.0
+> **文档版本**: v0.28.0 | **更新日期**: 2026-06-04
+> **当前基线**: v0.27.0 | **规划版本**: v0.28.0
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
 > **v0.19.0 重要变更**: 新增身体信号分析模块(HRV/疲劳度/恢复评估)
 > **v0.20.0 重要变更**: 新增ML增强预测模块(VDOT/比赛成绩/伤病风险预测)
 > **v0.21.0 重要变更**: 新增数字孪生引擎(What-If推演/计划对比)
 > **v0.23.0 重要变更**: 新增自适应进化引擎(决策追踪/结果回填/用户反馈)
 > **v0.24.0 重要变更**: 完成测试验证体系升级，全量测试3937 cases通过，覆盖率81%
+> **v0.28.0 重要变更**: 新增WebUI数据可视化后端，10个FastAPI端点，6大页面
 
 ---
 
@@ -795,4 +796,192 @@ hook.finalize_content(decision, content)  # 完成决策日志记录
 |---------|------|
 | `check_plan_execution` | 检查计划执行忠实度 |
 | `check_prediction_accuracy` | 检查预测准确度 |
+
+---
+
+## WebUI 数据可视化 API (v0.28.0)
+
+**v0.28.0 新增**: FastAPI 数据可视化后端，独立运行在端口 8766，为 WebUI 前端提供 REST API。
+
+### 应用工厂
+
+```python
+from src.core.webui.app import create_webui_app
+
+# 创建 WebUI 应用
+app = create_webui_app()
+
+# 健康检查
+# GET /api/health → {"status": "ok", "version": "0.28.0"}
+```
+
+### 认证中间件
+
+所有 `/api/webui/*` 端点（除 `/api/health`）需携带有效 Token：
+
+```
+Authorization: Bearer <token>
+```
+
+Token 通过 nanobot-ai 的 `token_issue_path` 签发：
+```bash
+curl http://127.0.0.1:8765/token
+# → {"token": "eyJ...", "expires_in": 300}
+```
+
+### Dashboard API
+
+```python
+# GET /api/webui/dashboard?days=7
+# 返回: 今日概览 + 本周统计
+```
+
+**响应 Schema**:
+```json
+{
+  "today": {
+    "distance_km": 5.2,
+    "duration_s": 1800,
+    "avg_pace_min_km": 5.77,
+    "avg_hr": 152,
+    "is_rest_day": false
+  },
+  "week": {
+    "total_distance_km": 35.8,
+    "total_duration_s": 12600,
+    "total_tss": 450,
+    "run_count": 4
+  }
+}
+```
+
+### VDOT 趋势 API
+
+```python
+# GET /api/webui/vdot/trend?days=90
+# 返回: VDOT 趋势数据列表
+```
+
+**响应 Schema**:
+```json
+{
+  "items": [
+    {"date": "2026-05-01", "vdot": 45.2, "distance": 5000, "duration": 1500}
+  ],
+  "days": 90
+}
+```
+
+### 训练负荷 API
+
+```python
+# GET /api/webui/training-load?days=42
+# 返回: 当日 ATL/CTL/TSB 数据
+
+# GET /api/webui/training-load/trend?days=42
+# 返回: 训练负荷趋势数据列表
+```
+
+**响应 Schema**:
+```json
+{
+  "items": [
+    {"date": "2026-05-01", "atl": 65, "ctl": 58, "tsb": -7, "fitness_status": "optimal"}
+  ],
+  "days": 42
+}
+```
+
+`fitness_status` 取值: `fresh`(>15) / `optimal`(0~15) / `fatigued`(-30~0) / `overtrained`(<-30)
+
+### 活动列表 API
+
+```python
+# GET /api/webui/activities?page=1&size=20&start_date=2026-01-01&end_date=2026-12-31&min_distance=5000
+```
+
+**响应 Schema**:
+```json
+{
+  "total": 150,
+  "page": 1,
+  "size": 20,
+  "items": [
+    {
+      "id": "sha256_hash",
+      "date": "2026-05-01",
+      "distance_km": 10.5,
+      "duration": "0:52:30",
+      "avg_pace": "5'00\"",
+      "avg_hr": 155
+    }
+  ]
+}
+```
+
+### 活动详情 API
+
+```python
+# GET /api/webui/activities/{sha256_hash}
+# 返回: 单次跑步完整数据
+```
+
+**响应 Schema**:
+```json
+{
+  "id": "sha256_hash",
+  "date": "2026-05-01",
+  "distance_km": 10.5,
+  "duration_s": 3150,
+  "avg_pace_min_km": 5.0,
+  "avg_hr": 155,
+  "max_hr": 178,
+  "vdot": 45.2,
+  "tss": 85,
+  "calories": 650
+}
+```
+
+### 身体信号 API
+
+```python
+# GET /api/webui/body-signals          # 汇总
+# GET /api/webui/body-signals/hrv       # HRV 分析
+# GET /api/webui/body-signals/fatigue   # 疲劳度
+# GET /api/webui/body-signals/recovery  # 恢复状态
+```
+
+**HRV 响应**:
+```json
+{
+  "resting_hr_trend": [{"date": "2026-05-01", "resting_hr": 52}],
+  "estimated_rmssd": 45.2,
+  "estimated_sdnn": 52.8,
+  "assessment": "恢复良好"
+}
+```
+
+**疲劳响应**:
+```json
+{
+  "score": 45,
+  "level": "中等",
+  "status": "yellow",
+  "recommendation": "适合轻松跑"
+}
+```
+
+### Server 封装
+
+```python
+from src.core.webui.server import WebUIServer
+
+# 启动 WebUI 服务
+server = WebUIServer(app=app, host="127.0.0.1", port=8766)
+server.start()
+```
+
+**数据一致性**: 所有 WebUI API 与 CLI 使用相同数据源（AnalyticsEngine + SessionRepository），保证数值误差 < 0.1%。
+
+**性能**: 所有同步调用使用 `run_in_threadpool()` 包装，避免阻塞 asyncio 事件循环。
 

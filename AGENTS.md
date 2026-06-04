@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v7.0.0 | **更新日期**: 2026-05-31
-> **当前基线**: v0.27.0
+> **版本**: v8.0.0 | **更新日期**: 2026-06-04
+> **当前基线**: v0.28.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -26,7 +26,7 @@
 - 云端存储
 - 实时流处理
 
-> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互，但仍是单用户本地运行。
+> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互。v0.28.0 新增 WebUI 数据可视化，提供 6 大跑步数据页面。
 
 ---
 
@@ -39,6 +39,8 @@
 | **CLI框架** | Typer + Rich | Latest |
 | **数据存储** | Apache Parquet | via pyarrow |
 | **计算引擎** | Polars | 0.20+ |
+| **WebUI 后端** | FastAPI + uvicorn | 0.115+ / 0.30+ |
+| **WebUI 前端** | React + TypeScript + Recharts | via webui/ |
 | **ML框架** | scikit-learn | 1.5+ |
 | **科学计算** | scipy | 1.10+ |
 | **模型解释** | shap | 0.48+ |
@@ -96,6 +98,17 @@ src/
 │       ├── evolution_controller.py # 进化触发控制器 (v0.25.0)
 │       ├── prompt_tuner.py     # 提示参数调优器 (v0.25.0)
 │       └── evolution_reporter.py # 进化报告生成器 (v0.25.0)
+│   └── webui/                  # WebUI数据可视化后端 (v0.28.0)
+│       ├── app.py              # FastAPI应用工厂
+│       ├── auth.py             # Token认证中间件
+│       ├── server.py           # uvicorn Server封装
+│       ├── config.py           # WebUI配置
+│       └── routes/             # API路由层
+│           ├── dashboard.py    # 仪表盘API
+│           ├── vdot.py         # VDOT趋势API
+│           ├── training_load.py # 训练负荷API
+│           ├── activities.py   # 活动列表/详情API
+│           └── body_signal.py  # 身体信号API
 ├── agents/
 │   ├── tools.py                # Agent 工具集
 │   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
@@ -104,6 +117,10 @@ src/
     ├── commands/               # 命令模块
     ├── handlers/               # 业务逻辑调用层
     └── app.py                  # CLI 应用入口
+webui/                          # WebUI前端项目 (v0.28.0)
+├── src/                        # React组件和页面
+├── dist/                       # 构建产物
+└── package.json
 ```
 
 ### 3.2 核心数据流
@@ -312,7 +329,9 @@ uv run nanobotrun gateway start --webui             # 启动Gateway并启用WebU
 uv run nanobotrun gateway start --webui --port 18790 # 指定端口
 ```
 
-> WebUI 启用后访问 http://127.0.0.1:8765，默认启用 token 认证。
+> WebUI 启用后：
+> - AI 对话: http://127.0.0.1:8765（默认启用 token 认证）
+> - 数据可视化: http://127.0.0.1:8766（6大页面，需 token 认证）
 
 ### 代码质量
 
