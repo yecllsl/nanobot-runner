@@ -379,6 +379,20 @@ def start(
         webui_runtime_model_name=get_runtime_model_name,
     )
 
+    # v0.28.0: WebUI FastAPI 后端
+    fastapi_server = None
+    if webui and context is not None:
+        webui_config = context.config.get_webui_config()
+        if webui_config.get("enabled", False):
+            from src.core.webui.server import create_server
+
+            fastapi_server = create_server(context)
+            api_host = webui_config.get("host", "127.0.0.1")
+            api_port = webui_config.get("port", 8766)
+            console.print(
+                f"[green]✓[/green] WebUI API: http://{api_host}:{api_port}/api/docs"
+            )
+
     # v0.17.0: 使用 GatewayIntegration 集成 Cron + Hook
     from src.core.plan.gateway_integration import GatewayIntegration
 
@@ -489,6 +503,13 @@ def start(
         if ws_config.get("websocket_requires_token", True):
             console.print(f"  - 获取Token: curl http://{ws_host}:{ws_port}{token_path}")
 
+        # v0.28.0: WebUI API 文档
+        if fastapi_server is not None:
+            webui_config = context.config.get_webui_config()
+            api_host = webui_config.get("host", "127.0.0.1")
+            api_port = webui_config.get("port", 8766)
+            console.print(f"  - API文档: http://{api_host}:{api_port}/api/docs")
+
     console.print()
     console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
 
@@ -496,13 +517,19 @@ def start(
         try:
             await cron.start()
             await heartbeat.start()
-            await asyncio.gather(
+            gather_tasks = [
                 agent.run(),
                 channels.start_all(),
-            )
+            ]
+            if fastapi_server is not None:
+                gather_tasks.append(fastapi_server.serve())
+
+            await asyncio.gather(*gather_tasks)
         except KeyboardInterrupt:
             console.print("\n[yellow]正在关闭...[/yellow]")
         finally:
+            if fastapi_server is not None:
+                fastapi_server.should_exit = True
             await agent.close_mcp()
             heartbeat.stop()
             integration.shutdown()  # v0.17.0: 使用集成器关闭
