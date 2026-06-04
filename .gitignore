@@ -74,6 +74,31 @@ ehthumbs.db
 *~
 
 # ======================
+# WebUI 前端 (Node.js/React/Vite)
+# ======================
+
+# 依赖目录
+node_modules/
+
+# 构建产物
+webui/dist/
+
+# 构建缓存
+webui/.vite/
+
+# TypeScript 编译产物
+*.tsbuildinfo
+
+# 包管理器锁定文件
+webui/package-lock.json
+webui/yarn.lock
+webui/pnpm-lock.yaml
+
+# 编辑器/IDE
+webui/.vscode/
+webui/.idea/
+
+# ======================
 # 项目特定配置
 # ======================
 
@@ -82,11 +107,21 @@ ehthumbs.db
 .parquet_data/
 .fit_cache/
 
-# FIT 文件（仅保留测试数据）
+# Parquet 数据文件 (本地用户数据，按年分片)
+*.parquet
+
+# FIT 文件 (仅保留测试数据)
 *.fit
 !tests/data/fixtures/*.fit
 
+# ML 模型文件
+*.pkl
+*.joblib
+*.model
+model_*.bin
+
 # 测试和覆盖率
+.pytest_cache/
 .coverage
 .coverage.*
 coverage.xml

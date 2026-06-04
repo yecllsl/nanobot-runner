@@ -9,6 +9,70 @@
 
 ---
 
+## [0.28.0] - 2026-06-04
+
+### 版本主题
+**WebUI 数据可视化** —— 扩展 WebUI，增加跑步数据可视化能力，6 大页面全面展示跑步数据
+
+> v0.28.0 是 Phase D（交互升级）的第三个版本，在 v0.27.0 WebUI 基础之上，新增完整的跑步数据可视化能力，从纯 AI 对话交互进化到数据可视化 + AI 对话双模式。
+
+**本版本已实现**:
+- ✅ 后端 FastAPI 服务：独立运行在端口 8766，10 个 API 端点
+- ✅ 前端 React SPA：6 个页面（Dashboard/VDOT/训练负荷/活动列表/活动详情/身体信号）
+- ✅ Gateway 集成：`gateway start --webui` 同时启动 AI 对话 (8765) + 数据可视化 (8766)
+- ✅ Token 认证：所有 API 端点需认证，共享 nanobot-ai 令牌机制
+- ✅ 数据一致性：WebUI 数据与 CLI 输出同源，误差 < 0.1%
+- ✅ 全量回归测试 126 用例零失败，后端覆盖率 100%
+
+### Added
+- `src/core/webui/` 模块：FastAPI 应用工厂、认证中间件、路由层、服务层
+- `webui/` 前端项目：React + TypeScript + Vite + Recharts + TailwindCSS
+- Dashboard API：`GET /api/webui/dashboard`，返回今日概览 + 本周统计
+- VDOT 趋势 API：`GET /api/webui/vdot/trend`，返回 VDOT 趋势数据
+- 训练负荷 API：`GET /api/webui/training-load` 和 `GET /api/webui/training-load/trend`
+- 活动列表 API：`GET /api/webui/activities`，支持分页/时间/距离筛选
+- 活动详情 API：`GET /api/webui/activities/{id}`，id 为 SHA256 哈希
+- 身体信号 API：4 个端点（汇总/HRV/疲劳/恢复）
+- WebUI 前端 6 个页面：Dashboard、VDOT 趋势、训练负荷、活动列表、活动详情、身体信号
+- `useTimeRange` Hook：全局时间范围状态管理（7/30/90/365 天）
+- Gateway `--webui` 标志增强：同时启动 FastAPI 数据可视化服务
+- `uvicorn.Server.serve()` 启动方式，与现有事件循环兼容
+- 前端 SPA 同源部署（端口 8766），避免 CORS 问题
+- 51 个 Python 后端单元测试 + 10 个前端单元测试
+- 60 个集成测试 + 5 个 E2E 测试
+
+### Changed
+- Gateway 启动流程：`--webui` 标志现在同时启动 AI 对话服务 (8765) 和数据可视化服务 (8766)
+- WebUI 访问地址从 8765 变更为 8766（数据可视化专用端口）
+- `pyproject.toml` wheel targets 包含 `webui/dist/` 前端构建产物
+
+### Security
+- 所有 WebUI API 端点默认启用 Token 认证
+- 仅监听 127.0.0.1（本地访问）
+- 共享 nanobot-ai 的 token_issue_path 短期令牌签发机制
+
+### 测试验证
+- 新增 51 个后端 Python 单元测试（`tests/unit/core/webui/`）
+- 新增 10 个前端 TypeScript 单元测试（`webui/src/__tests__/`）
+- 新增 25 个 WebUI 启动集成测试
+- 新增 35 个场景集成测试
+- 新增 5 个 E2E 用户旅程测试
+- 后端覆盖率：app.py 100%、auth.py 93%、routes/*.py 100%、server.py 100%
+- 全量测试通过率 100%（126/126）
+
+### 文档产出
+- `docs/test/strategy_v0.28.0.md` - 测试策略
+- `docs/test/测试报告_v0.28.0.md` - 测试报告
+- `docs/planning/task_list_v0.28.0.md` - 任务清单（22 项任务）
+- `docs/architecture/架构评审报告-v0.28.0.md` - 架构评审报告
+
+### 已知问题
+- P1: Token 签发端点无速率限制（v0.29.0 修复）
+- P2: 代码路径与架构设计文档需统一（v0.29.0 修复）
+- P2: JWT 密钥长度警告（配置层面确保 ≥32 字节即可）
+
+---
+
 ## [0.27.0] - 2026-05-31
 
 ### 版本主题

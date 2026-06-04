@@ -78,6 +78,21 @@
     "unified_session": false,
     "unified_session_comment": "是否启用统一会话模式，开启后 WebUI 与 CLI 共享同一会话上下文"
   },
+  "webui": {
+    "_comment": "WebUI FastAPI 后端配置",
+    "enabled": false,
+    "enabled_comment": "是否启用 WebUI REST API 后端",
+    "host": "127.0.0.1",
+    "host_comment": "FastAPI 服务监听地址",
+    "port": 8766,
+    "port_comment": "FastAPI 服务监听端口，与 WebSocket 端口分离",
+    "cors_origins": ["http://127.0.0.1:8765", "http://localhost:8765"],
+    "cors_origins_comment": "CORS 允许的来源列表，需包含 WebUI 前端地址",
+    "token_secret": "",
+    "token_secret_comment": "JWT 签名密钥，生产环境务必设置强密钥，为空则自动生成",
+    "token_ttl_s": 86400,
+    "token_ttl_s_comment": "JWT 令牌有效时长（秒），默认 24 小时"
+  },
   "tools": {
     "mcp_servers": {
       "weather": {

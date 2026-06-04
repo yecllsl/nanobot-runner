@@ -38,6 +38,7 @@ class AppConfig:
     model_presets: dict[str, dict[str, Any]] | None = None
     fallback_models: list[str] | None = None
     websocket: dict[str, Any] | None = None
+    webui: dict[str, Any] | None = None
 
     REQUIRED_FIELDS: ClassVar[list[str]] = ["version", "data_dir"]
 
@@ -56,6 +57,7 @@ class AppConfig:
         "model_presets": (dict, type(None)),
         "fallback_models": (list, type(None)),
         "websocket": (dict, type(None)),
+        "webui": (dict, type(None)),
     }
 
     @classmethod
@@ -193,6 +195,7 @@ class AppConfig:
             "model_presets": self.model_presets,
             "fallback_models": self.fallback_models,
             "websocket": self.websocket,
+            "webui": self.webui,
         }
 
     def __post_init__(self) -> None:

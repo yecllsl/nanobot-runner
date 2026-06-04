@@ -46,11 +46,20 @@ WS_ENV_KEY_MAPPING: dict[str, str] = {
     "token_issue_secret": "NANOBOT_WS_TOKEN_SECRET",
 }
 
+# WebUI 环境变量映射，支持 NANOBOT_WEBUI_* 环境变量覆盖配置文件值
+WEBUI_ENV_KEY_MAPPING: dict[str, str] = {
+    "enabled": "NANOBOT_WEBUI_ENABLED",
+    "host": "NANOBOT_WEBUI_HOST",
+    "port": "NANOBOT_WEBUI_PORT",
+    "token_secret": "NANOBOT_WEBUI_TOKEN_SECRET",
+    "token_ttl_s": "NANOBOT_WEBUI_TOKEN_TTL_S",
+}
+
 # 需要布尔类型转换的配置键
 BOOL_KEYS: set[str] = {"auto_push_feishu", "enabled"}
 
 # 需要整数类型转换的配置键
-INT_KEYS: set[str] = {"default_year", "port"}
+INT_KEYS: set[str] = {"default_year", "port", "token_ttl_s"}
 
 
 class ConfigManager:
@@ -476,6 +485,42 @@ class ConfigManager:
                 ws_config[ws_key] = self._cast_env_value(ws_key, env_value)
 
         return ws_config
+
+    def get_webui_config(self) -> dict[str, Any]:
+        """获取 WebUI REST API 配置
+
+        从 config.json 的 webui 配置节读取，支持环境变量覆盖。
+        优先级：环境变量 > 配置文件 > 默认值
+
+        Returns:
+            dict[str, Any]: WebUI 配置字典，配置节不存在时返回含默认值的 dict
+        """
+        config = self.load_config()
+
+        # 读取 webui 配置节，不存在或类型异常时使用默认值
+        webui_raw: Any = config.get("webui", {})
+        if not isinstance(webui_raw, dict):
+            webui_config: dict[str, Any] = {}
+        else:
+            webui_config = dict(webui_raw)
+
+        # 环境变量覆盖
+        for webui_key, env_key in WEBUI_ENV_KEY_MAPPING.items():
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                webui_config[webui_key] = self._cast_env_value(webui_key, env_value)
+
+        # 填充默认值（仅在字段缺失时）
+        webui_config.setdefault("enabled", False)
+        webui_config.setdefault("host", "127.0.0.1")
+        webui_config.setdefault("port", 8766)
+        webui_config.setdefault(
+            "cors_origins", ["http://127.0.0.1:8765", "http://localhost:8765"]
+        )
+        webui_config.setdefault("token_secret", "")
+        webui_config.setdefault("token_ttl_s", 86400)
+
+        return webui_config
 
     def has_llm_config(self) -> bool:
         """检查是否配置了LLM
