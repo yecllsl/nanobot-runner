@@ -83,6 +83,9 @@ git checkout v0.9.0 -- docs/
 docs/archive/
 ├── .gitignore           # 排除.zip文件
 ├── README.md            # 本文件（归档索引）
+├── v0.28.0-archive.zip # v0.28.0版本归档（本地备份，不提交）
+├── v0.27.0-archive.zip # v0.27.0版本归档（本地备份，不提交）
+├── v0.26.0-archive.zip # v0.26.0版本归档（本地备份，不提交）
 ├── v0.25.0-archive.zip # v0.25.0版本归档（本地备份，不提交）
 ├── v0.24.0-archive.zip # v0.24.0版本归档（本地备份，不提交）
 ├── v0.23.0-archive.zip # v0.23.0版本归档（本地备份，不提交）
@@ -114,6 +117,81 @@ docs/archive/
 ---
 
 ## 📋 归档清单
+
+### v0.28.0 (2026-06-05)
+
+**归档内容**（共11个文档）：
+- **测试文档**（2个）：测试报告_v0.28.0.md、strategy_v0.28.0.md
+- **运维文档**（2个）：发布报告_v0.28.0.md、流水线执行报告_v0.28.0.md
+- **评审文档**（1个）：代码评审报告_v0.28.0_REV-01.md
+- **架构文档**（1个）：架构评审报告-v0.28.0.md
+- **规划文档**（1个）：task_list_v0.28.0.md
+- **规格设计**（1个）：2026-05-23-nanobot-0.2.0-upgrade-design.md
+- **实施计划**（3个）：2026-05-30-fallback-provider.md、2026-06-04-webui-backend.md、2026-06-04-webui-frontend.md
+
+**版本特性 - WebUI数据可视化 v0.28.0**：
+- WebUI 后端：FastAPI + uvicorn 数据可视化服务（端口8766）
+- WebUI 前端：React + TypeScript + Recharts 6大页面
+- Dashboard API：今日概览/本周统计
+- VDOT API：VDOT趋势数据/预测区间
+- 训练负荷 API：ATL/CTL/TSB趋势/疲劳状态
+- 活动 API：活动列表/详情/筛选/分页
+- 身体信号 API：HRV/疲劳/恢复数据
+- 认证中间件：Token认证机制
+
+**质量门禁**：
+- 测试：4647 passed, 0 failed (100%)
+- ruff 代码检查：0 errors
+- mypy 类型检查：0 errors
+- 代码覆盖率：83%
+
+---
+
+### v0.27.0 (2026-05-31)
+
+**归档内容**（共11个文档）：
+- **测试文档**（4个）：测试报告_v0.27.0.md、回归报告_v0.27.0.md、上线结论_v0.27.0.md、strategy_v0.27.0.md
+- **运维文档**（2个）：发布报告_v0.27.0.md、流水线执行报告_v0.27.0.md
+- **评审文档**（2个）：代码评审报告_v0.27.0.md、2026-05-26-v0.27-架构评审报告.md
+- **规划文档**（1个）：task_list_v0.27.0.md
+- **规格设计**（2个）：2026-05-30-fallback-provider-design.md、2026-05-28-webui-settings-api-intercept-design.md
+- **实施计划**（1个）：2026-05-26-v0.27-webui-basics.md
+
+**版本特性 - WebUI 基础 v0.27.0**：
+- WebSocket 通道：浏览器端 AI 对话交互，默认启用 token 认证
+- Fallback Provider：可靠的 AI 响应回退机制
+- Gateway --webui 标志：一键启用 WebUI 模式
+- WebSocket 配置 Schema：完整的配置验证和读取
+- 新增测试：test_websocket_config.py、test_webui_startup.py、test_fallback_config.py
+
+**质量门禁**：
+- 测试：4591 passed, 2 skipped
+- ruff 代码检查：0 errors
+- mypy 类型检查：0 errors, 225 源文件
+- bandit 安全扫描：0 issues
+
+---
+
+### v0.26.0 (2026-05-24)
+
+**归档内容**（共9个文档）：
+- **测试文档**（5个）：测试报告_v0.26.0.md、回归报告_v0.26.0.md、上线结论_v0.26.0.md、strategy_v0.26.0.md、Bug清单_v0.26.0.md
+- **运维文档**（2个）：发布报告_v0.26.0.md、流水线执行报告_v0.26.0.md
+- **规划文档**（1个）：task_list_v0.26.0.md
+- **实施计划**（1个）：2026-05-24-v0.26.0-base-upgrade.md
+
+**版本特性 - 底座升级 + 新特性适配 v0.26.0**：
+- nanobot-ai 0.2.0 适配：Model Presets、Reasoning Visualization、GoalState
+- GoalState 跨对话目标追踪
+- 推理可见化：Agent 推理过程记录到 DecisionLog
+- Model Presets CLI：`nanobotrun model list` 查看预设列表
+- 依赖冲突预检、配置兼容性验证、ToolRegistry 注册验证
+
+**质量门禁**：
+- 回归测试：全部通过
+- 代码评审：通过
+
+---
 
 ### v0.22.1 (2026-05-18)
 
@@ -163,47 +241,6 @@ docs/archive/
 - 回归测试：全部通过
 - mypy 类型检查：通过
 - ruff 代码检查：通过
-
----
-
-### v0.27.0 (2026-05-31)
-
-**归档内容**（共7个文档）：
-- **测试文档**（4个）：测试报告_v0.27.0.md、回归报告_v0.27.0.md、上线结论_v0.27.0.md、strategy_v0.27.0.md
-- **运维文档**（1个）：发布报告_v0.27.0.md
-- **评审文档**（1个）：代码评审报告_v0.27.0.md
-- **规划文档**（1个）：task_list_v0.27.0.md
-
-**版本特性 - WebUI 基础 v0.27.0**：
-- WebSocket 通道：浏览器端 AI 对话交互，默认启用 token 认证
-- Fallback Provider：可靠的 AI 响应回退机制
-- Gateway --webui 标志：一键启用 WebUI 模式
-- WebSocket 配置 Schema：完整的配置验证和读取
-- 新增测试：test_websocket_config.py、test_webui_startup.py、test_fallback_config.py
-
-**质量门禁**：
-- 测试：4591 passed, 2 skipped
-- ruff 代码检查：0 errors
-- mypy 类型检查：0 errors, 225 源文件
-- bandit 安全扫描：0 issues
-
----
-
-### v0.26.0 (2026-05-24)
-
-**归档内容**（共5个文档）：
-- **测试文档**（3个）：测试报告_v0.26.0.md、回归报告_v0.26.0.md、上线结论_v0.26.0.md
-- **运维文档**（1个）：发布报告_v0.26.0.md
-- **评审文档**（1个）：代码评审报告_v0.26.0.md
-
-**版本特性 - Phase D 架构评审与产品规划 v0.26.0**：
-- 架构评审报告：Phase D 架构设计审查
-- 产品规划更新：Phase D 相关文档更新
-- nanobot-ai 0.2.0 适配：Model Presets、Reasoning Visualization、GoalState
-
-**质量门禁**：
-- 回归测试：全部通过
-- 代码评审：通过
 
 ---
 
