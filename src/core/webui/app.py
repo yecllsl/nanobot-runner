@@ -2,15 +2,19 @@
 
 创建和配置 FastAPI 应用实例，注册路由和中间件。
 通过 create_app() 工厂函数注入 AppContext 依赖。
+支持挂载前端静态文件，提供 SPA fallback 路由。
 """
 
 from __future__ import annotations
 
 import secrets
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.core.webui.auth import create_access_token
 
@@ -92,5 +96,58 @@ def create_app(context: AppContext) -> FastAPI:
     app.include_router(activities_router, prefix="/api", tags=["activities"])
     app.include_router(body_signal_router, prefix="/api", tags=["body-signal"])
 
+    # 挂载前端静态文件（SPA 模式）
+    # 优先查找项目 webui/dist 目录，回退到 nanobot 内置目录
+    _mount_frontend(app)
+
     _app_instance = app
     return app
+
+
+def _find_webui_dist() -> Path | None:
+    """查找前端构建产物目录
+
+    Returns:
+        Path | None: dist 目录路径，不存在时返回 None
+    """
+    # 优先使用项目 webui/dist 目录
+    project_dist = Path(__file__).resolve().parent.parent.parent.parent / "webui" / "dist"
+    if project_dist.is_dir() and (project_dist / "index.html").exists():
+        return project_dist
+
+    # 回退到 nanobot 内置目录
+    try:
+        import nanobot.web as web_pkg
+
+        default_dist = Path(web_pkg.__file__).resolve().parent / "dist"
+        if default_dist.is_dir() and (default_dist / "index.html").exists():
+            return default_dist
+    except ImportError:
+        pass
+
+    return None
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """挂载前端静态文件并提供 SPA fallback
+
+    静态资源（/assets/*）由 StaticFiles 处理，
+    其他非 /api 路径回退到 index.html（SPA 路由）。
+    """
+    dist_dir = _find_webui_dist()
+    if dist_dir is None:
+        return
+
+    assets_dir = dist_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    # SPA fallback：非 /api 路径返回 index.html
+    @app.get("/{path:path}", include_in_schema=False)
+    async def serve_spa(path: str) -> FileResponse:
+        """SPA fallback 路由，所有非 API 路径返回 index.html"""
+        # 尝试匹配 dist 中的实际文件（如 favicon.ico）
+        candidate = dist_dir / path
+        if path and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(dist_dir / "index.html"))

@@ -17,10 +17,17 @@ logger = get_logger(__name__)
 app = typer.Typer(help="Gateway 服务命令")
 
 
-def _connect_mcp_tools_sync(context: Any, agent: Any) -> dict[str, Any]:
-    """同步方式连接MCP服务器工具到Agent
+async def _connect_mcp_tools_async(context: Any, agent: Any) -> dict[str, Any]:
+    """异步方式连接MCP服务器工具到Agent
 
-    在Gateway同步启动流程中调用，通过asyncio.run执行异步连接。
+    在 run() 异步函数内调用，使用独立 task 执行 MCP 连接，
+    隔离 anyio cancel scope 对主事件循环中其他 task 的影响。
+
+    MCP stdio_client 使用 anyio 的 TaskGroup 和 cancel scope，
+    当 stdio 传输的异步生成器清理时，cancel scope 会尝试取消
+    同一 scope 下的所有 asyncio task（包括 uvicorn 等），
+    导致服务意外崩溃。通过在独立 task 中执行连接，
+    将 anyio cancel scope 的作用域限制在该 task 内。
 
     Args:
         context: 应用上下文
@@ -32,18 +39,24 @@ def _connect_mcp_tools_sync(context: Any, agent: Any) -> dict[str, Any]:
     from src.core.tools.mcp_connector import connect_mcp_tools_from_config
 
     config_path = context.config.config_file
-    try:
-        result = asyncio.run(connect_mcp_tools_from_config(config_path, agent.tools))
-        connected = result.get("connected_servers", [])
-        failed = result.get("failed_servers", [])
-        if connected:
-            logger.info(f"MCP工具已连接: {connected}")
-        if failed:
-            logger.warning(f"MCP连接失败: {failed}")
-        return result.get("exit_stacks", {})
-    except NanobotRunnerError as e:
-        logger.warning(f"连接MCP工具失败: {e}")
-        return {}
+
+    async def _do_connect() -> dict[str, Any]:
+        try:
+            return await connect_mcp_tools_from_config(config_path, agent.tools)
+        except NanobotRunnerError as e:
+            logger.warning(f"连接MCP工具失败: {e}")
+            return {"connected_servers": [], "failed_servers": [], "exit_stacks": {}}
+
+    # 在独立 task 中执行连接，隔离 anyio cancel scope
+    result = await asyncio.create_task(_do_connect())
+
+    connected = result.get("connected_servers", [])
+    failed = result.get("failed_servers", [])
+    if connected:
+        logger.info(f"MCP工具已连接: {connected}")
+    if failed:
+        logger.warning(f"MCP连接失败: {failed}")
+    return result.get("exit_stacks", {})
 
 
 def _format_stats(data: dict) -> str:
@@ -355,7 +368,10 @@ def start(
             agent.tools.register(tool)
         _register_runner_commands(agent, runner_tools)
 
-    _connect_mcp_tools_sync(context, agent)
+    # MCP工具连接移至 run() 异步函数内，避免 asyncio.run() 跨事件循环导致
+    # stdio_client cancel scope 冲突 (RuntimeError: Attempted to exit cancel scope
+    # in a different task than it was entered in)
+    mcp_context = (context, agent) if context else None
 
     # v0.27.0: 创建 SessionManager 以启用 WebUI 静态文件服务
     session_manager = SessionManager(workspace=workspace)
@@ -380,18 +396,18 @@ def start(
     )
 
     # v0.28.0: WebUI FastAPI 后端
+    # --webui 标志即为启动条件，无需额外检查 webui.enabled 配置
     fastapi_server = None
     if webui and context is not None:
         webui_config = context.config.get_webui_config()
-        if webui_config.get("enabled", False):
-            from src.core.webui.server import create_server
+        from src.core.webui.server import create_server
 
-            fastapi_server = create_server(context)
-            api_host = webui_config.get("host", "127.0.0.1")
-            api_port = webui_config.get("port", 8766)
-            console.print(
-                f"[green]✓[/green] WebUI API: http://{api_host}:{api_port}/api/docs"
-            )
+        fastapi_server = create_server(context)
+        api_host = webui_config.get("host", "127.0.0.1")
+        api_port = webui_config.get("port", 8766)
+        console.print(
+            f"[green][OK][/green] WebUI API: http://{api_host}:{api_port}/api/docs"
+        )
 
     # v0.17.0: 使用 GatewayIntegration 集成 Cron + Hook
     from src.core.plan.gateway_integration import GatewayIntegration
@@ -435,7 +451,7 @@ def start(
 
     if channels.enabled_channels:
         console.print(
-            f"[green]✓[/green] 已启用通道: {', '.join(channels.enabled_channels)}"
+            f"[green][OK][/green] 已启用通道: {', '.join(channels.enabled_channels)}"
         )
         # v0.27.0: WebSocket 通道启用时，显示 WebUI 访问地址与安全提示
         if "websocket" in channels.enabled_channels and context is not None:
@@ -443,7 +459,7 @@ def start(
             ws_host = ws_config.get("host", "127.0.0.1")
             ws_port = ws_config.get("port", 8765)
             console.print(
-                f"[green]✓[/green] WebUI 访问地址: http://{ws_host}:{ws_port}"
+                f"[green][OK][/green] WebUI 访问地址: http://{ws_host}:{ws_port}"
             )
             # Token 获取方式提示
             if ws_config.get("websocket_requires_token", True):
@@ -466,17 +482,17 @@ def start(
     cron_status_info = integration.get_cron_status()
     if cron_status_info.get("enabled"):
         console.print(
-            f"[green]✓[/green] 定时任务: {cron_status_info.get('jobs_count', 0)} 个"
+            f"[green][OK][/green] 定时任务: {cron_status_info.get('jobs_count', 0)} 个"
         )
         if cron_status_info.get("reminder_job"):
             reminder = cron_status_info["reminder_job"]
-            console.print(f"[green]✓[/green] 训练提醒: {reminder['cron']}")
+            console.print(f"[green][OK][/green] 训练提醒: {reminder['cron']}")
         elif cron_status_info.get("reminder_enabled"):
             console.print("[yellow]! 训练提醒已启用但未注册任务[/yellow]")
     else:
         console.print("[yellow]! Cron服务未启用[/yellow]")
 
-    console.print(f"[green]✓[/green] 心跳检测: 每 {hb_interval_s} 秒")
+    console.print(f"[green][OK][/green] 心跳检测: 每 {hb_interval_s} 秒")
     console.print()
     console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
     console.print("  - /stats - 查看训练统计")
@@ -515,25 +531,47 @@ def start(
 
     async def run():
         try:
+            # 在同一事件循环内连接MCP工具，避免跨事件循环的cancel scope冲突
+            if mcp_context is not None:
+                await _connect_mcp_tools_async(mcp_context[0], mcp_context[1])
+
             await cron.start()
             await heartbeat.start()
-            gather_tasks = [
+
+            # 将 uvicorn 放在独立 task 中运行，隔离 anyio cancel scope 的影响
+            # MCP stdio_client 使用 anyio TaskGroup，清理时 cancel scope 会取消
+            # 同一 scope 下的 asyncio task，导致 uvicorn 等服务被意外取消
+            if fastapi_server is not None:
+                webui_task = asyncio.create_task(fastapi_server.serve())
+            else:
+                webui_task = None
+
+            # agent.run() 和 channels.start_all() 使用 return_exceptions
+            # 防止 MCP cancel scope 异常级联
+            results = await asyncio.gather(
                 agent.run(),
                 channels.start_all(),
-            ]
-            if fastapi_server is not None:
-                gather_tasks.append(fastapi_server.serve())
-
-            await asyncio.gather(*gather_tasks)
+                return_exceptions=True,
+            )
+            for i, r in enumerate(results):
+                if isinstance(r, Exception) and not isinstance(r, KeyboardInterrupt):
+                    logger.warning(f"服务任务异常退出: {r}")
         except KeyboardInterrupt:
             console.print("\n[yellow]正在关闭...[/yellow]")
         finally:
+            # 按顺序优雅关闭：先停 uvicorn → 停通道 → 停心跳 → 关闭 MCP
             if fastapi_server is not None:
                 fastapi_server.should_exit = True
-            await agent.close_mcp()
-            heartbeat.stop()
-            integration.shutdown()  # v0.17.0: 使用集成器关闭
-            agent.stop()
+            if webui_task is not None and not webui_task.done():
+                webui_task.cancel()
             await channels.stop_all()
+            heartbeat.stop()
+            integration.shutdown()
+            agent.stop()
+            # MCP 关闭可能产生 cancel scope 冲突，隔离异常避免影响其他清理
+            try:
+                await agent.close_mcp()
+            except (RuntimeError, BaseExceptionGroup, asyncio.CancelledError) as e:
+                logger.debug(f"MCP关闭时异常（可忽略）: {e}")
 
     asyncio.run(run())
