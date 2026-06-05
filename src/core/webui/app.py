@@ -111,7 +111,9 @@ def _find_webui_dist() -> Path | None:
         Path | None: dist 目录路径，不存在时返回 None
     """
     # 优先使用项目 webui/dist 目录
-    project_dist = Path(__file__).resolve().parent.parent.parent.parent / "webui" / "dist"
+    project_dist = (
+        Path(__file__).resolve().parent.parent.parent.parent / "webui" / "dist"
+    )
     if project_dist.is_dir() and (project_dist / "index.html").exists():
         return project_dist
 
