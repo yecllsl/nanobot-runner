@@ -230,12 +230,16 @@ class TestModelManagerAutoUpdate:
 
     def test_auto_update_no_need(self, tmp_path):
         mm = ModelManager(models_dir=str(tmp_path / "models"))
+        # 使用最近日期（昨天），确保不触发 AUTO_UPDATE_MIN_DAYS(30) 阈值
+        from datetime import datetime, timedelta
+
+        recent_date = (datetime.now() - timedelta(days=1)).isoformat()
         mm.save_model(
             "vdot_predictor",
             {"test": True},
             {
                 "version": "v1",
-                "trained_at": "2026-05-08T10:00:00",
+                "trained_at": recent_date,
             },
         )
         result = mm.trigger_auto_update_if_needed("vdot_predictor", new_samples=0)
