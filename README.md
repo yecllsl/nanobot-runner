@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-4134%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.28.0 - WebUI 数据可视化，6 大页面全面展示跑步数据
+> **最新版本**: v0.29.0 - WebUI 管理控制台，训练计划管理 + 进化引擎控制台 + 设置中心
 
 ## 项目简介
 
@@ -135,13 +135,16 @@ uv run nanobotrun gateway start --webui             # 启用WebUI（AI对话8765
 🔑 Token获取:       curl http://127.0.0.1:8765/token
 ```
 
-**6 大页面**:
+**10 大页面** (v0.29.0):
 - **Dashboard**: 今日概览 + 本周统计
 - **VDOT 趋势**: VDOT 变化趋势图
 - **训练负荷**: ATL/CTL/TSB 趋势 + 疲劳状态
 - **活动列表**: 跑步记录浏览/筛选/分页
 - **活动详情**: 单次跑步完整数据 + 配速/心率曲线
 - **身体信号**: HRV/疲劳度/恢复状态
+- **训练计划** (NEW): 日历/列表双视图 + 执行进度 + AI/手工双模式调整
+- **进化引擎** (NEW): 进化状态面板 + 提示参数调优 + 月度进化报告
+- **设置中心** (NEW): 个人资料 + 偏好设置 + 系统配置
 
 ## 项目结构
 

@@ -6,6 +6,10 @@ import TrainingLoadPage from './pages/TrainingLoadPage';
 import ActivitiesPage from './pages/ActivitiesPage';
 import ActivityDetailPage from './pages/ActivityDetailPage';
 import BodySignalsPage from './pages/BodySignalsPage';
+import PlanPage from './pages/PlanPage';
+import EvolutionPage from './pages/EvolutionPage';
+import EvolutionReportPage from './pages/EvolutionReportPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   return (
@@ -18,6 +22,10 @@ function App() {
           <Route path="/activities" element={<ActivitiesPage />} />
           <Route path="/activities/:id" element={<ActivityDetailPage />} />
           <Route path="/body-signals" element={<BodySignalsPage />} />
+          <Route path="/plan" element={<PlanPage />} />
+          <Route path="/evolution" element={<EvolutionPage />} />
+          <Route path="/evolution/reports/:month" element={<EvolutionReportPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

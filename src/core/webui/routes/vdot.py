@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.concurrency import run_in_threadpool
 
 from src.core.webui.auth import get_current_user
 
+if TYPE_CHECKING:
+    from src.core.base.context import AppContext
+
 router = APIRouter()
 
 
-def _get_vdot_trend(context: Any, days: int = 30) -> dict[str, Any]:
+def _get_vdot_trend(context: AppContext, days: int = 30) -> dict[str, Any]:
     """同步获取 VDOT 趋势数据
 
     Args:

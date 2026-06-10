@@ -6,6 +6,9 @@ const navItems = [
   { path: '/training-load', label: '负荷', icon: '💪' },
   { path: '/activities', label: '活动', icon: '🏃' },
   { path: '/body-signals', label: '身体', icon: '❤️' },
+  { path: '/plan', label: '计划', icon: '📋' },
+  { path: '/evolution', label: '进化', icon: '🧬' },
+  { path: '/settings', label: '设置', icon: '⚙️' },
 ];
 
 export default function Sidebar() {

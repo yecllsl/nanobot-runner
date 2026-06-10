@@ -308,3 +308,29 @@ class EvolutionEngine:
         self._require_v025_component("prompt_tuner")
         assert self._prompt_tuner is not None
         return self._prompt_tuner.reset_to_default()
+
+    def get_available_report_months(self) -> list[str]:
+        """获取可用的进化报告月份列表
+
+        通过扫描 decisions/ 目录下的月份子目录（YYYY-MM格式）确定。
+
+        Returns:
+            list[str]: 可用的月份列表，按时间倒序排列
+        """
+        self._require_v025_component("evolution_reporter")
+        assert self._evolution_reporter is not None
+        store = self._evolution_reporter._store
+        decisions_dir = store.data_dir / "decisions"
+        months: list[str] = []
+        if decisions_dir.exists():
+            import re
+
+            months = sorted(
+                [
+                    d.name
+                    for d in decisions_dir.iterdir()
+                    if d.is_dir() and re.match(r"\d{4}-\d{2}", d.name)
+                ],
+                reverse=True,
+            )
+        return months
