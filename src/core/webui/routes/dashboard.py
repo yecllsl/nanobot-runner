@@ -5,17 +5,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
 
 from src.core.webui.auth import get_current_user
 
+if TYPE_CHECKING:
+    from src.core.base.context import AppContext
+
 router = APIRouter()
 
 
-def _get_dashboard_data(context: Any) -> dict[str, Any]:
+def _get_dashboard_data(context: AppContext) -> dict[str, Any]:
     """同步获取 Dashboard 汇总数据
 
     Args:

@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.concurrency import run_in_threadpool
 
 from src.core.webui.auth import get_current_user
 
+if TYPE_CHECKING:
+    from src.core.base.context import AppContext
+
 router = APIRouter()
 
 
-def _get_training_load(context: Any, days: int = 42) -> dict[str, Any]:
+def _get_training_load(context: AppContext, days: int = 42) -> dict[str, Any]:
     """同步获取训练负荷数据
 
     Args:
@@ -22,7 +25,7 @@ def _get_training_load(context: Any, days: int = 42) -> dict[str, Any]:
     return context.analytics.get_training_load(days=days)
 
 
-def _get_training_load_trend(context: Any, days: int = 90) -> dict[str, Any]:
+def _get_training_load_trend(context: AppContext, days: int = 90) -> dict[str, Any]:
     """同步获取训练负荷趋势数据
 
     Args:

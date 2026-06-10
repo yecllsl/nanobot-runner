@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v8.0.0 | **更新日期**: 2026-06-04
-> **当前基线**: v0.28.0
+> **版本**: v9.0.0 | **更新日期**: 2026-06-10
+> **当前基线**: v0.29.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -98,7 +98,7 @@ src/
 │       ├── evolution_controller.py # 进化触发控制器 (v0.25.0)
 │       ├── prompt_tuner.py     # 提示参数调优器 (v0.25.0)
 │       └── evolution_reporter.py # 进化报告生成器 (v0.25.0)
-│   └── webui/                  # WebUI数据可视化后端 (v0.28.0)
+│   └── webui/                  # WebUI数据可视化后端 (v0.28.0-v0.29.0)
 │       ├── app.py              # FastAPI应用工厂
 │       ├── auth.py             # Token认证中间件
 │       ├── server.py           # uvicorn Server封装
@@ -108,7 +108,10 @@ src/
 │           ├── vdot.py         # VDOT趋势API
 │           ├── training_load.py # 训练负荷API
 │           ├── activities.py   # 活动列表/详情API
-│           └── body_signal.py  # 身体信号API
+│           ├── body_signal.py  # 身体信号API
+│           ├── evolution.py    # 进化引擎API (v0.29.0)
+│           ├── plan.py         # 训练计划API (v0.29.0)
+│           └── settings.py     # 设置中心API (v0.29.0)
 ├── agents/
 │   ├── tools.py                # Agent 工具集
 │   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
@@ -331,7 +334,9 @@ uv run nanobotrun gateway start --webui --port 18790 # 指定端口
 
 > WebUI 启用后：
 > - AI 对话: http://127.0.0.1:8765（默认启用 token 认证）
-> - 数据可视化: http://127.0.0.1:8766（6大页面，需 token 认证）
+> - 数据可视化: http://127.0.0.1:8766（10大页面，需 token 认证）
+>   - v0.28.0: Dashboard、VDOT趋势、训练负荷、活动列表、活动详情、身体信号
+>   - v0.29.0: 训练计划管理、进化引擎控制台、月度进化报告、设置中心
 
 ### 代码质量
 

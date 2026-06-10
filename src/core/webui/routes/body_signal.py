@@ -5,17 +5,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
 
 from src.core.webui.auth import get_current_user
 
+if TYPE_CHECKING:
+    from src.core.base.context import AppContext
+
 router = APIRouter()
 
 
-def _get_daily_summary(context: Any) -> dict[str, Any]:
+def _get_daily_summary(context: AppContext) -> dict[str, Any]:
     """同步获取每日身体信号摘要
 
     Args:
@@ -25,7 +28,7 @@ def _get_daily_summary(context: Any) -> dict[str, Any]:
     return summary.to_dict()
 
 
-def _get_weekly_summary(context: Any) -> dict[str, Any]:
+def _get_weekly_summary(context: AppContext) -> dict[str, Any]:
     """同步获取每周身体信号摘要
 
     Args:
@@ -35,7 +38,7 @@ def _get_weekly_summary(context: Any) -> dict[str, Any]:
     return summary.to_dict()
 
 
-def _get_alerts(context: Any) -> dict[str, Any]:
+def _get_alerts(context: AppContext) -> dict[str, Any]:
     """同步获取身体信号预警
 
     Args:

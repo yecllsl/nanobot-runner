@@ -9,6 +9,93 @@
 
 ---
 
+## [0.29.0] - 2026-06-10
+
+### 版本主题
+**WebUI 管理控制台** —— 新增训练计划管理、进化引擎控制台、设置中心，从数据可视化进化到完整的管理控制台
+
+> v0.29.0 是 Phase D（交互升级）的第四个版本，在 v0.28.0 WebUI 数据可视化基础之上，新增训练计划管理、进化引擎控制台、设置中心三大模块，WebUI 从纯数据展示进化到完整的管理控制台。
+
+**本版本已实现**:
+- ✅ 训练计划管理：日历/列表双视图展示计划 + 执行进度 + AI/手工双模式调整
+- ✅ 进化引擎控制台：进化状态面板 + 提示参数调优 + 月度进化报告
+- ✅ 设置中心：个人资料 + 偏好设置 + 连接状态 + 系统配置
+- ✅ 后端新增 13 个 API 端点（evolution 5个、plan 5个、settings 3个）
+- ✅ 前端新增 4 个页面（EvolutionPage、EvolutionReportPage、PlanPage、SettingsPage）
+- ✅ 全量测试 47 用例零失败，后端覆盖率 96-100%
+
+### Added
+- `src/core/webui/routes/evolution.py`：进化引擎 WebUI 路由模块
+  - `GET /api/evolution/status`：获取进化引擎状态（只读）
+  - `GET /api/evolution/tuning`：获取当前提示调优参数
+  - `PUT /api/evolution/tuning`：更新提示调优参数（tone/detail/aggressive/data-driven）
+  - `GET /api/evolution/reports`：获取月度进化报告月份列表
+  - `GET /api/evolution/reports/{month}`：获取指定月份进化报告详情
+- `src/core/webui/routes/plan.py`：训练计划 WebUI 路由模块
+  - `GET /api/plan/list`：获取训练计划列表（支持status/limit筛选）
+  - `GET /api/plan/calendar`：获取日历视图数据
+  - `GET /api/plan/{plan_id}`：获取训练计划详情
+  - `GET /api/plan/progress/{plan_id}`：获取计划执行进度
+  - `PUT /api/plan/daily/{plan_id}/{date}`：更新单日训练详情
+- `src/core/webui/routes/settings.py`：设置中心 WebUI 路由模块
+  - `GET /api/settings/profile`：获取个人资料
+  - `PUT /api/settings/profile`：更新个人资料
+  - `GET /api/settings/system`：获取系统配置
+- `webui/src/api/evolution.ts`：进化引擎 API 客户端
+- `webui/src/api/plan.ts`：训练计划 API 客户端
+- `webui/src/api/settings.ts`：设置中心 API 客户端
+- `webui/src/pages/EvolutionPage.tsx`：进化引擎控制台页面
+- `webui/src/pages/EvolutionReportPage.tsx`：月度进化报告详情页
+- `webui/src/pages/PlanPage.tsx`：训练计划管理页面（日历/列表双视图）
+- `webui/src/pages/SettingsPage.tsx`：设置中心页面
+- `webui/src/components/plan/`：训练计划相关组件
+  - 日历视图组件
+  - 计划列表组件
+  - 执行进度环形图
+  - 计划编辑表单
+- `EvolutionEngine.get_available_report_months()` 公共方法：封装目录扫描逻辑，供 WebUI 路由调用
+- 35 个 Python 后端单元测试（`tests/unit/core/webui/test_routes_evolution.py`、`test_routes_plan.py`、`test_routes_settings.py`）
+- 12 个集成测试（`tests/integration/module/test_webui_v0290_routes.py`）
+
+### Changed
+- `src/core/evolution/evolution_engine.py`：新增 `get_available_report_months()` 公共方法，暴露月度报告列表查询能力
+- `src/core/webui/app.py`：注册 evolution/plan/settings 路由
+- `src/core/webui/routes/`：现有路由增加认证中间件一致性校验
+- `webui/src/App.tsx`：新增路由配置（/evolution、/evolution/report、/plan、/settings）
+- `webui/src/components/layout/Sidebar.tsx`：侧边栏新增"计划"、"进化"、"设置"导航项
+- `pyproject.toml`：版本号更新为 0.29.0
+- `docs/architecture/架构设计说明书.md`：更新架构图，补充 WebUI 管理控制台模块
+- `docs/requirements/REQ_需求规格说明书.md`：新增 v0.29.0 需求条目
+
+### Security
+- 所有新增 WebUI API 端点默认启用 Token 认证
+- 仅监听 127.0.0.1（本地访问）
+- 计划调整 API 复用现有 Agent 对话认证机制
+
+### 测试验证
+- 新增 35 个后端 Python 单元测试（`tests/unit/core/webui/`）
+- 新增 12 个集成测试（`tests/integration/module/`）
+- 后端覆盖率：evolution.py 100%、plan.py 97%、settings.py 96%
+- 全量测试通过率 100%（47/47）
+- ruff check：0 errors, 0 warnings
+- mypy 类型检查：Success: no issues found
+
+### Bug 修复
+- 修复集成测试路径前缀错误（`/api/webui/` → `/api/`）
+- 修复 evolution 路由方法名错误（`check_triggers()` → `check_evolution_triggers()`）
+- 修复 evolution 路由私有属性访问问题（新增公共方法封装）
+
+### 文档产出
+- `docs/test/strategy_v0.29.0.md` - 测试策略
+- `docs/test/测试报告_v0.29.0.md` - 测试报告
+- `docs/test/Bug清单_v0.29.0.md` - Bug 清单
+- `docs/architecture/review/2026-06-09-v0.29.0-架构评审报告.md` - 架构评审报告
+
+### 已知问题
+- 无阻塞上线的缺陷
+
+---
+
 ## [0.28.0] - 2026-06-04
 
 ### 版本主题

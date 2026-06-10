@@ -26,7 +26,7 @@
 
 ### 1.4 依赖检查
 
-- [ ] 执行 `uv sync --all-extras`
+- [ ] 执行 `uv sync --group dev`
 - [ ] 确认依赖版本兼容
 
 ## 2. 发布执行

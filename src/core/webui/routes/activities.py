@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
 
 from src.core.webui.auth import get_current_user
+
+if TYPE_CHECKING:
+    from src.core.base.context import AppContext
 
 router = APIRouter()
 
@@ -29,14 +32,18 @@ def _compute_session_id(timestamp: str) -> str:
     return hashlib.sha256(timestamp.encode("utf-8")).hexdigest()
 
 
-def _get_activities(context: Any, limit: int = 20) -> dict[str, Any]:
+def _get_activities(context: AppContext, limit: int = 20) -> dict[str, Any]:
     """同步获取最近活动列表
 
     Args:
         context: 应用上下文实例
         limit: 返回数量限制
     """
-    sessions = context.session_repo.get_recent_sessions(limit=limit)
+    try:
+        sessions = context.session_repo.get_recent_sessions(limit=limit)
+    except Exception:
+        # 仓库异常时返回空列表，避免内部错误泄露
+        sessions = []
 
     items = []
     for s in sessions:
@@ -53,7 +60,7 @@ def _get_activities(context: Any, limit: int = 20) -> dict[str, Any]:
     }
 
 
-def _get_activity_detail(context: Any, session_id: str) -> dict[str, Any] | None:
+def _get_activity_detail(context: AppContext, session_id: str) -> dict[str, Any] | None:
     """同步获取单个活动详情（通过SHA256哈希ID）
 
     Args:
