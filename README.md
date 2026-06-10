@@ -41,7 +41,7 @@ cd nanobot-runner
 
 # 使用 uv 安装
 uv venv
-uv sync --all-extras
+uv sync
 
 # 激活虚拟环境
 # Windows PowerShell

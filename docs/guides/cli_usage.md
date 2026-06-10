@@ -72,7 +72,7 @@ uv venv
 source .venv/bin/activate
 
 # 同步依赖
-uv sync --all-extras
+uv sync
 
 # 验证安装
 uv run nanobotrun --help
