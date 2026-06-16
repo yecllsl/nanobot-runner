@@ -83,6 +83,7 @@ git checkout v0.9.0 -- docs/
 docs/archive/
 ├── .gitignore           # 排除.zip文件
 ├── README.md            # 本文件（归档索引）
+├── v0.29.0-archive.zip # v0.29.0版本归档（本地备份，不提交）
 ├── v0.28.0-archive.zip # v0.28.0版本归档（本地备份，不提交）
 ├── v0.27.0-archive.zip # v0.27.0版本归档（本地备份，不提交）
 ├── v0.26.0-archive.zip # v0.26.0版本归档（本地备份，不提交）
