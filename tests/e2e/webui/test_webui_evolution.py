@@ -3,8 +3,6 @@
 测试进化状态面板、提示参数调优、月度进化报告。
 """
 
-import pytest
-
 
 class TestEvolutionStatusPanel:
     """进化状态面板测试"""

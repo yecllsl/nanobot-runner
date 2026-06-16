@@ -4,8 +4,6 @@
 注意：AI 对话功能在 Gateway 端口 8765，数据可视化在 API 端口 8766。
 """
 
-import pytest
-
 
 class TestAIChatEntry:
     """AI 对话入口测试"""
@@ -18,7 +16,9 @@ class TestAIChatEntry:
         link = page.locator("a:has-text('Agent对话')")
         assert link.is_visible()
 
-    def test_agent_chat_link_navigates_to_gateway(self, page, webui_base_url, auth_headers):
+    def test_agent_chat_link_navigates_to_gateway(
+        self, page, webui_base_url, auth_headers
+    ):
         """Agent 对话链接应指向 Gateway 端口"""
         page.goto(f"{webui_base_url}/")
         page.wait_for_load_state("networkidle")

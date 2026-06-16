@@ -3,8 +3,6 @@
 测试 VDOT 趋势、训练负荷、活动列表、身体信号等数据可视化页面。
 """
 
-import pytest
-
 
 class TestVdotPage:
     """VDOT 趋势页面测试"""
@@ -36,7 +34,10 @@ class TestVdotPage:
         page.goto(f"{webui_base_url}/vdot")
         page.wait_for_load_state("networkidle")
         # 检查最新VDOT/最高VDOT/数据点等统计
-        assert page.locator("text=最新VDOT").is_visible() or page.locator("text=均值").is_visible()
+        assert (
+            page.locator("text=最新VDOT").is_visible()
+            or page.locator("text=均值").is_visible()
+        )
 
 
 class TestTrainingLoadPage:
@@ -89,7 +90,10 @@ class TestActivitiesPage:
         page.goto(f"{webui_base_url}/activities")
         page.wait_for_load_state("networkidle")
         # 检查是否有日期格式的数据（2026-）
-        assert page.locator("text=/2026-/").first.is_visible() or page.locator("text=暂无数据").is_visible()
+        assert (
+            page.locator("text=/2026-/").first.is_visible()
+            or page.locator("text=暂无数据").is_visible()
+        )
 
 
 class TestBodySignalsPage:

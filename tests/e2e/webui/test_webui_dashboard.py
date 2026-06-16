@@ -3,8 +3,6 @@
 测试仪表盘页面加载、训练负荷卡片、身体信号摘要、最近活动列表。
 """
 
-import pytest
-
 
 class TestDashboardPageLoad:
     """仪表盘页面加载测试"""

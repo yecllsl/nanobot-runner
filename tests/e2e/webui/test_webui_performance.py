@@ -6,8 +6,6 @@
 
 import time
 
-import pytest
-
 
 class TestAPIResponseTime:
     """API 响应时间测试"""

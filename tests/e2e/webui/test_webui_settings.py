@@ -3,8 +3,6 @@
 测试个人信息、偏好设置、系统配置。
 """
 
-import pytest
-
 
 class TestSettingsProfile:
     """个人信息设置测试"""

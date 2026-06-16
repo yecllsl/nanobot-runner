@@ -3,7 +3,6 @@
 测试 JWT Token 认证机制，包括 Token 签发、验证、过期等场景。
 """
 
-import pytest
 from src.core.webui.auth import create_access_token
 
 
@@ -36,10 +35,7 @@ class TestAuthentication:
     def test_access_api_with_expired_token(self, client):
         """使用过期 Token 访问受保护 API 应返回 401"""
         # 签发一个已过期的 Token（ttl_seconds=0）
-        expired_token = create_access_token(
-            secret="e2e-test-secret-key",
-            ttl_seconds=0
-        )
+        expired_token = create_access_token(secret="e2e-test-secret-key", ttl_seconds=0)
         headers = {"Authorization": f"Bearer {expired_token}"}
         response = client.get("/api/dashboard", headers=headers)
         assert response.status_code == 401

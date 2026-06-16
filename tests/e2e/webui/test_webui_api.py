@@ -3,8 +3,6 @@
 覆盖所有 13 个 API 端点的基本功能、认证、错误处理。
 """
 
-import pytest
-
 
 class TestHealthEndpoint:
     """健康检查端点测试"""
@@ -171,7 +169,9 @@ class TestPlanAPI:
 
     def test_get_plan_progress_not_found(self, client, auth_headers):
         """GET /api/plan/progress/{id} 不存在的计划应返回 404"""
-        response = client.get("/api/plan/progress/nonexistent-plan", headers=auth_headers)
+        response = client.get(
+            "/api/plan/progress/nonexistent-plan", headers=auth_headers
+        )
         assert response.status_code == 404
 
 
@@ -199,7 +199,9 @@ class TestEvolutionAPI:
     def test_update_tuning_params(self, client, auth_headers):
         """PUT /api/evolution/tuning 应更新参数"""
         payload = {"tone": 0.7, "detail": 0.6}
-        response = client.put("/api/evolution/tuning", json=payload, headers=auth_headers)
+        response = client.put(
+            "/api/evolution/tuning", json=payload, headers=auth_headers
+        )
         assert response.status_code == 200
 
     def test_list_reports(self, client, auth_headers):
@@ -229,7 +231,9 @@ class TestSettingsAPI:
     def test_update_profile(self, client, auth_headers):
         """PUT /api/settings/profile 应更新个人信息"""
         payload = {"nickname": "新昵称"}
-        response = client.put("/api/settings/profile", json=payload, headers=auth_headers)
+        response = client.put(
+            "/api/settings/profile", json=payload, headers=auth_headers
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True

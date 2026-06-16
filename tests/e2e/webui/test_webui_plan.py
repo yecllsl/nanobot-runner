@@ -3,8 +3,6 @@
 测试训练计划日历视图、列表视图、执行进度、AI调整模式、手工调整模式。
 """
 
-import pytest
-
 
 class TestPlanCalendarView:
     """训练计划日历视图测试"""
@@ -20,7 +18,9 @@ class TestPlanCalendarView:
         page.goto(f"{webui_base_url}/plan")
         page.wait_for_load_state("networkidle")
         # 检查日历容器
-        calendar = page.locator(".calendar-container, .plan-calendar, [class*='calendar']").first
+        calendar = page.locator(
+            ".calendar-container, .plan-calendar, [class*='calendar']"
+        ).first
         assert calendar.is_visible() or page.is_visible("text=暂无训练计划")
 
     def test_calendar_week_month_switch(self, page, webui_base_url, auth_headers):
@@ -61,7 +61,9 @@ class TestPlanProgress:
         page.goto(f"{webui_base_url}/plan")
         page.wait_for_load_state("networkidle")
         # 检查进度图表
-        progress = page.locator(".progress-ring, .progress-chart, [class*='progress']").first
+        progress = page.locator(
+            ".progress-ring, .progress-chart, [class*='progress']"
+        ).first
         assert progress.is_visible() or page.is_visible("text=暂无")
 
     def test_fidelity_metrics(self, page, webui_base_url, auth_headers):

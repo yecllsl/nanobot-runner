@@ -4,13 +4,13 @@
 使用 FastAPI TestClient + Mock Context 进行数据一致性验证。
 """
 
-import pytest
-
 
 class TestDataConsistencyDashboard:
     """仪表盘数据一致性测试"""
 
-    def test_dashboard_training_load_values_match(self, client, auth_headers, mock_context):
+    def test_dashboard_training_load_values_match(
+        self, client, auth_headers, mock_context
+    ):
         """仪表盘训练负荷数据应与 analytics 引擎一致"""
         response = client.get("/api/dashboard", headers=auth_headers)
         assert response.status_code == 200
@@ -20,14 +20,18 @@ class TestDataConsistencyDashboard:
         expected_load = mock_context.analytics.get_training_load.return_value
         assert data["training_load"] == expected_load
 
-    def test_dashboard_body_signal_values_match(self, client, auth_headers, mock_context):
+    def test_dashboard_body_signal_values_match(
+        self, client, auth_headers, mock_context
+    ):
         """仪表盘身体信号数据应与 body_signal_engine 一致"""
         response = client.get("/api/dashboard", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
         # 验证 API 返回的身体信号数据与 mock_context 一致
-        expected_summary = mock_context.body_signal_engine.get_daily_summary.return_value.to_dict()
+        expected_summary = (
+            mock_context.body_signal_engine.get_daily_summary.return_value.to_dict()
+        )
         assert data["body_signal"] == expected_summary
 
 
