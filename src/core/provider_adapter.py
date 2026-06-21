@@ -442,10 +442,44 @@ class RunnerProviderAdapter:
                         "nanobot-ai 不支持 InlineFallbackConfig，跳过 fallback 注入"
                     )
 
+            # 注入 model_presets 到 nanobot Config（v0.30.0: nanobot-ai 0.2.1 运行时模型切换）
+            model_presets_dict: dict[str, Any] = {}
+            try:
+                from nanobot.config.schema import ModelPresetConfig as _MPC
+
+                presets_raw = runner_config.get("model_presets", {})
+                for preset_name, preset_data in presets_raw.items():
+                    if not isinstance(preset_data, dict):
+                        continue
+                    # config.json 使用 snake_case，ModelPresetConfig 使用 camelCase
+                    model_presets_dict[preset_name] = _MPC(
+                        model=preset_data.get("model", ""),
+                        provider=preset_data.get("provider", "auto"),
+                        maxTokens=preset_data.get(
+                            "maxTokens",
+                            preset_data.get("max_tokens", 8192),
+                        ),
+                        contextWindowTokens=preset_data.get(
+                            "contextWindowTokens",
+                            preset_data.get("context_window_tokens", 65536),
+                        ),
+                        temperature=preset_data.get("temperature", 0.1),
+                        reasoningEffort=preset_data.get(
+                            "reasoningEffort",
+                            preset_data.get("reasoning_effort", None),
+                        ),
+                        label=preset_data.get("label", None),
+                    )
+            except ImportError:
+                logger.debug(
+                    "nanobot-ai 不支持 ModelPresetConfig，跳过 model_presets 注入"
+                )
+
             config = Config(
                 providers=providers,
                 agents=agents,
                 channels=channels,
+                model_presets=model_presets_dict,
             )
 
             self._nanobot_config = config
