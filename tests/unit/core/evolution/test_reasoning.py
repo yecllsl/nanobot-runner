@@ -85,8 +85,8 @@ class TestReasoningVisualization:
         self, hook: DecisionLogHook, mock_context: MagicMock
     ) -> None:
         """emit_reasoning 应将推理片段追加到缓冲区"""
-        hook.emit_reasoning(mock_context, "分析用户VDOT趋势...")
-        hook.emit_reasoning(mock_context, "VDOT呈上升趋势，建议增加训练量")
+        run_async(hook.emit_reasoning("分析用户VDOT趋势..."))
+        run_async(hook.emit_reasoning("VDOT呈上升趋势，建议增加训练量"))
         assert len(hook._reasoning_buffer) == 2
         assert hook._reasoning_buffer[0] == "分析用户VDOT趋势..."
         assert hook._reasoning_buffer[1] == "VDOT呈上升趋势，建议增加训练量"
@@ -95,17 +95,17 @@ class TestReasoningVisualization:
         self, hook: DecisionLogHook, mock_context: MagicMock
     ) -> None:
         """emit_reasoning_end 应标记推理结束"""
-        hook.emit_reasoning(mock_context, "推理片段")
-        hook.emit_reasoning_end(mock_context)
+        run_async(hook.emit_reasoning("推理片段"))
+        run_async(hook.emit_reasoning_end())
         assert hook._reasoning_complete is True
 
     def test_finalize_content_includes_reasoning_snapshot(
         self, hook: DecisionLogHook, engine: EvolutionEngine, mock_context: MagicMock
     ) -> None:
         """finalize_content 应将推理缓冲区写入 DecisionLog 上下文快照"""
-        hook.emit_reasoning(mock_context, "第一步推理")
-        hook.emit_reasoning(mock_context, "第二步推理")
-        hook.emit_reasoning_end(mock_context)
+        run_async(hook.emit_reasoning("第一步推理"))
+        run_async(hook.emit_reasoning("第二步推理"))
+        run_async(hook.emit_reasoning_end())
 
         hook.finalize_content(mock_context, "以下是训练建议")
 
@@ -130,8 +130,8 @@ class TestReasoningVisualization:
         self, hook: DecisionLogHook, engine: EvolutionEngine, mock_context: MagicMock
     ) -> None:
         """finalize_content 后推理缓冲区应被清空"""
-        hook.emit_reasoning(mock_context, "推理内容")
-        hook.emit_reasoning_end(mock_context)
+        run_async(hook.emit_reasoning("推理内容"))
+        run_async(hook.emit_reasoning_end())
         hook.finalize_content(mock_context, "训练建议")
 
         assert hook._reasoning_buffer == []
@@ -141,8 +141,8 @@ class TestReasoningVisualization:
         self, hook: DecisionLogHook, mock_context: MagicMock
     ) -> None:
         """before_iteration 应重置推理状态"""
-        hook.emit_reasoning(mock_context, "推理")
-        hook.emit_reasoning_end(mock_context)
+        run_async(hook.emit_reasoning("推理"))
+        run_async(hook.emit_reasoning_end())
 
         run_async(hook.before_iteration(mock_context))
 

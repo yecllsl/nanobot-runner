@@ -99,6 +99,10 @@ class TestDecisionLogHookInheritance:
         """before_iteration应为异步方法"""
         assert inspect.iscoroutinefunction(hook.before_iteration)
 
+    def test_after_iteration_is_async(self, hook: DecisionLogHook) -> None:
+        """after_iteration应为异步方法（v0.30.0: nanobot-ai 0.2.1 改为 async）"""
+        assert inspect.iscoroutinefunction(hook.after_iteration)
+
     def test_before_execute_tools_is_async(self, hook: DecisionLogHook) -> None:
         """before_execute_tools应为异步方法"""
         assert inspect.iscoroutinefunction(hook.before_execute_tools)
@@ -551,7 +555,7 @@ class TestDecisionLogHookV025Integration:
         hook = DecisionLogHook(evolution_engine=mock_engine)
         hook._decision_logged = True
 
-        hook.after_iteration(MagicMock())
+        run_async(hook.after_iteration(MagicMock()))
         mock_engine.check_evolution_triggers.assert_called_once()
 
     def test_after_iteration_triggers_async_execution_via_engine(self) -> None:
@@ -580,7 +584,7 @@ class TestDecisionLogHookV025Integration:
         hook = DecisionLogHook(evolution_engine=mock_engine)
         hook._decision_logged = True
 
-        hook.after_iteration(MagicMock())
+        run_async(hook.after_iteration(MagicMock()))
 
         # 等待daemon线程执行
         time.sleep(0.5)
@@ -599,4 +603,4 @@ class TestDecisionLogHookV025Integration:
         hook._decision_logged = True
 
         # 不应抛出异常
-        hook.after_iteration(MagicMock())
+        run_async(hook.after_iteration(MagicMock()))
