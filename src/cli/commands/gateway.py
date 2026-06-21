@@ -320,7 +320,7 @@ def start(
     from nanobot.agent import AgentLoop
     from nanobot.bus import MessageBus
     from nanobot.channels.manager import ChannelManager
-    from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.cron.types import CronSchedule
     from nanobot.session.manager import SessionManager
     from nanobot.utils.helpers import sync_workspace_templates
 
@@ -424,30 +424,29 @@ def start(
 
     # 设置流式输出Hook
     streaming_hook = integration.setup_streaming_hook()
-    if streaming_hook and hasattr(agent, "hooks"):
-        agent.hooks.register(streaming_hook)
+    # v0.30.0: nanobot-ai 0.2.1 中 AgentLoop 无公开 hooks 属性
+    # 改用 _extra_hooks 列表直接追加
+    if streaming_hook:
+        agent._extra_hooks.append(streaming_hook)
 
-    def on_heartbeat_execute():
-        console.print("[dim]心跳检测执行中...[/dim]")
-
-    def on_heartbeat_notify(channel: str, chat_id: str, response: str):
-        from nanobot.bus import OutboundMessage
-
-        bus.publish_outbound(
-            OutboundMessage(channel=channel, chat_id=chat_id, content=response)
-        )
-
+    # v0.30.0: HeartbeatService 在 nanobot-ai 0.2.1 中已移除
+    # 改用 CronService 注册心跳任务
     hb_interval_s = 300
     hb_enabled = True
-    heartbeat = HeartbeatService(
-        workspace=workspace,
-        provider=provider,
-        model=agent.model,
-        on_execute=on_heartbeat_execute,
-        on_notify=on_heartbeat_notify,
-        interval_s=hb_interval_s,
-        enabled=hb_enabled,
-    )
+    hb_interval_minutes = max(1, hb_interval_s // 60)  # Cron 最小粒度为分钟
+
+    if hb_enabled:
+        try:
+            cron.add_job(
+                name="heartbeat",
+                schedule=CronSchedule(
+                    kind="cron", expr=f"*/{hb_interval_minutes} * * * *"
+                ),
+                message="心跳检测",
+            )
+            logger.info(f"心跳Cron任务已注册: 每 {hb_interval_minutes} 分钟")
+        except Exception as e:
+            logger.warning(f"注册心跳Cron任务失败: {e}")
 
     if channels.enabled_channels:
         console.print(
@@ -492,7 +491,9 @@ def start(
     else:
         console.print("[yellow]! Cron服务未启用[/yellow]")
 
-    console.print(f"[green][OK][/green] 心跳检测: 每 {hb_interval_s} 秒")
+    console.print(
+        f"[green][OK][/green] 心跳检测: 每 {hb_interval_minutes} 分钟 (CronService)"
+    )
     console.print()
     console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
     console.print("  - /stats - 查看训练统计")
@@ -536,7 +537,6 @@ def start(
                 await _connect_mcp_tools_async(mcp_context[0], mcp_context[1])
 
             await cron.start()
-            await heartbeat.start()
 
             # 将 uvicorn 放在独立 task 中运行，隔离 anyio cancel scope 的影响
             # MCP stdio_client 使用 anyio TaskGroup，清理时 cancel scope 会取消
@@ -565,7 +565,6 @@ def start(
             if webui_task is not None and not webui_task.done():
                 webui_task.cancel()
             await channels.stop_all()
-            heartbeat.stop()
             integration.shutdown()
             agent.stop()
             # MCP 关闭可能产生 cancel scope 冲突，隔离异常避免影响其他清理
