@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nanobot Runner - 跑者智能伙伴</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 80px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .hero-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 {
+            font-size: 2.8em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+        }
+
+        .hero .subtitle {
+            font-size: 1.4em;
+            color: #666;
+            font-weight: 300;
+        }
+
+        .hero .tagline {
+            display: inline-block;
+            margin-top: 25px;
+            padding: 10px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50px;
+            font-weight: 500;
+            font-size: 1.1em;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .section-icon {
+            font-size: 32px;
+            margin-right: 15px;
+        }
+
+        .section h2 {
+            font-size: 1.8em;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .section h3 {
+            font-size: 1.3em;
+            color: #667eea;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .section p {
+            margin-bottom: 15px;
+            color: #555;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-left: 5px solid #667eea;
+            padding: 20px 25px;
+            margin: 20px 0;
+            border-radius: 0 12px 12px 0;
+        }
+
+        .highlight-box strong {
+            color: #667eea;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .feature-item {
+            background: #f8f9ff;
+            padding: 25px;
+            border-radius: 16px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .feature-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+
+        .feature-item .icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+
+        .feature-item h4 {
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .feature-item p {
+            font-size: 0.95em;
+            color: #666;
+            margin: 0;
+        }
+
+        .pain-point {
+            display: flex;
+            align-items: flex-start;
+            margin: 15px 0;
+            padding: 15px;
+            background: #fff5f5;
+            border-radius: 12px;
+        }
+
+        .pain-point .emoji {
+            font-size: 24px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .pain-point p {
+            margin: 0;
+            color: #555;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            font-size: 0.95em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .footer p {
+            font-size: 0.95em;
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 15px;
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50px;
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .github-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 {
+                font-size: 2em;
+            }
+
+            .hero .subtitle {
+                font-size: 1.1em;
+            }
+
+            .section {
+                padding: 25px;
+            }
+
+            .stats-row {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero">
+            <div class="hero-icon">🏃‍♂️</div>
+            <h1>Nanobot Runner</h1>
+            <p class="subtitle">你的跑者智能伙伴</p>
+            <span class="tagline">科学训练 · 精准预测 · 远离伤痛</span>
+        </div>
+
+        <!-- Section 1: 创意介绍 -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">💡</span>
+                <h2>创意名称与介绍</h2>
+            </div>
+
+            <h3>想解决什么问题</h3>
+            <div class="highlight-box">
+                <p>业余跑者积累了大量跑步数据（手表记录、FIT 文件），但缺乏工具将数据转化为可操作的训练洞察——无法科学评估自己的跑力（VDOT）、预测比赛成绩、或提前发现伤病风险。</p>
+            </div>
+
+            <h3>为什么会想到做这个</h3>
+            <p>个人跑步训练中，数据分散在各个平台，没有统一工具进行深度分析。每次想了解自己的训练状态、预测马拉松成绩，都需要手动整理数据或依赖不够精确的估算公式。</p>
+
+            <h3>大概是什么产品</h3>
+            <div class="highlight-box">
+                <p>一个<strong>本地化的个人跑步数据分析 CLI + WebUI 系统</strong>，支持 FIT 文件解析、跑力评估、训练负荷追踪、身体信号分析、比赛成绩预测等功能。</p>
+            </div>
+        </div>
+
+        <!-- Section 2: 目标用户及痛点 -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">👥</span>
+                <h2>目标用户及痛点</h2>
+            </div>
+
+            <h3>面向哪些用户</h3>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="icon">🏃</div>
+                    <h4>进阶跑者</h4>
+                    <p>有跑步基础，跑龄 6 个月以上</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🎯</div>
+                    <h4>严肃爱好者</h4>
+                    <p>周跑量 30km+，追求突破</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🏅</div>
+                    <h4>备战选手</h4>
+                    <p>准备参加半马/全马比赛</p>
+                </div>
+            </div>
+
+            <h3>在什么场景下使用</h3>
+            <ul>
+                <li>📅 训练周期规划（冬训、夏训、赛前减量）</li>
+                <li>📊 每次跑完后的数据复盘</li>
+                <li>🎯 比赛目标设定与成绩预测</li>
+            </ul>
+
+            <h3>当前痛点</h3>
+            <div class="pain-point">
+                <span class="emoji">📁</span>
+                <p><strong>训练数据孤岛</strong> — 手表数据导出后缺乏深度分析</p>
+            </div>
+            <div class="pain-point">
+                <span class="emoji">❓</span>
+                <p><strong>跑力评估模糊</strong> — 不知道自己当前的真实 VDOT</p>
+            </div>
+            <div class="pain-point">
+                <span class="emoji">⚠️</span>
+                <p><strong>训练负荷失控</strong> — 不知道 ATL/CTL/TSB，导致训练过度或不足</p>
+            </div>
+            <div class="pain-point">
+                <span class="emoji">🩹</span>
+                <p><strong>伤病预防滞后</strong> — 等受伤了才知道训练出了问题</p>
+            </div>
+        </div>
+
+        <!-- Section 3: 价值与意义 -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">⭐</span>
+                <h2>价值与意义</h2>
+            </div>
+
+            <h3>效率提升</h3>
+            <div class="highlight-box">
+                <p>一键导入 FIT 文件，自动完成数据清洗、去重、归档。秒级生成训练报告（VDOT 趋势、负荷曲线、身体状态）。<strong>比手动用 Excel 分析效率提升 10 倍以上</strong>。</p>
+            </div>
+
+            <h3>科学训练</h3>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="icon">📈</div>
+                    <h4>VDOT 趋势追踪</h4>
+                    <p>量化训练效果，洞察跑力变化</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">⚖️</div>
+                    <h4>三维负荷监控</h4>
+                    <p>ATL/CTL/TSB 防止过度训练</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">❤️</div>
+                    <h4>身体信号分析</h4>
+                    <p>HRV、疲劳度、恢复状态多维度评估</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🔮</div>
+                    <h4>What-If 推演</h4>
+                    <p>模拟调整训练计划的潜在效果</p>
+                </div>
+            </div>
+
+            <h3>长期价值</h3>
+            <ul>
+                <li>🔄 <strong>数字孪生引擎</strong> — 构建个人跑步模型，越用越懂你</li>
+                <li>🧬 <strong>自适应进化引擎</strong> — 持续校准预测准确性</li>
+                <li>💾 <strong>一次投入，终身受益</strong> — 数据资产持续积累</li>
+            </ul>
+        </div>
+
+        <!-- Section 4: 核心功能一览 -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">🛠️</span>
+                <h2>核心功能一览</h2>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="icon">📂</div>
+                    <h4>FIT 数据导入</h4>
+                    <p>支持 Garmin、Coros 等主流设备，自动去重归档</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">⚡</div>
+                    <h4>VDOT 计算</h4>
+                    <p>基于 Jack Daniels 公式，精准评估跑力</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">📊</div>
+                    <h4>训练负荷分析</h4>
+                    <p>ATL/CTL/TSB 三维负荷追踪</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🏃</div>
+                    <h4>比赛成绩预测</h4>
+                    <p>5K 到全马多距离精准预测</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">💓</div>
+                    <h4>HRV 分析</h4>
+                    <p>心率变异分析，评估恢复状态</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🤖</div>
+                    <h4>AI 智能对话</h4>
+                    <p>自然语言查询训练数据与建议</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">📱</div>
+                    <h4>WebUI 可视化</h4>
+                    <p>10 大数据页面，训练状态一目了然</p>
+                </div>
+                <div class="feature-item">
+                    <div class="icon">🔬</div>
+                    <h4>数字孪生</h4>
+                    <p>个人跑步模型，What-If 推演</p>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-item">
+                    <div class="stat-number">v0.29</div>
+                    <div class="stat-label">最新版本</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">98</div>
+                    <div class="stat-label">自动化测试用例</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">测试通过率</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Nanobot Runner - 让每一位跑者都能科学训练</p>
+            <a href="https://github.com/yecllsl/nanobot-runner" class="github-link" target="_blank">
+                🔗 GitHub 项目地址
+            </a>
+        </div>
+    </div>
+</body>
+</html>
