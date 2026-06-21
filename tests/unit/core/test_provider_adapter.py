@@ -726,23 +726,20 @@ class TestPatchWebsocketSettingsApi:
         mock_cls = MagicMock()
         mock_cls._dispatch_http = original_dispatch
 
-        mock_ws_module = MagicMock(WebSocketChannel=mock_cls)
-
-        # 模拟 parse_request_path 和 http_error（v0.30.0: 迁移至 nanobot.webui.http_utils）
+        # v0.30.0: _http_error 和 _parse_request_path 从 nanobot.channels.websocket 导入
         mock_parse = MagicMock(return_value=("/api/settings/update", {}))
         mock_error = MagicMock(return_value=MagicMock(status=403))
 
-        mock_http_utils = MagicMock(
-            parse_request_path=mock_parse,
-            http_error=mock_error,
+        mock_ws_module = MagicMock(
+            WebSocketChannel=mock_cls,
+            _parse_request_path=mock_parse,
+            _http_error=mock_error,
         )
 
         with patch.dict(
             "sys.modules",
             {
                 "nanobot.channels.websocket": mock_ws_module,
-                "nanobot.webui": MagicMock(),
-                "nanobot.webui.http_utils": mock_http_utils,
             },
         ):
             _patch_websocket_settings_api()
@@ -772,21 +769,20 @@ class TestPatchWebsocketSettingsApi:
         mock_cls = MagicMock()
         mock_cls._dispatch_http = original_dispatch
 
-        mock_ws_module = MagicMock(WebSocketChannel=mock_cls)
+        # v0.30.0: _http_error 和 _parse_request_path 从 nanobot.channels.websocket 导入
         mock_parse = MagicMock(return_value=("/api/settings", {}))
         mock_error = MagicMock(return_value=MagicMock(status=403))
 
-        mock_http_utils = MagicMock(
-            parse_request_path=mock_parse,
-            http_error=mock_error,
+        mock_ws_module = MagicMock(
+            WebSocketChannel=mock_cls,
+            _parse_request_path=mock_parse,
+            _http_error=mock_error,
         )
 
         with patch.dict(
             "sys.modules",
             {
                 "nanobot.channels.websocket": mock_ws_module,
-                "nanobot.webui": MagicMock(),
-                "nanobot.webui.http_utils": mock_http_utils,
             },
         ):
             _patch_websocket_settings_api()

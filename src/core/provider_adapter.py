@@ -33,12 +33,10 @@ def _patch_websocket_settings_api() -> None:
     拦截 3 个设置写端点，返回 403 Forbidden。
     仅在 WebSocket 通道启用时调用。幂等：多次调用安全。
     """
-    from nanobot.channels.websocket import WebSocketChannel
-    from nanobot.webui.http_utils import (
-        http_error as _http_error,
-    )
-    from nanobot.webui.http_utils import (
-        parse_request_path as _parse_request_path,
+    from nanobot.channels.websocket import (
+        WebSocketChannel,
+        _http_error,
+        _parse_request_path,
     )
 
     # 幂等保护：已 patch 过则跳过
