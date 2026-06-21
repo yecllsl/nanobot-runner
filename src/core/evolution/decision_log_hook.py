@@ -174,8 +174,11 @@ class DecisionLogHook(AgentHook):
 
         return content
 
-    def after_iteration(self, context: Any) -> None:
-        """Agent迭代完成后回调（v0.26扩展：读取GoalState + 触发进化检查）"""
+    async def after_iteration(self, context: Any) -> None:
+        """Agent迭代完成后回调（v0.26扩展：读取GoalState + 触发进化检查）
+
+        v0.30.0: nanobot-ai 0.2.1 改为 async
+        """
         # v0.26: 读取 GoalState
         metadata = getattr(context, "metadata", None)
         goal_state = self.goal_state_raw(metadata)
@@ -225,26 +228,26 @@ class DecisionLogHook(AgentHook):
             return None
         return metadata.get("goal_state")
 
-    def emit_reasoning(self, context: AgentHookContext, reasoning_text: str) -> None:
+    async def emit_reasoning(self, reasoning_text: str) -> None:
         """推理片段回调（v0.26：推理可见化适配）
 
         将 Agent 推理片段追加到内部缓冲区，在 finalize_content 时
         写入 DecisionLog 的 prediction_snapshot。
 
+        v0.30.0: nanobot-ai 0.2.1 移除了 context 参数，改为 async
+
         Args:
-            context: Hook上下文
             reasoning_text: 推理片段文本
         """
         if reasoning_text:
             self._reasoning_buffer.append(reasoning_text)
 
-    def emit_reasoning_end(self, context: AgentHookContext) -> None:
+    async def emit_reasoning_end(self) -> None:
         """推理结束回调（v0.26：推理可见化适配）
 
         标记推理过程结束。
 
-        Args:
-            context: Hook上下文
+        v0.30.0: nanobot-ai 0.2.1 移除了 context 参数，改为 async
         """
         self._reasoning_complete = True
 

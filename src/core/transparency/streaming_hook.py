@@ -88,13 +88,16 @@ class StreamingHook(AgentHook):
             except NanobotRunnerError as e:
                 logger.warning(f"Gateway流式输出失败: {e}")
 
-    async def on_stream_end(self, context: AgentHookContext) -> None:
+    async def on_stream_end(
+        self, context: AgentHookContext, *, resuming: bool = False
+    ) -> None:
         """流式输出结束时触发
 
         输出换行并清理流式状态。
 
         Args:
             context: Hook上下文
+            resuming: 是否从上次中断处恢复（nanobot-ai 0.2.1 新增）
         """
         if self._stream_active and self._console is not None:
             self._console.print()
