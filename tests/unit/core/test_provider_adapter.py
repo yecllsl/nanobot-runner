@@ -464,8 +464,12 @@ def mock_nanobot_modules():
         "nanobot.channels": MagicMock(),
         "nanobot.channels.websocket": MagicMock(
             WebSocketChannel=MagicMock(),
-            _parse_request_path=MagicMock(return_value=("/", {})),
-            _http_error=MagicMock(return_value=MagicMock(status=403)),
+        ),
+        # v0.30.0: nanobot-ai 0.2.1 将 http_error/parse_request_path 迁移至此
+        "nanobot.webui": MagicMock(),
+        "nanobot.webui.http_utils": MagicMock(
+            http_error=MagicMock(return_value=MagicMock(status=403)),
+            parse_request_path=MagicMock(return_value=("/", {})),
         ),
     }
 
@@ -679,7 +683,14 @@ class TestPatchWebsocketSettingsApi:
 
         with patch.dict(
             "sys.modules",
-            {"nanobot.channels.websocket": MagicMock(WebSocketChannel=mock_cls)},
+            {
+                "nanobot.channels.websocket": MagicMock(WebSocketChannel=mock_cls),
+                "nanobot.webui": MagicMock(),
+                "nanobot.webui.http_utils": MagicMock(
+                    http_error=MagicMock(return_value=MagicMock(status=403)),
+                    parse_request_path=MagicMock(return_value=("/", {})),
+                ),
+            },
         ):
             _patch_websocket_settings_api()
 
@@ -717,14 +728,23 @@ class TestPatchWebsocketSettingsApi:
 
         mock_ws_module = MagicMock(WebSocketChannel=mock_cls)
 
-        # 模拟 _parse_request_path 和 _http_error
+        # 模拟 parse_request_path 和 http_error（v0.30.0: 迁移至 nanobot.webui.http_utils）
         mock_parse = MagicMock(return_value=("/api/settings/update", {}))
         mock_error = MagicMock(return_value=MagicMock(status=403))
 
-        mock_ws_module._parse_request_path = mock_parse
-        mock_ws_module._http_error = mock_error
+        mock_http_utils = MagicMock(
+            parse_request_path=mock_parse,
+            http_error=mock_error,
+        )
 
-        with patch.dict("sys.modules", {"nanobot.channels.websocket": mock_ws_module}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "nanobot.channels.websocket": mock_ws_module,
+                "nanobot.webui": MagicMock(),
+                "nanobot.webui.http_utils": mock_http_utils,
+            },
+        ):
             _patch_websocket_settings_api()
 
         # 获取 patch 后的方法
@@ -756,10 +776,19 @@ class TestPatchWebsocketSettingsApi:
         mock_parse = MagicMock(return_value=("/api/settings", {}))
         mock_error = MagicMock(return_value=MagicMock(status=403))
 
-        mock_ws_module._parse_request_path = mock_parse
-        mock_ws_module._http_error = mock_error
+        mock_http_utils = MagicMock(
+            parse_request_path=mock_parse,
+            http_error=mock_error,
+        )
 
-        with patch.dict("sys.modules", {"nanobot.channels.websocket": mock_ws_module}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "nanobot.channels.websocket": mock_ws_module,
+                "nanobot.webui": MagicMock(),
+                "nanobot.webui.http_utils": mock_http_utils,
+            },
+        ):
             _patch_websocket_settings_api()
 
         patched_dispatch = mock_cls._dispatch_http
