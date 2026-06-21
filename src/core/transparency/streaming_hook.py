@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from nanobot.agent.hook import AgentHook, AgentHookContext
 from nanobot.bus import MessageBus
@@ -77,12 +78,17 @@ class StreamingHook(AgentHook):
             try:
                 from nanobot.bus.events import OutboundMessage
 
+                # v0.30.0: 通过 context.streamed_reasoning 区分推理片段和普通输出
+                metadata: dict[str, Any] = {"stream_delta": True}
+                if context.streamed_reasoning:
+                    metadata["reasoning_delta"] = True
+
                 self._bus.publish_outbound(
                     OutboundMessage(
                         channel=self._channel,
                         chat_id=self._chat_id,
                         content=delta,
-                        metadata={"stream_delta": True},
+                        metadata=metadata,
                     )
                 )
             except NanobotRunnerError as e:
