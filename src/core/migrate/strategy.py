@@ -197,7 +197,7 @@ class V09xMigrationStrategy(MigrationStrategy):
             defaults = {
                 "auto_push_feishu": False,
                 "feishu_app_id": "",
-                "feishu_app_secret": "",
+                "feishu_app_secret": "",  # nosec B105
                 "feishu_receive_id": "",
                 "feishu_receive_id_type": "user_id",
             }

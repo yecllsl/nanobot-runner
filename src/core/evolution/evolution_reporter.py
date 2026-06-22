@@ -180,8 +180,9 @@ class EvolutionReporter:
                 profile = self._store.load_calibration_profile(model_type)
                 if profile is not None:
                     summary[model_type] = {"scale": profile.scale}
-        except Exception:
-            pass
+        except Exception as e:
+            # 校准数据加载失败不应阻塞报告生成，仅记录debug日志
+            logger.debug(f"加载校准数据失败，返回空摘要: {e}")
         return summary
 
     def _get_prompt_tuning_summary(self) -> dict[str, Any]:

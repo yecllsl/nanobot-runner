@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-4134%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.29.0 - WebUI 管理控制台，训练计划管理 + 进化引擎控制台 + 设置中心
+> **最新版本**: v0.30.0 - 代码质量基线修复，全量评审问题清零 + 类型安全增强 + 安全扫描清洁通过
 
 ## 项目简介
 

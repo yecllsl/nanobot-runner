@@ -80,61 +80,86 @@ class AppConfig:
             >>> errors
             []
         """
-        errors = []
+        errors: list[str] = []
 
-        # 检查必填字段
+        cls._validate_required_fields(config, errors)
+        cls._validate_field_types(config, errors)
+        cls._validate_version(config, errors)
+        cls._validate_fallback_models(config, errors)
+        cls._validate_feishu_receive_id_type(config, errors)
+
+        return len(errors) == 0, errors
+
+    @classmethod
+    def _validate_required_fields(cls, config: dict, errors: list[str]) -> None:
+        """验证必填字段是否存在且非空"""
         for field_name in cls.REQUIRED_FIELDS:
             if field_name not in config:
                 errors.append(f"缺少必填字段：{field_name}")
             elif config[field_name] is None or config[field_name] == "":
                 errors.append(f"必填字段不能为空：{field_name}")
 
-        # 检查字段类型
+    @classmethod
+    def _validate_field_types(cls, config: dict, errors: list[str]) -> None:
+        """验证字段类型是否正确"""
         for field_name, value in config.items():
-            if field_name in cls.FIELD_TYPES:
-                expected_type = cls.FIELD_TYPES[field_name]
-                # 处理 Union types (e.g., Optional[str] = str | None)
-                if isinstance(expected_type, tuple):
-                    # 检查值是否为元组中的任一类型
-                    if not any(isinstance(value, t) for t in expected_type):
-                        type_names = " | ".join(
-                            getattr(t, "__name__", str(t)) for t in expected_type
-                        )
-                        errors.append(
-                            f"字段 '{field_name}' 类型错误，期望 {type_names}，实际 {type(value).__name__}"
-                        )
-                elif not isinstance(value, expected_type):
-                    errors.append(
-                        f"字段 '{field_name}' 类型错误，期望 {expected_type.__name__}，实际 {type(value).__name__}"
-                    )
+            if field_name not in cls.FIELD_TYPES:
+                continue
 
-        # 检查版本号格式
+            expected_type = cls.FIELD_TYPES[field_name]
+            # 处理 Union types (e.g., Optional[str] = str | None)
+            if isinstance(expected_type, tuple):
+                if not any(isinstance(value, t) for t in expected_type):
+                    type_names = " | ".join(
+                        getattr(t, "__name__", str(t)) for t in expected_type
+                    )
+                    errors.append(
+                        f"字段 '{field_name}' 类型错误，期望 {type_names}，实际 {type(value).__name__}"
+                    )
+            elif not isinstance(value, expected_type):
+                errors.append(
+                    f"字段 '{field_name}' 类型错误，期望 {expected_type.__name__}，实际 {type(value).__name__}"
+                )
+
+    @classmethod
+    def _validate_version(cls, config: dict, errors: list[str]) -> None:
+        """验证版本号格式"""
         if "version" in config and config["version"]:
             version = config["version"]
             if not cls._is_valid_version(version):
                 errors.append(f"版本号格式错误：'{version}'，应为 x.y.z 格式")
 
-        # 检查 fallback_models 条目类型
-        if "fallback_models" in config and config["fallback_models"] is not None:
-            if not isinstance(config["fallback_models"], list):
-                errors.append("字段 'fallback_models' 类型错误，期望 list，实际非列表")
-            else:
-                for i, item in enumerate(config["fallback_models"]):
-                    if not isinstance(item, str):
-                        errors.append(
-                            f"fallback_models[{i}] 类型错误，期望 str，实际 {type(item).__name__}"
-                        )
+    @classmethod
+    def _validate_fallback_models(cls, config: dict, errors: list[str]) -> None:
+        """验证fallback_models字段类型"""
+        if "fallback_models" not in config or config["fallback_models"] is None:
+            return
 
-        # 检查 feishu_receive_id_type 的枚举值
-        if "feishu_receive_id_type" in config and config["feishu_receive_id_type"]:
-            valid_types = ["user_id", "open_id", "union_id"]
-            if config["feishu_receive_id_type"] not in valid_types:
+        if not isinstance(config["fallback_models"], list):
+            errors.append("字段 'fallback_models' 类型错误，期望 list，实际非列表")
+            return
+
+        for i, item in enumerate(config["fallback_models"]):
+            if not isinstance(item, str):
                 errors.append(
-                    f"feishu_receive_id_type 值错误：'{config['feishu_receive_id_type']}'，"
-                    f"应为 {valid_types} 之一"
+                    f"fallback_models[{i}] 类型错误，期望 str，实际 {type(item).__name__}"
                 )
 
-        return len(errors) == 0, errors
+    @classmethod
+    def _validate_feishu_receive_id_type(cls, config: dict, errors: list[str]) -> None:
+        """验证feishu_receive_id_type枚举值"""
+        if (
+            "feishu_receive_id_type" not in config
+            or not config["feishu_receive_id_type"]
+        ):
+            return
+
+        valid_types = ["user_id", "open_id", "union_id"]
+        if config["feishu_receive_id_type"] not in valid_types:
+            errors.append(
+                f"feishu_receive_id_type 值错误：'{config['feishu_receive_id_type']}'，"
+                f"应为 {valid_types} 之一"
+            )
 
     @staticmethod
     def _is_valid_version(version: str) -> bool:

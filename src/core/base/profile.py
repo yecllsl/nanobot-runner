@@ -830,59 +830,9 @@ class ProfileEngine:
             # 逐条应用过滤规则
             filtered_data = data
             for rule in rules:
-                try:
-                    # 检查字段是否存在
-                    if rule.field_name not in filtered_data.collect_schema().names():
-                        logger.debug(
-                            f"字段 {rule.field_name} 不存在，跳过规则：{rule.description}"
-                        )
-                        continue
-
-                    # 构建过滤条件
-                    condition = self._build_filter_condition(rule, strict_mode)
-                    if condition is None:
-                        continue
-
-                    # 应用过滤
-                    if rule.action == "filter":
-                        # 过滤掉不满足条件的数据（保留满足条件的数据）
-                        if rule.condition == "<":
-                            filtered_data = filtered_data.filter(
-                                pl.col(rule.field_name) >= rule.threshold
-                            )
-                        elif rule.condition == ">":
-                            filtered_data = filtered_data.filter(
-                                pl.col(rule.field_name) <= rule.threshold
-                            )
-                        elif rule.condition == "<=":
-                            filtered_data = filtered_data.filter(
-                                pl.col(rule.field_name) > rule.threshold
-                            )
-                        elif rule.condition == ">=":
-                            filtered_data = filtered_data.filter(
-                                pl.col(rule.field_name) < rule.threshold
-                            )
-                        elif rule.condition == "==":
-                            filtered_data = filtered_data.filter(
-                                pl.col(rule.field_name) != rule.threshold
-                            )
-                        logger.debug(f"应用过滤规则：{rule.description}")
-
-                    elif rule.action == "clip":
-                        # 截断处理
-                        if rule.condition == ">" and rule.clip_value is not None:
-                            filtered_data = filtered_data.with_columns(
-                                pl.when(pl.col(rule.field_name) > rule.threshold)
-                                .then(rule.clip_value)
-                                .otherwise(pl.col(rule.field_name))
-                                .alias(rule.field_name)
-                            )
-                            logger.debug(f"应用截断规则：{rule.description}")
-
-                except Exception as e:
-                    logger.warning(f"应用规则失败（{rule.field_name}）: {e}")
-                    if strict_mode:
-                        raise
+                filtered_data = self._apply_anomaly_rule(
+                    filtered_data, rule, strict_mode
+                )
 
             logger.info(
                 f"异常数据过滤完成，原始行数：{data.collect().height}, "
@@ -893,6 +843,77 @@ class ProfileEngine:
         except Exception as e:
             logger.error(f"异常数据过滤失败：{e}")
             raise RuntimeError(f"异常数据过滤失败：{e}") from e
+
+    def _apply_anomaly_rule(
+        self,
+        filtered_data: pl.LazyFrame,
+        rule: AnomalyFilterRule,
+        strict_mode: bool,
+    ) -> pl.LazyFrame:
+        """应用单条异常过滤规则"""
+        try:
+            # 检查字段是否存在
+            if rule.field_name not in filtered_data.collect_schema().names():
+                logger.debug(
+                    f"字段 {rule.field_name} 不存在，跳过规则：{rule.description}"
+                )
+                return filtered_data
+
+            # 构建过滤条件
+            condition = self._build_filter_condition(rule, strict_mode)
+            if condition is None:
+                return filtered_data
+
+            # 应用过滤或截断
+            if rule.action == "filter":
+                return self._apply_filter_action(filtered_data, rule)
+            elif rule.action == "clip":
+                return self._apply_clip_action(filtered_data, rule)
+
+            return filtered_data
+
+        except Exception as e:
+            logger.warning(f"应用规则失败（{rule.field_name}）: {e}")
+            if strict_mode:
+                raise
+            return filtered_data
+
+    def _apply_filter_action(
+        self, filtered_data: pl.LazyFrame, rule: AnomalyFilterRule
+    ) -> pl.LazyFrame:
+        """应用filter动作：过滤掉不满足条件的数据"""
+        col = pl.col(rule.field_name)
+        threshold = rule.threshold
+
+        # 根据条件构建反向过滤（保留满足条件的数据，过滤掉不满足的）
+        if rule.condition == "<":
+            filtered_data = filtered_data.filter(col >= threshold)
+        elif rule.condition == ">":
+            filtered_data = filtered_data.filter(col <= threshold)
+        elif rule.condition == "<=":
+            filtered_data = filtered_data.filter(col > threshold)
+        elif rule.condition == ">=":
+            filtered_data = filtered_data.filter(col < threshold)
+        elif rule.condition == "==":
+            filtered_data = filtered_data.filter(col != threshold)
+
+        logger.debug(f"应用过滤规则：{rule.description}")
+        return filtered_data
+
+    def _apply_clip_action(
+        self, filtered_data: pl.LazyFrame, rule: AnomalyFilterRule
+    ) -> pl.LazyFrame:
+        """应用clip动作：截断到阈值"""
+        if rule.condition == ">" and rule.clip_value is not None:
+            filtered_data = filtered_data.with_columns(
+                pl.when(pl.col(rule.field_name) > rule.threshold)
+                .then(rule.clip_value)
+                .otherwise(pl.col(rule.field_name))
+                .alias(rule.field_name)
+            )
+            logger.debug(f"应用截断规则：{rule.description}")
+
+        return filtered_data
 
     def _build_filter_condition(
         self,

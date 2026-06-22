@@ -168,6 +168,22 @@ class StorageManager:
         if not parquet_files:
             return pl.LazyFrame()
 
+        dfs = self._read_all_parquet_files(parquet_files)
+        if not dfs:
+            return pl.LazyFrame()
+
+        if len(dfs) == 1:
+            return dfs[0].lazy()
+
+        # 改进的 Schema 对齐逻辑：处理类型兼容性问题
+        all_schemas = self._merge_schemas(dfs)
+        all_columns = sorted(all_schemas.keys())
+        aligned_dfs = self._align_multiple_dataframes(dfs, all_schemas, all_columns)
+
+        return self._concat_with_fallback(aligned_dfs, all_columns, len(dfs))
+
+    def _read_all_parquet_files(self, parquet_files: list[Path]) -> list[pl.DataFrame]:
+        """读取所有parquet文件，跳过读取失败的文件"""
         dfs = []
         for filepath in parquet_files:
             try:
@@ -177,83 +193,110 @@ class StorageManager:
             except Exception as e:
                 logger.warning(f"读取文件失败 {filepath}: {e}")
                 continue
+        return dfs
 
-        if not dfs:
-            return pl.LazyFrame()
+    def _merge_schemas(self, dfs: list[pl.DataFrame]) -> dict[str, pl.DataType]:
+        """合并多个DataFrame的schema，处理类型兼容性
 
-        if len(dfs) == 1:
-            return dfs[0].lazy()
-
-        # 改进的 Schema 对齐逻辑：处理类型兼容性问题
-        all_schemas = {}
+        类型兼容规则：
+        - Int32 < Int64，Float32 < Float64（升级到更宽泛的类型）
+        - Null 类型被实际类型替换
+        - 不兼容的类型统一转换为 Utf8
+        """
+        all_schemas: dict[str, pl.DataType] = {}
         for df in dfs:
             for col_name, col_type in df.schema.items():
                 if col_name not in all_schemas:
                     all_schemas[col_name] = col_type
                 else:
-                    # 处理类型兼容性：Int32 < Int64，Float32 < Float64
                     existing_type = all_schemas[col_name]
-                    if col_type != pl.Null and existing_type == pl.Null:
-                        all_schemas[col_name] = col_type
-                    elif col_type != existing_type:
-                        # 选择更宽泛的类型
-                        if (existing_type == pl.Int32 and col_type == pl.Int64) or (
-                            existing_type == pl.Float32 and col_type == pl.Float64
-                        ):
-                            all_schemas[col_name] = col_type  # 升级到更宽泛的类型
-                        elif (existing_type == pl.Int64 and col_type == pl.Int32) or (
-                            existing_type == pl.Float64 and col_type == pl.Float32
-                        ):
-                            pass  # 保持现有的更宽泛类型
-                        else:
-                            # 对于不兼容的类型，统一转换为字符串类型
-                            all_schemas[col_name] = cast(pl.DataType, pl.Utf8)
+                    all_schemas[col_name] = self._resolve_type_compatibility(
+                        existing_type, col_type
+                    )
+        return all_schemas
 
-        all_columns = sorted(all_schemas.keys())
+    def _resolve_type_compatibility(
+        self, existing_type: pl.DataType, new_type: pl.DataType
+    ) -> pl.DataType:
+        """解析两个类型的兼容性，返回合并后的类型"""
+        # Null 类型处理
+        if new_type != pl.Null and existing_type == pl.Null:
+            return new_type
+        if new_type == existing_type:
+            return existing_type
 
+        # 升级到更宽泛的类型
+        widening_pairs = {(pl.Int32, pl.Int64), (pl.Float32, pl.Float64)}
+        if (existing_type, new_type) in widening_pairs:
+            return new_type  # 升级到更宽泛的类型
+        if (new_type, existing_type) in widening_pairs:
+            return existing_type  # 保持现有的更宽泛类型
+
+        # 对于不兼容的类型，统一转换为字符串类型
+        return cast(pl.DataType, pl.Utf8)
+
+    def _align_multiple_dataframes(
+        self,
+        dfs: list[pl.DataFrame],
+        all_schemas: dict[str, pl.DataType],
+        all_columns: list[str],
+    ) -> list[pl.DataFrame]:
+        """对齐所有DataFrame的schema和列顺序"""
         aligned_dfs = []
         for df in dfs:
-            df_schema = df.schema
-            missing_cols = set(all_columns) - set(df_schema.keys())
-
-            if missing_cols:
-                df = df.with_columns(
-                    [
-                        pl.lit(None).cast(all_schemas[col]).alias(col)
-                        for col in missing_cols
-                    ]
-                )
-
-            cast_exprs = []
-            for col in df_schema:
-                if col in all_schemas and df_schema[col] != all_schemas[col]:
-                    cast_exprs.append(pl.col(col).cast(all_schemas[col]))
-
-            if cast_exprs:
-                df = df.with_columns(cast_exprs)
-
-            df = df.select(all_columns)
+            df = self._align_single_dataframe(df, all_schemas, all_columns)
             aligned_dfs.append(df)
+        return aligned_dfs
 
+    def _align_single_dataframe(
+        self,
+        df: pl.DataFrame,
+        all_schemas: dict[str, pl.DataType],
+        all_columns: list[str],
+    ) -> pl.DataFrame:
+        """对齐单个DataFrame：补充缺失列、转换类型、排序列顺序"""
+        df_schema = df.schema
+        missing_cols = set(all_columns) - set(df_schema.keys())
+
+        if missing_cols:
+            df = df.with_columns(
+                [pl.lit(None).cast(all_schemas[col]).alias(col) for col in missing_cols]
+            )
+
+        cast_exprs = []
+        for col in df_schema:
+            if col in all_schemas and df_schema[col] != all_schemas[col]:
+                cast_exprs.append(pl.col(col).cast(all_schemas[col]))
+
+        if cast_exprs:
+            df = df.with_columns(cast_exprs)
+
+        return df.select(all_columns)
+
+    def _concat_with_fallback(
+        self,
+        aligned_dfs: list[pl.DataFrame],
+        all_columns: list[str],
+        file_count: int,
+    ) -> pl.LazyFrame:
+        """合并DataFrame，失败时使用宽松策略（全部转为字符串）"""
         try:
             result = pl.concat(aligned_dfs)
-            logger.debug(f"合并 {len(dfs)} 个文件，共 {result.height} 条记录")
+            logger.debug(f"合并 {file_count} 个文件，共 {result.height} 条记录")
             return result.lazy()
         except Exception as e:
             logger.error(f"合并文件失败: {e}")
             # 如果合并失败，尝试使用更宽松的策略
             logger.info("尝试使用宽松合并策略...")
             # 将所有列转换为字符串类型进行合并
-            string_dfs = []
-            for df in aligned_dfs:
-                string_df = df.select(
-                    [pl.col(col).cast(pl.Utf8) for col in all_columns]
-                )
-                string_dfs.append(string_df)
+            string_dfs = [
+                df.select([pl.col(col).cast(pl.Utf8) for col in all_columns])
+                for df in aligned_dfs
+            ]
 
             result = pl.concat(string_dfs)
             logger.warning(
-                f"使用宽松策略合并 {len(dfs)} 个文件，共 {result.height} 条记录"
+                f"使用宽松策略合并 {file_count} 个文件，共 {result.height} 条记录"
             )
             return result.lazy()
 

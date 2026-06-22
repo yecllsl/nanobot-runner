@@ -197,44 +197,30 @@ class PlanManager:
         Raises:
             PlanManagerError: 当计划不存在或参数无效时
         """
-        if plan_id not in self._plans:
-            raise PlanManagerError(f"计划不存在：{plan_id}")
-
-        if completion_rate is not None and not 0.0 <= completion_rate <= 1.0:
-            raise PlanManagerError("完成度必须在0.0-1.0之间")
-
-        if effort_score is not None and not 1 <= effort_score <= 10:
-            raise PlanManagerError("体感评分必须在1-10之间")
+        # 参数验证
+        self._validate_record_params(plan_id, completion_rate, effort_score)
 
         plan = self.get_plan(plan_id)
         if not plan:
             raise PlanManagerError(f"计划解析失败：{plan_id}")
 
-        target_day = None
-        for week in plan.weeks:
-            for day in week.daily_plans:
-                if day.date == date:
-                    target_day = day
-                    break
-            if target_day:
-                break
-
+        # 查找目标日期
+        target_day = self._find_target_day(plan, date)
         if not target_day:
             raise PlanManagerError(f"日期不存在于计划中：{date}")
 
-        if completion_rate is not None:
-            target_day.completion_rate = completion_rate
-        if effort_score is not None:
-            target_day.effort_score = effort_score
-        if notes:
-            target_day.feedback_notes = notes
-        if actual_distance_km is not None:
-            target_day.actual_distance_km = actual_distance_km
-        if actual_duration_min is not None:
-            target_day.actual_duration_min = actual_duration_min
-        if actual_avg_hr is not None:
-            target_day.actual_avg_hr = actual_avg_hr
+        # 更新目标日字段
+        self._update_target_day_fields(
+            target_day,
+            completion_rate=completion_rate,
+            effort_score=effort_score,
+            notes=notes,
+            actual_distance_km=actual_distance_km,
+            actual_duration_min=actual_duration_min,
+            actual_avg_hr=actual_avg_hr,
+        )
 
+        # 标记完成状态
         if completion_rate is not None and completion_rate >= 1.0:
             target_day.completed = True
 
@@ -248,6 +234,54 @@ class PlanManager:
             "plan_id": plan_id,
             "date": date,
         }
+
+    def _validate_record_params(
+        self,
+        plan_id: str,
+        completion_rate: float | None,
+        effort_score: int | None,
+    ) -> None:
+        """验证record_execution的参数"""
+        if plan_id not in self._plans:
+            raise PlanManagerError(f"计划不存在：{plan_id}")
+
+        if completion_rate is not None and not 0.0 <= completion_rate <= 1.0:
+            raise PlanManagerError("完成度必须在0.0-1.0之间")
+
+        if effort_score is not None and not 1 <= effort_score <= 10:
+            raise PlanManagerError("体感评分必须在1-10之间")
+
+    def _find_target_day(self, plan: Any, date: str) -> Any:
+        """在计划中查找指定日期的训练日"""
+        for week in plan.weeks:
+            for day in week.daily_plans:
+                if day.date == date:
+                    return day
+        return None
+
+    def _update_target_day_fields(
+        self,
+        target_day: Any,
+        completion_rate: float | None,
+        effort_score: int | None,
+        notes: str,
+        actual_distance_km: float | None,
+        actual_duration_min: int | None,
+        actual_avg_hr: int | None,
+    ) -> None:
+        """更新目标日的执行反馈字段"""
+        if completion_rate is not None:
+            target_day.completion_rate = completion_rate
+        if effort_score is not None:
+            target_day.effort_score = effort_score
+        if notes:
+            target_day.feedback_notes = notes
+        if actual_distance_km is not None:
+            target_day.actual_distance_km = actual_distance_km
+        if actual_duration_min is not None:
+            target_day.actual_duration_min = actual_duration_min
+        if actual_avg_hr is not None:
+            target_day.actual_avg_hr = actual_avg_hr
 
     def get_plan_status(self, plan_id: str) -> PlanStatus | None:
         """

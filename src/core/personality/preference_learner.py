@@ -3,7 +3,7 @@
 # 学习速率可配置，避免过度拟合
 
 import logging
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 from src.core.personality.models import (
     FeedbackRecord,
@@ -14,6 +14,26 @@ from src.core.personality.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class FeedbackStats(TypedDict):
+    """反馈统计数据
+
+    Attributes:
+        total_feedback: 反馈总数
+        positive_count: 正面反馈数
+        negative_count: 负面反馈数
+        neutral_count: 中性反馈数
+        correction_count: 纠正反馈数
+        category_distribution: 各偏好类别的反馈分布
+    """
+
+    total_feedback: int
+    positive_count: int
+    negative_count: int
+    neutral_count: int
+    correction_count: int
+    category_distribution: dict[str, int]
 
 
 class PreferenceLearner:
@@ -154,11 +174,11 @@ class PreferenceLearner:
         logger.info("AI人格已重置为默认值")
         return self.personality
 
-    def get_feedback_stats(self) -> dict[str, Any]:
+    def get_feedback_stats(self) -> FeedbackStats:
         """获取反馈统计
 
         Returns:
-            dict: 反馈统计数据
+            FeedbackStats: 反馈统计数据
         """
         if not self._feedback_history:
             return {
@@ -199,53 +219,77 @@ class PreferenceLearner:
         Returns:
             dict: 提取的偏好键值对
         """
-        extracted: dict[str, str] = {}
         content = feedback.content.lower()
-
         category = feedback.preference_category
 
-        if category == PreferenceCategory.TRAINING_TIME:
-            for time_val in ["morning", "afternoon", "evening"]:
-                if time_val in content:
-                    extracted["training_time"] = time_val
-                    break
+        extractors = {
+            PreferenceCategory.TRAINING_TIME: self._extract_training_time_preference,
+            PreferenceCategory.TRAINING_INTENSITY: self._extract_training_intensity_preference,
+            PreferenceCategory.COMMUNICATION_STYLE: self._extract_communication_style_preference,
+            PreferenceCategory.DETAIL_PREFERENCE: self._extract_detail_preference,
+        }
 
-        elif category == PreferenceCategory.TRAINING_INTENSITY:
-            for intensity in ["low", "medium", "high"]:
-                if intensity in content:
-                    extracted["training_intensity"] = intensity
-                    break
-            for keyword, value in [
-                ("轻松", "low"),
-                ("适中", "medium"),
-                ("高强度", "high"),
-            ]:
-                if keyword in content:
-                    extracted["training_intensity"] = value
-                    break
+        extractor = extractors.get(category)
+        if extractor is None:
+            return {}
 
-        elif category == PreferenceCategory.COMMUNICATION_STYLE:
-            for style in ["brief", "detailed", "encouraging", "analytical"]:
-                if style in content:
-                    extracted["communication_style"] = style
-                    break
-            for keyword, value in [
-                ("简洁", "brief"),
-                ("详细", "detailed"),
-                ("鼓励", "encouraging"),
-                ("分析", "analytical"),
-            ]:
-                if keyword in content:
-                    extracted["communication_style"] = value
-                    break
+        result = extractor(content)
+        return dict([result]) if result else {}
 
-        elif category == PreferenceCategory.DETAIL_PREFERENCE:
-            for level in ["concise", "standard", "detailed"]:
-                if level in content:
-                    extracted["detail_preference"] = level
-                    break
+    def _extract_training_time_preference(self, content: str) -> tuple[str, str] | None:
+        """从内容中提取训练时间偏好"""
+        for time_val in ["morning", "afternoon", "evening"]:
+            if time_val in content:
+                return ("training_time", time_val)
+        return None
 
-        return extracted
+    def _extract_training_intensity_preference(
+        self, content: str
+    ) -> tuple[str, str] | None:
+        """从内容中提取训练强度偏好"""
+        # 英文关键词
+        for intensity in ["low", "medium", "high"]:
+            if intensity in content:
+                return ("training_intensity", intensity)
+
+        # 中文关键词
+        for keyword, value in [
+            ("轻松", "low"),
+            ("适中", "medium"),
+            ("高强度", "high"),
+        ]:
+            if keyword in content:
+                return ("training_intensity", value)
+
+        return None
+
+    def _extract_communication_style_preference(
+        self, content: str
+    ) -> tuple[str, str] | None:
+        """从内容中提取沟通风格偏好"""
+        # 英文关键词
+        for style in ["brief", "detailed", "encouraging", "analytical"]:
+            if style in content:
+                return ("communication_style", style)
+
+        # 中文关键词
+        for keyword, value in [
+            ("简洁", "brief"),
+            ("详细", "detailed"),
+            ("鼓励", "encouraging"),
+            ("分析", "analytical"),
+        ]:
+            if keyword in content:
+                return ("communication_style", value)
+
+        return None
+
+    def _extract_detail_preference(self, content: str) -> tuple[str, str] | None:
+        """从内容中提取详细度偏好"""
+        for level in ["concise", "standard", "detailed"]:
+            if level in content:
+                return ("detail_preference", level)
+        return None
 
     def _handle_negative_feedback(self, feedback: FeedbackRecord) -> None:
         """处理负面反馈

@@ -2,7 +2,7 @@
 # 基于运动科学原理生成个性化训练计划
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, TypedDict
 
 from src.core.base.logger import get_logger
 from src.core.models import (
@@ -15,6 +15,40 @@ from src.core.models import (
 )
 
 logger = get_logger(__name__)
+
+
+class PlanSummary(TypedDict):
+    """训练计划摘要
+
+    Attributes:
+        plan_id: 计划ID
+        user_id: 用户ID
+        plan_type: 计划类型
+        fitness_level: 体能水平
+        duration_weeks: 计划总周数
+        total_distance_km: 总距离（公里）
+        total_duration_hours: 总时长（小时）
+        goal_distance_km: 目标距离（公里）
+        goal_date: 目标日期
+        workout_distribution: 各训练类型分布
+        created_at: 创建时间（ISO格式）
+        updated_at: 更新时间（ISO格式）
+        notes: 备注
+    """
+
+    plan_id: str
+    user_id: str
+    plan_type: str
+    fitness_level: str
+    duration_weeks: int
+    total_distance_km: float
+    total_duration_hours: float
+    goal_distance_km: float
+    goal_date: str
+    workout_distribution: dict[str, int]
+    created_at: str
+    updated_at: str
+    notes: str
 
 
 # 阶段配置：定义各训练阶段的特点
@@ -295,66 +329,13 @@ class TrainingPlanEngine:
             - 10-21km：基础期 4 周 + 进展期 3 周 + 巅峰期 2 周 + 比赛期 1 周
             - 21km 以上：基础期 6 周 + 进展期 4 周 + 巅峰期 3 周 + 比赛期 1 周
         """
-        phases = []
-        remaining_weeks = total_weeks
-
+        # 根据目标距离选择分配策略
         if goal_distance_km < 10:
-            # 短距离目标
-            base_weeks = min(4, remaining_weeks - 3)
-            if base_weeks > 0:
-                phases.append((PlanType.BASE, base_weeks))
-                remaining_weeks -= base_weeks
-
-            build_weeks = min(2, remaining_weeks - 1)
-            if build_weeks > 0:
-                phases.append((PlanType.BUILD, build_weeks))
-                remaining_weeks -= build_weeks
-
-            if remaining_weeks > 0:
-                phases.append((PlanType.RACE, 1))
-                remaining_weeks -= 1
-
+            phases, remaining_weeks = self._allocate_short_distance_phases(total_weeks)
         elif goal_distance_km < 21:
-            # 半马距离
-            base_weeks = min(4, remaining_weeks - 6)
-            if base_weeks > 0:
-                phases.append((PlanType.BASE, base_weeks))
-                remaining_weeks -= base_weeks
-
-            build_weeks = min(3, remaining_weeks - 3)
-            if build_weeks > 0:
-                phases.append((PlanType.BUILD, build_weeks))
-                remaining_weeks -= build_weeks
-
-            peak_weeks = min(2, remaining_weeks - 1)
-            if peak_weeks > 0:
-                phases.append((PlanType.PEAK, peak_weeks))
-                remaining_weeks -= peak_weeks
-
-            if remaining_weeks > 0:
-                phases.append((PlanType.RACE, 1))
-                remaining_weeks -= 1
-
+            phases, remaining_weeks = self._allocate_half_marathon_phases(total_weeks)
         else:
-            # 全马距离
-            base_weeks = min(6, remaining_weeks - 8)
-            if base_weeks > 0:
-                phases.append((PlanType.BASE, base_weeks))
-                remaining_weeks -= base_weeks
-
-            build_weeks = min(4, remaining_weeks - 4)
-            if build_weeks > 0:
-                phases.append((PlanType.BUILD, build_weeks))
-                remaining_weeks -= build_weeks
-
-            peak_weeks = min(3, remaining_weeks - 1)
-            if peak_weeks > 0:
-                phases.append((PlanType.PEAK, peak_weeks))
-                remaining_weeks -= peak_weeks
-
-            if remaining_weeks > 0:
-                phases.append((PlanType.RACE, 1))
-                remaining_weeks -= 1
+            phases, remaining_weeks = self._allocate_full_marathon_phases(total_weeks)
 
         # 如果还有剩余周数，添加恢复期
         if remaining_weeks > 0 and goal_distance_km >= 21:
@@ -366,6 +347,108 @@ class TrainingPlanEngine:
             phases = [(PlanType.BASE, max(1, total_weeks))]
 
         return phases
+
+    def _allocate_short_distance_phases(
+        self, total_weeks: int
+    ) -> tuple[list[tuple[PlanType, int]], int]:
+        """分配短距离目标（<10km）的训练阶段
+
+        Returns:
+            (phases, remaining_weeks) 元组
+        """
+        phases: list[tuple[PlanType, int]] = []
+        remaining_weeks = total_weeks
+
+        # 基础期：最多4周，至少为后续3周留空间
+        base_weeks = min(4, remaining_weeks - 3)
+        if base_weeks > 0:
+            phases.append((PlanType.BASE, base_weeks))
+            remaining_weeks -= base_weeks
+
+        # 进展期：最多2周，至少为比赛期1周留空间
+        build_weeks = min(2, remaining_weeks - 1)
+        if build_weeks > 0:
+            phases.append((PlanType.BUILD, build_weeks))
+            remaining_weeks -= build_weeks
+
+        # 比赛期：1周
+        if remaining_weeks > 0:
+            phases.append((PlanType.RACE, 1))
+            remaining_weeks -= 1
+
+        return phases, remaining_weeks
+
+    def _allocate_half_marathon_phases(
+        self, total_weeks: int
+    ) -> tuple[list[tuple[PlanType, int]], int]:
+        """分配半马距离（10-21km）的训练阶段
+
+        Returns:
+            (phases, remaining_weeks) 元组
+        """
+        phases: list[tuple[PlanType, int]] = []
+        remaining_weeks = total_weeks
+
+        # 基础期：最多4周，至少为后续6周留空间
+        base_weeks = min(4, remaining_weeks - 6)
+        if base_weeks > 0:
+            phases.append((PlanType.BASE, base_weeks))
+            remaining_weeks -= base_weeks
+
+        # 进展期：最多3周，至少为后续3周留空间
+        build_weeks = min(3, remaining_weeks - 3)
+        if build_weeks > 0:
+            phases.append((PlanType.BUILD, build_weeks))
+            remaining_weeks -= build_weeks
+
+        # 巅峰期：最多2周，至少为比赛期1周留空间
+        peak_weeks = min(2, remaining_weeks - 1)
+        if peak_weeks > 0:
+            phases.append((PlanType.PEAK, peak_weeks))
+            remaining_weeks -= peak_weeks
+
+        # 比赛期：1周
+        if remaining_weeks > 0:
+            phases.append((PlanType.RACE, 1))
+            remaining_weeks -= 1
+
+        return phases, remaining_weeks
+
+    def _allocate_full_marathon_phases(
+        self, total_weeks: int
+    ) -> tuple[list[tuple[PlanType, int]], int]:
+        """分配全马距离（>=21km）的训练阶段
+
+        Returns:
+            (phases, remaining_weeks) 元组
+        """
+        phases: list[tuple[PlanType, int]] = []
+        remaining_weeks = total_weeks
+
+        # 基础期：最多6周，至少为后续8周留空间
+        base_weeks = min(6, remaining_weeks - 8)
+        if base_weeks > 0:
+            phases.append((PlanType.BASE, base_weeks))
+            remaining_weeks -= base_weeks
+
+        # 进展期：最多4周，至少为后续4周留空间
+        build_weeks = min(4, remaining_weeks - 4)
+        if build_weeks > 0:
+            phases.append((PlanType.BUILD, build_weeks))
+            remaining_weeks -= build_weeks
+
+        # 巅峰期：最多3周，至少为比赛期1周留空间
+        peak_weeks = min(3, remaining_weeks - 1)
+        if peak_weeks > 0:
+            phases.append((PlanType.PEAK, peak_weeks))
+            remaining_weeks -= peak_weeks
+
+        # 比赛期：1周
+        if remaining_weeks > 0:
+            phases.append((PlanType.RACE, 1))
+            remaining_weeks -= 1
+
+        return phases, remaining_weeks
 
     def _generate_weekly_schedule(
         self,
@@ -554,6 +637,45 @@ class TrainingPlanEngine:
             - 连续未完成：降低训练量 20%
         """
         # 参数验证
+        self._validate_adjust_params(plan, week_number, hr_drift, rpe)
+
+        # 获取要调整的周计划
+        week_schedule = plan.weeks[week_number - 1]
+
+        # 计算调整系数
+        intensity_adjustment, volume_adjustment = self._calculate_adjustments(
+            hr_drift, rpe, completed_runs
+        )
+
+        # 应用调整到每日计划
+        self._apply_daily_adjustments(
+            week_schedule, intensity_adjustment, volume_adjustment
+        )
+
+        # 更新周统计
+        self._update_week_stats(week_schedule)
+
+        # 添加调整说明
+        week_schedule.notes = self._build_adjustment_notes(
+            hr_drift, rpe, volume_adjustment, intensity_adjustment
+        )
+
+        # 更新时间戳
+        plan.updated_at = datetime.now()
+
+        logger.info(
+            f"调整训练计划第{week_number}周：跑量{volume_adjustment * 100:.0f}%, 强度{intensity_adjustment * 100:.0f}%"
+        )
+        return plan
+
+    def _validate_adjust_params(
+        self,
+        plan: TrainingPlan,
+        week_number: int,
+        hr_drift: float | None,
+        rpe: int | None,
+    ) -> None:
+        """验证adjust_plan的参数"""
         if week_number < 1 or week_number > len(plan.weeks):
             raise ValueError(f"周数必须在 1-{len(plan.weeks)}之间")
 
@@ -563,50 +685,102 @@ class TrainingPlanEngine:
         if rpe is not None and (rpe < 1 or rpe > 10):
             raise ValueError("主观疲劳度必须在 1-10 之间")
 
-        # 获取要调整的周计划
-        week_schedule = plan.weeks[week_number - 1]
+    def _calculate_adjustments(
+        self,
+        hr_drift: float | None,
+        rpe: int | None,
+        completed_runs: list[dict[str, Any]] | None,
+    ) -> tuple[float, float]:
+        """计算强度和跑量调整系数
 
-        # 计算调整系数
+        Returns:
+            (intensity_adjustment, volume_adjustment) 元组
+        """
         intensity_adjustment = 1.0
         volume_adjustment = 1.0
 
         # 基于心率漂移调整
-        if hr_drift is not None:
-            if hr_drift > 10:
-                # 心率漂移严重，降低强度 20%，降低跑量 30%
-                intensity_adjustment *= 0.8
-                volume_adjustment *= 0.7
-                logger.warning(f"心率漂移严重 ({hr_drift}%), 大幅降低训练负荷")
-            elif hr_drift > 5:
-                # 心率漂移明显，降低强度 10%，降低跑量 15%
-                intensity_adjustment *= 0.9
-                volume_adjustment *= 0.85
-                logger.info(f"心率漂移明显 ({hr_drift}%), 适度降低训练负荷")
+        intensity_adjustment, volume_adjustment = self._adjust_for_hr_drift(
+            hr_drift, intensity_adjustment, volume_adjustment
+        )
 
         # 基于主观疲劳度调整
-        if rpe is not None:
-            if rpe >= 8:
-                # 非常疲劳，降低跑量 30%
-                volume_adjustment *= 0.7
-                logger.warning(f"主观疲劳度高 (RPE={rpe}), 降低训练量")
-            elif rpe >= 6:
-                # 中度疲劳，降低跑量 15%
-                volume_adjustment *= 0.85
-                logger.info(f"主观疲劳度中等 (RPE={rpe}), 适度降低训练量")
+        volume_adjustment = self._adjust_for_rpe(rpe, volume_adjustment)
 
         # 基于完成情况调整
-        if completed_runs:
-            incomplete_count = sum(
-                1 for run in completed_runs if not run.get("completed", True)
-            )
-            total_count = len(completed_runs)
+        volume_adjustment = self._adjust_for_completion(
+            completed_runs, volume_adjustment
+        )
 
-            if total_count > 0 and incomplete_count / total_count > 0.5:
-                # 超过一半未完成，降低跑量 20%
-                volume_adjustment *= 0.8
-                logger.info("训练完成率较低，降低训练量")
+        return intensity_adjustment, volume_adjustment
 
-        # 应用调整到每日计划
+    def _adjust_for_hr_drift(
+        self,
+        hr_drift: float | None,
+        intensity_adjustment: float,
+        volume_adjustment: float,
+    ) -> tuple[float, float]:
+        """基于心率漂移调整强度和跑量"""
+        if hr_drift is None:
+            return intensity_adjustment, volume_adjustment
+
+        if hr_drift > 10:
+            # 心率漂移严重，降低强度 20%，降低跑量 30%
+            intensity_adjustment *= 0.8
+            volume_adjustment *= 0.7
+            logger.warning(f"心率漂移严重 ({hr_drift}%), 大幅降低训练负荷")
+        elif hr_drift > 5:
+            # 心率漂移明显，降低强度 10%，降低跑量 15%
+            intensity_adjustment *= 0.9
+            volume_adjustment *= 0.85
+            logger.info(f"心率漂移明显 ({hr_drift}%), 适度降低训练负荷")
+
+        return intensity_adjustment, volume_adjustment
+
+    def _adjust_for_rpe(self, rpe: int | None, volume_adjustment: float) -> float:
+        """基于主观疲劳度调整跑量"""
+        if rpe is None:
+            return volume_adjustment
+
+        if rpe >= 8:
+            # 非常疲劳，降低跑量 30%
+            volume_adjustment *= 0.7
+            logger.warning(f"主观疲劳度高 (RPE={rpe}), 降低训练量")
+        elif rpe >= 6:
+            # 中度疲劳，降低跑量 15%
+            volume_adjustment *= 0.85
+            logger.info(f"主观疲劳度中等 (RPE={rpe}), 适度降低训练量")
+
+        return volume_adjustment
+
+    def _adjust_for_completion(
+        self,
+        completed_runs: list[dict[str, Any]] | None,
+        volume_adjustment: float,
+    ) -> float:
+        """基于训练完成情况调整跑量"""
+        if not completed_runs:
+            return volume_adjustment
+
+        incomplete_count = sum(
+            1 for run in completed_runs if not run.get("completed", True)
+        )
+        total_count = len(completed_runs)
+
+        if total_count > 0 and incomplete_count / total_count > 0.5:
+            # 超过一半未完成，降低跑量 20%
+            volume_adjustment *= 0.8
+            logger.info("训练完成率较低，降低训练量")
+
+        return volume_adjustment
+
+    def _apply_daily_adjustments(
+        self,
+        week_schedule: Any,
+        intensity_adjustment: float,
+        volume_adjustment: float,
+    ) -> None:
+        """应用调整到每日计划"""
         for daily_plan in week_schedule.daily_plans:
             if daily_plan.workout_type in [TrainingType.REST, TrainingType.RECOVERY]:
                 # 休息日和恢复跑不调整
@@ -629,7 +803,8 @@ class TrainingPlanEngine:
                 adjusted_pace = daily_plan.target_pace_min_per_km / intensity_adjustment
                 daily_plan.target_pace_min_per_km = round(adjusted_pace, 2)
 
-        # 更新周统计
+    def _update_week_stats(self, week_schedule: Any) -> None:
+        """更新周统计"""
         week_schedule.weekly_distance_km = round(
             sum(day.distance_km for day in week_schedule.daily_plans), 2
         )
@@ -637,7 +812,14 @@ class TrainingPlanEngine:
             day.duration_min for day in week_schedule.daily_plans
         )
 
-        # 添加调整说明
+    def _build_adjustment_notes(
+        self,
+        hr_drift: float | None,
+        rpe: int | None,
+        volume_adjustment: float,
+        intensity_adjustment: float,
+    ) -> str:
+        """构建调整说明"""
         adjustment_notes = []
         if hr_drift is not None:
             adjustment_notes.append(f"心率漂移：{hr_drift}%")
@@ -648,15 +830,7 @@ class TrainingPlanEngine:
         if intensity_adjustment < 1.0:
             adjustment_notes.append(f"强度调整：{intensity_adjustment * 100:.0f}%")
 
-        week_schedule.notes = f"计划调整：{', '.join(adjustment_notes)}"
-
-        # 更新时间戳
-        plan.updated_at = datetime.now()
-
-        logger.info(
-            f"调整训练计划第{week_number}周：跑量{volume_adjustment * 100:.0f}%, 强度{intensity_adjustment * 100:.0f}%"
-        )
-        return plan
+        return f"计划调整：{', '.join(adjustment_notes)}"
 
     def get_daily_workout(
         self,
@@ -696,7 +870,7 @@ class TrainingPlanEngine:
         # 未找到计划
         return None
 
-    def get_plan_summary(self, plan: TrainingPlan) -> dict[str, Any]:
+    def get_plan_summary(self, plan: TrainingPlan) -> PlanSummary:
         """
         获取训练计划摘要
 
@@ -704,7 +878,7 @@ class TrainingPlanEngine:
             plan: 训练计划
 
         Returns:
-            Dict[str, Any]: 计划摘要
+            PlanSummary: 计划摘要
         """
         total_distance = sum(week.weekly_distance_km for week in plan.weeks)
         total_duration = sum(week.weekly_duration_min for week in plan.weeks)

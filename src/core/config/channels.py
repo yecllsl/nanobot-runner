@@ -71,14 +71,14 @@ class FeishuChannelConfig(ChannelConfig):
     """飞书通道配置"""
 
     app_id: str = ""
-    app_secret: str = ""
+    app_secret: str = ""  # nosec B107
     receive_id: str = ""
     receive_id_type: str = "user_id"
 
     def __init__(
         self,
         app_id: str = "",
-        app_secret: str = "",
+        app_secret: str = "",  # nosec B107
         receive_id: str = "",
         receive_id_type: str = "user_id",
         enabled: bool = True,
@@ -104,7 +104,7 @@ class EmailChannelConfig(ChannelConfig):
     smtp_host: str = ""
     smtp_port: int = 587
     username: str = ""
-    password: str = ""
+    password: str = ""  # nosec B107
     to_addresses: list[str] = field(default_factory=list)
     use_tls: bool = True
 
@@ -113,7 +113,7 @@ class EmailChannelConfig(ChannelConfig):
         smtp_host: str = "",
         smtp_port: int = 587,
         username: str = "",
-        password: str = "",
+        password: str = "",  # nosec B107
         to_addresses: list[str] | None = None,
         use_tls: bool = True,
         enabled: bool = True,

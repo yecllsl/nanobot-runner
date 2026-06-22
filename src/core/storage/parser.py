@@ -107,8 +107,9 @@ class FitParser:
                         text = first_chars.decode("utf-8", errors="ignore")
                         if text.strip().startswith(("#", "[")):
                             return True
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # 探测失败=False是正确的语义，仅记录debug日志
+                        logger.debug(f"文本编码检测失败，按非Mock文件处理: {e}")
             return False
         except Exception:
             return False
