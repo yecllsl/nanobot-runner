@@ -1143,7 +1143,7 @@ wheels = [
 
 [[package]]
 name = "nanobot-ai"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
     { name = "anthropic" },
@@ -1172,7 +1172,7 @@ dependencies = [
     { name = "python-pptx" },
     { name = "python-socketio" },
     { name = "python-socks", marker = "sys_platform != 'win32'" },
-    { name = "python-telegram-bot", extra = ["socks"] },
+    { name = "python-telegram-bot", extra = ["socks", "webhooks"] },
     { name = "pyyaml" },
     { name = "qq-botpy" },
     { name = "questionary" },
@@ -1186,14 +1186,14 @@ dependencies = [
     { name = "websocket-client" },
     { name = "websockets" },
 ]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/db/3b/72773cdb8981b154b63d31b728ddd44463086a9fb2ccaba17919ab281025/nanobot_ai-0.2.0.tar.gz", hash = "sha256:80b2a600975f5091bd7470d79bb532af9bf3effd7d108817598c2ea3773748c7" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/90/f0/aa0bdc438b14083f63419b341bffdbb0dbab34db78c0d85624dc5d8b63c7/nanobot_ai-0.2.1.tar.gz", hash = "sha256:6d2df995bf4a9f8ad07f841bb2fc6926fd7d49c5cf2126e151e2f69c471e27ab" }
 wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/17/78/ea141634e6ad516789e5c93ae5ca0a42ef2faf344c7df3c5c197a9d7a885/nanobot_ai-0.2.0-py3-none-any.whl", hash = "sha256:922d49d3c70c1967bccc18b6d459472ed0cd2c6bff64a9b1d39feda7cc4a77ce" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/8a/ce/335db9e37924f6c456b15c13e55a8a1b2f214ed1becf032ece4a8354a494/nanobot_ai-0.2.1-py3-none-any.whl", hash = "sha256:0053391f287afc3f4503d9c2e5aaf50b50c45a058927a50064538518f1315197" },
 ]
 
 [[package]]
 name = "nanobot-runner"
-version = "0.29.0"
+version = "0.30.0"
 source = { editable = "." }
 dependencies = [
     { name = "dulwich" },
@@ -1261,19 +1261,19 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dulwich", specifier = ">=0.21.0" },
+    { name = "dulwich", specifier = ">=0.22.0,<1.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fitparse", specifier = ">=1.1.0" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27.0" },
     { name = "joblib", specifier = ">=1.3.0" },
-    { name = "nanobot-ai", specifier = ">=0.2.0" },
+    { name = "nanobot-ai", specifier = ">=0.2.1" },
     { name = "numba", specifier = ">=0.60.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "plotext", specifier = ">=5.0.0" },
     { name = "polars", specifier = ">=0.20.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.12.0,<3.0.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.23.0" },
@@ -1281,8 +1281,8 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'test'", specifier = ">=3.0.0" },
     { name = "pytest-timeout", marker = "extra == 'test'", specifier = ">=2.2.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "questionary", specifier = ">=1.10.0" },
-    { name = "rich", specifier = ">=13.0.0" },
+    { name = "questionary", specifier = ">=2.0.0,<3.0.0" },
+    { name = "rich", specifier = ">=14.0.0,<15.0.0" },
     { name = "scikit-learn", specifier = ">=1.5.0" },
     { name = "scipy", specifier = ">=1.10.0" },
     { name = "shap", specifier = ">=0.48.0" },
@@ -2101,6 +2101,9 @@ wheels = [
 socks = [
     { name = "httpx", extra = ["socks"] },
 ]
+webhooks = [
+    { name = "tornado" },
+]
 
 [[package]]
 name = "pytz"
@@ -2711,6 +2714,23 @@ wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/69/13/c07a9177d0b3bab7913299b9278845fc6eaaca14a02667c6be0b0a2270c8/tomli-2.4.0-cp312-cp312-win_amd64.whl", hash = "sha256:685306e2cc7da35be4ee914fd34ab801a6acacb061b6a7abca922aaf9ad368da" },
     { url = "https://mirrors.aliyun.com/pypi/packages/18/27/e267a60bbeeee343bcc279bb9e8fbed0cbe224bc7b2a3dc2975f22809a09/tomli-2.4.0-cp312-cp312-win_arm64.whl", hash = "sha256:5aa48d7c2356055feef06a43611fc401a07337d5b006be13a30f6c58f869e3c3" },
     { url = "https://mirrors.aliyun.com/pypi/packages/23/d1/136eb2cb77520a31e1f64cbae9d33ec6df0d78bdf4160398e86eec8a8754/tomli-2.4.0-py3-none-any.whl", hash = "sha256:1f776e7d669ebceb01dee46484485f43a4048746235e683bcdffacdf1fb4785a" },
+]
+
+[[package]]
+name = "tornado"
+version = "6.5.7"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/64/24/95ec527ad67b76d59299e5465b3935d05e4294b7e0290a3924b7487df30b/tornado-6.5.7.tar.gz", hash = "sha256:66c513a76cda70d53907bc27cf1447557699c2e95aa48ba27a442ff61c3ddfc2" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/02/dc/c7043cab6fed8ae159fc1923ce829ada35c4dbd797d408a43858ffaf9639/tornado-6.5.7-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:148b2eb15c2c765a50796172c1e499649b35f30d2e3c3d3e15913cfa56bfb163" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/92/4f/090b1431e5a43df696feceffc268c5383cc079ecb5f08ce58f917109aafe/tornado-6.5.7-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:9da38de27f1da3b78a966f0dae12b5a1ea9afe72ca805d84ff06508272ddf100" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/37/d8/ef374952fd5da67d4463122c2b8e5a96536ec10b4b339254c6dcde81d01c/tornado-6.5.7-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:8d759e71906ee783f8867b93bf26a265743da4c1e2f4a018464c1ba019862972" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/35/37/d434c73f4c6e014b745b9b37085f34f40c022f007efff3d7fe65991899f3/tornado-6.5.7-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:8a46347a18f23fb92b396beebe0fb78f61dda0cc302445202c16203d8a18848b" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/b6/2b/56b9aff361d7f1ab728a805ec7d7ea835f8807afa9f5cc690ea0e630efb9/tornado-6.5.7-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:7778b30bef919231265e91c69963ce0f49a1e9c07ac900bbe75b19ce2575ba92" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/02/30/a7444fb23aa76860a14198fab96ac79f1866b0a6e19e26c4381b0938e50f/tornado-6.5.7-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:e726f0c75da7726eec023aa62751ff8878bd2737e34fbdd33b1ae5897d2200f5" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/5c/42/5f0e56c01e8d9d36f4e23f367b85ae6cae0c1ecddd5e6977d8388ad27488/tornado-6.5.7-cp39-abi3-win32.whl", hash = "sha256:f8de3bf12d3efdd0cbe7c8887868198f8a91415e3f29fcf258d9b8eb7b1d9ae4" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/c9/a4/b393076ffb21b469eec5b328a0534cf03a3b90bfc6b1f09507cdd075d938/tornado-6.5.7-cp39-abi3-win_amd64.whl", hash = "sha256:de942f843533a039ef9fa3d9c88c7cd8a7c94553fb5ad0154270989b3d99a2c4" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/71/2e/7b1c769803121b809112cf9a00681c472eae1d80e32d7ec0e0bd61d0d0e1/tornado-6.5.7-cp39-abi3-win_arm64.whl", hash = "sha256:ff934fce95643af5f11efdae618eaa73d469dc588641e5c8d19295a0c65c4796" },
 ]
 
 [[package]]

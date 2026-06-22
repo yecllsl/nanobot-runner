@@ -29,7 +29,7 @@ class DiagnosisCategory(Enum):
 class ValidationStatus(Enum):
     """验证状态"""
 
-    PASS = "pass"
+    PASS = "pass"  # nosec B105
     FAIL = "fail"
     WARNING = "warning"
     SKIPPED = "skipped"

@@ -248,6 +248,351 @@ def _register_runner_commands(agent, runner_tools):
     agent.commands.prefix("/load ", cmd_load)
 
 
+def _setup_gateway_logging(verbose: bool, logs: bool) -> None:
+    """配置Gateway日志级别"""
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    if logs:
+        logging.getLogger("nanobot").setLevel(logging.DEBUG)
+        logging.getLogger("src").setLevel(logging.DEBUG)
+    else:
+        logging.getLogger("nanobot").setLevel(logging.WARNING)
+        logging.getLogger("src").setLevel(logging.WARNING)
+
+
+def _init_gateway_context(
+    webui: bool,
+) -> tuple[Any, Any, Any, Any]:
+    """初始化应用上下文、RunnerTools和Provider适配器
+
+    Returns:
+        (context, runner_tools, workspace, adapter) 元组
+    """
+    from pathlib import Path
+
+    from src.agents.tools import RunnerTools
+    from src.core.base.context import get_context
+    from src.core.provider_adapter import RunnerProviderAdapter
+
+    context = None
+    runner_tools = None
+    workspace = None
+    adapter = None
+
+    try:
+        context = get_context()
+        workspace = context.config.base_dir
+        runner_tools = RunnerTools(context)
+
+        if context.config.has_llm_config():
+            # v0.27.0: 传入 webui_enabled 标志，启用 WebSocket 通道
+            adapter = RunnerProviderAdapter(context.config, webui_enabled=webui)
+    except NanobotRunnerError:
+        console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
+        workspace = Path.home() / ".nanobot-runner"
+
+    return context, runner_tools, workspace, adapter
+
+
+def _setup_webui_branding() -> None:
+    """配置自定义 WebUI 品牌路径
+
+    通过 monkey-patch 覆盖默认的 WebUI 静态文件路径，
+    优先使用项目自定义的 webui/dist 目录。
+    """
+    from pathlib import Path
+
+    import nanobot.channels.manager as manager_module
+
+    def _custom_webui_dist():
+        """返回项目自定义的 WebUI dist 目录"""
+        # 优先使用项目自定义的 webui 目录
+        custom_dist = Path(__file__).resolve().parent.parent.parent / "webui" / "dist"
+        if custom_dist.is_dir() and (custom_dist / "index.html").exists():
+            return custom_dist
+        # 回退到 nanobot 默认目录
+        try:
+            import nanobot.web as web_pkg
+
+            default_dist = Path(web_pkg.__file__).resolve().parent / "dist"
+            return default_dist if default_dist.is_dir() else None
+        except ImportError:
+            return None
+
+    # 保存原始函数并替换
+    manager_module._default_webui_dist = _custom_webui_dist
+
+
+def _create_gateway_agent(
+    bus: Any,
+    provider: Any,
+    agent_defaults: Any,
+    workspace: Any,
+    runner_tools: Any,
+) -> Any:
+    """创建 AgentLoop 实例并注册工具与命令
+
+    Returns:
+        AgentLoop 实例
+    """
+    from nanobot.agent import AgentLoop
+
+    agent = AgentLoop(
+        bus=bus,
+        provider=provider,
+        workspace=workspace,
+        model=agent_defaults.model,
+        max_iterations=agent_defaults.max_tool_iterations,
+        context_window_tokens=agent_defaults.context_window_tokens,
+        context_block_limit=agent_defaults.context_block_limit,
+        max_tool_result_chars=agent_defaults.max_tool_result_chars,
+    )
+
+    if runner_tools:
+        from src.agents.tools import create_tools
+
+        for tool in create_tools(runner_tools):
+            agent.tools.register(tool)
+        _register_runner_commands(agent, runner_tools)
+
+    return agent
+
+
+def _create_runtime_model_callback(adapter: Any, agent: Any) -> Any:
+    """创建运行时模型名称回调函数
+
+    使 WebUI 显示实际使用的模型名称。获取失败时静默回退到 agent.model，
+    属信息性操作，不阻塞主流程。
+
+    Returns:
+        返回当前实际使用的模型名称的回调函数
+    """
+
+    def get_runtime_model_name():
+        """返回当前实际使用的模型名称"""
+        try:
+            # 优先从adapter获取实际配置的模型
+            if adapter and hasattr(adapter, "config"):
+                return adapter.config.llm_model
+        except Exception as e:
+            # 信息性操作，失败时回退到agent.model，不阻塞主流程
+            logger.debug(f"获取运行时模型名称失败，回退到agent.model: {e}")
+        # 回退到agent的模型
+        return agent.model if agent else None
+
+    return get_runtime_model_name
+
+
+def _setup_fastapi_server(context: Any, webui: bool) -> Any:
+    """创建 WebUI FastAPI 后端服务器
+
+    Returns:
+        FastAPI 服务器实例，未启用时返回 None
+    """
+    if not webui or context is None:
+        return None
+
+    webui_config = context.config.get_webui_config()
+    from src.core.webui.server import create_server
+
+    fastapi_server = create_server(context)
+    api_host = webui_config.get("host", "127.0.0.1")
+    api_port = webui_config.get("port", 8766)
+    console.print(
+        f"[green][OK][/green] WebUI API: http://{api_host}:{api_port}/api/docs"
+    )
+    return fastapi_server
+
+
+def _setup_gateway_integration(workspace: Any, bus: Any, context: Any) -> Any:
+    """创建并返回 GatewayIntegration 实例"""
+    from src.core.plan.gateway_integration import GatewayIntegration
+
+    return GatewayIntegration(
+        workspace=workspace,
+        bus=bus,
+        console=console,
+        data_dir=context.config.data_dir if context else None,
+    )
+
+
+def _register_heartbeat_cron(cron: Any) -> int:
+    """注册心跳Cron任务
+
+    v0.30.0: HeartbeatService 在 nanobot-ai 0.2.1 中已移除，
+    改用 CronService 注册心跳任务。
+
+    Returns:
+        心跳间隔分钟数
+    """
+    from nanobot.cron.types import CronSchedule
+
+    hb_interval_s = 300
+    hb_enabled = True
+    hb_interval_minutes = max(1, hb_interval_s // 60)  # Cron 最小粒度为分钟
+
+    if hb_enabled:
+        try:
+            cron.add_job(
+                name="heartbeat",
+                schedule=CronSchedule(
+                    kind="cron", expr=f"*/{hb_interval_minutes} * * * *"
+                ),
+                message="心跳检测",
+            )
+            logger.info(f"心跳Cron任务已注册: 每 {hb_interval_minutes} 分钟")
+        except Exception as e:
+            logger.warning(f"注册心跳Cron任务失败: {e}")
+
+    return hb_interval_minutes
+
+
+def _display_channel_status(channels: Any, context: Any) -> None:
+    """显示通道启用状态和WebUI访问信息"""
+    if not channels.enabled_channels:
+        console.print("[yellow]警告: 未启用任何通道[/yellow]")
+        return
+
+    console.print(
+        f"[green][OK][/green] 已启用通道: {', '.join(channels.enabled_channels)}"
+    )
+    # v0.27.0: WebSocket 通道启用时，显示 WebUI 访问地址与安全提示
+    if "websocket" in channels.enabled_channels and context is not None:
+        ws_config = context.config.get_websocket_config()
+        ws_host = ws_config.get("host", "127.0.0.1")
+        ws_port = ws_config.get("port", 8765)
+        console.print(f"[green][OK][/green] WebUI 访问地址: http://{ws_host}:{ws_port}")
+        # Token 获取方式提示
+        if ws_config.get("websocket_requires_token", True):
+            token_path = ws_config.get("token_issue_path") or "/token"
+            console.print(
+                f"[dim]  Token获取: curl http://{ws_host}:{ws_port}{token_path}[/dim]"
+            )
+        # 非本地绑定时显示安全警告
+        if ws_host not in ("127.0.0.1", "localhost"):
+            console.print(
+                "[yellow]⚠ 安全警告: WebUI 绑定到非本地地址，请确保网络环境安全[/yellow]"
+            )
+            console.print(
+                "[dim]  建议设置 websocket_requires_token=true 并配置强密钥[/dim]"
+            )
+
+
+def _display_cron_status(integration: Any) -> None:
+    """显示Cron服务和训练提醒状态"""
+    cron_status_info = integration.get_cron_status()
+    if cron_status_info.get("enabled"):
+        console.print(
+            f"[green][OK][/green] 定时任务: {cron_status_info.get('jobs_count', 0)} 个"
+        )
+        if cron_status_info.get("reminder_job"):
+            reminder = cron_status_info["reminder_job"]
+            console.print(f"[green][OK][/green] 训练提醒: {reminder['cron']}")
+        elif cron_status_info.get("reminder_enabled"):
+            console.print("[yellow]! 训练提醒已启用但未注册任务[/yellow]")
+    else:
+        console.print("[yellow]! Cron服务未启用[/yellow]")
+
+
+def _display_gateway_commands_info() -> None:
+    """显示飞书机器人交互命令帮助"""
+    console.print()
+    console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
+    console.print("  - /stats - 查看训练统计")
+    console.print("  - /recent [数量] - 查看最近训练")
+    console.print("  - /vd - 查看VDOT趋势")
+    console.print("  - /hr_drift - 查看心率漂移")
+    console.print("  - /load - 查看训练负荷")
+    console.print("  - /help - 显示帮助")
+
+
+def _display_webui_info(
+    webui: bool, channels: Any, context: Any, fastapi_server: Any
+) -> None:
+    """显示WebUI交互信息区块（仅在 WebSocket 通道启用时显示）"""
+    if (
+        not webui
+        or not channels.enabled_channels
+        or "websocket" not in channels.enabled_channels
+        or context is None
+    ):
+        return
+
+    ws_config = context.config.get_websocket_config()
+    ws_host = ws_config.get("host", "127.0.0.1")
+    ws_port = ws_config.get("port", 8765)
+    token_path = ws_config.get("token_issue_path") or "/token"
+    console.print()
+    console.print("[bold cyan]WebUI 交互：[/bold cyan]")
+    console.print(f"  - 浏览器访问: http://{ws_host}:{ws_port}")
+    if ws_config.get("websocket_requires_token", True):
+        console.print(f"  - 获取Token: curl http://{ws_host}:{ws_port}{token_path}")
+
+    # v0.28.0: WebUI API 文档
+    if fastapi_server is not None:
+        webui_config = context.config.get_webui_config()
+        api_host = webui_config.get("host", "127.0.0.1")
+        api_port = webui_config.get("port", 8766)
+        console.print(f"  - API文档: http://{api_host}:{api_port}/api/docs")
+
+
+async def _run_gateway(
+    agent: Any,
+    channels: Any,
+    cron: Any,
+    fastapi_server: Any,
+    integration: Any,
+    mcp_context: tuple | None,
+) -> None:
+    """运行Gateway服务的异步主循环
+
+    按顺序启动各组件，使用 return_exceptions 防止 MCP cancel scope 异常级联。
+    退出时按顺序优雅关闭：先停 uvicorn → 停通道 → 停心跳 → 关闭 MCP。
+    """
+    try:
+        # 在同一事件循环内连接MCP工具，避免跨事件循环的cancel scope冲突
+        if mcp_context is not None:
+            await _connect_mcp_tools_async(mcp_context[0], mcp_context[1])
+
+        await cron.start()
+
+        # 将 uvicorn 放在独立 task 中运行，隔离 anyio cancel scope 的影响
+        # MCP stdio_client 使用 anyio TaskGroup，清理时 cancel scope 会取消
+        # 同一 scope 下的 asyncio task，导致 uvicorn 等服务被意外取消
+        if fastapi_server is not None:
+            webui_task = asyncio.create_task(fastapi_server.serve())
+        else:
+            webui_task = None
+
+        # agent.run() 和 channels.start_all() 使用 return_exceptions
+        # 防止 MCP cancel scope 异常级联
+        results = await asyncio.gather(
+            agent.run(),
+            channels.start_all(),
+            return_exceptions=True,
+        )
+        for i, r in enumerate(results):
+            if isinstance(r, Exception) and not isinstance(r, KeyboardInterrupt):
+                logger.warning(f"服务任务异常退出: {r}")
+    except KeyboardInterrupt:
+        console.print("\n[yellow]正在关闭...[/yellow]")
+    finally:
+        # 按顺序优雅关闭：先停 uvicorn → 停通道 → 停心跳 → 关闭 MCP
+        if fastapi_server is not None:
+            fastapi_server.should_exit = True
+        if webui_task is not None and not webui_task.done():
+            webui_task.cancel()
+        await channels.stop_all()
+        integration.shutdown()
+        agent.stop()
+        # MCP 关闭可能产生 cancel scope 冲突，隔离异常避免影响其他清理
+        try:
+            await agent.close_mcp()
+        except (RuntimeError, BaseExceptionGroup, asyncio.CancelledError) as e:
+            logger.debug(f"MCP关闭时异常（可忽略）: {e}")
+
+
 @app.command()
 def start(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway端口"),
@@ -276,39 +621,13 @@ def start(
     WebUI模式:
         使用 --webui 标志启用WebSocket通道，可通过浏览器访问WebUI界面。
     """
-    from src.agents.tools import RunnerTools, create_tools
-    from src.core.base.context import get_context
-    from src.core.provider_adapter import RunnerProviderAdapter
+    # 1. 日志配置
+    _setup_gateway_logging(verbose, logs)
 
-    if verbose:
-        logging.basicConfig(level=logging.DEBUG)
+    # 2. 上下文初始化
+    context, runner_tools, workspace, adapter = _init_gateway_context(webui)
 
-    if logs:
-        logging.getLogger("nanobot").setLevel(logging.DEBUG)
-        logging.getLogger("src").setLevel(logging.DEBUG)
-    else:
-        logging.getLogger("nanobot").setLevel(logging.WARNING)
-        logging.getLogger("src").setLevel(logging.WARNING)
-
-    context = None
-    runner_tools = None
-    workspace = None
-    adapter = None
-
-    try:
-        context = get_context()
-        workspace = context.config.base_dir
-        runner_tools = RunnerTools(context)
-
-        if context.config.has_llm_config():
-            # v0.27.0: 传入 webui_enabled 标志，启用 WebSocket 通道
-            adapter = RunnerProviderAdapter(context.config, webui_enabled=webui)
-    except NanobotRunnerError:
-        console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
-        from pathlib import Path
-
-        workspace = Path.home() / ".nanobot-runner"
-
+    # 3. LLM配置检查
     if not adapter or not adapter.is_available():
         console.print("[red]LLM配置缺失，Gateway服务需要LLM支持[/red]")
         console.print("[yellow]请先运行: nanobotrun init[/yellow]")
@@ -317,76 +636,31 @@ def start(
     provider = adapter.get_provider_instance()
     agent_defaults = adapter.get_agent_defaults()
 
-    from nanobot.agent import AgentLoop
-    from nanobot.bus import MessageBus
-    from nanobot.channels.manager import ChannelManager
-    from nanobot.heartbeat.service import HeartbeatService
-    from nanobot.session.manager import SessionManager
+    # 4. 工作区模板同步与WebUI品牌配置
     from nanobot.utils.helpers import sync_workspace_templates
 
     sync_workspace_templates(workspace)
+    _setup_webui_branding()
 
-    # v0.27.0: 自定义 WebUI 品牌配置
-    # 通过 monkey-patch 覆盖默认的 WebUI 静态文件路径
-    from pathlib import Path
-
-    import nanobot.channels.manager as manager_module
-
-    def _custom_webui_dist():
-        """返回项目自定义的 WebUI dist 目录"""
-        # 优先使用项目自定义的 webui 目录
-        custom_dist = Path(__file__).resolve().parent.parent.parent / "webui" / "dist"
-        if custom_dist.is_dir() and (custom_dist / "index.html").exists():
-            return custom_dist
-        # 回退到 nanobot 默认目录
-        try:
-            import nanobot.web as web_pkg
-
-            default_dist = Path(web_pkg.__file__).resolve().parent / "dist"
-            return default_dist if default_dist.is_dir() else None
-        except ImportError:
-            return None
-
-    # 保存原始函数并替换
-    manager_module._default_webui_dist = _custom_webui_dist
+    # 5. 创建消息总线和Agent
+    from nanobot.bus import MessageBus
 
     bus = MessageBus()
-
-    agent = AgentLoop(
-        bus=bus,
-        provider=provider,
-        workspace=workspace,
-        model=agent_defaults.model,
-        max_iterations=agent_defaults.max_tool_iterations,
-        context_window_tokens=agent_defaults.context_window_tokens,
-        context_block_limit=agent_defaults.context_block_limit,
-        max_tool_result_chars=agent_defaults.max_tool_result_chars,
+    agent = _create_gateway_agent(
+        bus, provider, agent_defaults, workspace, runner_tools
     )
-
-    if runner_tools:
-        for tool in create_tools(runner_tools):
-            agent.tools.register(tool)
-        _register_runner_commands(agent, runner_tools)
 
     # MCP工具连接移至 run() 异步函数内，避免 asyncio.run() 跨事件循环导致
     # stdio_client cancel scope 冲突 (RuntimeError: Attempted to exit cancel scope
     # in a different task than it was entered in)
     mcp_context = (context, agent) if context else None
 
-    # v0.27.0: 创建 SessionManager 以启用 WebUI 静态文件服务
-    session_manager = SessionManager(workspace=workspace)
+    # 6. 创建 SessionManager 和通道管理器
+    from nanobot.channels.manager import ChannelManager
+    from nanobot.session.manager import SessionManager
 
-    # v0.27.0: 定义运行时模型名称回调，使WebUI显示实际使用的模型
-    def get_runtime_model_name():
-        """返回当前实际使用的模型名称"""
-        try:
-            # 优先从adapter获取实际配置的模型
-            if adapter and hasattr(adapter, "config"):
-                return adapter.config.llm_model
-        except Exception:
-            pass
-        # 回退到agent的模型
-        return agent.model if agent else None
+    session_manager = SessionManager(workspace=workspace)
+    get_runtime_model_name = _create_runtime_model_callback(adapter, agent)
 
     channels = ChannelManager(
         config=adapter._get_or_create_nanobot_config(),
@@ -395,183 +669,36 @@ def start(
         webui_runtime_model_name=get_runtime_model_name,
     )
 
-    # v0.28.0: WebUI FastAPI 后端
-    # --webui 标志即为启动条件，无需额外检查 webui.enabled 配置
-    fastapi_server = None
-    if webui and context is not None:
-        webui_config = context.config.get_webui_config()
-        from src.core.webui.server import create_server
+    # 7. WebUI FastAPI 后端（--webui 标志即为启动条件）
+    fastapi_server = _setup_fastapi_server(context, webui)
 
-        fastapi_server = create_server(context)
-        api_host = webui_config.get("host", "127.0.0.1")
-        api_port = webui_config.get("port", 8766)
-        console.print(
-            f"[green][OK][/green] WebUI API: http://{api_host}:{api_port}/api/docs"
-        )
-
-    # v0.17.0: 使用 GatewayIntegration 集成 Cron + Hook
-    from src.core.plan.gateway_integration import GatewayIntegration
-
-    integration = GatewayIntegration(
-        workspace=workspace,
-        bus=bus,
-        console=console,
-        data_dir=context.config.data_dir if context else None,
-    )
-
-    # 设置Cron服务（包含训练提醒）
+    # 8. Gateway集成（Cron + Hook）
+    integration = _setup_gateway_integration(workspace, bus, context)
     cron = integration.setup_cron_service(auto_register_reminder=True)
 
     # 设置流式输出Hook
+    # v0.30.0: nanobot-ai 0.2.1 中 AgentLoop 无公开 hooks 属性
+    # 改用 _extra_hooks 列表直接追加
     streaming_hook = integration.setup_streaming_hook()
-    if streaming_hook and hasattr(agent, "hooks"):
-        agent.hooks.register(streaming_hook)
+    if streaming_hook:
+        agent._extra_hooks.append(streaming_hook)
 
-    def on_heartbeat_execute():
-        console.print("[dim]心跳检测执行中...[/dim]")
+    # 9. 心跳Cron任务（v0.30.0: 改用 CronService）
+    hb_interval_minutes = _register_heartbeat_cron(cron)
 
-    def on_heartbeat_notify(channel: str, chat_id: str, response: str):
-        from nanobot.bus import OutboundMessage
-
-        bus.publish_outbound(
-            OutboundMessage(channel=channel, chat_id=chat_id, content=response)
-        )
-
-    hb_interval_s = 300
-    hb_enabled = True
-    heartbeat = HeartbeatService(
-        workspace=workspace,
-        provider=provider,
-        model=agent.model,
-        on_execute=on_heartbeat_execute,
-        on_notify=on_heartbeat_notify,
-        interval_s=hb_interval_s,
-        enabled=hb_enabled,
+    # 10. 显示启动状态信息
+    _display_channel_status(channels, context)
+    _display_cron_status(integration)
+    console.print(
+        f"[green][OK][/green] 心跳检测: 每 {hb_interval_minutes} 分钟 (CronService)"
     )
-
-    if channels.enabled_channels:
-        console.print(
-            f"[green][OK][/green] 已启用通道: {', '.join(channels.enabled_channels)}"
-        )
-        # v0.27.0: WebSocket 通道启用时，显示 WebUI 访问地址与安全提示
-        if "websocket" in channels.enabled_channels and context is not None:
-            ws_config = context.config.get_websocket_config()
-            ws_host = ws_config.get("host", "127.0.0.1")
-            ws_port = ws_config.get("port", 8765)
-            console.print(
-                f"[green][OK][/green] WebUI 访问地址: http://{ws_host}:{ws_port}"
-            )
-            # Token 获取方式提示
-            if ws_config.get("websocket_requires_token", True):
-                token_path = ws_config.get("token_issue_path") or "/token"
-                console.print(
-                    f"[dim]  Token获取: curl http://{ws_host}:{ws_port}{token_path}[/dim]"
-                )
-            # 非本地绑定时显示安全警告
-            if ws_host not in ("127.0.0.1", "localhost"):
-                console.print(
-                    "[yellow]⚠ 安全警告: WebUI 绑定到非本地地址，请确保网络环境安全[/yellow]"
-                )
-                console.print(
-                    "[dim]  建议设置 websocket_requires_token=true 并配置强密钥[/dim]"
-                )
-    else:
-        console.print("[yellow]警告: 未启用任何通道[/yellow]")
-
-    # v0.17.0: 显示Cron和提醒状态
-    cron_status_info = integration.get_cron_status()
-    if cron_status_info.get("enabled"):
-        console.print(
-            f"[green][OK][/green] 定时任务: {cron_status_info.get('jobs_count', 0)} 个"
-        )
-        if cron_status_info.get("reminder_job"):
-            reminder = cron_status_info["reminder_job"]
-            console.print(f"[green][OK][/green] 训练提醒: {reminder['cron']}")
-        elif cron_status_info.get("reminder_enabled"):
-            console.print("[yellow]! 训练提醒已启用但未注册任务[/yellow]")
-    else:
-        console.print("[yellow]! Cron服务未启用[/yellow]")
-
-    console.print(f"[green][OK][/green] 心跳检测: 每 {hb_interval_s} 秒")
-    console.print()
-    console.print("[bold cyan]飞书机器人交互命令：[/bold cyan]")
-    console.print("  - /stats - 查看训练统计")
-    console.print("  - /recent [数量] - 查看最近训练")
-    console.print("  - /vd - 查看VDOT趋势")
-    console.print("  - /hr_drift - 查看心率漂移")
-    console.print("  - /load - 查看训练负荷")
-    console.print("  - /help - 显示帮助")
-
-    # v0.27.0: WebUI 交互信息区块（仅在 WebSocket 通道启用时显示）
-    if (
-        webui
-        and channels.enabled_channels
-        and "websocket" in channels.enabled_channels
-        and context is not None
-    ):
-        ws_config = context.config.get_websocket_config()
-        ws_host = ws_config.get("host", "127.0.0.1")
-        ws_port = ws_config.get("port", 8765)
-        token_path = ws_config.get("token_issue_path") or "/token"
-        console.print()
-        console.print("[bold cyan]WebUI 交互：[/bold cyan]")
-        console.print(f"  - 浏览器访问: http://{ws_host}:{ws_port}")
-        if ws_config.get("websocket_requires_token", True):
-            console.print(f"  - 获取Token: curl http://{ws_host}:{ws_port}{token_path}")
-
-        # v0.28.0: WebUI API 文档
-        if fastapi_server is not None:
-            webui_config = context.config.get_webui_config()
-            api_host = webui_config.get("host", "127.0.0.1")
-            api_port = webui_config.get("port", 8766)
-            console.print(f"  - API文档: http://{api_host}:{api_port}/api/docs")
+    _display_gateway_commands_info()
+    _display_webui_info(webui, channels, context, fastapi_server)
 
     console.print()
     console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
 
-    async def run():
-        try:
-            # 在同一事件循环内连接MCP工具，避免跨事件循环的cancel scope冲突
-            if mcp_context is not None:
-                await _connect_mcp_tools_async(mcp_context[0], mcp_context[1])
-
-            await cron.start()
-            await heartbeat.start()
-
-            # 将 uvicorn 放在独立 task 中运行，隔离 anyio cancel scope 的影响
-            # MCP stdio_client 使用 anyio TaskGroup，清理时 cancel scope 会取消
-            # 同一 scope 下的 asyncio task，导致 uvicorn 等服务被意外取消
-            if fastapi_server is not None:
-                webui_task = asyncio.create_task(fastapi_server.serve())
-            else:
-                webui_task = None
-
-            # agent.run() 和 channels.start_all() 使用 return_exceptions
-            # 防止 MCP cancel scope 异常级联
-            results = await asyncio.gather(
-                agent.run(),
-                channels.start_all(),
-                return_exceptions=True,
-            )
-            for i, r in enumerate(results):
-                if isinstance(r, Exception) and not isinstance(r, KeyboardInterrupt):
-                    logger.warning(f"服务任务异常退出: {r}")
-        except KeyboardInterrupt:
-            console.print("\n[yellow]正在关闭...[/yellow]")
-        finally:
-            # 按顺序优雅关闭：先停 uvicorn → 停通道 → 停心跳 → 关闭 MCP
-            if fastapi_server is not None:
-                fastapi_server.should_exit = True
-            if webui_task is not None and not webui_task.done():
-                webui_task.cancel()
-            await channels.stop_all()
-            heartbeat.stop()
-            integration.shutdown()
-            agent.stop()
-            # MCP 关闭可能产生 cancel scope 冲突，隔离异常避免影响其他清理
-            try:
-                await agent.close_mcp()
-            except (RuntimeError, BaseExceptionGroup, asyncio.CancelledError) as e:
-                logger.debug(f"MCP关闭时异常（可忽略）: {e}")
-
-    asyncio.run(run())
+    # 11. 运行Gateway服务
+    asyncio.run(
+        _run_gateway(agent, channels, cron, fastapi_server, integration, mcp_context)
+    )

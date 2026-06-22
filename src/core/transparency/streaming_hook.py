@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from nanobot.agent.hook import AgentHook, AgentHookContext
 from nanobot.bus import MessageBus
@@ -77,24 +78,32 @@ class StreamingHook(AgentHook):
             try:
                 from nanobot.bus.events import OutboundMessage
 
+                # v0.30.0: 通过 context.streamed_reasoning 区分推理片段和普通输出
+                metadata: dict[str, Any] = {"stream_delta": True}
+                if context.streamed_reasoning:
+                    metadata["reasoning_delta"] = True
+
                 self._bus.publish_outbound(
                     OutboundMessage(
                         channel=self._channel,
                         chat_id=self._chat_id,
                         content=delta,
-                        metadata={"stream_delta": True},
+                        metadata=metadata,
                     )
                 )
             except NanobotRunnerError as e:
                 logger.warning(f"Gateway流式输出失败: {e}")
 
-    async def on_stream_end(self, context: AgentHookContext) -> None:
+    async def on_stream_end(
+        self, context: AgentHookContext, *, resuming: bool = False
+    ) -> None:
         """流式输出结束时触发
 
         输出换行并清理流式状态。
 
         Args:
             context: Hook上下文
+            resuming: 是否从上次中断处恢复（nanobot-ai 0.2.1 新增）
         """
         if self._stream_active and self._console is not None:
             self._console.print()

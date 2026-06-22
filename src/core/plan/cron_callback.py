@@ -19,6 +19,7 @@ class CronCallbackHandler:
 
     支持的任务类型：
     - training_reminder: 训练提醒任务
+    - heartbeat: 心跳检测任务 (v0.30.0)
     - system_event: 系统事件（受保护，不可删除）
     - agent_turn: 默认的Agent轮询任务
 
@@ -37,6 +38,8 @@ class CronCallbackHandler:
     SYSTEM_JOB_PREFIX: str = "system_"
     # 训练提醒任务名称
     TRAINING_REMINDER_JOB: str = "training_reminder"
+    # 心跳检测任务名称 (v0.30.0)
+    HEARTBEAT_JOB: str = "heartbeat"
 
     def __init__(
         self,
@@ -68,6 +71,8 @@ class CronCallbackHandler:
             # 根据任务名称分发
             if job.name == self.TRAINING_REMINDER_JOB:
                 return await self._handle_training_reminder(job)
+            elif job.name == self.HEARTBEAT_JOB:
+                return await self._handle_heartbeat(job)
             elif job.name.startswith(self.SYSTEM_JOB_PREFIX):
                 return await self._handle_system_event(job)
             else:
@@ -123,6 +128,20 @@ class CronCallbackHandler:
         # 系统事件通常由其他组件处理
         # 这里仅记录日志
         return f"系统事件已处理: {job.name}"
+
+    async def _handle_heartbeat(self, job: CronJob) -> str | None:
+        """处理心跳检测任务 (v0.30.0)
+
+        替代原 HeartbeatService，由 CronService 统一调度。
+
+        Args:
+            job: CronJob 实例
+
+        Returns:
+            Optional[str]: 处理结果
+        """
+        logger.debug("心跳检测执行中")
+        return "心跳检测完成"
 
     async def _handle_default(self, job: CronJob) -> str | None:
         """默认任务处理

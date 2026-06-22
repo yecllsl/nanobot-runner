@@ -68,6 +68,19 @@ def _mock_discover_all():
     return {"websocket": WebSocketChannel}
 
 
+def _mock_discover_enabled(enabled_names, _names=None):
+    """Mock discover_enabled() 只返回 WebSocket 通道
+
+    nanobot 0.2.1 中 ChannelManager._init_channels() 调用 discover_enabled()，
+    需要同时 mock 此函数以避免导入飞书等慢速模块。
+    """
+    from nanobot.channels.websocket import WebSocketChannel
+
+    if "websocket" in (enabled_names or []):
+        return {"websocket": WebSocketChannel}
+    return {}
+
+
 def _build_test_nanobot_config(
     host: str = TEST_WS_HOST,
     port: int = TEST_WS_PORT,
@@ -123,7 +136,7 @@ def _build_test_nanobot_config(
 
 
 def _create_channel_manager(config: Any, bus: MessageBus) -> Any:
-    """创建 ChannelManager 实例，mock discover_all 避免慢速导入
+    """创建 ChannelManager 实例，mock discover_all/discover_enabled 避免慢速导入
 
     Args:
         config: nanobot Config 对象
@@ -135,7 +148,10 @@ def _create_channel_manager(config: Any, bus: MessageBus) -> Any:
     from nanobot.channels.manager import ChannelManager
 
     with patch("nanobot.channels.registry.discover_all", _mock_discover_all):
-        return ChannelManager(config=config, bus=bus)
+        with patch(
+            "nanobot.channels.registry.discover_enabled", _mock_discover_enabled
+        ):
+            return ChannelManager(config=config, bus=bus)
 
 
 # ============================================================
@@ -168,6 +184,8 @@ class TestWebUIConfigInjection:
             "base_url": base_url,
         }
         mock.get_websocket_config.return_value = ws_config or {}
+        # v0.30.0: load_config() 必须返回真实字典，避免 MagicMock 导致 Pydantic 验证失败
+        mock.load_config.return_value = {}
         return mock
 
     @pytest.mark.integration
@@ -394,6 +412,8 @@ class TestChannelManagerWebUI:
             "token": "integration-test-token",
             "websocket_requires_token": False,
         }
+        # v0.30.0: load_config() 必须返回真实字典
+        mock_config.load_config.return_value = {}
 
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
         nanobot_config = adapter._get_or_create_nanobot_config()
@@ -838,6 +858,8 @@ class TestGatewayStartWebUIE2E:
             "base_url": None,
         }
         mock_config.get_websocket_config.return_value = {}
+        # v0.30.0: load_config() 必须返回真实字典
+        mock_config.load_config.return_value = {}
 
         # 模拟 gateway start --webui 的行为
         webui_enabled = True  # 对应 CLI --webui 参数
@@ -870,6 +892,8 @@ class TestGatewayStartWebUIE2E:
             "port": TEST_WS_PORT,
             "websocket_requires_token": False,
         }
+        # v0.30.0: load_config() 必须返回真实字典
+        mock_config.load_config.return_value = {}
 
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
         nanobot_config = adapter._get_or_create_nanobot_config()
@@ -897,6 +921,8 @@ class TestGatewayStartWebUIE2E:
             "base_url": None,
         }
         mock_config.get_websocket_config.return_value = {"enabled": False}
+        # v0.30.0: load_config() 必须返回真实字典
+        mock_config.load_config.return_value = {}
 
         # 不带 --webui 标志
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=False)
@@ -929,6 +955,8 @@ class TestGatewayStartWebUIE2E:
             "port": TEST_WS_PORT,
             "websocket_requires_token": False,
         }
+        # v0.30.0: load_config() 必须返回真实字典
+        mock_config.load_config.return_value = {}
 
         # 步骤1: 创建 Adapter（模拟 gateway start --webui）
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)

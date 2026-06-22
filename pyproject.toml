@@ -1,21 +1,21 @@
 [project]
 name = "nanobot-runner"
-version = "0.29.0"
+version = "0.30.0"
 description = "Nanobot Runner - 桌面端私人AI跑步助理"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "nanobot-ai>=0.2.0",
+    "nanobot-ai>=0.2.1",
     "typer[all]>=0.12.0",
-    "rich>=13.0.0",
+    "rich>=14.0.0,<15.0.0",
     "polars>=0.20.0",
     "pyarrow>=14.0.0",
     "fitparse>=1.1.0",
     "psutil>=7.2.2",
     "numpy>=2.4.2",
-    "questionary>=1.10.0",
-    "pydantic-settings>=2.0.0",
-    "dulwich>=0.21.0",
+    "questionary>=2.0.0,<3.0.0",
+    "pydantic-settings>=2.12.0,<3.0.0",
+    "dulwich>=0.22.0,<1.0.0",
     "pyyaml>=6.0.0",
     "plotext>=5.0.0",
     "scikit-learn>=1.5.0",

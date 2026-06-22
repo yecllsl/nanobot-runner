@@ -2,8 +2,8 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
-> **文档版本**: v0.29.0 | **更新日期**: 2026-06-10
-> **当前基线**: v0.29.0 | **规划版本**: v1.0.0
+> **文档版本**: v0.30.0 | **更新日期**: 2026-06-22
+> **当前基线**: v0.30.0 | **规划版本**: v1.0.0
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
 > **v0.19.0 重要变更**: 新增身体信号分析模块(HRV/疲劳度/恢复评估)
 > **v0.20.0 重要变更**: 新增ML增强预测模块(VDOT/比赛成绩/伤病风险预测)
@@ -145,7 +145,7 @@ drift = engine.analyze_hr_drift(records)
 | `get_running_stats(year)` | 年份 | `Dict[str, Any]` |
 | `calculate_vdot(distance_m, duration_s)` | 距离(米), 时长(秒) | `float` |
 | `get_vdot_trend(days)` | 统计天数 | `List[Dict]` |
-| `get_training_load(days)` | 分析天数 | `Dict` (含 atl/ctl/tsb) |
+| `get_training_load(days)` | 分析天数 | `TrainingLoadResult` TypedDict (含 atl/ctl/tsb/fitness_status) |
 | `analyze_hr_drift(records)` | 记录列表 | `Dict` (含 correlation) |
 
 ---

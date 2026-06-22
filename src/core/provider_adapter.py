@@ -440,10 +440,109 @@ class RunnerProviderAdapter:
                         "nanobot-ai 不支持 InlineFallbackConfig，跳过 fallback 注入"
                     )
 
+            # 注入 model_presets 到 nanobot Config（v0.30.0: nanobot-ai 0.2.1 运行时模型切换）
+            model_presets_dict: dict[str, Any] = {}
+            try:
+                from nanobot.config.schema import ModelPresetConfig as _MPC
+
+                presets_raw = runner_config.get("model_presets", {})
+                for preset_name, preset_data in presets_raw.items():
+                    if not isinstance(preset_data, dict):
+                        continue
+                    # config.json 使用 snake_case，ModelPresetConfig 使用 camelCase
+                    model_presets_dict[preset_name] = _MPC(
+                        model=preset_data.get("model", ""),
+                        provider=preset_data.get("provider", "auto"),
+                        maxTokens=preset_data.get(
+                            "maxTokens",
+                            preset_data.get("max_tokens", 8192),
+                        ),
+                        contextWindowTokens=preset_data.get(
+                            "contextWindowTokens",
+                            preset_data.get("context_window_tokens", 65536),
+                        ),
+                        temperature=preset_data.get("temperature", 0.1),
+                        reasoningEffort=preset_data.get(
+                            "reasoningEffort",
+                            preset_data.get("reasoning_effort", None),
+                        ),
+                        label=preset_data.get("label", None),
+                    )
+            except ImportError:
+                logger.debug(
+                    "nanobot-ai 不支持 ModelPresetConfig，跳过 model_presets 注入"
+                )
+
+            # 注入 tools 配置到 nanobot Config（v0.30.0: nanobot-ai 0.2.1 CLI Apps + MCP）
+            tools_config_obj: Any = None
+            try:
+                from nanobot.config.schema import (
+                    CliAppsToolConfig as _CliAppsCfg,
+                )
+                from nanobot.config.schema import (
+                    MCPServerConfig as _MCPServerCfg,
+                )
+                from nanobot.config.schema import (
+                    ToolsConfig as _ToolsCfg,
+                )
+
+                tools_section = runner_config.get("tools", {})
+
+                # 构建 cli_apps 配置
+                cli_apps_raw = tools_section.get("cli_apps", {})
+                cli_apps_cfg = _CliAppsCfg(
+                    enable=cli_apps_raw.get("enable", True),
+                    installTimeout=cli_apps_raw.get(
+                        "installTimeout",
+                        cli_apps_raw.get("install_timeout", 300),
+                    ),
+                    runTimeout=cli_apps_raw.get(
+                        "runTimeout",
+                        cli_apps_raw.get("run_timeout", 60),
+                    ),
+                    catalogTtlSeconds=cli_apps_raw.get(
+                        "catalogTtlSeconds",
+                        cli_apps_raw.get("catalog_ttl_seconds", 3600),
+                    ),
+                )
+
+                # 构建 mcp_servers 配置
+                mcp_servers_raw = tools_section.get("mcp_servers", {})
+                mcp_servers_dict: dict[str, Any] = {}
+                for server_name, server_data in mcp_servers_raw.items():
+                    if not isinstance(server_data, dict):
+                        continue
+                    mcp_servers_dict[server_name] = _MCPServerCfg(
+                        type=server_data.get("type", None),
+                        command=server_data.get("command", ""),
+                        args=server_data.get("args", []),
+                        env=server_data.get("env", {}),
+                        cwd=server_data.get("cwd", ""),
+                        url=server_data.get("url", ""),
+                        headers=server_data.get("headers", {}),
+                        toolTimeout=server_data.get(
+                            "toolTimeout",
+                            server_data.get("tool_timeout", 30),
+                        ),
+                        enabledTools=server_data.get(
+                            "enabledTools",
+                            server_data.get("enabled_tools", []),
+                        ),
+                    )
+
+                tools_config_obj = _ToolsCfg(
+                    cliApps=cli_apps_cfg,
+                    mcpServers=mcp_servers_dict,
+                )
+            except ImportError:
+                logger.debug("nanobot-ai 不支持 ToolsConfig，跳过 tools 配置注入")
+
             config = Config(
                 providers=providers,
                 agents=agents,
                 channels=channels,
+                model_presets=model_presets_dict,
+                **({"tools": tools_config_obj} if tools_config_obj is not None else {}),
             )
 
             self._nanobot_config = config

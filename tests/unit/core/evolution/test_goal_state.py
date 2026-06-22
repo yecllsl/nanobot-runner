@@ -81,7 +81,7 @@ class TestGoalStateIntegration:
         """after_iteration 应从 context.metadata 读取 goal_state"""
         mock_context.metadata = {"goal_state": "全马破4"}
         hook.finalize_content(mock_context, "以下是训练建议")
-        hook.after_iteration(mock_context)
+        run_async(hook.after_iteration(mock_context))
 
         decisions = engine.get_decision_history(limit=10)
         assert len(decisions) >= 1
@@ -93,7 +93,7 @@ class TestGoalStateIntegration:
         """metadata 中无 goal_state 时 DecisionLog.goal_state 应为 None"""
         mock_context.metadata = {}
         hook.finalize_content(mock_context, "以下是训练建议")
-        hook.after_iteration(mock_context)
+        run_async(hook.after_iteration(mock_context))
 
         decisions = engine.get_decision_history(limit=10)
         assert len(decisions) >= 1

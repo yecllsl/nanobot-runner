@@ -97,11 +97,12 @@ async def execute(self, **kwargs) -> dict:
 - 新代码必须添加类型注解
 - 核心模块类型覆盖率 ≥ 80%
 - 工具函数必须标注参数和返回值类型
+- **禁止返回 `dict[str, Any]`**：对于字典形式的返回数据，优先使用 `TypedDict` 或 `dataclass` 提供类型安全
 
 ### 3.2 类型注解示例
 
 ```python
-from typing import TYPE_CHECKING, Any, Optional, Union, Callable, TypeAlias
+from typing import TYPE_CHECKING, Any, Optional, Union, Callable, TypeAlias, TypedDict
 from datetime import datetime
 
 def calculate_vdot(distance_m: float, time_s: float) -> float:
@@ -110,14 +111,27 @@ def calculate_vdot(distance_m: float, time_s: float) -> float:
         raise ValueError("距离和时间必须为正数")
     return (distance_m / time_s) * 3.5
 
-ActivityRecord: TypeAlias = dict[str, Union[str, int, float, datetime]]
+# ✅ 推荐：使用 TypedDict 定义结构化字典返回类型（v0.30.0+）
+class TrainingLoadResult(TypedDict, total=False):
+    """训练负荷分析结果"""
+    atl: float
+    ctl: float
+    tsb: float
+    fitness_status: str
 
-class AnalyticsEngine:
-    def __init__(self, data_dir: Path) -> None:
-        self.data_dir = data_dir
-    
-    def get_stats(self, year: Optional[int] = None) -> dict[str, Any]:
-        ...
+# ✅ 替代方案：使用 dataclass 定义返回类型
+@dataclass
+class SessionSummary:
+    total_distance: float
+    avg_heart_rate: float
+
+# ❌ 禁止：返回无类型约束的 dict[str, Any]
+def get_stats(self, year: Optional[int] = None) -> dict[str, Any]:  # 禁止！
+    ...
+
+# ✅ 正确：返回 TypedDict 类型
+def get_training_load(self, days: int = 42) -> TrainingLoadResult:
+    return {"atl": 50.0, "ctl": 65.0, "tsb": 15.0, "fitness_status": "良好"}
 ```
 
 ---
@@ -318,4 +332,4 @@ uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 
 ---
 
-*文档版本: v0.9.1 | 更新日期: 2026-04-11*
+*文档版本: v0.30.0 | 更新日期: 2026-06-22*

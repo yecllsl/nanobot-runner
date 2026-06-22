@@ -9,6 +9,63 @@
 
 ---
 
+## [0.30.0] - 2026-06-22
+
+### 版本主题
+**代码质量基线修复** —— 基于基线评审报告全面修复代码质量问题，提升可维护性和类型安全
+
+> v0.30.0 是 Phase D（交互升级）的第五个版本，专注于代码质量改进，无新增用户功能。核心工作包括：基线评审问题修复、安全误报处理、类型安全增强。
+
+**本版本已实现**:
+- ✅ 基线评审问题全部修复：9个高/中优先级问题清零
+- ✅ 圈复杂度重构：8个超标函数拆分为职责单一的子函数
+- ✅ 类型安全增强：5处 `dict[str, Any]` 替换为 TypedDict
+- ✅ 安全误报处理：11处 Bandit B105/B107 误报添加 nosec 注释
+- ✅ 可观测性提升：3处静默异常处理添加 debug 日志
+- ✅ 外部依赖兼容：修复 nanobot-ai 0.2.1 模块变更导致的集成测试失败
+- ✅ 全量回归测试 4226 用例零失败，覆盖率 81%
+
+### Fixed
+- **代码重构**: `gateway.py:start()` 圈复杂度从37拆分为4个子函数
+- **代码重构**: `analytics.py:get_training_load_trend` 拆分为6个子函数（日期解析/数据加载/趋势计算等）
+- **代码重构**: `training_plan.py:_allocate_phases` 拆分为3个子函数（短距离/半马/全马分配策略）
+- **代码重构**: `profile.py:filter_anomaly_data` 拆分为4个子函数
+- **代码重构**: `config/schema.py:validate_config` 拆分为多个子函数
+- **代码重构**: `plan_manager.py:record_plan_execution` 拆分为多个子函数
+- **代码重构**: `parquet_manager.py:_concat_dataframes` 拆分为多个子函数
+- **类型安全**: `webui/app.py` 新增 `HealthCheckResponse`、`TokenResponse` TypedDict
+- **类型安全**: `analytics.py` 新增 `TrainingLoadResult` TypedDict
+- **类型安全**: `training_plan.py` 新增 `PlanSummary` TypedDict
+- **类型安全**: `personality/preference_learner.py` 新增 `FeedbackStats` TypedDict
+- **可观测性**: `evolution/evolution_reporter.py:183` 添加 debug 日志
+- **可观测性**: `gateway.py:386` 添加 debug 日志
+- **可观测性**: `storage/parser.py:110` 添加 debug 日志
+- **安全误报**: 6个文件共11处 B105/B107 误报添加 `# nosec` 注释
+- **Bug修复**: `provider_adapter.py` 修复 nanobot-ai 0.2.1 `http_utils` 模块不存在问题
+- **Bug修复**: 集成测试修复 MagicMock 导致 Pydantic 验证失败
+- **Bug修复**: 集成测试修复 `discover_enabled` 调用未 mock 导致超时
+
+### Security
+- Bandit B105/B107 误报消除，安全扫描清洁通过
+- 未引入新的安全变更
+
+### 测试验证
+- 全量单元测试：4226 passed, 1 skipped, 0 failed
+- 代码覆盖率：81%
+- ruff check：0 errors, 0 warnings
+- ruff C901 复杂度检查：全部 <15
+- bandit B105/B107：无剩余警告
+- mypy 类型检查：Success: no issues found
+
+### 文档产出
+- `docs/review/项目基线评审报告_v0.30.0.md` - 基线评审报告
+- `docs/development/Bug修复报告_v0.30.0.md` - Bug修复报告（含基线修复章节）
+
+### 已知问题
+- 无阻塞上线的缺陷
+
+---
+
 ## [0.29.0] - 2026-06-10
 
 ### 版本主题

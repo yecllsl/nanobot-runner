@@ -3,7 +3,7 @@
 # 拆分说明：训练效果计算 → analytics_effects.py，报告生成 → analytics_reports.py
 
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import polars as pl
 
@@ -70,6 +70,32 @@ def _resolve_col(df: pl.DataFrame, *candidates: str) -> str:
         if col in df.columns:
             return col
     raise RuntimeError(f"DataFrame中未找到候选列: {candidates}")
+
+
+class TrainingLoadResult(TypedDict, total=False):
+    """训练负荷分析结果
+
+    Attributes:
+        atl: 急性训练负荷（7天 EWMA）
+        ctl: 慢性训练负荷（42天 EWMA）
+        tsb: 训练压力平衡（CTL - ATL）
+        fitness_status: 体能状态评估
+        training_advice: 训练建议
+        days_analyzed: 分析天数
+        runs_count: 有效跑步次数
+        total_runs: 总跑步次数（含无效数据）
+        message: 提示信息（数据不足或数据量少时）
+    """
+
+    atl: float
+    ctl: float
+    tsb: float
+    fitness_status: str
+    training_advice: str
+    days_analyzed: int
+    runs_count: int
+    total_runs: int
+    message: str
 
 
 class AnalyticsEngine:
@@ -1005,47 +1031,88 @@ class AnalyticsEngine:
         Raises:
             ValueError: 当日期格式无效时
         """
-        from datetime import datetime, timedelta
-
         # 解析日期范围
-        if days is not None:
-            end_dt = datetime.now().replace(hour=23, minute=59, second=59)
-            start_dt = (end_dt - timedelta(days=days - 1)).replace(
-                hour=0, minute=0, second=0
-            )
-        else:
-            if end_date:
-                try:
-                    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
-                        hour=23, minute=59, second=59
-                    )
-                except ValueError as e:
-                    raise ValueError(
-                        f"结束日期格式无效: {end_date}，应为 YYYY-MM-DD"
-                    ) from e
-            else:
-                end_dt = datetime.now().replace(hour=23, minute=59, second=59)
-
-            if start_date:
-                try:
-                    start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
-                        hour=0, minute=0, second=0
-                    )
-                except ValueError as e:
-                    raise ValueError(
-                        f"开始日期格式无效: {start_date}，应为 YYYY-MM-DD"
-                    ) from e
-            else:
-                # 默认最近 90 天
-                start_dt = (end_dt - timedelta(days=89)).replace(
-                    hour=0, minute=0, second=0
-                )
+        start_dt, end_dt = self._parse_date_range(start_date, end_date, days)
 
         # 验证日期范围
         if start_dt > end_dt:
             raise ValueError("开始日期不能晚于结束日期")
 
-        # 读取数据（需要额外读取 CTL 计算所需的 42 天历史数据）
+        # 读取数据并计算TSS记录
+        tss_records = self._load_tss_records(start_dt, end_dt)
+
+        # 处理空数据情况
+        if not tss_records:
+            return self._build_empty_trend_result(
+                start_dt,
+                end_dt,
+                "暂无有效训练数据（心率数据缺失）",
+                "训练数据缺少心率信息，建议使用带有心率监测的设备记录训练",
+            )
+
+        # 聚合每日TSS并构建完整日期序列
+        complete_daily = self._build_complete_daily_tss(tss_records, start_dt, end_dt)
+
+        # 计算每日趋势
+        trend_data = self._compute_trend_data(complete_daily, tss_records, start_dt)
+
+        # 构建汇总信息
+        summary = self._build_trend_summary(trend_data[-1] if trend_data else None)
+
+        return {
+            "trend_data": trend_data,
+            "summary": summary,
+            "days_analyzed": len(trend_data),
+            "total_runs": len(tss_records),
+        }
+
+    def _parse_date_range(
+        self,
+        start_date: str | None,
+        end_date: str | None,
+        days: int | None,
+    ) -> tuple[Any, Any]:
+        """解析日期范围参数，返回 (start_dt, end_dt) 元组"""
+        if days is not None:
+            end_dt = datetime.now().replace(hour=23, minute=59, second=59)
+            start_dt = (end_dt - timedelta(days=days - 1)).replace(
+                hour=0, minute=0, second=0
+            )
+            return start_dt, end_dt
+
+        # 解析结束日期
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
+                    hour=23, minute=59, second=59
+                )
+            except ValueError as e:
+                raise ValueError(
+                    f"结束日期格式无效: {end_date}，应为 YYYY-MM-DD"
+                ) from e
+        else:
+            end_dt = datetime.now().replace(hour=23, minute=59, second=59)
+
+        # 解析开始日期
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
+                    hour=0, minute=0, second=0
+                )
+            except ValueError as e:
+                raise ValueError(
+                    f"开始日期格式无效: {start_date}，应为 YYYY-MM-DD"
+                ) from e
+        else:
+            # 默认最近 90 天
+            start_dt = (end_dt - timedelta(days=89)).replace(hour=0, minute=0, second=0)
+
+        return start_dt, end_dt
+
+    def _load_tss_records(self, start_dt: Any, end_dt: Any) -> list[dict[str, Any]]:
+        """加载指定日期范围内的TSS记录（包含42天历史数据）"""
+        from datetime import timedelta
+
         history_start = start_dt - timedelta(days=42)
         lf = self.storage.read_parquet()
 
@@ -1057,18 +1124,7 @@ class AnalyticsEngine:
         )
 
         if df.is_empty():
-            return {
-                "trend_data": [],
-                "summary": {
-                    "current_atl": 0.0,
-                    "current_ctl": 0.0,
-                    "current_tsb": 0.0,
-                    "status": "数据不足",
-                    "recommendation": "暂无跑步数据，请先导入 FIT 文件",
-                },
-                "message": "暂无跑步数据",
-                "days_analyzed": (end_dt - start_dt).days + 1,
-            }
+            return []
 
         tss_records = []
         for row in df.iter_rows(named=True):
@@ -1081,20 +1137,37 @@ class AnalyticsEngine:
             if timestamp and tss > 0:
                 tss_records.append({"timestamp": timestamp, "tss": tss})
 
-        # 如果没有有效的 TSS 数据
-        if not tss_records:
-            return {
-                "trend_data": [],
-                "summary": {
-                    "current_atl": 0.0,
-                    "current_ctl": 0.0,
-                    "current_tsb": 0.0,
-                    "status": "数据不足",
-                    "recommendation": "训练数据缺少心率信息，建议使用带有心率监测的设备记录训练",
-                },
-                "message": "暂无有效训练数据（心率数据缺失）",
-                "days_analyzed": (end_dt - start_dt).days + 1,
-            }
+        return tss_records
+
+    def _build_empty_trend_result(
+        self,
+        start_dt: Any,
+        end_dt: Any,
+        message: str,
+        recommendation: str,
+    ) -> dict[str, Any]:
+        """构建空数据的训练负荷趋势结果"""
+        return {
+            "trend_data": [],
+            "summary": {
+                "current_atl": 0.0,
+                "current_ctl": 0.0,
+                "current_tsb": 0.0,
+                "status": "数据不足",
+                "recommendation": recommendation,
+            },
+            "message": message,
+            "days_analyzed": (end_dt - start_dt).days + 1,
+        }
+
+    def _build_complete_daily_tss(
+        self,
+        tss_records: list[dict[str, Any]],
+        start_dt: Any,
+        end_dt: Any,
+    ) -> pl.DataFrame:
+        """构建完整的每日TSS数据（包含无训练的日期，TSS为0）"""
+        from datetime import timedelta
 
         # 创建 TSS 数据 DataFrame
         tss_df = pl.DataFrame(tss_records)
@@ -1123,9 +1196,16 @@ class AnalyticsEngine:
             0.0
         )
 
-        # 计算累积的 ATL、CTL、TSB
-        # 需要包含历史数据进行 EWMA 计算
-        # 先获取历史 TSS 数据（在 start_date 之前的）
+        return complete_daily
+
+    def _compute_trend_data(
+        self,
+        complete_daily: pl.DataFrame,
+        tss_records: list[dict[str, Any]],
+        start_dt: Any,
+    ) -> list[dict[str, Any]]:
+        """计算每日趋势数据（ATL、CTL、TSB）"""
+        # 获取历史 TSS 数据（在 start_date 之前的）
         history_tss: dict[str, float] = {}
         for record in tss_records:
             ts = record["timestamp"]
@@ -1169,35 +1249,28 @@ class AnalyticsEngine:
                 }
             )
 
-        # 获取最新数据作为汇总
-        latest = trend_data[-1] if trend_data else None
+        return trend_data
 
+    def _build_trend_summary(self, latest: dict[str, Any] | None) -> dict[str, Any]:
+        """构建训练负荷趋势的汇总信息"""
         if latest:
             _, recommendation = self._evaluate_fitness_status(
                 latest["tsb"], latest["atl"], latest["ctl"]
             )
-
-            summary = {
+            return {
                 "current_atl": latest["atl"],
                 "current_ctl": latest["ctl"],
                 "current_tsb": latest["tsb"],
                 "status": latest["status"],
                 "recommendation": recommendation,
             }
-        else:
-            summary = {
-                "current_atl": 0.0,
-                "current_ctl": 0.0,
-                "current_tsb": 0.0,
-                "status": "数据不足",
-                "recommendation": "暂无训练数据",
-            }
 
         return {
-            "trend_data": trend_data,
-            "summary": summary,
-            "days_analyzed": len(trend_data),
-            "total_runs": len(tss_records),
+            "current_atl": 0.0,
+            "current_ctl": 0.0,
+            "current_tsb": 0.0,
+            "status": "数据不足",
+            "recommendation": "暂无训练数据",
         }
 
     def get_pace_distribution(self, year: int | None = None) -> PaceDistributionResult:

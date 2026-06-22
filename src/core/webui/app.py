@@ -10,17 +10,33 @@ from __future__ import annotations
 import importlib.metadata
 import secrets
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from typing_extensions import TypedDict
 
 from src.core.webui.auth import create_access_token
 
 if TYPE_CHECKING:
     from src.core.base.context import AppContext
+
+
+class HealthCheckResponse(TypedDict):
+    """健康检查端点响应"""
+
+    status: str
+    version: str
+
+
+class TokenResponse(TypedDict):
+    """令牌签发端点响应"""
+
+    access_token: str
+    token_type: str
+
 
 # 全局应用实例（由 create_app 设置）
 _app_instance: FastAPI | None = None
@@ -80,15 +96,15 @@ def create_app(context: AppContext) -> FastAPI:
 
     # 健康检查端点（无需认证）
     @app.get("/api/health", tags=["system"])
-    async def health_check() -> dict[str, Any]:
+    async def health_check() -> HealthCheckResponse:
         return {"status": "ok", "version": app_version}
 
     # 令牌签发端点（无需认证）
     @app.post("/api/auth/token", tags=["auth"])
-    async def issue_token() -> dict[str, Any]:
+    async def issue_token() -> TokenResponse:
         ttl = webui_config.get("token_ttl_s", 86400)
         token = create_access_token(secret=token_secret, ttl_seconds=ttl)
-        return {"access_token": token, "token_type": "bearer"}
+        return {"access_token": token, "token_type": "bearer"}  # nosec B105
 
     # 注册业务路由
     from src.core.webui.routes.activities import router as activities_router

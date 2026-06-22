@@ -27,7 +27,7 @@ ENV_KEY_MAPPING: dict[str, str] = {
     "workspace_dir": "NANOBOT_WORKSPACE_DIR",
     "auto_push_feishu": "NANOBOT_AUTO_PUSH_FEISHU",
     "feishu_app_id": "NANOBOT_FEISHU_APP_ID",
-    "feishu_app_secret": "NANOBOT_FEISHU_APP_SECRET",
+    "feishu_app_secret": "NANOBOT_FEISHU_APP_SECRET",  # nosec B105
     "feishu_receive_id": "NANOBOT_FEISHU_RECEIVE_ID",
     "feishu_receive_id_type": "NANOBOT_FEISHU_RECEIVE_ID_TYPE",
     "timezone": "NANOBOT_TIMEZONE",
@@ -42,8 +42,8 @@ WS_ENV_KEY_MAPPING: dict[str, str] = {
     "enabled": "NANOBOT_WS_ENABLED",
     "host": "NANOBOT_WS_HOST",
     "port": "NANOBOT_WS_PORT",
-    "token": "NANOBOT_WS_TOKEN",
-    "token_issue_secret": "NANOBOT_WS_TOKEN_SECRET",
+    "token": "NANOBOT_WS_TOKEN",  # nosec B105
+    "token_issue_secret": "NANOBOT_WS_TOKEN_SECRET",  # nosec B105
 }
 
 # WebUI 环境变量映射，支持 NANOBOT_WEBUI_* 环境变量覆盖配置文件值
@@ -51,8 +51,8 @@ WEBUI_ENV_KEY_MAPPING: dict[str, str] = {
     "enabled": "NANOBOT_WEBUI_ENABLED",
     "host": "NANOBOT_WEBUI_HOST",
     "port": "NANOBOT_WEBUI_PORT",
-    "token_secret": "NANOBOT_WEBUI_TOKEN_SECRET",
-    "token_ttl_s": "NANOBOT_WEBUI_TOKEN_TTL_S",
+    "token_secret": "NANOBOT_WEBUI_TOKEN_SECRET",  # nosec B105
+    "token_ttl_s": "NANOBOT_WEBUI_TOKEN_TTL_S",  # nosec B105
 }
 
 # 需要布尔类型转换的配置键
@@ -177,7 +177,7 @@ class ConfigManager:
             "data_dir": str(Path.home() / ".nanobot-runner" / "data"),
             "auto_push_feishu": False,
             "feishu_app_id": "",
-            "feishu_app_secret": "",
+            "feishu_app_secret": "",  # nosec B105
             "feishu_receive_id": "",
             "feishu_receive_id_type": "user_id",
         }
