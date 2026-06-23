@@ -5,7 +5,7 @@ import typer
 from rich.panel import Panel
 
 from src.cli.common import CLIError, console, print_error
-from src.cli.handlers.status_handler import StatusHandler
+from src.core.base.context import get_context
 from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="身体状态查看命令")
@@ -20,8 +20,8 @@ def today() -> None:
         nanobotrun status today
     """
     try:
-        handler = StatusHandler()
-        result = handler.get_today_status()
+        context = get_context()
+        result = context.body_signal_engine.get_daily_summary().to_dict()
 
         recovery_status = result.get("recovery_status", "未知")
         fatigue_score = result.get("fatigue_score", 0.0)
@@ -70,8 +70,8 @@ def weekly() -> None:
         nanobotrun status weekly
     """
     try:
-        handler = StatusHandler()
-        result = handler.get_weekly_status()
+        context = get_context()
+        result = context.body_signal_engine.get_weekly_summary().to_dict()
 
         recovery_status = result.get("recovery_status", "未知")
         fatigue_score = result.get("fatigue_score", 0.0)

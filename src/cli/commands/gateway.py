@@ -394,7 +394,7 @@ def _setup_fastapi_server(context: Any, webui: bool) -> Any:
         return None
 
     webui_config = context.config.get_webui_config()
-    from src.core.webui.server import create_server
+    from src.core.webui.app import create_server
 
     fastapi_server = create_server(context)
     api_host = webui_config.get("host", "127.0.0.1")

@@ -3,6 +3,7 @@
 创建和配置 FastAPI 应用实例，注册路由和中间件。
 通过 create_app() 工厂函数注入 AppContext 依赖。
 支持挂载前端静态文件，提供 SPA fallback 路由。
+约束 C-01: 必须使用 uvicorn.Server(config).serve()，禁止 uvicorn.run()。
 """
 
 from __future__ import annotations
@@ -12,16 +13,20 @@ import secrets
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing_extensions import TypedDict
 
+from src.core.base.logger import get_logger
 from src.core.webui.auth import create_access_token
 
 if TYPE_CHECKING:
     from src.core.base.context import AppContext
+
+logger = get_logger(__name__)
 
 
 class HealthCheckResponse(TypedDict):
@@ -183,3 +188,35 @@ def _mount_frontend(app: FastAPI) -> None:
         if path and candidate.is_file():
             return FileResponse(str(candidate))
         return FileResponse(str(dist_dir / "index.html"))
+
+
+def create_server(context: AppContext) -> uvicorn.Server:
+    """创建 uvicorn Server 实例
+
+    使用 uvicorn.Server(config).serve() 模式，
+    可与 asyncio.gather() 配合实现并发运行。
+
+    Args:
+        context: 应用上下文
+
+    Returns:
+        uvicorn.Server: 配置好的 Server 实例
+    """
+    webui_config = context.config.get_webui_config()
+    host = webui_config.get("host", "127.0.0.1")
+    port = webui_config.get("port", 8766)
+
+    app = create_app(context=context)
+
+    config = uvicorn.Config(
+        app=app,
+        host=host,
+        port=port,
+        log_level="warning",
+        access_log=False,
+    )
+
+    server = uvicorn.Server(config)
+
+    logger.info(f"WebUI API 服务配置: {host}:{port}")
+    return server

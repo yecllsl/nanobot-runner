@@ -1,7 +1,7 @@
 # 配置 Schema 验证模块
 # 提供配置数据结构定义和验证机制
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, ClassVar
 
 
@@ -205,23 +205,7 @@ class AppConfig:
         Returns:
             dict: 配置字典
         """
-        return {
-            "version": self.version,
-            "data_dir": self.data_dir,
-            "auto_push_feishu": self.auto_push_feishu,
-            "feishu_app_id": self.feishu_app_id,
-            "feishu_app_secret": self.feishu_app_secret,
-            "feishu_receive_id": self.feishu_receive_id,
-            "feishu_receive_id_type": self.feishu_receive_id_type,
-            "llm_provider": self.llm_provider,
-            "llm_model": self.llm_model,
-            "llm_base_url": self.llm_base_url,
-            "tools": self.tools,
-            "model_presets": self.model_presets,
-            "fallback_models": self.fallback_models,
-            "websocket": self.websocket,
-            "webui": self.webui,
-        }
+        return asdict(self)
 
     def __post_init__(self) -> None:
         """数据类初始化后验证
