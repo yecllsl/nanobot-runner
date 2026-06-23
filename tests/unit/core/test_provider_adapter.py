@@ -943,3 +943,230 @@ class TestRunnerProviderAdapterFallback:
                 defaults = nb_config.agents.defaults
                 assert hasattr(defaults, "fallback_models")
                 assert len(defaults.fallback_models) == 1
+
+
+class TestProviderAdapterBranchCoverage:
+    """补充分支覆盖测试：异常处理、ImportError 回退、边界条件"""
+
+    def test_try_load_nanobot_config_import_error(self, mock_runner_config):
+        """测试 _try_load_nanobot_config 在 ImportError 时返回 False"""
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        with patch.dict("sys.modules", {"nanobot.config.loader": None}):
+            with patch("builtins.__import__", side_effect=ImportError("no nanobot")):
+                result = adapter._try_load_nanobot_config()
+                assert result is False
+
+    def test_try_load_nanobot_config_file_not_found(self, mock_runner_config):
+        """测试 _try_load_nanobot_config 在 FileNotFoundError 时返回 False"""
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        with patch(
+            "nanobot.config.loader.load_config",
+            side_effect=FileNotFoundError("config not found"),
+            create=True,
+        ):
+            result = adapter._try_load_nanobot_config()
+            assert result is False
+
+    def test_try_load_nanobot_config_value_error(self, mock_runner_config):
+        """测试 _try_load_nanobot_config 在 ValueError 时返回 False"""
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        with patch(
+            "nanobot.config.loader.load_config",
+            side_effect=ValueError("invalid config"),
+            create=True,
+        ):
+            result = adapter._try_load_nanobot_config()
+            assert result is False
+
+    def test_resolve_fallback_presets_import_error(self, mock_runner_config):
+        """测试 _resolve_fallback_presets 在 ImportError 时返回空列表"""
+        mock_runner_config.get_fallback_models.return_value = [
+            {"provider": "test", "model": "test-model", "api_key": "key"}
+        ]
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        with patch.dict("sys.modules", {"nanobot.config.schema": None}):
+            with patch("builtins.__import__", side_effect=ImportError("no schema")):
+                presets = adapter._resolve_fallback_presets()
+                assert presets == []
+
+    def test_create_primary_provider_import_error(self, mock_runner_config):
+        """测试 _create_primary_provider 在 ImportError 时抛出 LLMError"""
+        from src.core.config.llm_config import LLMConfig
+
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o-mini",
+            api_key="test-key",
+            base_url="https://api.openai.com",
+        )
+        with patch("builtins.__import__", side_effect=ImportError("no nanobot")):
+            with pytest.raises(LLMError, match="无法导入nanobot模块"):
+                adapter._create_primary_provider(llm_config)
+
+    def test_create_primary_provider_value_error(self, mock_runner_config):
+        """测试 _create_primary_provider 在 ValueError 时抛出 LLMError"""
+        from src.core.config.llm_config import LLMConfig
+
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o-mini",
+            api_key="test-key",
+            base_url="https://api.openai.com",
+        )
+        with patch(
+            "nanobot.providers.registry.find_by_name",
+            side_effect=ValueError("provider not found"),
+            create=True,
+        ):
+            with patch(
+                "nanobot.providers.openai_compat_provider.OpenAICompatProvider",
+                create=True,
+            ):
+                with pytest.raises(LLMError, match="创建Provider失败"):
+                    adapter._create_primary_provider(llm_config)
+
+    def test_create_fallback_provider_builds_provider(self, mock_runner_config):
+        """测试 _create_fallback_provider 构造 fallback Provider 实例"""
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = True
+        config.get_llm_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "api_key": "test-key",
+            "base_url": "https://api.openai.com",
+        }
+        config.get_websocket_config.return_value = {}
+        config.get_fallback_models.return_value = [
+            {
+                "provider": "nvidia",
+                "model": "llama-4",
+                "base_url": "https://api.nvidia.com",
+                "api_key": "nvapi-test",
+            },
+        ]
+        config.get_fallback_api_key.return_value = "nvapi-test"
+        config.base_dir = Path("/test")
+
+        adapter = RunnerProviderAdapter(config)
+        preset = MagicMock()
+        preset.provider = "nvidia"
+        preset.model = "llama-4"
+
+        mock_provider_cls = MagicMock()
+        mock_spec = MagicMock()
+        with patch(
+            "nanobot.providers.openai_compat_provider.OpenAICompatProvider",
+            mock_provider_cls,
+        ):
+            with patch(
+                "nanobot.providers.registry.find_by_name", return_value=mock_spec
+            ):
+                result = adapter._create_fallback_provider(preset)
+                mock_provider_cls.assert_called_once()
+                assert result is mock_provider_cls.return_value
+
+    def test_get_or_create_nanobot_config_caches(self, mock_runner_config):
+        """测试 _get_or_create_nanobot_config 缓存 nanobot 配置"""
+        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
+        mock_runner_config.get_websocket_config.return_value = {}
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "nanobot": MagicMock(),
+                "nanobot.config": MagicMock(),
+                "nanobot.config.loader": MagicMock(Config=MagicMock()),
+                "nanobot.config.schema": MagicMock(
+                    AgentsConfig=MagicMock(),
+                    ProvidersConfig=MagicMock(),
+                ),
+            },
+        ):
+            result1 = adapter._get_or_create_nanobot_config()
+            # 第二次调用应返回缓存
+            result2 = adapter._get_or_create_nanobot_config()
+            assert result1 is result2
+
+    def test_build_nanobot_config_skips_non_dict_preset(self, mock_runner_config):
+        """测试 _build_nanobot_config_from_runner 跳过非 dict 的 model_preset"""
+        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
+        mock_runner_config.get_websocket_config.return_value = {}
+        mock_runner_config.load_config.return_value = {
+            "model_presets": {
+                "valid_preset": {"provider": "openai", "model": "gpt-4"},
+                "invalid_preset": "not a dict",  # 应被跳过
+            }
+        }
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "nanobot": MagicMock(),
+                "nanobot.config": MagicMock(),
+                "nanobot.config.loader": MagicMock(Config=MagicMock()),
+                "nanobot.config.schema": MagicMock(
+                    AgentsConfig=MagicMock(),
+                    ProvidersConfig=MagicMock(),
+                    ModelPresetConfig=MagicMock(),
+                ),
+            },
+        ):
+            # 应正常构建，跳过非 dict 的 preset
+            adapter._build_nanobot_config_from_runner()
+
+    def test_build_nanobot_config_skips_non_dict_mcp_server(self, mock_runner_config):
+        """测试 _build_nanobot_config_from_runner 跳过非 dict 的 mcp_server"""
+        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
+        mock_runner_config.get_websocket_config.return_value = {}
+        mock_runner_config.load_config.return_value = {
+            "tools": {
+                "mcp_servers": {
+                    "valid_server": {"command": "test", "args": []},
+                    "invalid_server": "not a dict",  # 应被跳过
+                }
+            }
+        }
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "nanobot": MagicMock(),
+                "nanobot.config": MagicMock(),
+                "nanobot.config.loader": MagicMock(Config=MagicMock()),
+                "nanobot.config.schema": MagicMock(
+                    AgentsConfig=MagicMock(),
+                    ProvidersConfig=MagicMock(),
+                    CliAppsToolConfig=MagicMock(),
+                    MCPServerConfig=MagicMock(),
+                    ToolsConfig=MagicMock(),
+                ),
+            },
+        ):
+            # 应正常构建，跳过非 dict 的 mcp_server
+            adapter._build_nanobot_config_from_runner()
+
+    def test_build_nanobot_config_llm_error_on_failure(self, mock_runner_config):
+        """测试 _build_nanobot_config_from_runner 失败时抛出 LLMError"""
+        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
+        mock_runner_config.get_websocket_config.return_value = {}
+        # 让 get_llm_config 抛出异常
+        mock_runner_config.get_llm_config.side_effect = NanobotRunnerError(
+            "config error"
+        )
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "nanobot": MagicMock(),
+                "nanobot.config": MagicMock(),
+                "nanobot.config.loader": MagicMock(Config=MagicMock()),
+                "nanobot.config.schema": MagicMock(
+                    AgentsConfig=MagicMock(),
+                    ProvidersConfig=MagicMock(),
+                ),
+            },
+        ):
+            with pytest.raises(LLMError, match="无法构建nanobot配置"):
+                adapter._build_nanobot_config_from_runner()

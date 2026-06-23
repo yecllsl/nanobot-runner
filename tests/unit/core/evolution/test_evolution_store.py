@@ -769,3 +769,227 @@ class TestEvolutionStoreV025:
         params = PromptTuningParams.default()
         store.save_prompt_tuning_params(params)
         assert tuning_dir.exists()
+
+
+class TestEvolutionStoreBranchCoverage:
+    """补充分支覆盖测试：异常处理、边界条件、类型转换"""
+
+    def test_row_to_decision_with_bool_recommendation_accepted(self, tmp_path):
+        """测试 _row_to_decision 处理 bool 类型 recommendation_accepted"""
+        from src.core.evolution.evolution_store import _row_to_decision
+
+        # 直接构造包含 bool 类型 recommendation_accepted 的行
+        row = {
+            "decision_id": "dec_bool",
+            "timestamp": "2026-05-01T10:00:00",
+            "runner_state": '{"vdot": 45.0}',
+            "decision_type": "training_advice",
+            "tool_call_chain": "[]",
+            "prediction_snapshot": None,
+            "recommendation_text": None,
+            "execution_status": "executed",
+            "recommendation_accepted": True,  # bool 类型
+            "session_key": "",
+            "goal_state": None,
+        }
+        decision = _row_to_decision(row)
+        assert decision.recommendation_accepted is True
+
+    def test_get_prediction_actual_pairs_unknown_model_type(self, tmp_path):
+        """测试 get_prediction_actual_pairs 未知 model_type 返回空列表"""
+        store = EvolutionStore(tmp_path)
+        pairs = store.get_prediction_actual_pairs("unknown_type", min_count=1)
+        assert pairs == []
+
+    def test_get_prediction_actual_pairs_training_response(self, tmp_path):
+        """测试 get_prediction_actual_pairs 的 training_response 分支"""
+        from src.core.evolution.models import DecisionLog, OutcomeRecord
+        from src.core.transparency.models import DecisionType
+
+        store = EvolutionStore(tmp_path)
+        now = datetime.now()
+        decision = DecisionLog(
+            decision_id="dec_tr_001",
+            timestamp=now,
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot={"predicted_vdot_impact": 0.5},
+            recommendation_text="test",
+            execution_status="executed",
+            recommendation_accepted=True,
+            session_key="test",
+        )
+        outcome = OutcomeRecord(
+            outcome_id="out_tr_001",
+            decision_id="dec_tr_001",
+            outcome_timestamp=now,
+            actual_vdot=45.5,
+            actual_injury=False,
+            execution_fidelity=0.9,
+            user_feedback_score=4,
+            user_feedback_text=None,
+            prediction_error=0.01,
+            prediction_direction="over",
+            session_id="test",
+        )
+        store.save_decision(decision)
+        store.save_outcome(outcome)
+        pairs = store.get_prediction_actual_pairs("training_response", min_count=1)
+        assert len(pairs) == 1
+        # actual = outcome.actual_vdot - runner_state.vdot = 45.5 - 45.0 = 0.5
+        assert pairs[0] == (0.5, 0.5)
+
+    def test_get_prediction_actual_pairs_missing_prediction_key(self, tmp_path):
+        """测试 prediction_snapshot 缺少预测键时跳过"""
+        from src.core.evolution.models import DecisionLog, OutcomeRecord
+        from src.core.transparency.models import DecisionType
+
+        store = EvolutionStore(tmp_path)
+        now = datetime.now()
+        # prediction_snapshot 存在但没有 predicted_vdot 键
+        decision = DecisionLog(
+            decision_id="dec_miss",
+            timestamp=now,
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot={"other_key": 1.0},
+            recommendation_text="test",
+            execution_status="executed",
+            recommendation_accepted=True,
+            session_key="test",
+        )
+        outcome = OutcomeRecord(
+            outcome_id="out_miss",
+            decision_id="dec_miss",
+            outcome_timestamp=now,
+            actual_vdot=45.5,
+            actual_injury=False,
+            execution_fidelity=None,
+            user_feedback_score=None,
+            user_feedback_text=None,
+            prediction_error=None,
+            prediction_direction=None,
+            session_id=None,
+        )
+        store.save_decision(decision)
+        store.save_outcome(outcome)
+        pairs = store.get_prediction_actual_pairs("vdot", min_count=1)
+        assert pairs == []
+
+    def test_get_prediction_actual_pairs_none_actual_vdot(self, tmp_path):
+        """测试 actual_vdot 为 None 时跳过"""
+        from src.core.evolution.models import DecisionLog, OutcomeRecord
+        from src.core.transparency.models import DecisionType
+
+        store = EvolutionStore(tmp_path)
+        now = datetime.now()
+        decision = DecisionLog(
+            decision_id="dec_none",
+            timestamp=now,
+            runner_state={"vdot": 45.0},
+            decision_type=DecisionType.TRAINING_ADVICE,
+            tool_call_chain=[],
+            prediction_snapshot={"predicted_vdot": 46.0},
+            recommendation_text="test",
+            execution_status="executed",
+            recommendation_accepted=True,
+            session_key="test",
+        )
+        # actual_vdot 为 None
+        outcome = OutcomeRecord(
+            outcome_id="out_none",
+            decision_id="dec_none",
+            outcome_timestamp=now,
+            actual_vdot=None,
+            actual_injury=False,
+            execution_fidelity=None,
+            user_feedback_score=None,
+            user_feedback_text=None,
+            prediction_error=None,
+            prediction_direction=None,
+            session_id=None,
+        )
+        store.save_decision(decision)
+        store.save_outcome(outcome)
+        pairs = store.get_prediction_actual_pairs("vdot", min_count=1)
+        assert pairs == []
+
+    def test_count_decisions_skips_non_directory(self, tmp_path):
+        """测试 count_decisions 跳过非目录文件"""
+        decisions_dir = tmp_path / "decisions"
+        decisions_dir.mkdir(parents=True)
+        # 创建一个非目录文件，应被跳过
+        (decisions_dir / "not_a_dir.txt").write_text("test")
+
+        store = EvolutionStore(tmp_path)
+        assert store.count_decisions() == 0
+
+    def test_count_decisions_skips_corrupted_parquet(self, tmp_path):
+        """测试 count_decisions 跳过损坏的 parquet 文件"""
+        decisions_dir = tmp_path / "decisions" / "2026-05"
+        decisions_dir.mkdir(parents=True)
+        # 创建一个损坏的 parquet 文件
+        (decisions_dir / "decisions_2026-05.parquet").write_text("corrupted")
+
+        store = EvolutionStore(tmp_path)
+        # 应跳过损坏文件，返回 0 而非抛出异常
+        assert store.count_decisions() == 0
+
+    def test_get_decision_by_id_empty_dir_returns_none(self, tmp_path):
+        """测试 decisions 目录存在但无 parquet 文件时返回 None"""
+        decisions_dir = tmp_path / "decisions"
+        decisions_dir.mkdir(parents=True)
+
+        store = EvolutionStore(tmp_path)
+        result = store.get_decision_by_id("any_id")
+        assert result is None
+
+    def test_load_prompt_tuning_params_corrupted_returns_none(self, tmp_path):
+        """测试加载损坏的提示调优参数文件返回 None"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        tuning_dir = tmp_path / "tuning"
+        tuning_dir.mkdir(parents=True)
+        # 写入损坏的 JSON
+        (tuning_dir / "prompt_params.json").write_text("not a json", encoding="utf-8")
+        result = store.load_prompt_tuning_params()
+        assert result is None
+
+    def test_load_trigger_state_corrupted_returns_none(self, tmp_path):
+        """测试加载损坏的触发器状态文件返回 None"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        tuning_dir = tmp_path / "tuning"
+        tuning_dir.mkdir(parents=True)
+        # 写入损坏的 JSON
+        (tuning_dir / "trigger_state.json").write_text("not a json", encoding="utf-8")
+        result = store.load_trigger_state("any_key")
+        assert result is None
+
+    def test_save_trigger_state_merges_existing(self, tmp_path):
+        """测试 save_trigger_state 合并已有状态"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        store.save_trigger_state("key1", "value1")
+        store.save_trigger_state("key2", "value2")
+        # 两个键都应存在
+        assert store.load_trigger_state("key1") == "value1"
+        assert store.load_trigger_state("key2") == "value2"
+
+    def test_save_trigger_state_corrupted_existing_overwritten(self, tmp_path):
+        """测试 save_trigger_state 覆盖损坏的已有状态文件"""
+        from src.core.evolution.evolution_store import EvolutionStore
+
+        store = EvolutionStore(tmp_path)
+        tuning_dir = tmp_path / "tuning"
+        tuning_dir.mkdir(parents=True)
+        # 写入损坏的 JSON
+        (tuning_dir / "trigger_state.json").write_text("corrupted", encoding="utf-8")
+        # 应能正常写入，覆盖损坏文件
+        store.save_trigger_state("new_key", "new_value")
+        assert store.load_trigger_state("new_key") == "new_value"
