@@ -3,7 +3,6 @@
 
 import json
 import os
-import shutil
 import time
 from enum import Enum
 from pathlib import Path
@@ -183,24 +182,10 @@ class ConfigManager:
         }
 
     def _ensure_dirs(self) -> None:
-        """确保必要目录存在，并迁移旧的定时任务配置"""
+        """确保必要目录存在"""
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.cron_dir.mkdir(parents=True, exist_ok=True)
-
-        self._migrate_old_cron_config()
-
-    def _migrate_old_cron_config(self) -> None:
-        """迁移旧的定时任务配置到新位置"""
-        old_cron_store = Path.home() / ".nanobot" / "cron" / "jobs.json"
-        new_cron_store = self.cron_store
-
-        if old_cron_store.exists() and not new_cron_store.exists():
-            try:
-                shutil.copy2(old_cron_store, new_cron_store)
-                logger.info(f"已迁移定时任务配置：{old_cron_store} -> {new_cron_store}")
-            except NanobotRunnerError as e:
-                logger.warning(f"迁移定时任务配置失败：{e}")
 
     def _ensure_config(self) -> None:
         """确保配置文件存在

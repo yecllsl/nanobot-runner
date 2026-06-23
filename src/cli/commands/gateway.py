@@ -282,6 +282,12 @@ def _init_gateway_context(
 
     try:
         context = get_context()
+        # 覆盖 nanobot-ai 默认配置路径，使所有运行时数据（media/cron/logs/webui）
+        # 写入项目目录 ~/.nanobot-runner/ 而非 ~/.nanobot/
+        from nanobot.config.loader import set_config_path
+
+        set_config_path(context.config.config_file)
+
         workspace = context.config.base_dir
         runner_tools = RunnerTools(context)
 

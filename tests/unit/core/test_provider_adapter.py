@@ -69,35 +69,8 @@ class TestRunnerProviderAdapterGetLlmConfig:
         config.has_llm_config.return_value = False
         adapter = RunnerProviderAdapter(config)
 
-        with patch.object(adapter, "_try_load_nanobot_config", return_value=False):
-            with pytest.raises(LLMError, match="未配置LLM"):
-                adapter.get_llm_config()
-
-    def test_get_llm_config_fallback_to_nanobot(self):
-        config = MagicMock(spec=ConfigManager)
-        config.has_llm_config.return_value = False
-        adapter = RunnerProviderAdapter(config)
-
-        mock_nanobot_config = MagicMock()
-        mock_nanobot_config.agents.defaults.model = "gpt-4"
-        mock_nanobot_config.agents.defaults.max_tool_iterations = 15
-        mock_nanobot_config.agents.defaults.context_window_tokens = 128000
-        mock_nanobot_config.agents.defaults.context_block_limit = 10
-        mock_nanobot_config.agents.defaults.max_tool_result_chars = 32000
-        mock_nanobot_config.providers.default = "openai"
-        mock_provider_cfg = MagicMock()
-        mock_provider_cfg.api_key = "nanobot-key"
-        mock_provider_cfg.base_url = "https://api.openai.com"
-        mock_nanobot_config.providers = MagicMock()
-        mock_nanobot_config.providers.default = "openai"
-        mock_nanobot_config.providers.openai = mock_provider_cfg
-
-        adapter._nanobot_config = mock_nanobot_config
-
-        with patch.object(adapter, "_try_load_nanobot_config", return_value=True):
-            llm_config = adapter.get_llm_config()
-            assert llm_config.model == "gpt-4"
-            assert llm_config.api_key == "nanobot-key"
+        with pytest.raises(LLMError, match="未配置LLM"):
+            adapter.get_llm_config()
 
 
 class TestRunnerProviderAdapterIsAvailable:
@@ -109,17 +82,7 @@ class TestRunnerProviderAdapterIsAvailable:
         config = MagicMock(spec=ConfigManager)
         config.has_llm_config.return_value = False
         adapter = RunnerProviderAdapter(config)
-
-        with patch.object(adapter, "_try_load_nanobot_config", return_value=False):
-            assert adapter.is_available() is False
-
-    def test_is_available_with_nanobot_fallback(self):
-        config = MagicMock(spec=ConfigManager)
-        config.has_llm_config.return_value = False
-        adapter = RunnerProviderAdapter(config)
-
-        with patch.object(adapter, "_try_load_nanobot_config", return_value=True):
-            assert adapter.is_available() is True
+        assert adapter.is_available() is False
 
 
 class TestRunnerProviderAdapterGetAgentDefaults:
@@ -167,23 +130,6 @@ class TestRunnerProviderAdapterHasRunnerLlmConfig:
         assert adapter._has_runner_llm_config() is False
 
 
-class TestRunnerProviderAdapterTryLoadNanobotConfig:
-    def test_try_load_already_loaded(self, mock_runner_config):
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        adapter._nanobot_config = MagicMock()
-        assert adapter._try_load_nanobot_config() is True
-
-    def test_try_load_import_error(self, mock_runner_config):
-        adapter = RunnerProviderAdapter(mock_runner_config)
-
-        with patch(
-            "src.core.provider_adapter.RunnerProviderAdapter._try_load_nanobot_config",
-            return_value=False,
-        ):
-            result = adapter._try_load_nanobot_config()
-            assert result is False
-
-
 class TestRunnerProviderAdapterFromRunnerConfig:
     def test_from_runner_config(self, mock_runner_config):
         adapter = RunnerProviderAdapter(mock_runner_config)
@@ -192,54 +138,6 @@ class TestRunnerProviderAdapterFromRunnerConfig:
         assert llm_config.model == "gpt-4o-mini"
         assert llm_config.api_key == "test-key"
         assert llm_config.base_url == "https://api.openai.com"
-
-
-class TestRunnerProviderAdapterFromNanobotConfig:
-    def test_from_nanobot_config_no_config(self, mock_runner_config):
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        with pytest.raises(LLMError, match="nanobot配置未加载"):
-            adapter._from_nanobot_config()
-
-    def test_from_nanobot_config_with_config(self, mock_runner_config):
-        adapter = RunnerProviderAdapter(mock_runner_config)
-
-        mock_cfg = MagicMock()
-        mock_cfg.agents.defaults.model = "gpt-4"
-        mock_cfg.agents.defaults.max_tool_iterations = 15
-        mock_cfg.agents.defaults.context_window_tokens = 128000
-        mock_cfg.agents.defaults.context_block_limit = 10
-        mock_cfg.agents.defaults.max_tool_result_chars = 32000
-        mock_cfg.providers.default = "openai"
-        mock_provider = MagicMock()
-        mock_provider.api_key = "key-123"
-        mock_provider.base_url = "https://api.openai.com"
-        mock_cfg.providers.openai = mock_provider
-
-        adapter._nanobot_config = mock_cfg
-        llm_config = adapter._from_nanobot_config()
-        assert llm_config.provider == "openai"
-        assert llm_config.model == "gpt-4"
-        assert llm_config.api_key == "key-123"
-
-    def test_from_nanobot_config_no_api_key_uses_env(self, mock_runner_config):
-        adapter = RunnerProviderAdapter(mock_runner_config)
-
-        mock_cfg = MagicMock()
-        mock_cfg.agents.defaults.model = "gpt-4"
-        mock_cfg.agents.defaults.max_tool_iterations = 15
-        mock_cfg.agents.defaults.context_window_tokens = 128000
-        mock_cfg.agents.defaults.context_block_limit = 10
-        mock_cfg.agents.defaults.max_tool_result_chars = 32000
-        mock_cfg.providers.default = "openai"
-        mock_provider = MagicMock()
-        mock_provider.api_key = None
-        mock_provider.base_url = None
-        mock_cfg.providers.openai = mock_provider
-
-        adapter._nanobot_config = mock_cfg
-        with patch.dict(os.environ, {"NANOBOT_LLM_API_KEY": "env-key"}):
-            llm_config = adapter._from_nanobot_config()
-            assert llm_config.api_key == "env-key"
 
 
 class TestParseEnvFile:
@@ -947,36 +845,6 @@ class TestRunnerProviderAdapterFallback:
 
 class TestProviderAdapterBranchCoverage:
     """补充分支覆盖测试：异常处理、ImportError 回退、边界条件"""
-
-    def test_try_load_nanobot_config_import_error(self, mock_runner_config):
-        """测试 _try_load_nanobot_config 在 ImportError 时返回 False"""
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        with patch.dict("sys.modules", {"nanobot.config.loader": None}):
-            with patch("builtins.__import__", side_effect=ImportError("no nanobot")):
-                result = adapter._try_load_nanobot_config()
-                assert result is False
-
-    def test_try_load_nanobot_config_file_not_found(self, mock_runner_config):
-        """测试 _try_load_nanobot_config 在 FileNotFoundError 时返回 False"""
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        with patch(
-            "nanobot.config.loader.load_config",
-            side_effect=FileNotFoundError("config not found"),
-            create=True,
-        ):
-            result = adapter._try_load_nanobot_config()
-            assert result is False
-
-    def test_try_load_nanobot_config_value_error(self, mock_runner_config):
-        """测试 _try_load_nanobot_config 在 ValueError 时返回 False"""
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        with patch(
-            "nanobot.config.loader.load_config",
-            side_effect=ValueError("invalid config"),
-            create=True,
-        ):
-            result = adapter._try_load_nanobot_config()
-            assert result is False
 
     def test_resolve_fallback_presets_import_error(self, mock_runner_config):
         """测试 _resolve_fallback_presets 在 ImportError 时返回空列表"""

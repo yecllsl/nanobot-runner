@@ -126,11 +126,7 @@ class RunnerProviderAdapter:
     """项目配置注入器
 
     从项目配置读取LLM配置，注入到nanobot-ai模块。
-    支持回退到nanobot配置（仅用于兼容已安装nanobot的用户）。
-
-    配置优先级：
-    1. 项目配置（主配置源）：~/.nanobot-runner/config.json + 环境变量
-    2. nanobot配置（回退）：~/.nanobot/config.json
+    完全依赖项目配置（~/.nanobot-runner/config.json），不回退到 ~/.nanobot/config.json。
     """
 
     def __init__(
@@ -150,7 +146,7 @@ class RunnerProviderAdapter:
     def get_llm_config(self) -> LLMConfig:
         """获取LLM配置
 
-        优先从项目配置读取，回退到nanobot配置。
+        从项目配置读取，未配置时抛出异常。
 
         Returns:
             LLMConfig: LLM配置数据类实例
@@ -160,8 +156,6 @@ class RunnerProviderAdapter:
         """
         if self._has_runner_llm_config():
             return self._from_runner_config()
-        if self._try_load_nanobot_config():
-            return self._from_nanobot_config()
         raise LLMError(
             "未配置LLM，请运行 'nanobotrun system init' 完成配置",
             recovery_suggestion="运行 nanobotrun system init 配置LLM，或设置 NANOBOT_LLM_PROVIDER 和 NANOBOT_LLM_MODEL 环境变量",
@@ -332,9 +326,9 @@ class RunnerProviderAdapter:
         """检查配置是否可用
 
         Returns:
-            bool: 项目配置或nanobot配置是否包含LLM配置
+            bool: 项目配置是否包含LLM配置
         """
-        return self._has_runner_llm_config() or self._try_load_nanobot_config()
+        return self._has_runner_llm_config()
 
     def close(self) -> None:
         """关闭Provider连接，释放资源"""
@@ -665,24 +659,6 @@ class RunnerProviderAdapter:
         except (NanobotRunnerError, Exception):
             return False
 
-    def _try_load_nanobot_config(self) -> bool:
-        """尝试加载nanobot配置（回退）
-
-        Returns:
-            bool: 是否成功加载nanobot配置
-        """
-        if self._nanobot_config is not None:
-            return True
-
-        try:
-            from nanobot.config.loader import load_config
-
-            self._nanobot_config = load_config()
-            return True
-        except (ImportError, FileNotFoundError, ValueError) as e:
-            logger.debug(f"nanobot配置加载失败: {e}")
-            return False
-
     def _from_runner_config(self) -> LLMConfig:
         """从项目配置提取LLM配置
 
@@ -695,41 +671,4 @@ class RunnerProviderAdapter:
             model=llm_dict.get("model", "gpt-4o-mini"),
             api_key=llm_dict.get("api_key"),
             base_url=llm_dict.get("base_url"),
-        )
-
-    def _from_nanobot_config(self) -> LLMConfig:
-        """从nanobot配置提取LLM配置（回退）
-
-        Returns:
-            LLMConfig: LLM配置数据类实例
-        """
-        if self._nanobot_config is None:
-            raise LLMError(
-                "nanobot配置未加载",
-                recovery_suggestion="请确认已安装nanobot-ai并正确配置",
-            )
-
-        defaults = self._nanobot_config.agents.defaults
-        provider_name = self._nanobot_config.providers.default
-
-        api_key: str | None = None
-        providers = self._nanobot_config.providers
-        if hasattr(providers, provider_name):
-            provider_cfg = getattr(providers, provider_name)
-            api_key = getattr(provider_cfg, "api_key", None)
-
-        base_url: str | None = None
-        if hasattr(providers, provider_name):
-            provider_cfg = getattr(providers, provider_name)
-            base_url = getattr(provider_cfg, "base_url", None)
-
-        return LLMConfig(
-            provider=provider_name,
-            model=defaults.model,
-            api_key=api_key or os.getenv("NANOBOT_LLM_API_KEY"),
-            base_url=base_url,
-            max_iterations=defaults.max_tool_iterations,
-            context_window_tokens=defaults.context_window_tokens,
-            context_block_limit=defaults.context_block_limit,
-            max_tool_result_chars=defaults.max_tool_result_chars,
         )

@@ -96,9 +96,6 @@ class InitWizard:
 
             written = self.generate_config_files(target_dir, user_config, env_vars)
 
-            if agent_mode and user_config.get("llm_provider"):
-                self._sync_to_nanobot()
-
             next_steps = [
                 "导入数据: nanobotrun data import <FIT文件路径>",
                 "查看统计: nanobotrun data stats",
@@ -168,8 +165,6 @@ class InitWizard:
                 errors=result.errors,
                 warnings=result.warnings,
             )
-
-        self._sync_to_nanobot()
 
         next_steps = [
             "导入数据: nanobotrun data import <FIT文件路径>",
@@ -323,24 +318,3 @@ class InitWizard:
         """
         config_file = workspace_dir / "config.json"
         return config_file.exists()
-
-    def _sync_to_nanobot(self) -> None:
-        """同步配置到nanobot
-
-        初始化完成后，将LLM配置同步到~/.nanobot/config.json，
-        确保已安装nanobot的用户可以正常使用。
-        同步失败不影响项目功能，仅记录警告。
-        """
-        try:
-            from src.core.config.sync import NanobotConfigSync
-
-            sync = NanobotConfigSync(self.config)
-            result = sync.sync_to_nanobot()
-
-            if result.success:
-                logger.info(f"已同步 {len(result.synced_fields)} 个字段到nanobot配置")
-            else:
-                for error in result.errors:
-                    logger.warning(f"nanobot配置同步失败: {error}")
-        except NanobotRunnerError as e:
-            logger.warning(f"nanobot配置同步异常: {e}")
