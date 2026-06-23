@@ -76,6 +76,7 @@ class MCPServerConfig:
         command: stdio模式下的启动命令
         args: stdio模式下的命令参数
         env: 环境变量配置
+        cwd: stdio模式下的工作目录
         url: sse/streamableHttp模式下的服务端URL
         headers: streamableHttp模式下的请求头
         tool_timeout: 工具调用超时时间（秒）
@@ -88,6 +89,7 @@ class MCPServerConfig:
     command: str | None = None
     args: list[str] | None = None
     env: dict[str, str] | None = None
+    cwd: str | None = None
     url: str | None = None
     headers: dict[str, str] | None = None
     tool_timeout: int = 30
@@ -109,6 +111,8 @@ class MCPServerConfig:
                 config["args"] = self.args
             if self.env is not None:
                 config["env"] = self.env
+            if self.cwd is not None:
+                config["cwd"] = self.cwd
         elif self.transport_type in (
             MCPTransportType.SSE,
             MCPTransportType.STREAMABLE_HTTP,
@@ -156,6 +160,7 @@ class MCPServerConfig:
             command=config.get("command"),
             args=config.get("args"),
             env=config.get("env"),
+            cwd=config.get("cwd"),
             url=config.get("url"),
             headers=config.get("headers"),
             tool_timeout=config.get("tool_timeout", 30),

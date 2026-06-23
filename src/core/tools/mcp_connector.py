@@ -29,6 +29,7 @@ def _adapt_for_nanobot(server_config: MCPServerConfig) -> SimpleNamespace:
         command=server_config.command,
         args=server_config.args,
         env=server_config.env,
+        cwd=server_config.cwd,
         url=server_config.url,
         headers=server_config.headers,
         tool_timeout=server_config.tool_timeout,
