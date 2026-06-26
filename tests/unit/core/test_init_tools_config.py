@@ -48,10 +48,11 @@ class TestToolsConfigIntegration:
                 InitPrompts,
                 "run_llm_provider_wizard",
                 return_value={
-                    "NANOBOT_LLM_PROVIDER": "openai",
-                    "NANOBOT_LLM_MODEL": "gpt-4o-mini",
-                    "NANOBOT_LLM_API_KEY": "test-key",
-                    "NANOBOT_LLM_BASE_URL": "",
+                    "config": {
+                        "llm_provider": "openai",
+                        "llm_model": "gpt-4o-mini",
+                    },
+                    "env_vars": {"NANOBOT_LLM_API_KEY": "test-key"},
                 },
             ),
             patch.object(
@@ -62,7 +63,10 @@ class TestToolsConfigIntegration:
             patch.object(
                 InitPrompts,
                 "run_feishu_config_wizard",
-                return_value={"NANOBOT_AUTO_PUSH_FEISHU": "false"},
+                return_value={
+                    "config": {"auto_push_feishu": False},
+                    "env_vars": {},
+                },
             ),
         ):
             result = InitPrompts.run_full_wizard(skip_optional=True, agent_mode=True)

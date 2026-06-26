@@ -197,10 +197,10 @@ class TestGetWebsocketConfig:
         assert result2["enabled"] is True
         assert result2["host"] == "localhost"
 
-    # ---- 环境变量覆盖场景 ----
+    # ---- 环境变量覆盖场景（仅敏感字段）----
 
-    def test_env_enabled_true(self, tmp_path):
-        """测试 NANOBOT_WS_ENABLED=true 覆盖 enabled 为 True"""
+    def test_env_enabled_ignored(self, tmp_path):
+        """NANOBOT_WS_ENABLED 为非敏感字段，环境变量不再覆盖 config.json 值"""
         config_data = {
             "version": "0.9.4",
             "data_dir": str(tmp_path / "data"),
@@ -210,77 +210,12 @@ class TestGetWebsocketConfig:
             with patch.object(Path, "home", return_value=tmp_path):
                 cm = ConfigManager()
                 cm.save_config(config_data)
-
                 result = cm.get_websocket_config()
-
-                assert result["enabled"] is True
-
-    def test_env_enabled_yes(self, tmp_path):
-        """测试 NANOBOT_WS_ENABLED=yes 覆盖 enabled 为 True"""
-        config_data = {
-            "version": "0.9.4",
-            "data_dir": str(tmp_path / "data"),
-            "websocket": {"enabled": False},
-        }
-        with patch.dict(os.environ, {"NANOBOT_WS_ENABLED": "yes"}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(config_data)
-
-                result = cm.get_websocket_config()
-
-                assert result["enabled"] is True
-
-    def test_env_enabled_one(self, tmp_path):
-        """测试 NANOBOT_WS_ENABLED=1 覆盖 enabled 为 True"""
-        config_data = {
-            "version": "0.9.4",
-            "data_dir": str(tmp_path / "data"),
-            "websocket": {"enabled": False},
-        }
-        with patch.dict(os.environ, {"NANOBOT_WS_ENABLED": "1"}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(config_data)
-
-                result = cm.get_websocket_config()
-
-                assert result["enabled"] is True
-
-    def test_env_enabled_false(self, tmp_path):
-        """测试 NANOBOT_WS_ENABLED=false 覆盖 enabled 为 False"""
-        config_data = {
-            "version": "0.9.4",
-            "data_dir": str(tmp_path / "data"),
-            "websocket": {"enabled": True},
-        }
-        with patch.dict(os.environ, {"NANOBOT_WS_ENABLED": "false"}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(config_data)
-
-                result = cm.get_websocket_config()
-
+                # config.json 值优先
                 assert result["enabled"] is False
 
-    def test_env_enabled_case_insensitive(self, tmp_path):
-        """测试 NANOBOT_WS_ENABLED 大写值也能正确转换"""
-        config_data = {
-            "version": "0.9.4",
-            "data_dir": str(tmp_path / "data"),
-            "websocket": {"enabled": False},
-        }
-        with patch.dict(os.environ, {"NANOBOT_WS_ENABLED": "TRUE"}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(config_data)
-
-                result = cm.get_websocket_config()
-
-                assert result["enabled"] is True
-
-    def test_env_host_override(self, tmp_path):
-        """测试 NANOBOT_WS_HOST 覆盖 host"""
+    def test_env_host_ignored(self, tmp_path):
+        """NANOBOT_WS_HOST 为非敏感字段，环境变量不再覆盖 config.json 值"""
         config_data = {
             "version": "0.9.4",
             "data_dir": str(tmp_path / "data"),
@@ -292,11 +227,11 @@ class TestGetWebsocketConfig:
                 cm.save_config(config_data)
 
                 result = cm.get_websocket_config()
+                # config.json 值优先
+                assert result["host"] == "localhost"
 
-                assert result["host"] == "10.0.0.1"
-
-    def test_env_port_override(self, tmp_path):
-        """测试 NANOBOT_WS_PORT 覆盖 port（整数类型转换）"""
+    def test_env_port_ignored(self, tmp_path):
+        """NANOBOT_WS_PORT 为非敏感字段，环境变量不再覆盖 config.json 值"""
         config_data = {
             "version": "0.9.4",
             "data_dir": str(tmp_path / "data"),
@@ -309,11 +244,12 @@ class TestGetWebsocketConfig:
 
                 result = cm.get_websocket_config()
 
-                assert result["port"] == 9090
+                # port 来自 config.json，环境变量不再覆盖
+                assert result["port"] == 8080
                 assert isinstance(result["port"], int)
 
     def test_env_port_invalid_value(self, tmp_path):
-        """测试 NANOBOT_WS_PORT 非数字值时保留原始字符串"""
+        """NANOBOT_WS_PORT 为非敏感字段，无效环境变量值不会进入 config"""
         config_data = {
             "version": "0.9.4",
             "data_dir": str(tmp_path / "data"),
@@ -326,8 +262,8 @@ class TestGetWebsocketConfig:
 
                 result = cm.get_websocket_config()
 
-                # int() 转换失败时回退为原始字符串
-                assert result["port"] == "abc"
+                # 环境变量不再覆盖，port 仍来自 config.json
+                assert result["port"] == 8080
 
     def test_env_token_override(self, tmp_path):
         """测试 NANOBOT_WS_TOKEN 覆盖 token"""
@@ -368,7 +304,7 @@ class TestGetWebsocketConfig:
                 assert result["token_issue_secret"] == "new-secret-from-env"
 
     def test_env_override_without_config_section(self, tmp_path):
-        """测试配置文件无 websocket 节时，环境变量仍可生效"""
+        """测试配置文件无 websocket 节时，非敏感环境变量不再生效"""
         config_data = {
             "version": "0.9.4",
             "data_dir": str(tmp_path / "data"),
@@ -387,10 +323,8 @@ class TestGetWebsocketConfig:
                 cm.save_config(config_data)
 
                 result = cm.get_websocket_config()
-
-                assert result["enabled"] is True
-                assert result["host"] == "0.0.0.0"
-                assert result["port"] == 3000
+                # 非敏感环境变量不再生效，返回空 dict
+                assert result == {}
 
     def test_all_env_vars_override_simultaneously(self, tmp_path):
         """测试所有 WebSocket 环境变量同时覆盖"""
@@ -422,14 +356,15 @@ class TestGetWebsocketConfig:
 
                 result = cm.get_websocket_config()
 
-                assert result["enabled"] is True
-                assert result["host"] == "10.20.30.40"
-                assert result["port"] == 9999
+                # 非敏感字段来自 config.json，敏感字段 (token/token_issue_secret) 来自环境变量
+                assert result["enabled"] is False
+                assert result["host"] == "localhost"
+                assert result["port"] == 8080
                 assert result["token"] == "env-token"
                 assert result["token_issue_secret"] == "env-secret"
 
     def test_env_override_priority_over_config(self, tmp_path):
-        """测试环境变量优先级高于配置文件"""
+        """测试环境变量优先级（仅敏感字段覆盖 config.json）"""
         config_data = {
             "version": "0.9.4",
             "data_dir": str(tmp_path / "data"),
@@ -453,10 +388,9 @@ class TestGetWebsocketConfig:
 
                 result = cm.get_websocket_config()
 
-                # 环境变量覆盖的值
-                assert result["host"] == "env-host"
-                assert result["port"] == 6000
-                # 配置文件的值（无对应环境变量）
+                # 非敏感字段仍使用 config.json 值，环境变量不再覆盖
+                assert result["host"] == "config-host"
+                assert result["port"] == 5000
                 assert result["enabled"] is True
 
     # ---- 默认值场景 ----
@@ -527,6 +461,6 @@ class TestGetWebsocketConfig:
                 # 配置文件的值
                 assert result["host"] == "localhost"
                 assert result["port"] == 8080
-                # 环境变量新增的字段
-                assert result["enabled"] is True
+                # 仅敏感字段（token）可通过环境变量新增，非敏感字段（enabled）不再生效
+                assert "enabled" not in result
                 assert result["token"] == "env-token"

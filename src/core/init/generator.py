@@ -108,7 +108,9 @@ class ConfigGenerator:
         return json.dumps(config, indent=2, ensure_ascii=False)
 
     def generate_env_local(self, env_vars: dict[str, str]) -> str:
-        """生成 .env.local 文件内容
+        """生成 .env.local 文件内容（仅敏感凭证）
+
+        非敏感配置由 config.json 管理，.env.local 只保存 API Key、Token 等敏感数据。
 
         Args:
             env_vars: 环境变量字典
@@ -116,20 +118,13 @@ class ConfigGenerator:
         Returns:
             str: .env.local 文件内容
         """
+        # ponytail: 移除了 NANOBOT_LLM_PROVIDER/MODEL/BASE_URL、NANOBOT_AUTO_PUSH_FEISHU
+        # 等非敏感字段，仅保留敏感凭证
         lines: list[str] = ["# Nanobot Runner 环境变量配置\n"]
 
         if env_vars.get("NANOBOT_LLM_API_KEY"):
-            lines.append("# LLM 配置\n")
-            lines.append(
-                f"NANOBOT_LLM_PROVIDER={env_vars.get('NANOBOT_LLM_PROVIDER', 'openai')}\n"
-            )
-            lines.append(
-                f"NANOBOT_LLM_MODEL={env_vars.get('NANOBOT_LLM_MODEL', 'gpt-4o-mini')}\n"
-            )
+            lines.append("# LLM API Key（敏感数据）\n")
             lines.append(f"NANOBOT_LLM_API_KEY={env_vars['NANOBOT_LLM_API_KEY']}\n")
-            base_url = env_vars.get("NANOBOT_LLM_BASE_URL", "")
-            if base_url:
-                lines.append(f"NANOBOT_LLM_BASE_URL={base_url}\n")
 
         feishu_keys = [
             "NANOBOT_FEISHU_APP_ID",
@@ -138,13 +133,10 @@ class ConfigGenerator:
         ]
         has_feishu = any(env_vars.get(k) for k in feishu_keys)
         if has_feishu:
-            lines.append("\n# 飞书通知配置\n")
+            lines.append("\n# 飞书通知凭证（敏感数据）\n")
             for key in feishu_keys:
                 if env_vars.get(key):
                     lines.append(f"{key}={env_vars[key]}\n")
-            lines.append(
-                f"NANOBOT_AUTO_PUSH_FEISHU={env_vars.get('NANOBOT_AUTO_PUSH_FEISHU', 'false')}\n"
-            )
 
         fallback_prefix = "NANOBOT_LLM_API_KEY_"
         fallback_keys = [

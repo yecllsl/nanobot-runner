@@ -22,36 +22,20 @@ class ConfigSource(Enum):
 
 
 ENV_KEY_MAPPING: dict[str, str] = {
-    "data_dir": "NANOBOT_DATA_DIR",
-    "workspace_dir": "NANOBOT_WORKSPACE_DIR",
-    "auto_push_feishu": "NANOBOT_AUTO_PUSH_FEISHU",
+    # 仅保留敏感字段
     "feishu_app_id": "NANOBOT_FEISHU_APP_ID",
     "feishu_app_secret": "NANOBOT_FEISHU_APP_SECRET",  # nosec B105
-    "feishu_receive_id": "NANOBOT_FEISHU_RECEIVE_ID",
-    "feishu_receive_id_type": "NANOBOT_FEISHU_RECEIVE_ID_TYPE",
-    "timezone": "NANOBOT_TIMEZONE",
-    "default_year": "NANOBOT_DEFAULT_YEAR",
-    "llm_provider": "NANOBOT_LLM_PROVIDER",
-    "llm_model": "NANOBOT_LLM_MODEL",
-    "llm_base_url": "NANOBOT_LLM_BASE_URL",
 }
 
-# WebSocket 环境变量映射，支持 NANOBOT_WS_* 环境变量覆盖配置文件值
+# WebSocket 环境变量映射，仅保留敏感字段
 WS_ENV_KEY_MAPPING: dict[str, str] = {
-    "enabled": "NANOBOT_WS_ENABLED",
-    "host": "NANOBOT_WS_HOST",
-    "port": "NANOBOT_WS_PORT",
     "token": "NANOBOT_WS_TOKEN",  # nosec B105
     "token_issue_secret": "NANOBOT_WS_TOKEN_SECRET",  # nosec B105
 }
 
-# WebUI 环境变量映射，支持 NANOBOT_WEBUI_* 环境变量覆盖配置文件值
+# WebUI 环境变量映射，仅保留敏感字段
 WEBUI_ENV_KEY_MAPPING: dict[str, str] = {
-    "enabled": "NANOBOT_WEBUI_ENABLED",
-    "host": "NANOBOT_WEBUI_HOST",
-    "port": "NANOBOT_WEBUI_PORT",
     "token_secret": "NANOBOT_WEBUI_TOKEN_SECRET",  # nosec B105
-    "token_ttl_s": "NANOBOT_WEBUI_TOKEN_TTL_S",  # nosec B105
 }
 
 # 需要布尔类型转换的配置键
@@ -166,7 +150,7 @@ class ConfigManager:
 
     @staticmethod
     def _get_default_config() -> dict[str, Any]:
-        """获取默认配置
+        """获取默认配置（仅包含非敏感字段）
 
         Returns:
             dict: 默认配置字典
@@ -176,7 +160,6 @@ class ConfigManager:
             "data_dir": str(Path.home() / ".nanobot-runner" / "data"),
             "auto_push_feishu": False,
             "feishu_app_id": "",
-            "feishu_app_secret": "",  # nosec B105
             "feishu_receive_id": "",
             "feishu_receive_id_type": "user_id",
         }
@@ -431,18 +414,18 @@ class ConfigManager:
     def get_llm_config(self) -> dict[str, Any]:
         """获取LLM配置
 
-        优先级：环境变量 > 配置文件 > 默认值
+        - 非敏感字段（provider/model/base_url）：仅从配置文件读取
+        - 敏感字段（api_key）：仅从环境变量读取
 
         Returns:
             dict[str, Any]: LLM配置字典，包含provider、model、api_key、base_url
         """
         config = self.load_config()
         return {
-            "provider": os.getenv("NANOBOT_LLM_PROVIDER")
-            or config.get("llm_provider", ""),
-            "model": os.getenv("NANOBOT_LLM_MODEL") or config.get("llm_model", ""),
+            "provider": config.get("llm_provider", ""),
+            "model": config.get("llm_model", ""),
             "api_key": os.getenv("NANOBOT_LLM_API_KEY"),
-            "base_url": os.getenv("NANOBOT_LLM_BASE_URL") or config.get("llm_base_url"),
+            "base_url": config.get("llm_base_url"),
         }
 
     def get_websocket_config(self) -> dict[str, Any]:
@@ -550,11 +533,8 @@ class ConfigManager:
             env_manager = EnvManager(env_file=self.base_dir / ".env.local")
             env_vars: dict[str, str] = {
                 "NANOBOT_LLM_API_KEY": api_key,
-                "NANOBOT_LLM_PROVIDER": provider,
-                "NANOBOT_LLM_MODEL": model,
+                # ponytail: 仅保存敏感数据到 .env.local
             }
-            if base_url:
-                env_vars["NANOBOT_LLM_BASE_URL"] = base_url
             env_manager.save_env_file(env_vars)
 
     def get_fallback_api_key(self, provider: str) -> str | None:

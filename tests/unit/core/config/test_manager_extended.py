@@ -119,7 +119,9 @@ class TestConfigManagerGetLlmConfig:
                 assert llm["model"] == "gpt-4"
                 assert llm["base_url"] == "https://api.openai.com"
 
-    def test_get_llm_config_env_override(self, tmp_path):
+    def test_get_llm_config_env_override_ignored(self, tmp_path):
+        """非敏感 LLM 字段（provider/model/base_url）不再被环境变量覆盖，
+        get_llm_config 优先读取 config.json 值"""
         with patch.dict(
             os.environ,
             {"NANOBOT_LLM_PROVIDER": "anthropic", "NANOBOT_LLM_MODEL": "claude-3"},
@@ -136,8 +138,9 @@ class TestConfigManagerGetLlmConfig:
                     }
                 )
                 llm = cm.get_llm_config()
-                assert llm["provider"] == "anthropic"
-                assert llm["model"] == "claude-3"
+                # config.json 值优先，环境变量不再覆盖非敏感字段
+                assert llm["provider"] == "openai"
+                assert llm["model"] == "gpt-4"
 
     def test_get_llm_config_empty(self, tmp_path):
         with patch.dict(os.environ, {}, clear=True):

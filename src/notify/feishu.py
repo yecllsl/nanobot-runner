@@ -25,10 +25,11 @@ class FeishuAuth:
     2. 获取和刷新 tenant_access_token
     3. 处理 token 过期和重试
 
-    配置位置：~/.nanobot-runner/config.json
-    配置字段：
-        - feishu_app_id: 飞书应用 App ID
-        - feishu_app_secret: 飞书应用 App Secret
+    凭证来源（优先级）：
+    1. 构造函数参数 app_id/app_secret
+    2. 环境变量 NANOBOT_FEISHU_APP_ID / NANOBOT_FEISHU_APP_SECRET
+    3. .env.local 文件
+    4. ~/.nanobot-runner/config.json（已弃用，仅向后兼容）
     """
 
     TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"  # nosec B105
@@ -44,12 +45,12 @@ class FeishuAuth:
 
         Args:
             config: 配置管理器，不指定则创建默认实例
-            app_id: 飞书应用 App ID，不指定则从配置文件读取
-            app_secret: 飞书应用 App Secret，不指定则从配置文件读取
+            app_id: 飞书应用 App ID，不指定则从环境变量读取
+            app_secret: 飞书应用 App Secret，不指定则从环境变量读取
         """
         self.config = config or ConfigManager()
-        self.app_id = app_id or self.config.get("feishu_app_id")
-        self.app_secret = app_secret or self.config.get("feishu_app_secret")
+        self.app_id = app_id or os.environ.get("NANOBOT_FEISHU_APP_ID")
+        self.app_secret = app_secret or os.environ.get("NANOBOT_FEISHU_APP_SECRET")
 
         if not self.app_id or not self.app_secret:
             self._try_load_env_local()
@@ -57,6 +58,12 @@ class FeishuAuth:
             self.app_secret = self.app_secret or os.environ.get(
                 "NANOBOT_FEISHU_APP_SECRET"
             )
+
+        # ponytail: 从 config.json 读取（已弃用，仅向后兼容）
+        if not self.app_id:
+            self.app_id = self.config.get("feishu_app_id")
+        if not self.app_secret:
+            self.app_secret = self.config.get("feishu_app_secret")
 
         self._access_token: str | None = None
         self._token_expire_time: float | None = None

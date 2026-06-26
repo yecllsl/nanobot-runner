@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -25,7 +25,13 @@ def mock_runner_config():
         "context_block_limit": 10,
         "max_tool_result_chars": 32000,
     }
-    config.get.return_value = None
+
+    def _mock_get(key: str, default: Any = None) -> Any:
+        if key == "timezone":
+            return "Asia/Shanghai"
+        return default
+
+    config.get.side_effect = _mock_get
     # 默认返回空的 WebSocket 配置，表示未启用
     config.get_websocket_config.return_value = {}
     # 添加 base_dir 属性，避免 _build_nanobot_config_from_runner 失败
@@ -92,6 +98,38 @@ class TestRunnerProviderAdapterGetAgentDefaults:
         assert isinstance(defaults, AgentDefaults)
         assert defaults.model == "gpt-4o-mini"
         assert defaults.max_tool_iterations == 10
+
+    def test_get_agent_defaults_includes_timezone(self, mock_runner_config):
+        """回归测试: AgentDefaults 应包含项目配置的 timezone
+
+        根因: config.json 配置了 "timezone": "Asia/Shanghai"，但
+        RunnerProviderAdapter.get_agent_defaults() 未返回 timezone，
+        导致 AgentLoop 默认使用 UTC。
+        """
+        adapter = RunnerProviderAdapter(mock_runner_config)
+        defaults = adapter.get_agent_defaults()
+        assert defaults.timezone == "Asia/Shanghai"
+
+    def test_get_agent_defaults_timezone_fallback(self):
+        """未配置 timezone 时，AgentDefaults 应回退到默认值"""
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = True
+        config.get_llm_config.return_value = {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "api_key": "test-key",
+            "max_iterations": 10,
+            "context_window_tokens": 128000,
+            "context_block_limit": 10,
+            "max_tool_result_chars": 32000,
+        }
+        config.get.return_value = None
+        config.get_websocket_config.return_value = {}
+        config.base_dir = Path("/test/runner")
+
+        adapter = RunnerProviderAdapter(config)
+        defaults = adapter.get_agent_defaults()
+        assert defaults.timezone == "UTC"
 
 
 class TestRunnerProviderAdapterClose:
@@ -427,6 +465,42 @@ class TestBuildNanobotConfigWebsocket:
         assert defaults["bot_icon"] == "🤖"
         assert defaults["unified_session"] is True
 
+    def test_timezone_from_runner_config_passed_to_agents_defaults(
+        self, mock_runner_config, mock_nanobot_modules
+    ):
+        """回归测试: 项目配置的 timezone 应注入到 nanobot AgentsConfig.defaults
+
+        根因: config.json 配置了 "timezone": "Asia/Shanghai"，但
+        _build_nanobot_config_from_runner 未将其传给 AgentsConfig，
+        导致 WebUI 和 AgentLoop 默认使用 UTC。
+        """
+        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
+        mock_runner_config.get_websocket_config.return_value = {}
+
+        adapter._build_nanobot_config_from_runner()
+
+        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
+        agents_config_cls.assert_called_once()
+        call_kwargs = agents_config_cls.call_args[1]
+        defaults = call_kwargs["defaults"]
+        assert defaults["timezone"] == "Asia/Shanghai"
+
+    def test_timezone_defaults_to_utc_when_not_configured(
+        self, mock_runner_config, mock_nanobot_modules
+    ):
+        """未配置 timezone 时，应使用 nanobot 默认 UTC（向后兼容）"""
+        mock_runner_config.get.side_effect = lambda key, default=None: default
+
+        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
+        mock_runner_config.get_websocket_config.return_value = {}
+
+        adapter._build_nanobot_config_from_runner()
+
+        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
+        call_kwargs = agents_config_cls.call_args[1]
+        defaults = call_kwargs["defaults"]
+        assert defaults.get("timezone") is None
+
     def test_websocket_channel_built_when_webui_enabled(
         self, mock_runner_config, mock_nanobot_modules
     ):
@@ -553,150 +627,386 @@ class TestBuildNanobotConfigWebsocket:
 
 
 # ============================================================
-# WebUI Settings API 拦截单元测试
+# WebUI Settings API 代理单元测试
 # ============================================================
 
 
 class TestPatchWebsocketSettingsApi:
     """测试 _patch_websocket_settings_api 的 monkey-patch 行为
 
-    验证 WebUI Settings 写操作端点被拦截返回 403，
-    而读端点和其他端点不受影响。
+    验证 patch 后 nanobot.config.loader 的 load_config/save_config 源函数被替换，
+    且所有已导入该函数的 webui 模块（settings_api/mcp_presets_api/cli_apps_api）
+    的本地引用也被替换，读写实际指向项目配置。
     """
 
     @pytest.fixture
-    def mock_ws_channel_cls(self):
-        """模拟 nanobot.channels.websocket.WebSocketChannel 类"""
-        mock_cls = MagicMock()
-        # 保存原始 _dispatch_http 方法（不含 _runner_patched 属性）
-        original_dispatch = MagicMock(spec=[])
-        mock_cls._dispatch_http = original_dispatch
-        return mock_cls, original_dispatch
+    def mock_loader_modules(self):
+        """模拟 nanobot.config.loader 及 webui 子模块
 
-    def test_settings_update_blocked(self, mock_ws_channel_cls):
-        """调用 patch 后，/api/settings/update 应返回 403 而非调用原始方法"""
+        各 webui 模块的 load_config/save_config 初始指向 loader 的同名函数，
+        模拟模块级 from nanobot.config.loader import load_config 的绑定行为。
+        """
+        mock_loader = MagicMock()
+        mock_loader.load_config = MagicMock(return_value=MagicMock())
+        mock_loader.save_config = MagicMock()
+
+        mock_settings_api = MagicMock()
+        mock_settings_api.load_config = mock_loader.load_config
+        mock_settings_api.save_config = mock_loader.save_config
+
+        mock_mcp_presets_api = MagicMock()
+        mock_mcp_presets_api.load_config = mock_loader.load_config
+
+        mock_cli_apps_api = MagicMock()
+        mock_cli_apps_api.load_config = mock_loader.load_config
+
+        # nanobot.config.schema.Config 返回可设置属性的 MagicMock
+        mock_schema = MagicMock()
+        mock_schema.Config = MagicMock(return_value=MagicMock())
+
+        return {
+            "loader": mock_loader,
+            "settings_api": mock_settings_api,
+            "mcp_presets_api": mock_mcp_presets_api,
+            "cli_apps_api": mock_cli_apps_api,
+            "schema": mock_schema,
+        }
+
+    @staticmethod
+    def _make_sys_modules(modules: dict[str, Any]) -> dict[str, Any]:
+        """构建 sys.modules mock，包含 nanobot.config.loader 及 webui 子模块"""
+        mock_nanobot = MagicMock()
+        mock_config_pkg = MagicMock()
+        mock_config_pkg.loader = modules["loader"]
+        mock_webui = MagicMock()
+        mock_webui.settings_api = modules["settings_api"]
+        mock_webui.mcp_presets_api = modules["mcp_presets_api"]
+        mock_webui.cli_apps_api = modules["cli_apps_api"]
+        mock_nanobot.config = mock_config_pkg
+        mock_nanobot.webui = mock_webui
+        return {
+            "nanobot": mock_nanobot,
+            "nanobot.config": mock_config_pkg,
+            "nanobot.config.loader": modules["loader"],
+            "nanobot.config.schema": modules["schema"],
+            "nanobot.webui": mock_webui,
+            "nanobot.webui.settings_api": modules["settings_api"],
+            "nanobot.webui.mcp_presets_api": modules["mcp_presets_api"],
+            "nanobot.webui.cli_apps_api": modules["cli_apps_api"],
+        }
+
+    def test_patch_replaces_load_and_save(self, mock_loader_modules):
+        """调用 patch 后，源函数和所有 webui 模块本地引用应被替换"""
         from src.core.provider_adapter import _patch_websocket_settings_api
 
-        mock_cls, original_dispatch = mock_ws_channel_cls
+        # 保存原始引用，用于后续验证被替换
+        original_loader_save = mock_loader_modules["loader"].save_config
+        original_settings_save = mock_loader_modules["settings_api"].save_config
 
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot.channels.websocket": MagicMock(WebSocketChannel=mock_cls),
-                "nanobot.webui": MagicMock(),
-                "nanobot.webui.http_utils": MagicMock(
-                    http_error=MagicMock(return_value=MagicMock(status=403)),
-                    parse_request_path=MagicMock(return_value=("/", {})),
-                ),
-            },
-        ):
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
             _patch_websocket_settings_api()
 
-        # 验证 _dispatch_http 已被替换
-        assert mock_cls._dispatch_http is not original_dispatch
-
-    def test_blocked_paths_return_403(self, mock_runner_config):
-        """3 个写端点路径在 _BLOCKED_SETTINGS_PATHS 中"""
-        from src.core.provider_adapter import _BLOCKED_SETTINGS_PATHS
-
-        assert "/api/settings/update" in _BLOCKED_SETTINGS_PATHS
-        assert "/api/settings/provider/update" in _BLOCKED_SETTINGS_PATHS
-        assert "/api/settings/web-search/update" in _BLOCKED_SETTINGS_PATHS
-
-    def test_read_paths_not_blocked(self):
-        """读端点路径不在 _BLOCKED_SETTINGS_PATHS 中"""
-        from src.core.provider_adapter import _BLOCKED_SETTINGS_PATHS
-
-        assert "/api/settings" not in _BLOCKED_SETTINGS_PATHS
-        assert "/api/sessions" not in _BLOCKED_SETTINGS_PATHS
-        assert "/webui/bootstrap" not in _BLOCKED_SETTINGS_PATHS
-        assert "/api/commands" not in _BLOCKED_SETTINGS_PATHS
-
-    @pytest.mark.asyncio
-    async def test_dispatch_http_blocks_write_endpoints(self):
-        """monkey-patch 后的 _dispatch_http 应拦截写端点并返回 403"""
-        from src.core.provider_adapter import (
-            _patch_websocket_settings_api,
+        # 验证源函数被替换
+        assert (
+            getattr(mock_loader_modules["loader"].load_config, "_runner_patched", False)
+            is True
+        )
+        # 验证所有 webui 模块本地引用被替换
+        for name in ("settings_api", "mcp_presets_api", "cli_apps_api"):
+            mod = mock_loader_modules[name]
+            assert getattr(mod.load_config, "_runner_patched", False) is True, (
+                f"{name} load_config 未被 patch"
+            )
+        # save_config 也应被替换（不再是原始 mock）
+        assert mock_loader_modules["loader"].save_config is not original_loader_save
+        assert (
+            mock_loader_modules["settings_api"].save_config
+            is not original_settings_save
         )
 
-        # 构造模拟的 WebSocketChannel 类
-        original_dispatch = AsyncMock(return_value=MagicMock(status=200), spec=[])
-        mock_cls = MagicMock()
-        mock_cls._dispatch_http = original_dispatch
-
-        # v0.30.0: _http_error 和 _parse_request_path 从 nanobot.channels.websocket 导入
-        mock_parse = MagicMock(return_value=("/api/settings/update", {}))
-        mock_error = MagicMock(return_value=MagicMock(status=403))
-
-        mock_ws_module = MagicMock(
-            WebSocketChannel=mock_cls,
-            _parse_request_path=mock_parse,
-            _http_error=mock_error,
-        )
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot.channels.websocket": mock_ws_module,
-            },
-        ):
-            _patch_websocket_settings_api()
-
-        # 获取 patch 后的方法
-        patched_dispatch = mock_cls._dispatch_http
-
-        # 模拟调用
-        mock_self = MagicMock()
-        mock_connection = MagicMock()
-        mock_request = MagicMock()
-        mock_request.path = "/api/settings/update"
-
-        result = await patched_dispatch(mock_self, mock_connection, mock_request)
-
-        # 验证 _http_error 被调用，状态码 403
-        mock_error.assert_called_once()
-        call_args = mock_error.call_args
-        assert call_args[0][0] == 403
-
-    @pytest.mark.asyncio
-    async def test_dispatch_http_passes_read_endpoints(self):
-        """monkey-patch 后的 _dispatch_http 应放行读端点，调用原始方法"""
+    def test_load_config_does_not_call_original(self, mock_loader_modules):
+        """_runner_load_config 不应调用原始 load_config（避免读取项目配置文件触发 Pydantic 验证错误）"""
         from src.core.provider_adapter import _patch_websocket_settings_api
 
-        original_dispatch = AsyncMock(return_value=MagicMock(status=200), spec=[])
-        mock_cls = MagicMock()
-        mock_cls._dispatch_http = original_dispatch
+        # 保存原始 load_config 引用
+        original_load = mock_loader_modules["loader"].load_config
 
-        # v0.30.0: _http_error 和 _parse_request_path 从 nanobot.channels.websocket 导入
-        mock_parse = MagicMock(return_value=("/api/settings", {}))
-        mock_error = MagicMock(return_value=MagicMock(status=403))
-
-        mock_ws_module = MagicMock(
-            WebSocketChannel=mock_cls,
-            _parse_request_path=mock_parse,
-            _http_error=mock_error,
-        )
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot.channels.websocket": mock_ws_module,
-            },
-        ):
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
             _patch_websocket_settings_api()
 
-        patched_dispatch = mock_cls._dispatch_http
+            with patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls:
+                mock_cm = MagicMock()
+                mock_cm.get_llm_config.return_value = {
+                    "provider": "zhipu",
+                    "model": "glm-4",
+                    "api_key": "test-key",
+                    "base_url": "https://api.zhipu.ai",
+                }
+                mock_cm_cls.return_value = mock_cm
 
-        mock_self = MagicMock()
-        mock_connection = MagicMock()
-        mock_request = MagicMock()
-        mock_request.path = "/api/settings"
+                # 通过源函数调用（模拟 websocket.py 的函数内导入）
+                result = mock_loader_modules["loader"].load_config()
 
-        result = await patched_dispatch(mock_self, mock_connection, mock_request)
+                # 原始 load_config 不应被调用（避免读取项目配置文件）
+                original_load.assert_not_called()
+                # 但 Config() 应被调用构造默认配置
+                mock_loader_modules["schema"].Config.assert_called_once()
+                assert result is not None
 
-        # 验证原始方法被调用，_http_error 未被调用
-        original_dispatch.assert_called_once()
-        mock_error.assert_not_called()
+    def test_load_config_syncs_from_runner(self, mock_loader_modules):
+        """_runner_load_config 应从项目配置同步 LLM 字段到 nanobot Config"""
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
+            _patch_websocket_settings_api()
+
+            with patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls:
+                mock_cm = MagicMock()
+                mock_cm.get_llm_config.return_value = {
+                    "provider": "zhipu",
+                    "model": "glm-4",
+                    "api_key": "test-key",
+                    "base_url": "https://api.zhipu.ai",
+                }
+                mock_cm.get.return_value = "Asia/Shanghai"
+                mock_cm_cls.return_value = mock_cm
+
+                result = mock_loader_modules["settings_api"].load_config()
+
+                # 验证 LLM 字段被项目配置覆盖
+                assert result.agents.defaults.model == "glm-4"
+                assert result.agents.defaults.provider == "zhipu"
+                # 验证 timezone 被项目配置覆盖
+                assert result.agents.defaults.timezone == "Asia/Shanghai"
+
+    def test_save_config_writes_to_runner(self, mock_loader_modules):
+        """_runner_save_config 应从 nanobot Config 提取 LLM 字段写入项目配置，并同步环境变量"""
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
+            _patch_websocket_settings_api()
+
+            with patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls:
+                mock_cm = MagicMock()
+                mock_cm.load_config.return_value = {
+                    "version": "0.30.0",
+                    "data_dir": "/data",
+                }
+                mock_cm_cls.return_value = mock_cm
+
+                # 构造一个模拟的 nanobot Config 对象
+                mock_config = MagicMock()
+                mock_config.agents.defaults.model = "new-model"
+                mock_config.agents.defaults.provider = "openai"
+                mock_config.agents.defaults.timezone = "Asia/Shanghai"
+                mock_provider = MagicMock()
+                mock_provider.api_key = "new-key"
+                mock_provider.api_base = "https://api.openai.com"
+                mock_config.providers = MagicMock()
+                # getattr(config.providers, "openai") 返回 mock_provider
+                mock_config.providers.openai = mock_provider
+
+                # 保存旧环境变量，测试后恢复
+                old_env = {k: os.environ.get(k) for k in ("NANOBOT_LLM_API_KEY",)}
+                try:
+                    mock_loader_modules["settings_api"].save_config(mock_config)
+
+                    # 验证 ConfigManager.save_llm_config 被调用
+                    mock_cm.save_llm_config.assert_called_once_with(
+                        provider="openai",
+                        model="new-model",
+                        base_url="https://api.openai.com",
+                        api_key="new-key",
+                    )
+                    # 验证进程环境变量仅同步 API Key（非敏感字段已写入 config.json）
+                    assert os.environ["NANOBOT_LLM_API_KEY"] == "new-key"
+                    # 验证 timezone 被保存到项目配置
+                    mock_cm.save_config.assert_called_once()
+                    saved_config = mock_cm.save_config.call_args[0][0]
+                    assert saved_config["timezone"] == "Asia/Shanghai"
+                finally:
+                    for k, v in old_env.items():
+                        if v is None:
+                            os.environ.pop(k, None)
+                        else:
+                            os.environ[k] = v
+
+    def test_save_config_saves_non_default_provider_keys(self, mock_loader_modules):
+        """_runner_save_config 应保存非默认供应商的 api_key 到 .env.local"""
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
+            _patch_websocket_settings_api()
+
+            with (
+                patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls,
+                patch("src.core.config.env_manager.EnvManager") as mock_env_cls,
+            ):
+                mock_cm = MagicMock()
+                mock_cm.base_dir = Path("/test")
+                mock_cm_cls.return_value = mock_cm
+
+                # 默认供应商是 zhipu，另外配置了 siliconflow
+                mock_config = MagicMock()
+                mock_config.agents.defaults.model = "glm-4"
+                mock_config.agents.defaults.provider = "zhipu"
+                zhipu_pc = MagicMock()
+                zhipu_pc.api_key = "zhipu-key"
+                zhipu_pc.api_base = "https://api.zhipu.ai"
+                siliconflow_pc = MagicMock()
+                siliconflow_pc.api_key = "sf-key"
+                siliconflow_pc.api_base = "https://api.siliconflow.cn/v1"
+                mock_config.providers = MagicMock()
+                mock_config.providers.zhipu = zhipu_pc
+                mock_config.providers.siliconflow = siliconflow_pc
+                # 让 dir() 返回真实供应商名（MagicMock 的 dir 会包含很多内部属性，
+                # 但 hasattr(pc, "api_key") 会过滤掉非 ProviderConfig 的属性）
+                mock_config.providers._mock_children = {
+                    "zhipu": zhipu_pc,
+                    "siliconflow": siliconflow_pc,
+                }
+
+                old_env = {}
+                for k in ("NANOBOT_LLM_API_KEY_SILICONFLOW",):
+                    old_env[k] = os.environ.get(k)
+                try:
+                    mock_loader_modules["settings_api"].save_config(mock_config)
+
+                    # 验证非默认供应商 api_key 环境变量被更新（api_base 为非敏感字段，不再写入 env）
+                    assert os.environ.get("NANOBOT_LLM_API_KEY_SILICONFLOW") == "sf-key"
+                    # 验证 EnvManager.save_env_file 被调用
+                    mock_env_cls.assert_called_once()
+                    mock_env_cls.return_value.save_env_file.assert_called_once()
+                finally:
+                    for k, v in old_env.items():
+                        if v is None:
+                            os.environ.pop(k, None)
+                        else:
+                            os.environ[k] = v
+
+    def test_load_config_restores_provider_keys_from_env(self, mock_loader_modules):
+        """_runner_load_config 应从环境变量恢复非默认供应商的 api_key"""
+        # 直接用真实 nanobot Config 验证，不 mock schema
+        from nanobot.config.schema import Config as RealConfig
+
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        # 设置环境变量模拟之前保存的 siliconflow 配置
+        old_env = {}
+        for k, v in {
+            "NANOBOT_LLM_API_KEY_SILICONFLOW": "sf-key",
+        }.items():
+            old_env[k] = os.environ.get(k)
+            os.environ[k] = v
+
+        try:
+            # 构造 loader mock，load_config 使用真实 _runner_load_config
+            mock_loader = MagicMock()
+            mock_loader.load_config = MagicMock(return_value=MagicMock())
+            mock_loader.save_config = MagicMock()
+
+            mock_settings_api = MagicMock()
+            mock_settings_api.load_config = mock_loader.load_config
+            mock_settings_api.save_config = mock_loader.save_config
+
+            mock_schema = MagicMock()
+            mock_schema.Config = RealConfig
+
+            mock_nanobot = MagicMock()
+            mock_config_pkg = MagicMock()
+            mock_config_pkg.loader = mock_loader
+            mock_webui = MagicMock()
+            mock_webui.settings_api = mock_settings_api
+
+            sys_modules = {
+                "nanobot": mock_nanobot,
+                "nanobot.config": mock_config_pkg,
+                "nanobot.config.loader": mock_loader,
+                "nanobot.config.schema": mock_schema,
+                "nanobot.webui": mock_webui,
+                "nanobot.webui.settings_api": mock_settings_api,
+            }
+
+            with patch.dict("sys.modules", sys_modules):
+                _patch_websocket_settings_api()
+
+                with patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls:
+                    mock_cm = MagicMock()
+                    mock_cm.get_llm_config.return_value = {
+                        "provider": "zhipu",
+                        "model": "glm-4",
+                        "api_key": "zhipu-key",
+                        "base_url": "https://api.zhipu.ai",
+                    }
+                    mock_cm_cls.return_value = mock_cm
+
+                    result = mock_loader.load_config()
+
+                    # 验证非默认供应商的 api_key 被恢复（api_base 为非敏感字段，不再从环境变量恢复）
+                    assert result.providers.siliconflow.api_key == "sf-key"
+        finally:
+            for k, v in old_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_patch_idempotent(self, mock_loader_modules):
+        """多次调用 patch 应安全（幂等）"""
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
+            _patch_websocket_settings_api()
+            first_load = mock_loader_modules["loader"].load_config
+            first_save = mock_loader_modules["loader"].save_config
+
+            _patch_websocket_settings_api()
+
+            # 第二次调用不应替换
+            assert mock_loader_modules["loader"].load_config is first_load
+            assert mock_loader_modules["loader"].save_config is first_save
+
+    def test_load_config_handles_exception(self, mock_loader_modules):
+        """_runner_load_config 在项目配置读取失败时应返回默认 Config"""
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
+            _patch_websocket_settings_api()
+
+            with patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls:
+                mock_cm_cls.side_effect = Exception("config error")
+
+                # 不应抛出异常，返回默认 config
+                result = mock_loader_modules["settings_api"].load_config()
+                assert result is not None
+
+    def test_save_config_handles_exception(self, mock_loader_modules):
+        """_runner_save_config 在写入失败时不应抛出异常"""
+        from src.core.provider_adapter import _patch_websocket_settings_api
+
+        sys_modules = self._make_sys_modules(mock_loader_modules)
+        with patch.dict("sys.modules", sys_modules):
+            _patch_websocket_settings_api()
+
+            with patch("src.core.provider_adapter.ConfigManager") as mock_cm_cls:
+                mock_cm = MagicMock()
+                mock_cm.save_llm_config.side_effect = Exception("write error")
+                mock_cm_cls.return_value = mock_cm
+
+                mock_config = MagicMock()
+                mock_config.agents.defaults.model = "model"
+                mock_config.agents.defaults.provider = "provider"
+                mock_config.providers = MagicMock()
+
+                # 不应抛出异常
+                mock_loader_modules["settings_api"].save_config(mock_config)
 
     def test_patch_called_during_config_build_when_webui_enabled(
         self, mock_runner_config, mock_nanobot_modules

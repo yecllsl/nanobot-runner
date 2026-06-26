@@ -104,6 +104,53 @@ class TestGatewayIntegration:
 
             shutil.rmtree(workspace, ignore_errors=True)
 
+    def test_setup_cron_service_passes_timezone_to_reminder(self):
+        """回归测试: 注册训练提醒时应将配置的 timezone 传递给 CronSchedule
+
+        根因: config.json 配置了 "timezone": "Asia/Shanghai"，但
+        _register_training_reminder_job 未将 tz 传给 CronSchedule，
+        导致 CronService 回退到系统时区（UTC）。
+        """
+        workspace = Path(tempfile.mkdtemp())
+
+        try:
+            with patch("src.core.plan.gateway_integration.CronService") as MockCron:
+                mock_cron = MagicMock()
+                mock_cron.list_jobs.return_value = []
+                MockCron.return_value = mock_cron
+
+                integration = GatewayIntegration(workspace, timezone="Asia/Shanghai")
+                integration.setup_cron_service(auto_register_reminder=True)
+
+                mock_cron.add_job.assert_called_once()
+                schedule = mock_cron.add_job.call_args.kwargs["schedule"]
+                assert schedule.tz == "Asia/Shanghai"
+        finally:
+            import shutil
+
+            shutil.rmtree(workspace, ignore_errors=True)
+
+    def test_setup_cron_service_no_timezone_defaults_none(self):
+        """未传入 timezone 时，CronSchedule.tz 保持 None（向后兼容）"""
+        workspace = Path(tempfile.mkdtemp())
+
+        try:
+            with patch("src.core.plan.gateway_integration.CronService") as MockCron:
+                mock_cron = MagicMock()
+                mock_cron.list_jobs.return_value = []
+                MockCron.return_value = mock_cron
+
+                integration = GatewayIntegration(workspace)
+                integration.setup_cron_service(auto_register_reminder=True)
+
+                mock_cron.add_job.assert_called_once()
+                schedule = mock_cron.add_job.call_args.kwargs["schedule"]
+                assert schedule.tz is None
+        finally:
+            import shutil
+
+            shutil.rmtree(workspace, ignore_errors=True)
+
     def test_setup_cron_service_existing_job(self):
         """测试已存在任务时跳过注册"""
         workspace = Path(tempfile.mkdtemp())

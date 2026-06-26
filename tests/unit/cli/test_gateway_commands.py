@@ -13,6 +13,8 @@
 - _format_training_load: 训练负荷格式化
 """
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from src.cli.commands.gateway import (
@@ -21,6 +23,7 @@ from src.cli.commands.gateway import (
     _format_stats,
     _format_training_load,
     _format_vdot,
+    _register_heartbeat_cron,
 )
 
 
@@ -293,6 +296,33 @@ class TestFormatTrainingLoad:
 
         assert isinstance(result, str)
         assert "训练平衡" in result
+
+
+class TestRegisterHeartbeatCron:
+    """测试 _register_heartbeat_cron 函数"""
+
+    def test_passes_timezone_to_cron_schedule(self):
+        """回归测试: 心跳 Cron 任务应将配置的 timezone 传递给 CronSchedule
+
+        根因: config.json 配置了 "timezone": "Asia/Shanghai"，但
+        _register_heartbeat_cron 未将 tz 传给 CronSchedule，
+        导致 CronService 回退到系统时区（UTC）。
+        """
+        cron = MagicMock()
+        _register_heartbeat_cron(cron, timezone="Asia/Shanghai")
+
+        cron.add_job.assert_called_once()
+        schedule = cron.add_job.call_args.kwargs["schedule"]
+        assert schedule.tz == "Asia/Shanghai"
+
+    def test_no_timezone_defaults_none(self):
+        """未传入 timezone 时，CronSchedule.tz 保持 None（向后兼容）"""
+        cron = MagicMock()
+        _register_heartbeat_cron(cron)
+
+        cron.add_job.assert_called_once()
+        schedule = cron.add_job.call_args.kwargs["schedule"]
+        assert schedule.tz is None
 
 
 class TestTypeContract:

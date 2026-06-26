@@ -183,8 +183,9 @@ class TestAppConfigToDict:
             feishu_receive_id_type="open_id",
         )
         config_dict = app_config.to_dict()
-        assert len(config_dict) == 15
+        assert len(config_dict) == 16
         assert config_dict["feishu_receive_id_type"] == "open_id"
+        assert config_dict["timezone"] == "Asia/Shanghai"
 
 
 class TestAppConfigInit:

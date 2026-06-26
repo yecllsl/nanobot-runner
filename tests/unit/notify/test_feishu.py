@@ -23,6 +23,11 @@ class TestFeishuAuth:
         }.get(key)
         return mock_config
 
+    @patch.dict(
+        os.environ,
+        {"NANOBOT_FEISHU_APP_ID": "", "NANOBOT_FEISHU_APP_SECRET": ""},
+        clear=True,
+    )
     def test_init_with_config(self, mock_config):
         """测试使用配置初始化"""
         auth = FeishuAuth(config=mock_config)

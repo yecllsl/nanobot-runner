@@ -248,7 +248,7 @@ class TestConfigHotReloadE2E:
         assert ConfigManager._cache_time == 0
 
     def test_config_with_env_override(self) -> None:
-        """测试环境变量覆盖配置"""
+        """测试环境变量覆盖配置（仅敏感字段）"""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "config.json"
             config_file.write_text(
@@ -257,6 +257,7 @@ class TestConfigHotReloadE2E:
                         "version": "0.17.0",
                         "data_dir": str(tmpdir),
                         "llm_provider": "openai",
+                        "feishu_app_id": "file_id",
                     }
                 ),
                 encoding="utf-8",
@@ -264,13 +265,16 @@ class TestConfigHotReloadE2E:
 
             env_vars = {
                 "NANOBOT_CONFIG_FILE": str(config_file),
-                "NANOBOT_LLM_PROVIDER": "anthropic",
+                "NANOBOT_FEISHU_APP_ID": "env_id",
             }
             with patch.dict(os.environ, env_vars):
                 ConfigManager.reset_cache()
                 manager = ConfigManager()
                 config = manager.load_config_with_env_override()
-                assert config["llm_provider"] == "anthropic"
+                # 敏感字段被环境变量覆盖
+                assert config["feishu_app_id"] == "env_id"
+                # 非敏感字段保持 config.json 值
+                assert config["llm_provider"] == "openai"
 
 
 class TestMultiChannelConfigE2E:
@@ -631,8 +635,8 @@ class TestV0170IntegrationE2E:
                 manager = ConfigManager()
                 config = manager.load_config_with_env_override()
 
-                # 环境变量应该覆盖文件配置
-                assert config.get("llm_provider") == "anthropic"
+                # 非敏感字段不被环境变量覆盖，保持 config.json 值
+                assert config.get("llm_provider") == "openai"
 
     def test_end_to_end_user_journey(self) -> None:
         """端到端用户旅程测试"""

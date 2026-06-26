@@ -66,8 +66,8 @@ class TestGetWebuiConfig:
         assert result["host"] == "127.0.0.1"
         assert result["port"] == 8766
 
-    def test_env_override_port(self, config_dir: Path) -> None:
-        """环境变量覆盖 webui.port"""
+    def test_env_override_port_ignored(self, config_dir: Path) -> None:
+        """NANOBOT_WEBUI_PORT 为非敏感字段，环境变量不再覆盖 config.json 值"""
         with patch.dict(
             os.environ,
             {
@@ -78,11 +78,11 @@ class TestGetWebuiConfig:
             ConfigManager.reset_cache()
             mgr = ConfigManager()
             result = mgr.get_webui_config()
+        # port 仍来自 config.json，环境变量不再覆盖
+        assert result["port"] == 9090
 
-        assert result["port"] == 9999
-
-    def test_env_override_enabled(self, config_dir: Path) -> None:
-        """环境变量覆盖 webui.enabled"""
+    def test_env_override_enabled_ignored(self, config_dir: Path) -> None:
+        """NANOBOT_WEBUI_ENABLED 为非敏感字段，环境变量不再覆盖 config.json 值"""
         with patch.dict(
             os.environ,
             {
@@ -93,8 +93,8 @@ class TestGetWebuiConfig:
             ConfigManager.reset_cache()
             mgr = ConfigManager()
             result = mgr.get_webui_config()
-
-        assert result["enabled"] is False
+        # enabled 仍来自 config.json（true），环境变量不再覆盖
+        assert result["enabled"] is True
 
     def test_defaults_when_missing_fields(self, tmp_path: Path) -> None:
         """webui 配置节存在但字段缺失时使用默认值"""

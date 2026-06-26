@@ -9,10 +9,9 @@ class TestInitPrompts:
 
     def test_default_llm_config(self) -> None:
         config = InitPrompts._default_llm_config()
-        assert config["NANOBOT_LLM_PROVIDER"] == "openai"
-        assert config["NANOBOT_LLM_MODEL"] == "gpt-4o-mini"
-        assert config["NANOBOT_LLM_API_KEY"] == ""
-        assert config["NANOBOT_LLM_BASE_URL"] == ""
+        assert config["config"]["llm_provider"] == "openai"
+        assert config["config"]["llm_model"] == "gpt-4o-mini"
+        assert config["env_vars"]["NANOBOT_LLM_API_KEY"] == ""
 
     def test_default_model_for_provider(self) -> None:
         assert InitPrompts._default_model_for_provider("openai") == "gpt-4o-mini"
@@ -30,7 +29,7 @@ class TestInitPrompts:
             ) as mock:
                 mock.return_value = InitPrompts._default_llm_config()
                 result = mock()
-                assert result["NANOBOT_LLM_PROVIDER"] == "openai"
+                assert result["config"]["llm_provider"] == "openai"
 
     def test_run_llm_provider_wizard_with_questionary(self) -> None:
         mock_questionary = MagicMock()
@@ -45,7 +44,7 @@ class TestInitPrompts:
                 return_value={"_model_presets": {}, "_fallback_models": []},
             ):
                 result = InitPrompts.run_llm_provider_wizard()
-                assert result["NANOBOT_LLM_PROVIDER"] == "anthropic"
+                assert result["config"]["llm_provider"] == "anthropic"
 
     def test_run_llm_provider_wizard_user_cancels(self) -> None:
         mock_questionary = MagicMock()
@@ -53,7 +52,7 @@ class TestInitPrompts:
 
         with patch.dict("sys.modules", {"questionary": mock_questionary}):
             result = InitPrompts.run_llm_provider_wizard()
-            assert result["NANOBOT_LLM_PROVIDER"] == "openai"
+            assert result["config"]["llm_provider"] == "openai"
 
     def test_run_business_config_wizard_no_questionary(self) -> None:
         with patch.dict("sys.modules", {"questionary": None}):
@@ -78,7 +77,7 @@ class TestInitPrompts:
 
         with patch.dict("sys.modules", {"questionary": mock_questionary}):
             result = InitPrompts.run_feishu_config_wizard()
-            assert result["NANOBOT_AUTO_PUSH_FEISHU"] == "false"
+            assert result["config"]["auto_push_feishu"] is False
 
     def test_run_feishu_config_wizard_enabled(self) -> None:
         mock_questionary = MagicMock()
@@ -91,18 +90,21 @@ class TestInitPrompts:
 
         with patch.dict("sys.modules", {"questionary": mock_questionary}):
             result = InitPrompts.run_feishu_config_wizard()
-            assert result["NANOBOT_AUTO_PUSH_FEISHU"] == "true"
-            assert result["NANOBOT_FEISHU_APP_ID"] == "cli_test_id"
-            assert result["NANOBOT_FEISHU_APP_SECRET"] == "cli_test_secret"
+            assert result["config"]["auto_push_feishu"] is True
+            assert result["env_vars"]["NANOBOT_FEISHU_APP_ID"] == "cli_test_id"
+            assert result["env_vars"]["NANOBOT_FEISHU_APP_SECRET"] == "cli_test_secret"
 
     def test_run_feishu_config_wizard_no_questionary(self) -> None:
         with patch.dict("sys.modules", {"questionary": None}):
             with patch(
                 "src.core.init.prompts.InitPrompts.run_feishu_config_wizard"
             ) as mock:
-                mock.return_value = {"NANOBOT_AUTO_PUSH_FEISHU": "false"}
+                mock.return_value = {
+                    "config": {"auto_push_feishu": False},
+                    "env_vars": {},
+                }
                 result = mock()
-                assert result["NANOBOT_AUTO_PUSH_FEISHU"] == "false"
+                assert result["config"]["auto_push_feishu"] is False
 
     def test_run_full_wizard_skip_optional(self) -> None:
         with patch.object(
@@ -136,10 +138,12 @@ class TestInitPrompts:
                     InitPrompts,
                     "run_feishu_config_wizard",
                     return_value={
-                        "NANOBOT_AUTO_PUSH_FEISHU": "true",
-                        "NANOBOT_FEISHU_APP_ID": "test_id",
-                        "NANOBOT_FEISHU_APP_SECRET": "test_secret",
-                        "NANOBOT_FEISHU_RECEIVE_ID": "test_receive",
+                        "config": {"auto_push_feishu": True},
+                        "env_vars": {
+                            "NANOBOT_FEISHU_APP_ID": "test_id",
+                            "NANOBOT_FEISHU_APP_SECRET": "test_secret",
+                            "NANOBOT_FEISHU_RECEIVE_ID": "test_receive",
+                        },
                     },
                 ):
                     result = InitPrompts.run_full_wizard(skip_optional=False)

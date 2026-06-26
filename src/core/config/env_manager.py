@@ -6,24 +6,21 @@ from src.core.base.logger import get_logger
 
 logger = get_logger(__name__)
 
-_ENV_TEMPLATE = """# Nanobot Runner 环境变量配置
-# 复制此文件为 .env.local 并填写实际值
+_ENV_TEMPLATE = """# Nanobot Runner 环境变量
+# === 仅保存敏感凭证 ===
+# 非敏感配置请放入 ~/.nanobot-runner/config.json
 
-# LLM Provider 配置
-NANOBOT_LLM_PROVIDER=openai
-NANOBOT_LLM_MODEL=gpt-4o-mini
+# LLM API Key（敏感数据）
 NANOBOT_LLM_API_KEY=your-api-key-here
-NANOBOT_LLM_BASE_URL=
 
-# Workspace 配置
-NANOBOT_WORKSPACE_DIR=
-NANOBOT_DATA_DIR=
-
-# 飞书通知配置（可选）
+# 飞书应用凭证（敏感数据）
 NANOBOT_FEISHU_APP_ID=
 NANOBOT_FEISHU_APP_SECRET=
-NANOBOT_FEISHU_RECEIVE_ID=
-NANOBOT_AUTO_PUSH_FEISHU=false
+
+# WebSocket/WebUI 静态令牌（敏感数据）
+NANOBOT_WS_TOKEN=
+NANOBOT_WS_TOKEN_SECRET=
+NANOBOT_WEBUI_TOKEN_SECRET=
 """
 
 
@@ -157,16 +154,13 @@ class EnvManager:
         return _ENV_TEMPLATE
 
     def get_llm_env_vars(self) -> dict[str, str | None]:
-        """获取LLM相关环境变量
+        """获取LLM相关环境变量（仅敏感字段）
 
         Returns:
             dict[str, str | None]: LLM环境变量字典
         """
         return {
-            "provider": os.getenv("NANOBOT_LLM_PROVIDER"),
-            "model": os.getenv("NANOBOT_LLM_MODEL"),
             "api_key": os.getenv("NANOBOT_LLM_API_KEY"),
-            "base_url": os.getenv("NANOBOT_LLM_BASE_URL"),
         }
 
     def has_llm_api_key(self) -> bool:
@@ -178,7 +172,7 @@ class EnvManager:
         return bool(os.getenv("NANOBOT_LLM_API_KEY"))
 
     def load_llm_env(self, env_file: Path | None = None) -> dict[str, str]:
-        """加载LLM相关环境变量
+        """加载LLM相关环境变量（仅敏感字段）
 
         优先加载指定文件中的环境变量，然后返回LLM配置。
 
@@ -190,11 +184,9 @@ class EnvManager:
         """
         self.load_env(env_file)
 
+        # ponytail: 仅加载敏感的 API Key，非敏感配置由 config.json 管理
         llm_keys = [
-            "NANOBOT_LLM_PROVIDER",
-            "NANOBOT_LLM_MODEL",
             "NANOBOT_LLM_API_KEY",
-            "NANOBOT_LLM_BASE_URL",
         ]
 
         loaded: dict[str, str] = {}

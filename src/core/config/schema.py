@@ -26,6 +26,7 @@ class AppConfig:
 
     version: str
     data_dir: str
+    timezone: str = "Asia/Shanghai"
     auto_push_feishu: bool = False
     feishu_app_id: str | None = None
     feishu_app_secret: str | None = None
@@ -45,6 +46,7 @@ class AppConfig:
     FIELD_TYPES: ClassVar[dict[str, type | tuple[type, ...]]] = {
         "version": str,
         "data_dir": str,
+        "timezone": str,
         "auto_push_feishu": bool,
         "feishu_app_id": (str, type(None)),
         "feishu_app_secret": (str, type(None)),

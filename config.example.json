@@ -5,7 +5,7 @@
   "default_year": 2024,
   "auto_push_feishu": false,
   "feishu_app_id": "cli_xxxxxxxxxxxx",
-  "feishu_app_secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "feishu_app_id_comment": "飞书应用 App ID。app_secret 为敏感数据，请放入 .env.local，勿写入此文件",
   "feishu_receive_id": "ou_xxxxxxxxxxxxxxxxxxxxxxxx",
   "feishu_receive_id_type": "user_id",
   "report_schedule": {
@@ -51,12 +51,10 @@
     "port_comment": "WebSocket 服务监听端口",
     "path": "/",
     "path_comment": "WebSocket 服务路径",
-    "token": "",
-    "token_comment": "静态访问令牌，为空则不启用静态令牌验证",
+    "token_comment": "token 为敏感数据，请放入 .env.local（NANOBOT_WS_TOKEN），勿写入此文件",
     "token_issue_path": "",
     "token_issue_path_comment": "令牌签发接口路径，如 /token，为空则不启用动态签发",
-    "token_issue_secret": "",
-    "token_issue_secret_comment": "令牌签发密钥，用于 JWT 签名，生产环境务必设置强密钥",
+    "token_issue_secret_comment": "token_issue_secret 为敏感数据，请放入 .env.local（NANOBOT_WS_TOKEN_SECRET），勿写入此文件",
     "token_ttl_s": 300,
     "token_ttl_s_comment": "动态签发令牌的有效时长（秒），默认 5 分钟",
     "websocket_requires_token": true,
@@ -76,7 +74,8 @@
     "ssl_keyfile": "",
     "ssl_keyfile_comment": "SSL 私钥文件路径，配合 ssl_certfile 使用",
     "unified_session": false,
-    "unified_session_comment": "是否启用统一会话模式，开启后 WebUI 与 CLI 共享同一会话上下文"
+    "unified_session_comment": "token/token_issue_secret 为敏感数据，请放入 .env.local（NANOBOT_WS_TOKEN / NANOBOT_WS_TOKEN_SECRET）",
+    "unified_session_comment_2": "是否启用统一会话模式，开启后 WebUI 与 CLI 共享同一会话上下文"
   },
   "webui": {
     "_comment": "WebUI FastAPI 后端配置",
@@ -88,8 +87,7 @@
     "port_comment": "FastAPI 服务监听端口，与 WebSocket 端口分离",
     "cors_origins": ["http://127.0.0.1:8765", "http://localhost:8765"],
     "cors_origins_comment": "CORS 允许的来源列表，需包含 WebUI 前端地址",
-    "token_secret": "",
-    "token_secret_comment": "JWT 签名密钥，生产环境务必设置强密钥，为空则自动生成",
+    "token_secret_comment": "token_secret 为敏感数据，请放入 .env.local（NANOBOT_WEBUI_TOKEN_SECRET），勿写入此文件",
     "token_ttl_s": 86400,
     "token_ttl_s_comment": "JWT 令牌有效时长（秒），默认 24 小时"
   },

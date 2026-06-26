@@ -17,46 +17,21 @@ logger = get_logger(__name__)
 app = typer.Typer(help="Gateway 服务命令")
 
 
-async def _connect_mcp_tools_async(context: Any, agent: Any) -> dict[str, Any]:
-    """异步方式连接MCP服务器工具到Agent
+# ponytail: 全局 asyncio 异常处理器，防止 WebSocket 客户端断开等预期内异常级联崩溃
+def _asyncio_exception_handler(
+    loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+) -> None:
+    """全局 asyncio 异常处理器
 
-    在 run() 异步函数内调用，使用独立 task 执行 MCP 连接，
-    隔离 anyio cancel scope 对主事件循环中其他 task 的影响。
-
-    MCP stdio_client 使用 anyio 的 TaskGroup 和 cancel scope，
-    当 stdio 传输的异步生成器清理时，cancel scope 会尝试取消
-    同一 scope 下的所有 asyncio task（包括 uvicorn 等），
-    导致服务意外崩溃。通过在独立 task 中执行连接，
-    将 anyio cancel scope 的作用域限制在该 task 内。
-
-    Args:
-        context: 应用上下文
-        agent: AgentLoop实例
-
-    Returns:
-        dict[str, Any]: MCP连接的exit_stacks映射
+    仅记录异常日志，不中断事件循环。避免 WebSocket 客户端连接断开时
+    (ConnectionClosedError) 级联崩溃整个 Gateway 服务。
     """
-    from src.core.tools.mcp_connector import connect_mcp_tools_from_config
-
-    config_path = context.config.config_file
-
-    async def _do_connect() -> dict[str, Any]:
-        try:
-            return await connect_mcp_tools_from_config(config_path, agent.tools)
-        except NanobotRunnerError as e:
-            logger.warning(f"连接MCP工具失败: {e}")
-            return {"connected_servers": [], "failed_servers": [], "exit_stacks": {}}
-
-    # 在独立 task 中执行连接，隔离 anyio cancel scope
-    result = await asyncio.create_task(_do_connect())
-
-    connected = result.get("connected_servers", [])
-    failed = result.get("failed_servers", [])
-    if connected:
-        logger.info(f"MCP工具已连接: {connected}")
-    if failed:
-        logger.warning(f"MCP连接失败: {failed}")
-    return result.get("exit_stacks", {})
+    exc = context.get("exception")
+    message = context.get("message", "")
+    if exc and "ConnectionClosedError" in type(exc).__name__:
+        logger.debug(f"WebSocket 客户端连接断开（预期内）: {exc}")
+    else:
+        logger.warning(f"asyncio 异常: {message}", exc_info=exc)
 
 
 def _format_stats(data: dict) -> str:
@@ -336,8 +311,13 @@ def _create_gateway_agent(
     agent_defaults: Any,
     workspace: Any,
     runner_tools: Any,
+    mcp_servers: dict[str, Any] | None = None,
 ) -> Any:
     """创建 AgentLoop 实例并注册工具与命令
+
+    Args:
+        mcp_servers: MCP服务器配置，传入后由 agent._connect_mcp() 统一连接，
+            确保 connect/close 在同一 task，避免 anyio cancel scope 跨 task 报错
 
     Returns:
         AgentLoop 实例
@@ -353,6 +333,8 @@ def _create_gateway_agent(
         context_window_tokens=agent_defaults.context_window_tokens,
         context_block_limit=agent_defaults.context_block_limit,
         max_tool_result_chars=agent_defaults.max_tool_result_chars,
+        timezone=getattr(agent_defaults, "timezone", None),
+        mcp_servers=mcp_servers or {},
     )
 
     if runner_tools:
@@ -415,19 +397,27 @@ def _setup_gateway_integration(workspace: Any, bus: Any, context: Any) -> Any:
     """创建并返回 GatewayIntegration 实例"""
     from src.core.plan.gateway_integration import GatewayIntegration
 
+    # 读取配置文件中的时区，传递给 Cron 任务，避免回退到系统时区（UTC）
+    timezone = context.config.get("timezone") if context else None
+
     return GatewayIntegration(
         workspace=workspace,
         bus=bus,
         console=console,
         data_dir=context.config.data_dir if context else None,
+        timezone=timezone,
     )
 
 
-def _register_heartbeat_cron(cron: Any) -> int:
+def _register_heartbeat_cron(cron: Any, timezone: str | None = None) -> int:
     """注册心跳Cron任务
 
     v0.30.0: HeartbeatService 在 nanobot-ai 0.2.1 中已移除，
     改用 CronService 注册心跳任务。
+
+    Args:
+        cron: CronService 实例
+        timezone: 配置文件中的时区（如 "Asia/Shanghai"），传入后 Cron 任务按此时区调度
 
     Returns:
         心跳间隔分钟数
@@ -443,7 +433,9 @@ def _register_heartbeat_cron(cron: Any) -> int:
             cron.add_job(
                 name="heartbeat",
                 schedule=CronSchedule(
-                    kind="cron", expr=f"*/{hb_interval_minutes} * * * *"
+                    kind="cron",
+                    expr=f"*/{hb_interval_minutes} * * * *",
+                    tz=timezone,
                 ),
                 message="心跳检测",
             )
@@ -549,30 +541,28 @@ async def _run_gateway(
     cron: Any,
     fastapi_server: Any,
     integration: Any,
-    mcp_context: tuple | None,
+    mcp_context: Any | None,
 ) -> None:
     """运行Gateway服务的异步主循环
 
-    按顺序启动各组件，使用 return_exceptions 防止 MCP cancel scope 异常级联。
-    退出时按顺序优雅关闭：先停 uvicorn → 停通道 → 停心跳 → 关闭 MCP。
+    MCP 连接和断开均通过 agent 在同一 task 内完成，避免 anyio cancel scope
+    跨 task 报错。退出时按顺序优雅关闭：uvicorn → 通道 → 心跳 → MCP。
     """
     try:
-        # 在同一事件循环内连接MCP工具，避免跨事件循环的cancel scope冲突
+        # 通过 agent._connect_mcp() 连接，确保与 close_mcp() 在同一 task
         if mcp_context is not None:
-            await _connect_mcp_tools_async(mcp_context[0], mcp_context[1])
+            await agent._connect_mcp()
+            mcp_connected = list(agent._mcp_stacks.keys())
+            if mcp_connected:
+                logger.info(f"MCP工具已连接: {mcp_connected}")
 
         await cron.start()
 
-        # 将 uvicorn 放在独立 task 中运行，隔离 anyio cancel scope 的影响
-        # MCP stdio_client 使用 anyio TaskGroup，清理时 cancel scope 会取消
-        # 同一 scope 下的 asyncio task，导致 uvicorn 等服务被意外取消
         if fastapi_server is not None:
             webui_task = asyncio.create_task(fastapi_server.serve())
         else:
             webui_task = None
 
-        # agent.run() 和 channels.start_all() 使用 return_exceptions
-        # 防止 MCP cancel scope 异常级联
         results = await asyncio.gather(
             agent.run(),
             channels.start_all(),
@@ -584,7 +574,7 @@ async def _run_gateway(
     except KeyboardInterrupt:
         console.print("\n[yellow]正在关闭...[/yellow]")
     finally:
-        # 按顺序优雅关闭：先停 uvicorn → 停通道 → 停心跳 → 关闭 MCP
+        # 按顺序优雅关闭：uvicorn → 通道 → 心跳 → MCP
         if fastapi_server is not None:
             fastapi_server.should_exit = True
         if webui_task is not None and not webui_task.done():
@@ -592,10 +582,15 @@ async def _run_gateway(
         await channels.stop_all()
         integration.shutdown()
         agent.stop()
-        # MCP 关闭可能产生 cancel scope 冲突，隔离异常避免影响其他清理
+        # MCP 关闭加超时，防止 anyio cancel scope 清理卡住
         try:
-            await agent.close_mcp()
-        except (RuntimeError, BaseExceptionGroup, asyncio.CancelledError) as e:
+            await asyncio.wait_for(agent.close_mcp(), timeout=5.0)
+        except (
+            TimeoutError,
+            RuntimeError,
+            BaseExceptionGroup,
+            asyncio.CancelledError,
+        ) as e:
             logger.debug(f"MCP关闭时异常（可忽略）: {e}")
 
 
@@ -652,14 +647,21 @@ def start(
     from nanobot.bus import MessageBus
 
     bus = MessageBus()
+
+    # 加载 MCP 配置，传入 AgentLoop 由 _connect_mcp() 统一连接
+    # 确保 connect/close 在同一 task，避免 anyio cancel scope 跨 task 报错
+    mcp_servers: dict[str, Any] = {}
+    if context:
+        from src.core.tools.mcp_connector import load_mcp_servers_config
+
+        mcp_servers = load_mcp_servers_config(context.config.config_file)
+
     agent = _create_gateway_agent(
-        bus, provider, agent_defaults, workspace, runner_tools
+        bus, provider, agent_defaults, workspace, runner_tools, mcp_servers
     )
 
-    # MCP工具连接移至 run() 异步函数内，避免 asyncio.run() 跨事件循环导致
-    # stdio_client cancel scope 冲突 (RuntimeError: Attempted to exit cancel scope
-    # in a different task than it was entered in)
-    mcp_context = (context, agent) if context else None
+    # MCP 连接/断开均在 _run_gateway 内通过 agent 完成
+    mcp_context = agent if mcp_servers else None
 
     # 6. 创建 SessionManager 和通道管理器
     from nanobot.channels.manager import ChannelManager
@@ -690,7 +692,8 @@ def start(
         agent._extra_hooks.append(streaming_hook)
 
     # 9. 心跳Cron任务（v0.30.0: 改用 CronService）
-    hb_interval_minutes = _register_heartbeat_cron(cron)
+    hb_timezone = context.config.get("timezone") if context else None
+    hb_interval_minutes = _register_heartbeat_cron(cron, timezone=hb_timezone)
 
     # 10. 显示启动状态信息
     _display_channel_status(channels, context)
@@ -705,6 +708,15 @@ def start(
     console.print("[bold green]Gateway 服务已启动，按 Ctrl+C 停止[/bold green]")
 
     # 11. 运行Gateway服务
-    asyncio.run(
-        _run_gateway(agent, channels, cron, fastapi_server, integration, mcp_context)
-    )
+    # 设置全局 asyncio 异常处理器，防止 WebSocket 客户端断开等异常级联崩溃
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.set_exception_handler(_asyncio_exception_handler)
+    try:
+        loop.run_until_complete(
+            _run_gateway(
+                agent, channels, cron, fastapi_server, integration, mcp_context
+            )
+        )
+    finally:
+        loop.close()
