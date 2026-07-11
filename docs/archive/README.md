@@ -137,16 +137,24 @@ docs/archive/
 
 ### v0.30.0 (2026-06-22)
 
-**归档内容**（共9个文档）：
+**归档内容**（共21个文档）：
 - **测试文档**（2个）：测试报告_v0.30.0.md、回归报告_v0.30.0.md
 - **运维文档**（2个）：发布报告_v0.30.0.md、流水线执行报告_v0.30.0_20260622.md
 - **开发文档**（1个）：Bug修复报告_v0.30.0.md
 - **评审文档**（4个）：代码评审报告_v0.30.0.md、项目基线评审报告_v0.30.0.md、ponytail-audit-report_v0.30.0.md、ponytail-audit-review_v0.30.0.md
+- **架构文档**（12个）：
+  - 可行性分析报告：upgrade_feasibility_report_comprehensive.md、upgrade_feasibility_report_GLM5.1.md、upgrade_feasibility_report_GLM5.2.md、upgrade_feasibility_report_qwen3.7.md
+  - 架构评审报告：review/2026-05-24-PhaseD-架构评审报告.md
+  - 设计图表（7个）：diagrams/coros_course_sidebar.png、diagrams/coros_plan_panel.png、diagrams/coros_plan_sidebar.png、diagrams/coros_plan_view.png、diagrams/coros_schedule_full.png、diagrams/coros_schedule_viewport.png、diagrams/coros_today_view.png
+- **规划文档**（2个）：2026-06-21-nanobot-upgrade-plan.md、2026-06-21-nanobot-upgrade-design.md
 
 **版本特性 - 项目基线建立 v0.30.0**：
 - 项目基线评审与建立
 - Ponytail 代码审计
 - 代码评审与质量保障
+- nanobot-ai 底座升级可行性分析（GLM-5.1/GLM-5.2/Qwen-3.7 三份报告）
+- Phase D 架构评审
+- 升级设计文档与规划方案
 
 ---
 
