@@ -1,6 +1,7 @@
 # Bug 修复报告 - v0.31.0
 
 > **版本**: v0.31.0 | **日期**: 2026-06-23 | **修复人**: 开发工程师
+> **更新**: 2026-07-11 | 新增 BUG-004, BUG-005
 
 ---
 
@@ -11,6 +12,8 @@
 | BUG-001 | P2 | WebUI E2E 测试因服务器未启动全部失败 | 已修复 |
 | BUG-002 | P2 | 单元测试覆盖率低于基线 (81% < 83%) | 已修复 |
 | BUG-003 | P2 | WebUI UI 层 Playwright 测试大面积失败 (45/57) | 已修复 |
+| BUG-004 | P1 | test_incremental_performance 性能测试比较不公平导致CI失败 | 已修复 |
+| BUG-005 | P1 | test_analyze_with_sufficient_data 硬编码日期过期导致CI失败 | 已修复 |
 
 ---
 
@@ -295,3 +298,66 @@ assert page.locator("text=/\\d+\\.\\d+\\.\\d+/").first.is_visible()
 ## 8. 后续建议
 
 建议执行 `regression-testing` 验证所有 Bug 修复的稳定性。
+
+---
+
+## 9. BUG-004: test_incremental_performance 性能测试比较不公平
+
+### 9.1 问题描述
+
+CI流水线 Test Suite (3.11) 单元测试失败，`test_incremental_performance` 断言 `incremental_time < batch_time` 失败。
+
+### 9.2 根因分析
+
+**系统化调试（Phase 1-3）**：
+
+1. **错误信息**：`assert 0.0077 < 0.0040` — 增量计算（0.0077s）比批量计算（0.0040s）慢47.3%
+2. **数据流追踪**：
+   - 增量路径：100次 Python 循环，每次 O(1) 简单运算
+   - 批量路径：**仅10次** numpy 向量化调用，每次 O(n) 但在 C 层执行
+3. **根因**：比较不公平。对于 n=100 的小数据集，10次 numpy 调用轻松击败100次 Python 循环
+
+### 9.3 修复方案
+
+将批量路径改为模拟真实使用场景：每个新 TSS 值到达时全量重算（100次递增列表计算），而非10次重复全量计算。
+
+- 修复前：100次增量 O(1) vs 10次批量 O(n) — 比较不公平
+- 修复后：100次增量 O(1) vs 100次批量 O(n)递增 — 总复杂度 O(n) vs O(n²)
+
+### 9.4 修改文件
+
+| 文件 | 修改类型 | 说明 |
+|------|---------|------|
+| `tests/unit/core/calculators/test_training_load_analyzer.py` | 修改 | 批量路径改为100次递增列表全量重算 |
+
+### 9.5 验证结果
+
+- 修复后增量计算：0.0001s，批量计算：0.0011s，性能提升 1260%
+- 全部4380个单元测试通过，0失败
+
+---
+
+## 10. BUG-005: test_analyze_with_sufficient_data 硬编码日期过期
+
+### 10.1 问题描述
+
+`test_analyze_with_sufficient_data` 断言 `report.data_sufficient is True` 失败，实际返回 `False`（total_pairs=0）。
+
+### 10.2 根因分析
+
+测试数据使用硬编码日期 `datetime(2026, 1, 1 + i)`，当前日期为2026年7月11日。`analyze(months=6)` 的6个月窗口（180天）截止日约为2026年1月12日，而测试数据日期为1月1-9日，已超出窗口被过滤。
+
+### 10.3 修复方案
+
+将硬编码日期改为相对当前日期的动态日期：`now - timedelta(days=len(pairs_data) - i)`。
+
+### 10.4 修改文件
+
+| 文件 | 修改类型 | 说明 |
+|------|---------|------|
+| `tests/unit/core/evolution/test_response_analyzer.py` | 修改 | 硬编码日期改为动态相对日期 |
+
+### 10.5 验证结果
+
+- 该测试文件全部8个测试通过
+- 全部4380个单元测试通过，0失败
