@@ -563,12 +563,17 @@ class TestTrainingLoadAnalyzerIncremental:
     def test_incremental_performance(
         self, training_load_analyzer: TrainingLoadAnalyzer
     ) -> None:
-        """测试增量计算性能"""
+        """测试增量计算性能
+
+        模拟真实场景：每个新 TSS 值到达时，
+        增量更新 O(1) vs 全量重算 O(n)。
+        """
         import time
 
         n_runs = 100
         tss_values = [100.0 + i * 5 for i in range(n_runs)]
 
+        # 增量路径: 100次 O(1) 更新
         training_load_analyzer.reset_incremental_state()
         start_incremental = time.perf_counter()
         for tss in tss_values:
@@ -576,14 +581,15 @@ class TestTrainingLoadAnalyzerIncremental:
             training_load_analyzer.update_ctl_incremental(tss)
         incremental_time = time.perf_counter() - start_incremental
 
+        # 批量路径: 100次全量重算（模拟每次新值到达时从零开始计算）
         start_batch = time.perf_counter()
-        for _ in range(10):
-            training_load_analyzer.calculate_atl(tss_values)
-            training_load_analyzer.calculate_ctl(tss_values)
+        for i in range(n_runs):
+            training_load_analyzer.calculate_atl(tss_values[: i + 1])
+            training_load_analyzer.calculate_ctl(tss_values[: i + 1])
         batch_time = time.perf_counter() - start_batch
 
         print(f"\n增量计算: {incremental_time:.4f}s")
-        print(f"批量计算(10次): {batch_time:.4f}s")
+        print(f"批量计算(100次递增): {batch_time:.4f}s")
         print(f"性能提升: {(batch_time / incremental_time - 1) * 100:.1f}%")
 
         assert incremental_time < batch_time

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import uvicorn
 
-from src.core.webui.server import create_server
+from src.core.webui.app import create_server
 
 
 def _make_mock_context() -> MagicMock:

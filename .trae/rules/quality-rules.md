@@ -13,11 +13,8 @@ description: 质量规则：测试覆盖、代码规范、文档完整
 - 必须Mock外部API调用（飞书、LLM）
 
 ## 开发方法论
-- 禁止先写实现后补测试，必须TDD顺序（RED→GREEN→REFACTOR）
-- 禁止无失败测试就写生产代码
-- 禁止未经验证就声称完成，必须运行验证命令拿证据
-- 禁止跳过根因分析直接修复Bug，必须先systematic-debugging
-- 禁止需求不明确时直接编码，必须先brainstorming澄清
+
+> 四项全局方法论（TDD / systematic-debugging / verification / brainstorming）定义与铁律见 [AGENTS.md §4.3](../../AGENTS.md#43-全局方法论嵌入铁律)，执行流程见 [process-rules.md](process-rules.md#开发流程嵌入全局方法论)。
 
 ## 代码规范
 - 禁止裸Exception，必须使用自定义异常

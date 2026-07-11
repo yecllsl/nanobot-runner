@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v10.1.0 | **更新日期**: 2026-06-22
-> **当前基线**: v0.30.0
+> **版本**: v11.0.0 | **更新日期**: 2026-06-23
+> **当前基线**: v0.31.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -43,7 +43,6 @@
 | **WebUI 前端** | React + TypeScript + Recharts | via webui/ |
 | **ML框架** | scikit-learn | 1.5+ |
 | **科学计算** | scipy | 1.10+ |
-| **模型解释** | shap | 0.48+ |
 | **模型序列化** | joblib | 1.3+ |
 | **数据解析** | fitparse | Latest |
 | **包管理** | uv | Latest |
@@ -206,13 +205,11 @@ CLI Handlers / Agent Tools
 
 ### 5.1 绝对禁止
 
+以下为项目特有的禁止规则。通用编码规范（`# type: ignore`、`Dict[str, Any]`、LazyFrame 过早 collect()、裸 `Exception` 等）见 [quality-rules.md](.trae/rules/quality-rules.md#代码规范)。
+
 - 禁止直接实例化核心组件：必须通过 `get_context()` 获取应用上下文
 - 禁止在代码中硬编码任何密钥或敏感信息：必须使用 `config` 模块
-- 禁止使用 `# type: ignore`：必须写出正确的类型注解
 - 禁止擅自安装新的依赖：如果需要，必须先向用户请示
-- 禁止返回 `Dict[str, Any]`：必须使用类型安全的数据类
-- 禁止在 LazyFrame 中过早调用 `.collect()`：仅最终输出时调用
-- 禁止使用裸 `Exception`：必须使用自定义异常
 - 禁止引入复杂设计模式：保持代码简单直白
 
 ### 5.2 必须遵守
@@ -220,7 +217,7 @@ CLI Handlers / Agent Tools
 - 所有数据库查询必须使用 LazyFrame
 - 错误处理必须使用项目统一的异常类
 - 类名使用 PascalCase，函数/变量使用 snake_case，常量使用 UPPER_SNAKE_CASE
-- 核心模块类型注解覆盖率 ≥ 80%
+- 核心模块类型注解覆盖率 ≥ 80%（与测试覆盖率不同，见 [quality-rules.md](.trae/rules/quality-rules.md#测试覆盖)）
 - 编写新功能前，先搜索 `src/core/` 和 `src/utils/` 目录，复用现有函数
 - 所有新增字段/工具，必须更新 Schema/TOOL_DESCRIPTIONS
 
@@ -355,11 +352,10 @@ uv run pytest tests/unit/
 
 - **必须编写单元测试**：核心业务逻辑（`src/core/`）
 - **必须编写集成测试**：模块间交互（`tests/integration/`）
-- **必须 Mock 外部 API 调用**：飞书通知、LLM 调用
-- **禁止 Mock 内部业务逻辑**：保持测试真实性
-- **禁止使用真实用户数据**：必须使用脱敏数据
 
-> 详细测试规范见：[测试指南](docs/guides/testing_guide.md)
+> Mock 规范、覆盖率要求见 [quality-rules.md](.trae/rules/quality-rules.md#测试覆盖)
+> 测试数据隐私要求见 [compliance-rules.md](.trae/rules/compliance-rules.md#数据隐私)
+> 详细测试规范见 [测试指南](docs/guides/testing_guide.md)
 
 ---
 

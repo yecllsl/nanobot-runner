@@ -127,6 +127,9 @@ class ConfigMigrator:
     def _migrate_llm_config(self, nanobot_config: dict[str, Any]) -> dict[str, Any]:
         """迁移LLM配置
 
+        非敏感字段（provider/model/base_url）迁移到 config.json，
+        敏感字段（api_key）迁移到 .env.local。
+
         Args:
             nanobot_config: nanobot配置字典
 
@@ -143,7 +146,7 @@ class ConfigMigrator:
         if provider_name:
             config["llm_provider"] = provider_name
             fields.append("llm_provider")
-            env_vars["NANOBOT_LLM_PROVIDER"] = provider_name
+            # ponytail: 非敏感字段只写入 config.json
 
         agents = nanobot_config.get("agents", {})
         defaults = agents.get("defaults", {})
@@ -152,7 +155,6 @@ class ConfigMigrator:
         if model:
             config["llm_model"] = model
             fields.append("llm_model")
-            env_vars["NANOBOT_LLM_MODEL"] = model
 
         provider_cfg = providers.get(provider_name, {})
         api_key = provider_cfg.get("api_key", "")
@@ -171,7 +173,7 @@ class ConfigMigrator:
         if base_url:
             config["llm_base_url"] = base_url
             fields.append("llm_base_url")
-            env_vars["NANOBOT_LLM_BASE_URL"] = base_url
+            # ponytail: 非敏感字段只写入 config.json
 
         return {"fields": fields, "env_vars": env_vars, "config": config}
 

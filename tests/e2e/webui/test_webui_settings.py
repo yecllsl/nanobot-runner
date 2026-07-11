@@ -59,4 +59,5 @@ class TestSettingsSystem:
         """版本号应显示"""
         page.goto(f"{webui_base_url}/settings")
         page.wait_for_load_state("networkidle")
-        assert page.locator("text=0.29.0").is_visible()
+        # 版本号由后端动态读取，断言版本号格式而非硬编码值
+        assert page.locator("text=/\\d+\\.\\d+\\.\\d+/").first.is_visible()

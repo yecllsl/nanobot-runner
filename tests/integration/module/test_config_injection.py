@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -66,8 +66,7 @@ class TestConfigInjectionIntegration:
         adapter = RunnerProviderAdapter(mock_config)
         assert adapter.is_available()
 
-    @patch.object(RunnerProviderAdapter, "_try_load_nanobot_config", return_value=False)
-    def test_injection_chain_missing_config(self, mock_nanobot: MagicMock) -> None:
+    def test_injection_chain_missing_config(self) -> None:
         """验证配置缺失时的错误处理"""
         mock_config = MagicMock()
         mock_config.has_llm_config.return_value = False
@@ -139,11 +138,8 @@ class TestConfigInjectionIntegration:
         assert llm_config.api_key is None
         assert llm_config.base_url == "http://localhost:11434"
 
-    @patch.object(RunnerProviderAdapter, "_try_load_nanobot_config", return_value=False)
-    def test_injection_chain_no_runner_no_nanobot(
-        self, mock_nanobot: MagicMock
-    ) -> None:
-        """验证项目配置和nanobot配置都缺失时的错误"""
+    def test_injection_chain_no_runner_config(self) -> None:
+        """验证项目配置缺失时的错误"""
         mock_config = MagicMock()
         mock_config.has_llm_config.return_value = False
         mock_config.get_llm_config.return_value = {

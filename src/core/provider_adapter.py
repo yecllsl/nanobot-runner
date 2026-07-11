@@ -12,49 +12,188 @@ from src.core.config.manager import ConfigManager
 
 logger = get_logger(__name__)
 
-_BLOCKED_SETTINGS_PATHS: frozenset[str] = frozenset(
-    {
-        "/api/settings/update",
-        "/api/settings/provider/update",
-        "/api/settings/web-search/update",
-    }
-)
-
-_SETTINGS_UPDATE_BLOCKED_MESSAGE = (
-    "Settings updates are managed by nanobot-runner config. "
-    "Use 'nanobotrun system init' or edit ~/.nanobot-runner/config.json"
-)
-
 
 def _patch_websocket_settings_api() -> None:
-    """拦截 WebUI Settings 写操作，防止写入 ~/.nanobot/config.json
+    """代理 nanobot 配置读写到项目配置
 
-    通过 monkey-patch WebSocketChannel._dispatch_http 方法，
-    拦截 3 个设置写端点，返回 403 Forbidden。
+    通过 monkey-patch nanobot.config.loader 的 load_config/save_config 源函数，
+    及所有已导入该函数的 webui 模块本地引用（settings_api/mcp_presets_api/cli_apps_api），
+    让所有调用者读写项目配置（~/.nanobot-runner/config.json）。
+
+    - load_config: 直接构造默认 Config，用项目配置覆盖 LLM 字段
+      （不读取项目配置文件，避免 Pydantic 验证错误）
+    - save_config: 从 nanobot Config 提取 LLM 字段，写入项目 ConfigManager
+
     仅在 WebSocket 通道启用时调用。幂等：多次调用安全。
     """
-    from nanobot.channels.websocket import (
-        WebSocketChannel,
-        _http_error,
-        _parse_request_path,
-    )
+    from nanobot.config import loader as nanobot_loader
 
-    # 幂等保护：已 patch 过则跳过
-    if getattr(WebSocketChannel._dispatch_http, "_runner_patched", False):
+    # 幂等保护：已 patch 过则跳过（用 is True 避免 MagicMock 误判）
+    if getattr(nanobot_loader.load_config, "_runner_patched", False) is True:
         return
 
-    _original_dispatch = WebSocketChannel._dispatch_http
+    def _runner_load_config(config_path: Any = None) -> Any:
+        """返回默认 Config，用项目配置覆盖 LLM 字段
 
-    async def _runner_dispatch_http(
-        self: WebSocketChannel, connection: Any, request: Any
-    ) -> Any:
-        got, _ = _parse_request_path(request.path)
-        if got in _BLOCKED_SETTINGS_PATHS:
-            return _http_error(403, _SETTINGS_UPDATE_BLOCKED_MESSAGE)
-        return await _original_dispatch(self, connection, request)
+        不调用原始 load_config，避免读取项目配置文件触发 Pydantic 验证错误。
+        同时从环境变量恢复非默认供应商的 api_key/api_base。
+        """
+        from nanobot.config.schema import Config
 
-    _runner_dispatch_http._runner_patched = True  # type: ignore[attr-defined]
-    WebSocketChannel._dispatch_http = _runner_dispatch_http
+        config = Config()
+        try:
+            llm = ConfigManager().get_llm_config()
+            if llm.get("model"):
+                config.agents.defaults.model = llm["model"]
+            if llm.get("provider"):
+                config.agents.defaults.provider = llm["provider"]
+            provider_name = llm.get("provider", "")
+            if provider_name:
+                provider_config = getattr(config.providers, provider_name, None)
+                if provider_config:
+                    if llm.get("api_key"):
+                        provider_config.api_key = llm["api_key"]
+                    if llm.get("base_url"):
+                        provider_config.api_base = llm["base_url"]
+
+            # 从环境变量恢复非默认供应商的 api_key/api_base
+            # （update_provider_settings 保存到 NANOBOT_LLM_API_KEY_{UPPER}）
+            for attr_name in dir(config.providers):
+                if attr_name.startswith("_") or attr_name == provider_name:
+                    continue
+                pc = getattr(config.providers, attr_name, None)
+                if pc is None or not hasattr(pc, "api_key"):
+                    continue
+                upper = attr_name.upper()
+                pk = os.environ.get(f"NANOBOT_LLM_API_KEY_{upper}")
+                if pk:
+                    pc.api_key = pk
+                pb = os.environ.get(f"NANOBOT_LLM_BASE_URL_{upper}")
+                if pb:
+                    pc.api_base = pb
+
+            # 从项目配置 websocket 节读取 bot_name/bot_icon
+            ws_config = ConfigManager().get_websocket_config()
+            if ws_config.get("bot_name"):
+                config.agents.defaults.bot_name = ws_config["bot_name"]
+            if ws_config.get("bot_icon"):
+                config.agents.defaults.bot_icon = ws_config["bot_icon"]
+
+            # 从项目配置读取时区，覆盖 nanobot 默认 UTC
+            timezone = ConfigManager().get("timezone")
+            if isinstance(timezone, str) and timezone:
+                config.agents.defaults.timezone = timezone
+
+            # 强制 workspace 指向项目目录，避免 nanobot 默认的 ~/.nanobot
+            config.agents.defaults.workspace = str(ConfigManager().base_dir)
+        except Exception as e:
+            logger.debug(f"从项目配置同步到 nanobot Config 失败: {e}")
+        return config
+
+    def _runner_save_config(config: Any, config_path: Any = None) -> None:
+        """从 nanobot Config 提取 LLM 配置，写入项目配置
+
+        1. 默认供应商（defaults.provider）→ ConfigManager.save_llm_config() + os.environ
+        2. 其他供应商的 api_key/api_base → .env.local（NANOBOT_LLM_API_KEY_{UPPER}）
+        """
+        try:
+            defaults = config.agents.defaults
+            provider_name = defaults.provider
+            provider_config = getattr(config.providers, provider_name, None)
+            api_key = provider_config.api_key if provider_config else None
+            api_base = provider_config.api_base if provider_config else None
+            ConfigManager().save_llm_config(
+                provider=provider_name,
+                model=defaults.model,
+                base_url=api_base,
+                api_key=api_key,
+            )
+            # ponytail: 非敏感配置 (provider/model/base_url) 已写入 config.json，
+            # 不再写入环境变量。仅同步 API Key 到进程环境变量确保 get_llm_config() 可读到。
+            if api_key:
+                os.environ["NANOBOT_LLM_API_KEY"] = api_key
+
+            # 保存非默认供应商的 api_key 到 .env.local
+            # （update_provider_settings 可能配置了其他供应商）
+            # ponytail: api_base 是非敏感配置，不再写入 .env.local/环境变量
+            provider_env: dict[str, str] = {}
+            for attr_name in dir(config.providers):
+                if attr_name.startswith("_"):
+                    continue
+                pc = getattr(config.providers, attr_name, None)
+                if pc is None or not hasattr(pc, "api_key"):
+                    continue
+                # 跳过默认供应商（已通过 save_llm_config 处理）
+                if attr_name == provider_name:
+                    continue
+                pk = getattr(pc, "api_key", None)
+                upper = attr_name.upper()
+                if pk and isinstance(pk, str):
+                    env_key = f"NANOBOT_LLM_API_KEY_{upper}"
+                    provider_env[env_key] = pk
+                    os.environ[env_key] = pk
+
+            if provider_env:
+                from src.core.config.env_manager import EnvManager
+
+                EnvManager(
+                    env_file=ConfigManager().base_dir / ".env.local"
+                ).save_env_file(provider_env)
+
+            # 保存 bot_name/bot_icon 到项目配置 websocket 节
+            # 保存 timezone 到项目配置顶层，确保 WebUI 修改后持久化
+            cm = ConfigManager()
+            proj_config = cm.load_config()
+
+            bot_name = getattr(defaults, "bot_name", None)
+            bot_icon = getattr(defaults, "bot_icon", None)
+            if bot_name or bot_icon:
+                ws = proj_config.get("websocket", {})
+                if not isinstance(ws, dict):
+                    ws = {}
+                if bot_name:
+                    ws["bot_name"] = bot_name
+                if bot_icon:
+                    ws["bot_icon"] = bot_icon
+                proj_config["websocket"] = ws
+
+            timezone = getattr(defaults, "timezone", None)
+            if isinstance(timezone, str) and proj_config.get("timezone") != timezone:
+                proj_config["timezone"] = timezone
+
+            cm.save_config(proj_config)
+
+            logger.info(
+                "WebUI 设置已同步到项目配置: provider=%s, model=%s, timezone=%s",
+                provider_name,
+                defaults.model,
+                proj_config.get("timezone", "UTC"),
+            )
+        except Exception as e:
+            logger.warning(f"从 nanobot Config 同步到项目配置失败: {e}")
+
+    _runner_load_config._runner_patched = True  # type: ignore[attr-defined]
+
+    # patch 源函数（影响函数内导入和直接调用，如 websocket.py 的 _default_model_name_from_config）
+    nanobot_loader.load_config = _runner_load_config
+    nanobot_loader.save_config = _runner_save_config
+
+    # patch 已导入的 webui 模块本地引用（模块级 from ... import 绑定的引用不会被源函数 patch 影响）
+    import importlib
+
+    for module_name in (
+        "nanobot.webui.settings_api",
+        "nanobot.webui.mcp_presets_api",
+        "nanobot.webui.cli_apps_api",
+    ):
+        try:
+            module: Any = importlib.import_module(module_name)
+            if hasattr(module, "load_config"):
+                module.load_config = _runner_load_config
+            if hasattr(module, "save_config"):
+                module.save_config = _runner_save_config
+        except ImportError:
+            pass
 
 
 @dataclass(frozen=True)
@@ -69,6 +208,7 @@ class AgentDefaults:
         context_window_tokens: 上下文窗口token数量
         context_block_limit: 上下文块数量限制
         max_tool_result_chars: 工具返回结果最大字符数
+        timezone: Agent 时区（IANA 格式），影响日程和时间感知回复
     """
 
     model: str
@@ -76,6 +216,7 @@ class AgentDefaults:
     context_window_tokens: int = 128000
     context_block_limit: int = 10
     max_tool_result_chars: int = 32000
+    timezone: str = "UTC"
 
 
 class ProviderAdapter(Protocol):
@@ -126,11 +267,7 @@ class RunnerProviderAdapter:
     """项目配置注入器
 
     从项目配置读取LLM配置，注入到nanobot-ai模块。
-    支持回退到nanobot配置（仅用于兼容已安装nanobot的用户）。
-
-    配置优先级：
-    1. 项目配置（主配置源）：~/.nanobot-runner/config.json + 环境变量
-    2. nanobot配置（回退）：~/.nanobot/config.json
+    完全依赖项目配置（~/.nanobot-runner/config.json），不回退到 ~/.nanobot/config.json。
     """
 
     def __init__(
@@ -150,7 +287,7 @@ class RunnerProviderAdapter:
     def get_llm_config(self) -> LLMConfig:
         """获取LLM配置
 
-        优先从项目配置读取，回退到nanobot配置。
+        从项目配置读取，未配置时抛出异常。
 
         Returns:
             LLMConfig: LLM配置数据类实例
@@ -160,11 +297,9 @@ class RunnerProviderAdapter:
         """
         if self._has_runner_llm_config():
             return self._from_runner_config()
-        if self._try_load_nanobot_config():
-            return self._from_nanobot_config()
         raise LLMError(
             "未配置LLM，请运行 'nanobotrun system init' 完成配置",
-            recovery_suggestion="运行 nanobotrun system init 配置LLM，或设置 NANOBOT_LLM_PROVIDER 和 NANOBOT_LLM_MODEL 环境变量",
+            recovery_suggestion="运行 nanobotrun system init 配置LLM",
         )
 
     def get_provider_instance(self) -> Any:
@@ -320,21 +455,25 @@ class RunnerProviderAdapter:
             AgentDefaults: Agent默认配置实例
         """
         llm_config = self.get_llm_config()
+        # 从项目配置读取时区，未配置或类型异常时回退到 UTC
+        raw_timezone = self._runner_config.get("timezone")
+        timezone = raw_timezone if isinstance(raw_timezone, str) else "UTC"
         return AgentDefaults(
             model=llm_config.model,
             max_tool_iterations=llm_config.max_iterations,
             context_window_tokens=llm_config.context_window_tokens,
             context_block_limit=llm_config.context_block_limit,
             max_tool_result_chars=llm_config.max_tool_result_chars,
+            timezone=timezone,
         )
 
     def is_available(self) -> bool:
         """检查配置是否可用
 
         Returns:
-            bool: 项目配置或nanobot配置是否包含LLM配置
+            bool: 项目配置是否包含LLM配置
         """
-        return self._has_runner_llm_config() or self._try_load_nanobot_config()
+        return self._has_runner_llm_config()
 
     def close(self) -> None:
         """关闭Provider连接，释放资源"""
@@ -393,7 +532,11 @@ class RunnerProviderAdapter:
             unified_session = ws_config.get("unified_session", False)
 
             # v0.27.0: 设置 workspace 为项目目录，避免使用默认的 ~/.nanobot
-            workspace_path = str(self._runner_config.base_dir / "workspace")
+            workspace_path = str(self._runner_config.base_dir)
+
+            # 从项目配置读取时区，仅当为有效字符串时才覆盖 nanobot 默认 UTC
+            timezone = self._runner_config.get("timezone")
+            timezone_kwarg = {"timezone": timezone} if isinstance(timezone, str) else {}
 
             agents = AgentsConfig(
                 defaults={
@@ -402,6 +545,7 @@ class RunnerProviderAdapter:
                     "bot_icon": bot_icon,
                     "unified_session": unified_session,
                     "workspace": workspace_path,
+                    **timezone_kwarg,
                 },
             )
 
@@ -665,24 +809,6 @@ class RunnerProviderAdapter:
         except (NanobotRunnerError, Exception):
             return False
 
-    def _try_load_nanobot_config(self) -> bool:
-        """尝试加载nanobot配置（回退）
-
-        Returns:
-            bool: 是否成功加载nanobot配置
-        """
-        if self._nanobot_config is not None:
-            return True
-
-        try:
-            from nanobot.config.loader import load_config
-
-            self._nanobot_config = load_config()
-            return True
-        except (ImportError, FileNotFoundError, ValueError) as e:
-            logger.debug(f"nanobot配置加载失败: {e}")
-            return False
-
     def _from_runner_config(self) -> LLMConfig:
         """从项目配置提取LLM配置
 
@@ -695,41 +821,4 @@ class RunnerProviderAdapter:
             model=llm_dict.get("model", "gpt-4o-mini"),
             api_key=llm_dict.get("api_key"),
             base_url=llm_dict.get("base_url"),
-        )
-
-    def _from_nanobot_config(self) -> LLMConfig:
-        """从nanobot配置提取LLM配置（回退）
-
-        Returns:
-            LLMConfig: LLM配置数据类实例
-        """
-        if self._nanobot_config is None:
-            raise LLMError(
-                "nanobot配置未加载",
-                recovery_suggestion="请确认已安装nanobot-ai并正确配置",
-            )
-
-        defaults = self._nanobot_config.agents.defaults
-        provider_name = self._nanobot_config.providers.default
-
-        api_key: str | None = None
-        providers = self._nanobot_config.providers
-        if hasattr(providers, provider_name):
-            provider_cfg = getattr(providers, provider_name)
-            api_key = getattr(provider_cfg, "api_key", None)
-
-        base_url: str | None = None
-        if hasattr(providers, provider_name):
-            provider_cfg = getattr(providers, provider_name)
-            base_url = getattr(provider_cfg, "base_url", None)
-
-        return LLMConfig(
-            provider=provider_name,
-            model=defaults.model,
-            api_key=api_key or os.getenv("NANOBOT_LLM_API_KEY"),
-            base_url=base_url,
-            max_iterations=defaults.max_tool_iterations,
-            context_window_tokens=defaults.context_window_tokens,
-            context_block_limit=defaults.context_block_limit,
-            max_tool_result_chars=defaults.max_tool_result_chars,
         )

@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.cli.handlers.export_handler import ExportHandler
 from src.core.export.engine import ExportEngine
 from src.core.export.models import ExportConfig, ExportResult
 
@@ -69,12 +68,7 @@ class TestExportE2E:
         """提供配置好的 ExportEngine"""
         return ExportEngine(storage=mock_storage, analytics=mock_analytics)
 
-    @pytest.fixture
-    def handler(self, engine):
-        """提供配置好的 ExportHandler"""
-        return ExportHandler(export_engine=engine)
-
-    def test_export_sessions_csv_full_pipeline(self, handler, tmp_path):
+    def test_export_sessions_csv_full_pipeline(self, engine, tmp_path):
         """测试 CSV 导出完整链路：Handler -> Engine -> 文件"""
         output_path = tmp_path / "runs.csv"
         config = ExportConfig(
@@ -83,7 +77,7 @@ class TestExportE2E:
             end_date=datetime(2024, 1, 31),
             include_computed_fields=False,
         )
-        result = handler.handle_export_sessions(config, "csv")
+        result = engine.export_sessions(config, "csv")
 
         assert isinstance(result, ExportResult)
         assert result.success is True
@@ -97,7 +91,7 @@ class TestExportE2E:
         assert "2024-01-01" in content
         assert "5000.0" in content
 
-    def test_export_sessions_json_full_pipeline(self, handler, tmp_path):
+    def test_export_sessions_json_full_pipeline(self, engine, tmp_path):
         """测试 JSON 导出完整链路"""
         import json
 
@@ -106,7 +100,7 @@ class TestExportE2E:
             output_path=output_path,
             include_computed_fields=False,
         )
-        result = handler.handle_export_sessions(config, "json")
+        result = engine.export_sessions(config, "json")
 
         assert result.success is True
         assert result.record_count == 3
@@ -119,14 +113,14 @@ class TestExportE2E:
         assert content["metadata"]["record_count"] == 3
         assert len(content["data"]) == 3
 
-    def test_export_sessions_parquet_full_pipeline(self, handler, tmp_path):
+    def test_export_sessions_parquet_full_pipeline(self, engine, tmp_path):
         """测试 Parquet 导出完整链路"""
         output_path = tmp_path / "runs.parquet"
         config = ExportConfig(
             output_path=output_path,
             include_computed_fields=False,
         )
-        result = handler.handle_export_sessions(config, "parquet")
+        result = engine.export_sessions(config, "parquet")
 
         assert result.success is True
         assert result.record_count == 3
@@ -152,7 +146,7 @@ class TestExportE2E:
         # 计算字段应出现在导出内容中
         assert "session_vdot" in content or "session_training_stress_score" in content
 
-    def test_export_summary_weekly(self, handler, tmp_path):
+    def test_export_summary_weekly(self, engine, tmp_path):
         """测试按周汇总导出"""
         output_path = tmp_path / "weekly_summary.csv"
         config = ExportConfig(
@@ -161,9 +155,7 @@ class TestExportE2E:
             end_date=datetime(2024, 1, 31),
             include_computed_fields=False,
         )
-        result = handler.handle_export_summary(
-            config, period="weekly", format_name="csv"
-        )
+        result = engine.export_summary(config, format_name="csv", period="weekly")
 
         assert result.success is True
         assert output_path.exists()
@@ -175,7 +167,7 @@ class TestExportE2E:
             or "avg_heart_rate" in content
         )
 
-    def test_export_summary_monthly(self, handler, tmp_path):
+    def test_export_summary_monthly(self, engine, tmp_path):
         """测试按月汇总导出"""
         output_path = tmp_path / "monthly_summary.json"
         config = ExportConfig(
@@ -184,14 +176,12 @@ class TestExportE2E:
             end_date=datetime(2024, 3, 31),
             include_computed_fields=False,
         )
-        result = handler.handle_export_summary(
-            config, period="monthly", format_name="json"
-        )
+        result = engine.export_summary(config, format_name="json", period="monthly")
 
         assert result.success is True
         assert output_path.exists()
 
-    def test_export_summary_yearly(self, handler, tmp_path):
+    def test_export_summary_yearly(self, engine, tmp_path):
         """测试按年汇总导出"""
         output_path = tmp_path / "yearly_summary.csv"
         config = ExportConfig(
@@ -200,26 +190,24 @@ class TestExportE2E:
             end_date=datetime(2024, 12, 31),
             include_computed_fields=False,
         )
-        result = handler.handle_export_summary(
-            config, period="yearly", format_name="csv"
-        )
+        result = engine.export_summary(config, format_name="csv", period="yearly")
 
         assert result.success is True
         assert output_path.exists()
 
-    def test_export_invalid_format(self, handler, tmp_path):
+    def test_export_invalid_format(self, engine, tmp_path):
         """测试无效格式返回失败"""
         output_path = tmp_path / "runs.xyz"
         config = ExportConfig(output_path=output_path)
-        result = handler.handle_export_sessions(config, "xyz")
+        result = engine.export_sessions(config, "xyz")
 
         assert result.success is False
         assert "不支持的导出格式" in result.message
 
-    def test_export_path_traversal_rejected(self, handler):
+    def test_export_path_traversal_rejected(self, engine):
         """测试路径穿越被阻止"""
         config = ExportConfig(output_path=Path("../secret.csv"))
-        result = handler.handle_export_sessions(config, "csv")
+        result = engine.export_sessions(config, "csv")
 
         assert result.success is False
         assert "路径包含路径穿越" in result.message
@@ -230,11 +218,10 @@ class TestExportE2E:
         storage.query_by_date_range.return_value = []
         analytics = MagicMock()
         engine = ExportEngine(storage=storage, analytics=analytics)
-        handler = ExportHandler(export_engine=engine)
 
         output_path = tmp_path / "empty.csv"
         config = ExportConfig(output_path=output_path, include_computed_fields=False)
-        result = handler.handle_export_sessions(config, "csv")
+        result = engine.export_sessions(config, "csv")
 
         assert result.success is True
         assert result.record_count == 0

@@ -9,7 +9,6 @@ from pathlib import Path
 import typer
 
 from src.cli.common import CLIError, console, print_error, print_status
-from src.cli.handlers.export_handler import ExportHandler
 from src.core.base.context import get_context
 from src.core.base.exceptions import NanobotRunnerError
 from src.core.export.models import ExportConfig, ExportResult
@@ -111,7 +110,6 @@ def sessions(
 
     try:
         context = get_context()
-        handler = ExportHandler(export_engine=context.export_engine)
 
         config = ExportConfig(
             output_path=output,
@@ -127,7 +125,7 @@ def sessions(
             )
             console.print(f"[dim]日期范围: {date_range}[/dim]")
 
-        result = handler.handle_export_sessions(config, format_name.lower())
+        result = context.export_engine.export_sessions(config, format_name.lower())
         _print_export_result(result)
 
         if not result.success:
@@ -221,7 +219,6 @@ def summary(
 
     try:
         context = get_context()
-        handler = ExportHandler(export_engine=context.export_engine)
 
         config = ExportConfig(
             output_path=output,
@@ -239,8 +236,8 @@ def summary(
             )
             console.print(f"[dim]日期范围: {date_range}[/dim]")
 
-        result = handler.handle_export_summary(
-            config, period.lower(), format_name.lower()
+        result = context.export_engine.export_summary(
+            config, format_name.lower(), period.lower()
         )
         _print_export_result(result)
 

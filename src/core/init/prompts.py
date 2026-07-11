@@ -14,11 +14,11 @@ class InitPrompts:
     """
 
     @staticmethod
-    def run_llm_provider_wizard() -> dict[str, str]:
+    def run_llm_provider_wizard() -> dict[str, Any]:
         """运行 LLM Provider 配置向导
 
         Returns:
-            dict[str, str]: LLM 配置字典
+            dict[str, Any]: LLM 配置字典，包含 config（非敏感）和 env_vars（敏感）
         """
         try:
             import questionary
@@ -53,15 +53,28 @@ class InitPrompts:
                 default="",
             ).ask()
 
-            result = {
-                "NANOBOT_LLM_PROVIDER": provider,
-                "NANOBOT_LLM_MODEL": model or "gpt-4o-mini",
-                "NANOBOT_LLM_API_KEY": api_key or "",
-                "NANOBOT_LLM_BASE_URL": base_url or "",
+            # 非敏感配置入 config，敏感凭证入 env_vars
+            result: dict[str, Any] = {
+                "config": {
+                    "llm_provider": provider,
+                    "llm_model": model or "gpt-4o-mini",
+                },
+                "env_vars": {
+                    "NANOBOT_LLM_API_KEY": api_key or "",
+                },
             }
+            if base_url:
+                result["config"]["llm_base_url"] = base_url
 
             fallback_result = InitPrompts.run_fallback_wizard(provider or "openai")
-            result.update(fallback_result)
+            if fallback_result.get("_model_presets"):
+                result["_model_presets"] = fallback_result["_model_presets"]
+            if fallback_result.get("_fallback_models"):
+                result["_fallback_models"] = fallback_result["_fallback_models"]
+            # 备选供应商 API Key（敏感）入 env_vars
+            for k, v in fallback_result.items():
+                if k.startswith("NANOBOT_LLM_API_KEY_") and v:
+                    result["env_vars"][k] = v
 
             return result
 
@@ -93,11 +106,11 @@ class InitPrompts:
             return {"timezone": "Asia/Shanghai"}
 
     @staticmethod
-    def run_feishu_config_wizard() -> dict[str, str]:
+    def run_feishu_config_wizard() -> dict[str, Any]:
         """运行飞书通知配置向导（可选）
 
         Returns:
-            dict[str, str]: 飞书配置字典
+            dict[str, Any]: 飞书配置字典，包含 config（非敏感）和 env_vars（敏感凭证）
         """
         try:
             import questionary
@@ -108,21 +121,23 @@ class InitPrompts:
             ).ask()
 
             if not enable:
-                return {"NANOBOT_AUTO_PUSH_FEISHU": "false"}
+                return {"config": {"auto_push_feishu": False}, "env_vars": {}}
 
             app_id = questionary.text("输入飞书 App ID:").ask()
             app_secret = questionary.password("输入飞书 App Secret:").ask()
             receive_id = questionary.text("输入飞书接收者 ID:").ask()
 
             return {
-                "NANOBOT_AUTO_PUSH_FEISHU": "true",
-                "NANOBOT_FEISHU_APP_ID": app_id or "",
-                "NANOBOT_FEISHU_APP_SECRET": app_secret or "",
-                "NANOBOT_FEISHU_RECEIVE_ID": receive_id or "",
+                "config": {"auto_push_feishu": True},
+                "env_vars": {
+                    "NANOBOT_FEISHU_APP_ID": app_id or "",
+                    "NANOBOT_FEISHU_APP_SECRET": app_secret or "",
+                    "NANOBOT_FEISHU_RECEIVE_ID": receive_id or "",
+                },
             }
 
         except ImportError:
-            return {"NANOBOT_AUTO_PUSH_FEISHU": "false"}
+            return {"config": {"auto_push_feishu": False}, "env_vars": {}}
 
     @staticmethod
     def run_full_wizard(
@@ -136,37 +151,23 @@ class InitPrompts:
             agent_mode: 是否配置LLM（True=Agent模式，False=数据模式）
 
         Returns:
-            dict[str, Any]: 完整配置字典，包含 config 和 env_vars
+            dict[str, Any]: 完整配置字典，包含 config（非敏感）和 env_vars（敏感凭证）
         """
-        llm_env: dict[str, str] = {}
-        if agent_mode:
-            llm_env = InitPrompts.run_llm_provider_wizard()
-
-        business_config = InitPrompts.run_business_config_wizard()
-
-        feishu_env: dict[str, str] = {}
-        if not skip_optional:
-            feishu_env = InitPrompts.run_feishu_config_wizard()
-
-        config: dict[str, Any] = {
-            "version": __version__,
-            **business_config,
-            "auto_push_feishu": feishu_env.get("NANOBOT_AUTO_PUSH_FEISHU", "false")
-            == "true",
-        }
+        config: dict[str, Any] = {"version": __version__}
+        env_vars: dict[str, str] = {}
 
         if agent_mode:
-            config["llm_provider"] = llm_env.get("NANOBOT_LLM_PROVIDER", "openai")
-            config["llm_model"] = llm_env.get("NANOBOT_LLM_MODEL", "gpt-4o-mini")
-            base_url = llm_env.get("NANOBOT_LLM_BASE_URL", "")
+            llm_result = InitPrompts.run_llm_provider_wizard()
+            config["llm_provider"] = llm_result["config"].get("llm_provider", "openai")
+            config["llm_model"] = llm_result["config"].get("llm_model", "gpt-4o-mini")
+            base_url = llm_result["config"].get("llm_base_url")
             if base_url:
                 config["llm_base_url"] = base_url
+            env_vars.update(llm_result.get("env_vars", {}))
 
             # 注入 fallback 配置到 config.json
-            _fb_raw: list[str] | str = llm_env.pop("_fallback_models", [])
-            _mp_raw: dict[str, Any] | str = llm_env.pop("_model_presets", {})
-            fallback_models: list[str] = _fb_raw if isinstance(_fb_raw, list) else []
-            model_presets: dict[str, Any] = _mp_raw if isinstance(_mp_raw, dict) else {}
+            fallback_models = llm_result.get("_fallback_models", [])
+            model_presets = llm_result.get("_model_presets", {})
             if fallback_models:
                 config["fallback_models"] = fallback_models
             if model_presets:
@@ -174,22 +175,35 @@ class InitPrompts:
 
             config["tools"] = InitPrompts._default_tools_config()
 
-        env_vars = {**llm_env, **feishu_env}
+        business_config = InitPrompts.run_business_config_wizard()
+        config.update(business_config)
+
+        if not skip_optional:
+            feishu_result = InitPrompts.run_feishu_config_wizard()
+            config["auto_push_feishu"] = feishu_result["config"].get(
+                "auto_push_feishu", False
+            )
+            env_vars.update(feishu_result.get("env_vars", {}))
+        else:
+            config["auto_push_feishu"] = False
 
         return {"config": config, "env_vars": env_vars}
 
     @staticmethod
-    def _default_llm_config() -> dict[str, str]:
+    def _default_llm_config() -> dict[str, Any]:
         """获取默认 LLM 配置
 
         Returns:
-            dict[str, str]: 默认 LLM 配置字典
+            dict[str, Any]: 默认 LLM 配置字典，包含 config（非敏感）和 env_vars（敏感）
         """
         return {
-            "NANOBOT_LLM_PROVIDER": "openai",
-            "NANOBOT_LLM_MODEL": "gpt-4o-mini",
-            "NANOBOT_LLM_API_KEY": "",
-            "NANOBOT_LLM_BASE_URL": "",
+            "config": {
+                "llm_provider": "openai",
+                "llm_model": "gpt-4o-mini",
+            },
+            "env_vars": {
+                "NANOBOT_LLM_API_KEY": "",
+            },
         }
 
     @staticmethod

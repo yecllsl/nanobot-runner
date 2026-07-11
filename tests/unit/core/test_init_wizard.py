@@ -84,7 +84,8 @@ class TestConfigGenerator:
         result = generator.generate_env_local(env_vars)
 
         assert "NANOBOT_LLM_API_KEY=sk-test" in result
-        assert "NANOBOT_LLM_PROVIDER=openai" in result
+        # ponytail: 非敏感字段不再写入 .env.local
+        assert "NANOBOT_LLM_PROVIDER" not in result
 
     def test_generate_env_local_with_feishu(self) -> None:
         generator = ConfigGenerator()
@@ -97,7 +98,9 @@ class TestConfigGenerator:
         result = generator.generate_env_local(env_vars)
 
         assert "NANOBOT_FEISHU_APP_ID=cli_test" in result
-        assert "飞书通知配置" in result
+        assert "飞书通知凭证" in result
+        # ponytail: auto_push_feishu 标志由 config.json 管理
+        assert "NANOBOT_AUTO_PUSH_FEISHU" not in result
 
     def test_write_config_files(self, tmp_path: Path) -> None:
         generator = ConfigGenerator()

@@ -38,6 +38,7 @@ class GatewayIntegration:
         bus: MessageBus | None = None,
         console: Console | None = None,
         data_dir: Path | None = None,
+        timezone: str | None = None,
     ) -> None:
         """初始化Gateway集成器
 
@@ -46,11 +47,13 @@ class GatewayIntegration:
             bus: 消息总线实例
             console: Rich控制台实例
             data_dir: 数据目录，默认使用workspace/data
+            timezone: 配置文件中的时区（如 "Asia/Shanghai"），用于 CronSchedule
         """
         self.workspace = workspace
         self.bus = bus
         self.console = console
         self.data_dir = data_dir or workspace / "data"
+        self.timezone = timezone
 
         # 组件实例
         self.reminder_manager: TrainingReminderManager | None = None
@@ -118,7 +121,11 @@ class GatewayIntegration:
             schedule = self.reminder_manager.schedule
             self.cron_service.add_job(
                 name=CronCallbackHandler.TRAINING_REMINDER_JOB,
-                schedule=CronSchedule(kind="cron", expr=schedule.cron_expression),
+                schedule=CronSchedule(
+                    kind="cron",
+                    expr=schedule.cron_expression,
+                    tz=self.timezone,
+                ),
                 message="训练提醒",
             )
 

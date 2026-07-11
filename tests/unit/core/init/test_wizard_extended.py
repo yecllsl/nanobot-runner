@@ -135,10 +135,9 @@ class TestInitWizardMigrateMode:
         return InitWizard(config=mock_config)
 
     @patch.object(InitWizard, "_is_already_initialized", return_value=False)
-    @patch.object(InitWizard, "_sync_to_nanobot")
     @patch("src.core.init.migrate.ConfigMigrator")
     def test_migrate_mode_success(
-        self, mock_migrator_cls: MagicMock, mock_sync: MagicMock, mock_init: MagicMock
+        self, mock_migrator_cls: MagicMock, mock_init: MagicMock
     ) -> None:
         mock_migrator = MagicMock()
         mock_migrator.migrate_from_nanobot.return_value = MigrationResult(
@@ -154,7 +153,6 @@ class TestInitWizardMigrateMode:
 
         assert result.success
         assert result.config_path == Path("/tmp/config.json")
-        mock_sync.assert_called_once()
 
     @patch.object(InitWizard, "_is_already_initialized", return_value=True)
     def test_migrate_mode_already_initialized_no_force(
@@ -194,7 +192,6 @@ class TestInitWizardAgentMode:
         return InitWizard(config=mock_config)
 
     @patch.object(InitWizard, "_is_already_initialized", return_value=False)
-    @patch.object(InitWizard, "_sync_to_nanobot")
     @patch.object(InitWizard, "guide_config")
     @patch.object(InitWizard, "validate_config")
     @patch.object(InitWizard, "generate_config_files")
@@ -205,7 +202,6 @@ class TestInitWizardAgentMode:
         mock_generate: MagicMock,
         mock_validate: MagicMock,
         mock_guide: MagicMock,
-        mock_sync: MagicMock,
         mock_init: MagicMock,
     ) -> None:
         mock_detect.return_value = MagicMock(missing_dependencies=[])
@@ -223,11 +219,9 @@ class TestInitWizardAgentMode:
 
         assert result.success
         mock_guide.assert_called_once_with(skip_optional=False, agent_mode=False)
-        mock_sync.assert_not_called()
         assert "Agent聊天" not in " ".join(result.next_steps)
 
     @patch.object(InitWizard, "_is_already_initialized", return_value=False)
-    @patch.object(InitWizard, "_sync_to_nanobot")
     @patch.object(InitWizard, "guide_config")
     @patch.object(InitWizard, "validate_config")
     @patch.object(InitWizard, "generate_config_files")
@@ -238,7 +232,6 @@ class TestInitWizardAgentMode:
         mock_generate: MagicMock,
         mock_validate: MagicMock,
         mock_guide: MagicMock,
-        mock_sync: MagicMock,
         mock_init: MagicMock,
     ) -> None:
         mock_detect.return_value = MagicMock(missing_dependencies=[])
@@ -261,5 +254,4 @@ class TestInitWizardAgentMode:
 
         assert result.success
         mock_guide.assert_called_once_with(skip_optional=False, agent_mode=True)
-        mock_sync.assert_called_once()
         assert "Agent聊天" in " ".join(result.next_steps)

@@ -1,18 +1,29 @@
 from __future__ import annotations
 
+from typing import Any
+
 import typer
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from src.cli.common import CLIError, console, print_error
-from src.cli.handlers.prediction_handler import PredictionHandler
+from src.core.base.context import get_context
 from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="ML智能预测命令", no_args_is_help=True)
 
 model_app = typer.Typer(help="预测模型管理", no_args_is_help=True)
 app.add_typer(model_app, name="model")
+
+
+def _get_prediction_engine() -> Any:
+    """获取预测引擎实例"""
+    context = get_context()
+    engine = context.prediction_engine
+    if engine is None:
+        raise RuntimeError("预测引擎未初始化，请先运行 nanobotrun system init")
+    return engine
 
 
 def _format_prediction_type(prediction_type: str, confidence: float) -> str:
@@ -49,10 +60,10 @@ def predict_vdot(
         nanobotrun predict vdot -d 90
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
         console.print(f"[bold]VDOT趋势预测[/bold] (未来 {days} 天)")
 
-        result = handler.predict_vdot_trend(days=days)
+        result = engine.predict_vdot_trend(days=days).to_dict()
 
         current_vdot = result.get("current_vdot", 0)
         predicted_vdot = result.get("predicted_vdot", 0)
@@ -101,11 +112,13 @@ def predict_race(
         nanobotrun predict race -D 10 --date 2026-06-01
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
         distance_label = f"{distance:.1f}km"
         console.print(f"[bold]比赛成绩预测[/bold] ({distance_label})")
 
-        result = handler.predict_race_result(distance_km=distance, race_date=race_date)
+        result = engine.predict_race_result(
+            distance_km=distance, race_date=race_date
+        ).to_dict()
 
         predicted_time = result.get("predicted_time", "N/A")
         confidence = result.get("confidence", 0)
@@ -145,10 +158,10 @@ def predict_injury(
         nanobotrun predict injury -d 7
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
         console.print(f"[bold]伤病风险预测[/bold] (未来 {days} 天)")
 
-        result = handler.predict_injury_risk(days=days)
+        result = engine.predict_injury_risk(days=days).to_dict()
 
         risk_score = result.get("risk_score", 0)
         risk_level = result.get("risk_level", "unknown")
@@ -217,16 +230,16 @@ def predict_response(
         nanobotrun predict response -t easy -m 45 -i low
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
         console.print(
             f"[bold]训练响应预测[/bold] ({session_type}, {duration}min, {intensity})"
         )
 
-        result = handler.predict_training_response(
+        result = engine.predict_training_response(
             session_type=session_type,
             duration_min=duration,
             intensity=intensity,
-        )
+        ).to_dict()
 
         vdot_impact = result.get("predicted_vdot_impact", 0)
         fatigue_impact = result.get("predicted_fatigue_impact", 0)
@@ -274,10 +287,10 @@ def prediction_status() -> None:
         nanobotrun predict status
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
         console.print("[bold]预测数据充足度评估[/bold]")
 
-        result = handler.check_prediction_status()
+        result = engine.check_prediction_status().to_dict()
 
         vdot_status = result.get("vdot_status", {})
         race_status = result.get("race_status", {})
@@ -293,11 +306,7 @@ def prediction_status() -> None:
 
         model_status_map: dict[str, bool] = {}
         try:
-            from src.core.base.context import AppContextFactory
-
-            ctx = AppContextFactory.create()
-            engine = ctx.prediction_engine
-            if engine is not None and engine._model_manager is not None:
+            if engine._model_manager is not None:
                 for mt in ("vdot_predictor", "injury_predictor"):
                     st = engine._model_manager.get_model_status(mt)
                     model_status_map[mt] = st.is_available
@@ -355,7 +364,7 @@ def model_status(
         nanobotrun predict model status -t vdot
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
 
         type_map = {
             "all": ["vdot_predictor", "injury_predictor"],
@@ -373,7 +382,7 @@ def model_status(
         table.add_column("验证误差", width=10)
 
         for mt in model_types:
-            result = handler.manage_model(action="status", model_type=mt)
+            result = engine.manage_model(action="status", model_type=mt).to_dict()
             details = result.get("details", {})
             is_available = details.get("is_available", False)
             status_label = (
@@ -381,11 +390,7 @@ def model_status(
             )
 
             try:
-                from src.core.base.context import AppContextFactory
-
-                ctx = AppContextFactory.create()
-                engine = ctx.prediction_engine
-                if engine and engine._model_manager:
+                if engine._model_manager:
                     st = engine._model_manager.get_model_status(mt)
                     table.add_row(
                         mt,
@@ -422,7 +427,7 @@ def model_train(
         nanobotrun predict model train -t injury
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
 
         type_map = {
             "vdot": "vdot_predictor",
@@ -436,7 +441,9 @@ def model_train(
             console=console,
         ) as progress:
             task = progress.add_task(f"[cyan]训练 {model_type} 模型...", total=None)
-            result = handler.manage_model(action="train", model_type=actual_type)
+            result = engine.manage_model(
+                action="train", model_type=actual_type
+            ).to_dict()
             progress.update(task, completed=1, total=1)
 
         success = result.get("success", False)
@@ -467,7 +474,7 @@ def model_rollback(
         nanobotrun predict model rollback -t injury
     """
     try:
-        handler = PredictionHandler()
+        engine = _get_prediction_engine()
 
         type_map = {
             "vdot": "vdot_predictor",
@@ -475,7 +482,9 @@ def model_rollback(
         }
         actual_type = type_map.get(model_type, model_type)
 
-        result = handler.manage_model(action="rollback", model_type=actual_type)
+        result = engine.manage_model(
+            action="rollback", model_type=actual_type
+        ).to_dict()
 
         success = result.get("success", False)
         message = result.get("message", "")
