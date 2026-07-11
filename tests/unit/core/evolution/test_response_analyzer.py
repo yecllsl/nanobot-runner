@@ -19,7 +19,7 @@ class TestResponseAnalyzer:
         for i, pd in enumerate(pairs_data):
             decision = DecisionLog(
                 decision_id=f"dec_{i:03d}",
-                timestamp=datetime(2026, 1, 1 + i, 10, 0, 0),
+                timestamp=datetime(2026, 5, 1 + i, 10, 0, 0),
                 runner_state={"vdot": pd.get("vdot", 45.0)},
                 decision_type=DecisionType.TRAINING_ADVICE,
                 tool_call_chain=pd.get("tool_call_chain", []),
@@ -32,7 +32,7 @@ class TestResponseAnalyzer:
             outcome = OutcomeRecord(
                 outcome_id=f"out_{i:03d}",
                 decision_id=f"dec_{i:03d}",
-                outcome_timestamp=datetime(2026, 1, 5 + i, 10, 0, 0),
+                outcome_timestamp=datetime(2026, 5, 5 + i, 10, 0, 0),
                 actual_vdot=pd.get("actual_vdot"),
                 actual_injury=False,
                 execution_fidelity=pd.get("fidelity", 0.85),
