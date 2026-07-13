@@ -162,8 +162,10 @@ class DreamIntegration:
     def trigger_dream(self) -> dict[str, Any]:
         """手动触发Dream整理
 
-        在实际运行时，会调用nanobot SDK的Dream.run()方法。
-        此处提供配置层面的触发接口。
+        nanobot-ai 0.2.2 已移除 Dream 类，改为 cron + process_direct 模式：
+        - 记忆整理通过 CronService 定时触发
+        - 实际执行通过 AgentLoop.process_direct() 完成
+        此处仅提供配置层面的触发接口，实际执行由 CronService 编排。
 
         Returns:
             dict: 触发结果
