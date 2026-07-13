@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
+
+from nanobot.providers.registry import PROVIDERS, ProviderSpec, create_dynamic_spec
 
 from src.core.base.exceptions import LLMError, NanobotRunnerError
 from src.core.base.logger import get_logger
@@ -645,3 +647,63 @@ class RunnerProviderAdapter:
             api_key=llm_dict.get("api_key"),
             base_url=llm_dict.get("base_url"),
         )
+
+
+class DynamicProviderRegistry:
+    """动态 Provider 注册器
+
+    利用 nanobot 0.2.2 的 create_dynamic_spec() 和 ProvidersConfig.extra="allow" 能力，
+    支持运行时注册自定义 OpenAI 兼容 Provider。
+    """
+
+    _custom_providers: dict[str, ProviderSpec] = {}
+    _provider_metadata: dict[str, dict[str, str]] = {}
+
+    @classmethod
+    def register_custom_provider(
+        cls,
+        name: str,
+        api_base: str,
+        api_key: str,
+        default_model: str,
+    ) -> None:
+        """注册自定义 OpenAI 兼容 Provider
+
+        Args:
+            name: Provider 名称（不能与内置冲突）
+            api_base: API 端点
+            api_key: API 密钥（存储在 metadata 中，供配置层使用）
+            default_model: 默认模型（存储在 metadata 中，供配置层使用）
+        """
+        builtin_names = {p.name for p in PROVIDERS}
+        if name.lower() in builtin_names:
+            logger.warning("Provider 名称 '%s' 与内置冲突，拒绝注册", name)
+            return
+
+        spec = create_dynamic_spec(name)
+        if api_base:
+            spec = replace(spec, default_api_base=api_base)
+
+        cls._custom_providers[name] = spec
+        cls._provider_metadata[name] = {
+            "api_key": api_key,
+            "default_model": default_model,
+        }
+        logger.info("自定义 Provider '%s' 注册成功", name)
+
+    @classmethod
+    def list_custom_providers(cls) -> list[str]:
+        """列出已注册的自定义 Provider 名称"""
+        return list(cls._custom_providers.keys())
+
+    @classmethod
+    def get_provider_spec(cls, name: str) -> ProviderSpec | None:
+        """获取已注册的 ProviderSpec
+
+        Args:
+            name: Provider 名称
+
+        Returns:
+            ProviderSpec | None: 已注册的 spec，未注册返回 None
+        """
+        return cls._custom_providers.get(name)
