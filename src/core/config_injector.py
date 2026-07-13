@@ -60,6 +60,7 @@ class ConfigInjector:
                 Config,
                 ProviderConfig,
                 ProvidersConfig,
+                TranscriptionConfig,
             )
 
             # 校验必要字段：agents.defaults 是 Runner 配置的最小要求
@@ -81,16 +82,32 @@ class ConfigInjector:
                     api_base=prov_cfg.get("api_base"),
                 )
 
+            # 处理 transcription 配置（nanobot 0.2.2 新增）
+            # 用户未配置时使用 nanobot 默认值（enabled=True）
+            transcription_raw = runner_config.get("transcription")
+            transcription_cfg = None
+            if isinstance(transcription_raw, dict):
+                transcription_cfg = TranscriptionConfig(
+                    enabled=transcription_raw.get("enabled", False),
+                    provider=transcription_raw.get("provider"),
+                    model=transcription_raw.get("model"),
+                    language=transcription_raw.get("language"),
+                    max_duration_sec=transcription_raw.get("max_duration_sec", 120),
+                    max_upload_mb=transcription_raw.get("max_upload_mb", 25),
+                )
+
             # 仅传递 nanobot Config 实际支持的字段；websocket / webui
             # 等 RunFlowAgent 私有字段不映射（nanobot 0.2.2 无对应 Schema）
-            config = Config(
-                agents=AgentsConfig(
-                    defaults=AgentDefaults(**agents_defaults),
-                ),
-                providers=ProvidersConfig(**providers_kwargs)
+            config_kwargs: dict[str, Any] = {
+                "agents": AgentsConfig(defaults=AgentDefaults(**agents_defaults)),
+                "providers": ProvidersConfig(**providers_kwargs)
                 if providers_kwargs
                 else ProvidersConfig(),
-            )
+            }
+            if transcription_cfg is not None:
+                config_kwargs["transcription"] = transcription_cfg
+
+            config = Config(**config_kwargs)
 
             logger.debug("成功构建 nanobot Config")
             return config

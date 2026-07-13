@@ -66,3 +66,52 @@ def test_resolve_webui_dist_custom(config_injector, tmp_path, monkeypatch):
     result = config_injector.resolve_webui_dist()
     # 结果可能是 Path 或 None，取决于实际 dist 目录是否存在
     assert result is None or isinstance(result, Path)
+
+
+def test_build_with_transcription_config(config_injector):
+    """测试构建带 transcription 配置的 Config（v0.32.0 新增）"""
+    runner_config = {
+        "agents": {"defaults": {"model": "gpt-4", "provider": "openai"}},
+        "transcription": {
+            "enabled": False,
+            "provider": "assemblyai",
+            "model": "best",
+            "language": "zh",
+            "max_duration_sec": 300,
+            "max_upload_mb": 25,
+        },
+    }
+    config = config_injector.build_nanobot_config(runner_config)
+    assert config.transcription.enabled is False
+    assert config.transcription.provider == "assemblyai"
+    assert config.transcription.model == "best"
+    assert config.transcription.language == "zh"
+    assert config.transcription.max_duration_sec == 300
+
+
+def test_build_without_transcription_uses_default(config_injector):
+    """测试未配置 transcription 时使用 nanobot 默认值"""
+    runner_config = {
+        "agents": {"defaults": {"model": "gpt-4", "provider": "openai"}},
+    }
+    config = config_injector.build_nanobot_config(runner_config)
+    # nanobot 默认 transcription.enabled=True
+    assert config.transcription is not None
+    assert config.transcription.enabled is True
+
+
+def test_build_with_partial_transcription(config_injector):
+    """测试部分 transcription 配置使用默认值填充"""
+    runner_config = {
+        "agents": {"defaults": {"model": "gpt-4", "provider": "openai"}},
+        "transcription": {
+            "enabled": True,
+            "provider": "assemblyai",
+        },
+    }
+    config = config_injector.build_nanobot_config(runner_config)
+    assert config.transcription.enabled is True
+    assert config.transcription.provider == "assemblyai"
+    # 未设置的字段使用 nanobot 默认值
+    assert config.transcription.max_duration_sec == 120
+    assert config.transcription.max_upload_mb == 25

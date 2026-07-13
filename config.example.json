@@ -98,6 +98,16 @@
       "api_base": "https://api.mistral.ai/v1"
     }
   },
+  "transcription": {
+    "enabled": false,
+    "enabled_comment": "是否启用语音转录（nanobot 0.2.2 新增）。默认关闭，启用后需配置 provider 和 api_key",
+    "provider": "assemblyai",
+    "provider_comment": "转录服务商，可选 assemblyai。api_key 为敏感数据，请放入 .env.local（ASSEMBLYAI_API_KEY），勿写入此文件",
+    "model": "best",
+    "language": "zh",
+    "max_duration_sec": 300,
+    "max_upload_mb": 25
+  },
   "tools": {
     "mcp_servers": {
       "weather": {
