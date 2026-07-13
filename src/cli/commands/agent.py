@@ -7,6 +7,7 @@ import contextlib
 import typer
 
 from src.cli.common import CLIError, console, print_error
+from src.core.agent_loop_adapter import AgentLoopAdapter
 from src.core.base.exceptions import NanobotRunnerError
 
 app = typer.Typer(help="Agent 交互命令")
@@ -64,6 +65,7 @@ async def _run_chat() -> None:
     console.print()
 
     agent = None
+    agent_adapter: AgentLoopAdapter | None = None
 
     try:
         context = get_context()
@@ -108,8 +110,11 @@ async def _run_chat() -> None:
         for tool in create_tools(runner_tools):
             agent.tools.register(tool)
 
-        await agent._connect_mcp()
-        mcp_connected = list(agent._mcp_stacks.keys())
+        # 通过 Adapter 封装私有 API 调用，隔离 nanobot 版本变更风险
+        agent_adapter = AgentLoopAdapter(agent)
+
+        await agent_adapter.connect_mcp()
+        mcp_connected = list(agent_adapter.mcp_stacks.keys())
         mcp_failed = [name for name in mcp_config if name not in mcp_connected]
 
         console.print("[bold green][OK] Agent 已初始化[/bold green]")
@@ -148,8 +153,8 @@ async def _run_chat() -> None:
         console.print("[yellow]请确保已正确配置本地模型[/yellow]")
     finally:
         with contextlib.suppress(Exception):
-            if agent is not None:
-                for task in list(agent._background_tasks):
+            if agent is not None and agent_adapter is not None:
+                for task in list(agent_adapter.background_tasks):
                     task.cancel()
                 try:  # noqa: SIM105
                     await asyncio.wait_for(agent.close_mcp(), timeout=5.0)
