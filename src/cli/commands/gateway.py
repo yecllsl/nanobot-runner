@@ -276,35 +276,6 @@ def _init_gateway_context(
     return context, runner_tools, workspace, adapter
 
 
-def _setup_webui_branding() -> None:
-    """配置自定义 WebUI 品牌路径
-
-    通过 monkey-patch 覆盖默认的 WebUI 静态文件路径，
-    优先使用项目自定义的 webui/dist 目录。
-    """
-    from pathlib import Path
-
-    import nanobot.channels.manager as manager_module
-
-    def _custom_webui_dist():
-        """返回项目自定义的 WebUI dist 目录"""
-        # 优先使用项目自定义的 webui 目录
-        custom_dist = Path(__file__).resolve().parent.parent.parent / "webui" / "dist"
-        if custom_dist.is_dir() and (custom_dist / "index.html").exists():
-            return custom_dist
-        # 回退到 nanobot 默认目录
-        try:
-            import nanobot.web as web_pkg
-
-            default_dist = Path(web_pkg.__file__).resolve().parent / "dist"
-            return default_dist if default_dist.is_dir() else None
-        except ImportError:
-            return None
-
-    # 保存原始函数并替换
-    manager_module._default_webui_dist = _custom_webui_dist
-
-
 def _create_gateway_agent(
     bus: Any,
     provider: Any,
@@ -316,7 +287,7 @@ def _create_gateway_agent(
     """创建 AgentLoop 实例并注册工具与命令
 
     Args:
-        mcp_servers: MCP服务器配置，传入后由 agent._connect_mcp() 统一连接，
+        mcp_servers: MCP服务器配置，传入后由 AgentLoopAdapter.connect_mcp() 统一连接，
             确保 connect/close 在同一 task，避免 anyio cancel scope 跨 task 报错
 
     Returns:
@@ -542,17 +513,19 @@ async def _run_gateway(
     fastapi_server: Any,
     integration: Any,
     mcp_context: Any | None,
+    agent_adapter: Any,
 ) -> None:
     """运行Gateway服务的异步主循环
 
-    MCP 连接和断开均通过 agent 在同一 task 内完成，避免 anyio cancel scope
-    跨 task 报错。退出时按顺序优雅关闭：uvicorn → 通道 → 心跳 → MCP。
+    MCP 连接通过 agent_adapter 封装私有 API，断开通过 agent.close_mcp()，
+    均在同一 task 内完成，避免 anyio cancel scope 跨 task 报错。
+    退出时按顺序优雅关闭：uvicorn → 通道 → 心跳 → MCP。
     """
     try:
-        # 通过 agent._connect_mcp() 连接，确保与 close_mcp() 在同一 task
+        # 通过 agent_adapter.connect_mcp() 连接，确保与 close_mcp() 在同一 task
         if mcp_context is not None:
-            await agent._connect_mcp()
-            mcp_connected = list(agent._mcp_stacks.keys())
+            await agent_adapter.connect_mcp()
+            mcp_connected = list(agent_adapter.mcp_stacks.keys())
             if mcp_connected:
                 logger.info(f"MCP工具已连接: {mcp_connected}")
 
@@ -637,18 +610,17 @@ def start(
     provider = adapter.get_provider_instance()
     agent_defaults = adapter.get_agent_defaults()
 
-    # 4. 工作区模板同步与WebUI品牌配置
+    # 4. 工作区模板同步
     from nanobot.utils.helpers import sync_workspace_templates
 
     sync_workspace_templates(workspace)
-    _setup_webui_branding()
 
     # 5. 创建消息总线和Agent
     from nanobot.bus import MessageBus
 
     bus = MessageBus()
 
-    # 加载 MCP 配置，传入 AgentLoop 由 _connect_mcp() 统一连接
+    # 加载 MCP 配置，传入 AgentLoop 由 AgentLoopAdapter 统一连接
     # 确保 connect/close 在同一 task，避免 anyio cancel scope 跨 task 报错
     mcp_servers: dict[str, Any] = {}
     if context:
@@ -660,7 +632,12 @@ def start(
         bus, provider, agent_defaults, workspace, runner_tools, mcp_servers
     )
 
-    # MCP 连接/断开均在 _run_gateway 内通过 agent 完成
+    # v0.32.0: 通过 AgentLoopAdapter 封装 AgentLoop 私有 API，隔离 nanobot 版本变更风险
+    from src.core.agent_loop_adapter import AgentLoopAdapter
+
+    agent_adapter = AgentLoopAdapter(agent)
+
+    # MCP 连接/断开均在 _run_gateway 内通过 agent_adapter 完成
     mcp_context = agent if mcp_servers else None
 
     # 6. 创建 SessionManager 和通道管理器
@@ -684,12 +661,10 @@ def start(
     integration = _setup_gateway_integration(workspace, bus, context)
     cron = integration.setup_cron_service(auto_register_reminder=True)
 
-    # 设置流式输出Hook
-    # v0.30.0: nanobot-ai 0.2.1 中 AgentLoop 无公开 hooks 属性
-    # 改用 _extra_hooks 列表直接追加
+    # 设置流式输出Hook（通过 AgentLoopAdapter 封装私有 API）
     streaming_hook = integration.setup_streaming_hook()
     if streaming_hook:
-        agent._extra_hooks.append(streaming_hook)
+        agent_adapter.add_hook(streaming_hook)
 
     # 9. 心跳Cron任务（v0.30.0: 改用 CronService）
     hb_timezone = context.config.get("timezone") if context else None
@@ -715,7 +690,13 @@ def start(
     try:
         loop.run_until_complete(
             _run_gateway(
-                agent, channels, cron, fastapi_server, integration, mcp_context
+                agent,
+                channels,
+                cron,
+                fastapi_server,
+                integration,
+                mcp_context,
+                agent_adapter,
             )
         )
     finally:
