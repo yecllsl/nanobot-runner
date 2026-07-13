@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from nanobot.agent.hook import AgentHook, AgentHookContext
+from nanobot.agent.hook import AgentHook, AgentHookContext, AgentRunHookContext
 
 from src.core.base.logger import get_logger
 from src.core.evolution.models import DecisionLog
@@ -47,6 +47,10 @@ class DecisionLogHook(AgentHook):
 
     直接继承AgentHook（非ObservabilityHook），作为独立Hook注册，
     避免与ObservabilityHook的finalize_content产生状态竞争。
+
+    在Agent run 生命周期中（nanobot-ai 0.2.2 新增）：
+    - before_run: 记录 run 开始（仅日志）
+    - after_run: 记录 run 结束及错误（仅日志）
 
     在Agent迭代生命周期中：
     - before_iteration: 重置状态
@@ -93,6 +97,17 @@ class DecisionLogHook(AgentHook):
         self._current_goal_state = None
         self._reasoning_buffer = []
         self._reasoning_complete = False
+
+    async def before_run(self, context: AgentRunHookContext) -> None:
+        """Agent run 开始前回调（nanobot-ai 0.2.2 新增）
+
+        记录 run 开始，用于追踪决策会话边界。
+        不创建 DecisionLog（那是 finalize_content 的职责）。
+
+        Args:
+            context: Run-level Hook 上下文，此时大部分字段为空
+        """
+        logger.debug("Agent run 开始: session=%s", self._session_key or "unknown")
 
     async def before_execute_tools(self, context: AgentHookContext) -> None:
         """工具执行前捕获工具调用到_tool_call_chain
@@ -213,6 +228,33 @@ class DecisionLogHook(AgentHook):
             pass
         except Exception as e:
             logger.warning("进化触发检查异常（不影响主流程）: %s", e)
+
+    async def after_run(self, context: AgentRunHookContext) -> None:
+        """Agent run 结束后回调（nanobot-ai 0.2.2 新增）
+
+        记录 run 结束，包含运行统计。若发生错误则记录 warning。
+        不创建 DecisionLog（那是 finalize_content 的职责）。
+
+        Args:
+            context: Run-level Hook 上下文，包含完整运行结果
+        """
+        # 使用 getattr 安全访问，兼容 mock 上下文
+        tools_used = getattr(context, "tools_used", None) or []
+        stop_reason = getattr(context, "stop_reason", None)
+        error = getattr(context, "error", None)
+        exception = getattr(context, "exception", None)
+        has_error = bool(error or exception)
+
+        logger.debug(
+            "Agent run 结束: tools=%d, error=%s, stop_reason=%s",
+            len(tools_used),
+            has_error,
+            stop_reason,
+        )
+
+        if has_error:
+            error_msg = error or str(exception)
+            logger.warning("Agent run 异常结束: %s", error_msg)
 
     @staticmethod
     def goal_state_raw(metadata: dict[str, Any] | None) -> str | None:

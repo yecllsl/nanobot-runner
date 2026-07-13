@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import shutil
 import tempfile
 from pathlib import Path
@@ -13,7 +14,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from nanobot.agent.hook import AgentHook, AgentHookContext
+from nanobot.agent.hook import AgentHook, AgentHookContext, AgentRunHookContext
 
 from src.core.evolution.decision_log_hook import DecisionLogHook
 from src.core.evolution.decision_logger import DecisionLogger
@@ -604,3 +605,97 @@ class TestDecisionLogHookV025Integration:
 
         # 不应抛出异常
         run_async(hook.after_iteration(MagicMock()))
+
+
+class TestRunLevelHook:
+    """测试 run-level hook（nanobot-ai 0.2.2 新增 before_run/after_run）"""
+
+    _LOGGER_NAME = "src.core.evolution.decision_log_hook"
+
+    def test_before_run_is_async(self, hook: DecisionLogHook) -> None:
+        """before_run 应为异步方法"""
+        assert inspect.iscoroutinefunction(hook.before_run)
+
+    def test_after_run_is_async(self, hook: DecisionLogHook) -> None:
+        """after_run 应为异步方法"""
+        assert inspect.iscoroutinefunction(hook.after_run)
+
+    def test_before_run_logs_start(
+        self, hook: DecisionLogHook, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """before_run 应记录 run 开始日志"""
+        context = MagicMock(spec=AgentRunHookContext)
+        context.messages = []
+        with caplog.at_level(logging.DEBUG, logger=self._LOGGER_NAME):
+            run_async(hook.before_run(context))
+        assert any("run 开始" in r.message for r in caplog.records)
+
+    def test_after_run_logs_completion(
+        self, hook: DecisionLogHook, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """after_run 正常结束时应记录 run 结束日志"""
+        context = MagicMock(spec=AgentRunHookContext)
+        context.final_content = "test response"
+        context.tools_used = ["tool1"]
+        context.usage = {"total_tokens": 100}
+        context.stop_reason = "stop"
+        context.error = None
+        context.exception = None
+        with caplog.at_level(logging.DEBUG, logger=self._LOGGER_NAME):
+            run_async(hook.after_run(context))
+        assert any("run 结束" in r.message for r in caplog.records)
+
+    def test_after_run_with_error_logs_warning(
+        self, hook: DecisionLogHook, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """after_run 遇到错误时应记录 warning 日志"""
+        context = MagicMock(spec=AgentRunHookContext)
+        context.final_content = None
+        context.error = "LLM timeout"
+        context.exception = Exception("timeout")
+        context.tools_used = []
+        context.usage = {}
+        context.stop_reason = "error"
+        with caplog.at_level(logging.WARNING, logger=self._LOGGER_NAME):
+            run_async(hook.after_run(context))
+        assert any("异常" in r.message for r in caplog.records)
+
+    def test_after_run_no_error_no_warning(
+        self, hook: DecisionLogHook, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """after_run 正常结束不应产生 warning 日志"""
+        context = MagicMock(spec=AgentRunHookContext)
+        context.final_content = "ok"
+        context.tools_used = []
+        context.usage = {}
+        context.stop_reason = "stop"
+        context.error = None
+        context.exception = None
+        with caplog.at_level(logging.WARNING, logger=self._LOGGER_NAME):
+            run_async(hook.after_run(context))
+        assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+
+    def test_before_run_does_not_create_decision_log(
+        self, hook: DecisionLogHook, engine: EvolutionEngine
+    ) -> None:
+        """before_run 不应创建 DecisionLog（那是 finalize_content 的职责）"""
+        context = MagicMock(spec=AgentRunHookContext)
+        context.messages = []
+        run_async(hook.before_run(context))
+        decisions = engine.get_decision_history(limit=10)
+        assert len(decisions) == 0
+
+    def test_after_run_does_not_create_decision_log(
+        self, hook: DecisionLogHook, engine: EvolutionEngine
+    ) -> None:
+        """after_run 不应创建 DecisionLog（那是 finalize_content 的职责）"""
+        context = MagicMock(spec=AgentRunHookContext)
+        context.final_content = "test"
+        context.tools_used = []
+        context.usage = {}
+        context.stop_reason = "stop"
+        context.error = None
+        context.exception = None
+        run_async(hook.after_run(context))
+        decisions = engine.get_decision_history(limit=10)
+        assert len(decisions) == 0
