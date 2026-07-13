@@ -91,6 +91,13 @@
     "token_ttl_s": 86400,
     "token_ttl_s_comment": "JWT 令牌有效时长（秒），默认 24 小时"
   },
+  "providers": {
+    "mistral": {
+      "api_key": "",
+      "api_key_comment": "api_key 为敏感数据，请放入 .env.local（MISTRAL_API_KEY），勿写入此文件。nanobot 0.2.2 内置 38 个 Provider（含 mistral/groq/nvidia 等）",
+      "api_base": "https://api.mistral.ai/v1"
+    }
+  },
   "tools": {
     "mcp_servers": {
       "weather": {
