@@ -8,7 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from src.core.base.exceptions import NanobotRunnerError
+from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.schema import AppConfig
 
@@ -21,22 +21,8 @@ class ConfigSource(Enum):
     DEFAULT = "default"
 
 
-ENV_KEY_MAPPING: dict[str, str] = {
-    # 仅保留敏感字段
-    "feishu_app_id": "NANOBOT_FEISHU_APP_ID",
-    "feishu_app_secret": "NANOBOT_FEISHU_APP_SECRET",  # nosec B105
-}
-
-# WebSocket 环境变量映射，仅保留敏感字段
-WS_ENV_KEY_MAPPING: dict[str, str] = {
-    "token": "NANOBOT_WS_TOKEN",  # nosec B105
-    "token_issue_secret": "NANOBOT_WS_TOKEN_SECRET",  # nosec B105
-}
-
-# WebUI 环境变量映射，仅保留敏感字段
-WEBUI_ENV_KEY_MAPPING: dict[str, str] = {
-    "token_secret": "NANOBOT_WEBUI_TOKEN_SECRET",  # nosec B105
-}
+# Runner 专有字段无需环境变量覆盖
+ENV_KEY_MAPPING: dict[str, str] = {}
 
 # 需要布尔类型转换的配置键
 BOOL_KEYS: set[str] = {"auto_push_feishu", "enabled"}
@@ -150,18 +136,17 @@ class ConfigManager:
 
     @staticmethod
     def _get_default_config() -> dict[str, Any]:
-        """获取默认配置（仅包含非敏感字段）
+        """获取默认配置（仅 Runner 专有字段）
 
         Returns:
             dict: 默认配置字典
         """
         return {
-            "version": "0.9.4",
+            "version": "0.32.0",
             "data_dir": str(Path.home() / ".nanobot-runner" / "data"),
+            "timezone": "Asia/Shanghai",
             "auto_push_feishu": False,
-            "feishu_app_id": "",
-            "feishu_receive_id": "",
-            "feishu_receive_id_type": "user_id",
+            "user_id": "default_user",
         }
 
     def _ensure_dirs(self) -> None:
@@ -253,6 +238,38 @@ class ConfigManager:
 
         return config
 
+    def get_nanobot_config_path(self) -> Path:
+        """获取 nanobot_config.json 路径
+
+        Returns:
+            Path: nanobot_config.json 文件路径
+        """
+        return self.base_dir / "nanobot_config.json"
+
+    def load_nanobot_config(self) -> dict[str, Any]:
+        """加载 nanobot_config.json
+
+        nanobot_config.json 是 nanobot 配置的唯一真实源，包含
+        providers/agents/channels/model_presets/tools 等字段。
+
+        Returns:
+            dict[str, Any]: nanobot 配置字典，文件不存在时返回空 dict
+
+        Raises:
+            ConfigError: JSON 格式错误时抛出（规格 7.3 错误处理要求）
+        """
+        path = self.get_nanobot_config_path()
+        if not path.exists():
+            return {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ConfigError(
+                f"配置文件格式错误，请检查 nanobot_config.json: {e}",
+                recovery_suggestion="请修正 JSON 语法错误",
+            ) from e
+
     def get(self, key: str, default: Any = None) -> Any:
         """获取配置项
 
@@ -319,17 +336,6 @@ class ConfigManager:
             if env_value is not None:
                 config[config_key] = self._cast_env_value(config_key, env_value)
 
-        # WebSocket 环境变量覆盖
-        ws_config = config.get("websocket", {})
-        if not isinstance(ws_config, dict):
-            ws_config = {}
-        for ws_key, env_key in WS_ENV_KEY_MAPPING.items():
-            env_value = os.getenv(env_key)
-            if env_value is not None:
-                ws_config[ws_key] = self._cast_env_value(ws_key, env_value)
-        if ws_config:
-            config["websocket"] = ws_config
-
         return config
 
     @staticmethod
@@ -380,217 +386,51 @@ class ConfigManager:
     def validate_config_consistency(self) -> list[dict[str, str]]:
         """验证配置一致性
 
-        检查环境变量与配置文件之间的值是否冲突。
-
         Returns:
-            list[dict[str, str]]: 不一致项列表，每项包含field、env_value、file_value
+            list[dict[str, str]]: 不一致项列表
         """
-        inconsistencies: list[dict[str, str]] = []
-
-        if self._using_default:
-            return inconsistencies
-
-        try:
-            file_config = self.load_config()
-        except NanobotRunnerError:
-            return inconsistencies
-
-        for config_key, env_key in ENV_KEY_MAPPING.items():
-            env_value = os.getenv(env_key)
-            if env_value is not None and config_key in file_config:
-                file_value = str(file_config[config_key])
-                casted_env = self._cast_env_value(config_key, env_value)
-                if str(casted_env) != file_value:
-                    inconsistencies.append(
-                        {
-                            "field": config_key,
-                            "env_value": env_value,
-                            "file_value": file_value,
-                        }
-                    )
-
-        return inconsistencies
-
-    def get_llm_config(self) -> dict[str, Any]:
-        """获取LLM配置
-
-        - 非敏感字段（provider/model/base_url）：仅从配置文件读取
-        - 敏感字段（api_key）：仅从环境变量读取
-
-        Returns:
-            dict[str, Any]: LLM配置字典，包含provider、model、api_key、base_url
-        """
-        config = self.load_config()
-        return {
-            "provider": config.get("llm_provider", ""),
-            "model": config.get("llm_model", ""),
-            "api_key": os.getenv("NANOBOT_LLM_API_KEY"),
-            "base_url": config.get("llm_base_url"),
-        }
-
-    def get_websocket_config(self) -> dict[str, Any]:
-        """获取 WebSocket 配置
-
-        从 config.json 的 websocket 配置节读取，支持环境变量覆盖。
-        优先级：环境变量 > 配置文件 > 默认值
-
-        Returns:
-            dict[str, Any]: WebSocket 配置字典，配置节不存在时返回空 dict
-        """
-        config = self.load_config()
-
-        # 读取 websocket 配置节，不存在或类型异常时返回空 dict
-        ws_raw: Any = config.get("websocket", {})
-        if not isinstance(ws_raw, dict):
-            ws_config: dict[str, Any] = {}
-        else:
-            ws_config = dict(ws_raw)  # 浅拷贝，避免修改原始配置
-
-        # 环境变量覆盖配置文件值，类型转换复用 _cast_env_value
-        for ws_key, env_key in WS_ENV_KEY_MAPPING.items():
-            env_value = os.getenv(env_key)
-            if env_value is not None:
-                ws_config[ws_key] = self._cast_env_value(ws_key, env_value)
-
-        return ws_config
-
-    def get_webui_config(self) -> dict[str, Any]:
-        """获取 WebUI REST API 配置
-
-        从 config.json 的 webui 配置节读取，支持环境变量覆盖。
-        优先级：环境变量 > 配置文件 > 默认值
-
-        Returns:
-            dict[str, Any]: WebUI 配置字典，配置节不存在时返回含默认值的 dict
-        """
-        config = self.load_config()
-
-        # 读取 webui 配置节，不存在或类型异常时使用默认值
-        webui_raw: Any = config.get("webui", {})
-        if not isinstance(webui_raw, dict):
-            webui_config: dict[str, Any] = {}
-        else:
-            webui_config = dict(webui_raw)
-
-        # 环境变量覆盖
-        for webui_key, env_key in WEBUI_ENV_KEY_MAPPING.items():
-            env_value = os.getenv(env_key)
-            if env_value is not None:
-                webui_config[webui_key] = self._cast_env_value(webui_key, env_value)
-
-        # 填充默认值（仅在字段缺失时）
-        webui_config.setdefault("enabled", False)
-        webui_config.setdefault("host", "127.0.0.1")
-        webui_config.setdefault("port", 8766)
-        webui_config.setdefault(
-            "cors_origins", ["http://127.0.0.1:8765", "http://localhost:8765"]
-        )
-        webui_config.setdefault("token_secret", "")
-        webui_config.setdefault("token_ttl_s", 86400)
-
-        return webui_config
+        return []
 
     def has_llm_config(self) -> bool:
-        """检查是否配置了LLM
+        """检查是否配置了有效的 LLM
+
+        检查 nanobot_config.json 是否有 providers.default
+        且对应 provider 有非空 apiKey。
 
         Returns:
-            bool: 是否存在LLM配置（至少包含provider和model）
+            bool: 是否存在有效 LLM 配置
         """
-        llm = self.get_llm_config()
-        return bool(llm.get("provider") and llm.get("model"))
+        nano_cfg = self.load_nanobot_config()
+        providers = nano_cfg.get("providers", {})
+        default_provider = providers.get("default", "")
+        if not default_provider:
+            return False
+        provider_cfg = providers.get(default_provider, {})
+        return bool(provider_cfg.get("apiKey"))
 
-    def save_llm_config(
-        self,
-        provider: str,
-        model: str,
-        base_url: str | None = None,
-        api_key: str | None = None,
-    ) -> None:
-        """保存LLM配置
+    def resolve_webui_dist(self) -> Path | None:
+        """解析 WebUI dist 目录
 
-        将LLM配置项保存到config.json，API Key保存到.env.local。
-
-        Args:
-            provider: LLM提供商名称
-            model: 模型名称
-            base_url: 自定义API端点URL（可选）
-            api_key: API密钥（可选，保存到.env.local而非config.json）
-        """
-        config = self.load_config()
-        config["llm_provider"] = provider
-        config["llm_model"] = model
-
-        if base_url is not None:
-            config["llm_base_url"] = base_url
-        elif "llm_base_url" in config:
-            del config["llm_base_url"]
-
-        self.save_config(config)
-
-        if api_key is not None:
-            from src.core.config.env_manager import EnvManager
-
-            env_manager = EnvManager(env_file=self.base_dir / ".env.local")
-            env_vars: dict[str, str] = {
-                "NANOBOT_LLM_API_KEY": api_key,
-                # ponytail: 仅保存敏感数据到 .env.local
-            }
-            env_manager.save_env_file(env_vars)
-
-    def get_fallback_api_key(self, provider: str) -> str | None:
-        """获取备选供应商 API Key
-
-        查找优先级：
-        1. NANOBOT_LLM_API_KEY_{PROVIDER_UPPER}
-        2. NANOBOT_LLM_API_KEY（主供应商 Key 兜底）
-
-        Args:
-            provider: 供应商名称
+        优先使用 RunFlowAgent 自有 dist（项目根/webui/dist），
+        回退到 nanobot 内置 dist（nanobot/web/dist）。
 
         Returns:
-            str | None: API Key，未找到返回 None
+            Path | None: dist 目录路径，不存在则返回 None
         """
-        provider_key = f"NANOBOT_LLM_API_KEY_{provider.upper()}"
-        key = os.getenv(provider_key)
-        if key:
-            return key
-        return os.getenv("NANOBOT_LLM_API_KEY")
+        custom_dist = Path(__file__).parent.parent.parent.parent / "webui" / "dist"
+        if custom_dist.exists():
+            return custom_dist
 
-    def get_fallback_models(self) -> list[dict[str, Any]]:
-        """获取备选供应商配置列表
+        try:
+            import nanobot.web as web_pkg
 
-        从 config.json 的 fallback_models 和 model_presets 中解析完整的备选供应商配置。
+            nanobot_dist = Path(web_pkg.__file__).parent / "dist"
+            if nanobot_dist.exists():
+                return nanobot_dist
+        except (ImportError, AttributeError):
+            pass
 
-        Returns:
-            list[dict[str, Any]]: 备选供应商配置列表，每个字典包含 provider/model/base_url/api_key
-        """
-        config = self.load_config()
-        fallback_names: list[str] = config.get("fallback_models") or []
-        presets: dict[str, dict[str, Any]] = config.get("model_presets") or {}
-
-        result: list[dict[str, Any]] = []
-        for name in fallback_names:
-            preset = presets.get(name)
-            if preset is None:
-                logger.warning(
-                    f"fallback_models 引用的预设 '{name}' 在 model_presets 中不存在，跳过"
-                )
-                continue
-            provider = preset.get("provider", "")
-            model = preset.get("model", "")
-            if not provider or not model:
-                logger.warning(f"预设 '{name}' 缺少 provider 或 model，跳过")
-                continue
-            api_key = self.get_fallback_api_key(provider)
-            result.append(
-                {
-                    "provider": provider,
-                    "model": model,
-                    "base_url": preset.get("base_url"),
-                    "api_key": api_key,
-                }
-            )
-        return result
+        return None
 
 
 config = ConfigManager(allow_default=True)

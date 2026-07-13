@@ -53,10 +53,10 @@ class TestConfigManager:
                 with open(cm.config_file, encoding="utf-8") as f:
                     config_data = json.load(f)
 
-                assert config_data["version"] == "0.9.4"
+                assert config_data["version"] == "0.32.0"
                 assert "data_dir" in config_data
                 assert "auto_push_feishu" in config_data
-                assert "feishu_app_id" in config_data
+                assert "timezone" in config_data
 
     def test_allow_default_does_not_auto_create_config(self, tmp_path):
         """测试 allow_default=True 时不自动创建配置文件
@@ -283,3 +283,88 @@ class TestConfigManager:
                     )
 
                 assert not cm._is_cache_valid()
+
+
+class TestNanobotConfigLoading:
+    """测试 nanobot_config.json 读取功能（v0.32.0）"""
+
+    def test_get_nanobot_config_path(self, tmp_path):
+        """测试获取 nanobot_config.json 路径"""
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            assert cm.get_nanobot_config_path() == tmp_path / "nanobot_config.json"
+
+    def test_load_nanobot_config_not_exists(self, tmp_path):
+        """nanobot_config.json 不存在时返回空 dict"""
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            result = cm.load_nanobot_config()
+            assert result == {}
+
+    def test_load_nanobot_config_exists(self, tmp_path):
+        """nanobot_config.json 存在时返回配置字典"""
+        nano_config = {
+            "providers": {
+                "default": "custom",
+                "custom": {"apiKey": "sk-test", "apiBase": "https://api.test.com/v1"},
+            },
+            "agents": {"defaults": {"model": "test-model"}},
+        }
+        nano_path = tmp_path / "nanobot_config.json"
+        nano_path.write_text(json.dumps(nano_config), encoding="utf-8")
+
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            result = cm.load_nanobot_config()
+            assert result["providers"]["default"] == "custom"
+            assert result["agents"]["defaults"]["model"] == "test-model"
+
+    def test_has_llm_config_true(self, tmp_path):
+        """nanobot_config.json 有有效 provider+apiKey 时 has_llm_config 返回 True"""
+        nano_config = {
+            "providers": {
+                "default": "custom",
+                "custom": {"apiKey": "sk-test", "apiBase": "https://api.test.com/v1"},
+            },
+        }
+        nano_path = tmp_path / "nanobot_config.json"
+        nano_path.write_text(json.dumps(nano_config), encoding="utf-8")
+
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            assert cm.has_llm_config() is True
+
+    def test_has_llm_config_false_no_file(self, tmp_path):
+        """nanobot_config.json 不存在时 has_llm_config 返回 False"""
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            assert cm.has_llm_config() is False
+
+    def test_has_llm_config_false_no_api_key(self, tmp_path):
+        """provider 存在但 apiKey 为空时 has_llm_config 返回 False"""
+        nano_config = {
+            "providers": {
+                "default": "custom",
+                "custom": {"apiKey": "", "apiBase": "https://api.test.com/v1"},
+            },
+        }
+        nano_path = tmp_path / "nanobot_config.json"
+        nano_path.write_text(json.dumps(nano_config), encoding="utf-8")
+
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            assert cm.has_llm_config() is False
+
+    def test_resolve_webui_dist_returns_path_or_none(self, tmp_path):
+        """resolve_webui_dist 返回 Path 或 None"""
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            result = cm.resolve_webui_dist()
+            assert result is None or isinstance(result, Path)
