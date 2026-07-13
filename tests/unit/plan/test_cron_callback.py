@@ -326,3 +326,182 @@ class TestCreateTrainingReminderJob:
 
         assert job_config["schedule"]["expr"] == "0 8 * * *"
         assert job_config["schedule"]["tz"] == "Asia/Shanghai"
+
+
+class TestSessionBinding:
+    """Cron 会话绑定测试（v0.32.0）"""
+
+    @pytest.mark.anyio
+    async def test_default_job_with_session_key(self):
+        """测试带 session_key 的默认任务"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_session_001",
+            name="custom_session_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(
+                kind="agent_turn",
+                message="会话任务",
+                session_key="feishu:12345",
+            ),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        result = await handler._handle_default(job)
+
+        assert result is not None
+        assert "session=feishu:12345" in result
+
+    @pytest.mark.anyio
+    async def test_default_job_with_delivery_context(self):
+        """测试带投递上下文的默认任务"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_delivery_001",
+            name="delivery_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(
+                kind="agent_turn",
+                message="投递任务",
+                session_key="feishu:12345",
+                origin_channel="feishu",
+                origin_chat_id="chat_001",
+                origin_metadata={"user_id": "user_123"},
+            ),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        result = await handler._handle_default(job)
+
+        assert result is not None
+        assert "channel=feishu" in result
+        assert "session=feishu:12345" in result
+
+    @pytest.mark.anyio
+    async def test_default_job_without_delivery_context(self):
+        """测试无投递上下文的默认任务（向后兼容）"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_no_delivery_001",
+            name="simple_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(kind="agent_turn", message="简单任务"),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        result = await handler._handle_default(job)
+
+        assert result is not None
+        assert "简单任务" in result
+        # 无投递上下文时不应包含 session 信息
+        assert "session=" not in result
+
+    @pytest.mark.anyio
+    async def test_default_job_no_payload_session(self):
+        """测试无 session_key 的 payload"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_no_session_001",
+            name="no_session_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(kind="agent_turn", message="无会话"),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        result = await handler._handle_default(job)
+
+        assert result is not None
+        assert "无会话" in result
+
+    @pytest.mark.anyio
+    async def test_resolve_delivery_context_success(self):
+        """测试解析投递上下文成功"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_resolve_001",
+            name="resolve_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(
+                kind="agent_turn",
+                message="测试",
+                origin_channel="feishu",
+                origin_chat_id="chat_001",
+                origin_metadata={"key": "value"},
+            ),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        ctx = handler._resolve_delivery_context(job)
+
+        assert ctx is not None
+        assert ctx[0] == "feishu"
+        assert ctx[1] == "chat_001"
+        assert ctx[2] == {"key": "value"}
+
+    @pytest.mark.anyio
+    async def test_resolve_delivery_context_none(self):
+        """测试无投递上下文时返回 None"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_resolve_002",
+            name="no_ctx_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(kind="agent_turn", message="测试"),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        ctx = handler._resolve_delivery_context(job)
+
+        assert ctx is None
+
+    @pytest.mark.anyio
+    async def test_on_job_with_session_bound_job(self):
+        """测试 on_job 处理会话绑定任务"""
+        handler = CronCallbackHandler()
+
+        job = CronJob(
+            id="test_on_job_session_001",
+            name="custom_agent_job",
+            enabled=True,
+            schedule=CronSchedule(kind="cron", expr="0 9 * * *"),
+            payload=CronPayload(
+                kind="agent_turn",
+                message="Agent 会话任务",
+                session_key="feishu:12345",
+                origin_channel="feishu",
+                origin_chat_id="chat_001",
+            ),
+            state=CronJobState(),
+            created_at_ms=0,
+            updated_at_ms=0,
+        )
+
+        result = await handler.on_job(job)
+
+        assert result is not None
+        assert "session=feishu:12345" in result
+        assert "channel=feishu" in result

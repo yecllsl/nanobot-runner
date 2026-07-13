@@ -4,6 +4,7 @@
 import logging
 from typing import Any
 
+from nanobot.cron.session_delivery import origin_delivery_context
 from nanobot.cron.types import CronJob
 
 from src.core.base.exceptions import NanobotRunnerError
@@ -65,7 +66,7 @@ class CronCallbackHandler:
         Returns:
             Optional[str]: 处理结果消息，None表示无需返回
         """
-        logger.info(f"Cron任务执行: {job.name} ({job.id})")
+        logger.info("Cron任务执行: %s (%s)", job.name, job.id)
 
         try:
             # 根据任务名称分发
@@ -80,7 +81,7 @@ class CronCallbackHandler:
                 return await self._handle_default(job)
 
         except NanobotRunnerError as e:
-            logger.error(f"Cron任务处理异常: {job.name} - {e}", exc_info=True)
+            logger.error("Cron任务处理异常: %s - %s", job.name, e, exc_info=True)
             raise  # 抛出异常让 CronService 记录错误状态
 
     async def _handle_training_reminder(self, job: CronJob) -> str | None:
@@ -100,7 +101,7 @@ class CronCallbackHandler:
         result = self.reminder_manager.on_reminder_trigger()
 
         if result.get("sent"):
-            logger.info(f"训练提醒发送成功: {result.get('record', {}).get('id')}")
+            logger.info("训练提醒发送成功: %s", result.get("record", {}).get("id"))
             return f"训练提醒已发送: {result['record']['message']}"
         elif result.get("reason") == "disabled":
             logger.info("训练提醒功能已禁用")
@@ -112,7 +113,7 @@ class CronCallbackHandler:
             logger.info("免打扰时段，跳过提醒")
             return "免打扰时段"
         else:
-            logger.warning(f"训练提醒未发送: {result.get('reason')}")
+            logger.warning("训练提醒未发送: %s", result.get("reason"))
             return f"提醒未发送: {result.get('reason', '未知原因')}"
 
     async def _handle_system_event(self, job: CronJob) -> str | None:
@@ -124,7 +125,7 @@ class CronCallbackHandler:
         Returns:
             Optional[str]: 处理结果
         """
-        logger.debug(f"系统事件任务: {job.name}")
+        logger.debug("系统事件任务: %s", job.name)
         # 系统事件通常由其他组件处理
         # 这里仅记录日志
         return f"系统事件已处理: {job.name}"
@@ -143,8 +144,31 @@ class CronCallbackHandler:
         logger.debug("心跳检测执行中")
         return "心跳检测完成"
 
+    def _resolve_delivery_context(
+        self, job: CronJob
+    ) -> tuple[str, str, dict[str, Any]] | None:
+        """解析 CronJob 的投递上下文
+
+        使用 nanobot 0.2.2 的 origin_delivery_context 函数提取
+        (channel, chat_id, metadata)。如果 job 没有投递上下文，返回 None。
+
+        Args:
+            job: CronJob 实例
+
+        Returns:
+            tuple[channel, chat_id, metadata] | None
+        """
+        try:
+            return origin_delivery_context(job)
+        except ValueError:
+            # job 没有 origin delivery context，这是正常的
+            return None
+
     async def _handle_default(self, job: CronJob) -> str | None:
         """默认任务处理
+
+        对于 agent_turn 类型的任务，提取会话信息并记录。
+        使用 nanobot 0.2.2 的 origin_delivery_context 解析投递上下文。
 
         Args:
             job: CronJob 实例
@@ -152,9 +176,30 @@ class CronCallbackHandler:
         Returns:
             Optional[str]: 处理结果
         """
-        logger.debug(f"默认任务处理: {job.name}")
-        # 对于 agent_turn 类型的任务，CronService 会调用 on_job
-        # 但通常这些任务由 Agent 处理，这里仅记录
+        session_key = getattr(job.payload, "session_key", None) if job.payload else None
+        delivery_ctx = self._resolve_delivery_context(job)
+
+        if delivery_ctx is not None:
+            channel, chat_id, metadata = delivery_ctx
+            logger.debug(
+                "会话绑定任务: %s, session=%s, channel=%s, chat_id=%s",
+                job.name,
+                session_key or "unknown",
+                channel,
+                chat_id,
+            )
+            return f"任务已记录: {job.name} (session={session_key or 'unknown'}, channel={channel})"
+
+        # ponytail: 移除了未使用的 msg 变量；新增 session_key 存在但无 delivery context 的分支
+        if session_key is not None:
+            logger.debug(
+                "会话任务(无投递上下文): %s, session=%s",
+                job.name,
+                session_key,
+            )
+            return f"任务已记录: {job.name} (session={session_key})"
+
+        logger.debug("默认任务处理: %s", job.name)
         if job.payload and job.payload.message:
             return f"任务已记录: {job.name} - {job.payload.message[:50]}"
         return f"任务已记录: {job.name}"
