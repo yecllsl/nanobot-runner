@@ -1118,7 +1118,7 @@ wheels = [
 
 [[package]]
 name = "nanobot-ai"
-version = "0.2.1"
+version = "0.2.2"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple/" }
 dependencies = [
     { name = "anthropic" },
@@ -1134,6 +1134,7 @@ dependencies = [
     { name = "json-repair" },
     { name = "lark-oapi" },
     { name = "loguru" },
+    { name = "lxml-html-clean" },
     { name = "mcp" },
     { name = "msgpack" },
     { name = "oauth-cli-kit" },
@@ -1161,9 +1162,9 @@ dependencies = [
     { name = "websocket-client" },
     { name = "websockets" },
 ]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/90/f0/aa0bdc438b14083f63419b341bffdbb0dbab34db78c0d85624dc5d8b63c7/nanobot_ai-0.2.1.tar.gz", hash = "sha256:6d2df995bf4a9f8ad07f841bb2fc6926fd7d49c5cf2126e151e2f69c471e27ab" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/db/b7/f13c1c7a9cccbd8cd275c077d78e48128de169e32ea783423e36af78c5cb/nanobot_ai-0.2.2.tar.gz", hash = "sha256:711ca035da526b380b84997a03ca3b3ed8a93cb6c6403db9b3921570bc14a7ec" }
 wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/8a/ce/335db9e37924f6c456b15c13e55a8a1b2f214ed1becf032ece4a8354a494/nanobot_ai-0.2.1-py3-none-any.whl", hash = "sha256:0053391f287afc3f4503d9c2e5aaf50b50c45a058927a50064538518f1315197" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/e0/87/767aeb88ff044da112fb86ffdb92a1f98f79904dc91359ea280297901a8b/nanobot_ai-0.2.2-py3-none-any.whl", hash = "sha256:3f71011e2b0b5f97f2480151d013ed167b2163a4d92913d8e00aceafc648a82e" },
 ]
 
 [[package]]
@@ -1234,7 +1235,7 @@ requires-dist = [
     { name = "fitparse", specifier = ">=1.1.0" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27.0" },
     { name = "joblib", specifier = ">=1.3.0" },
-    { name = "nanobot-ai", specifier = ">=0.2.1" },
+    { name = "nanobot-ai", specifier = ">=0.2.2,<0.3.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "plotext", specifier = ">=5.0.0" },
     { name = "polars", specifier = ">=0.20.0" },
