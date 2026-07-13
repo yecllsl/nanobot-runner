@@ -47,29 +47,6 @@ class TestAppConfigValidate:
         assert is_valid is False
         assert any("版本号格式错误" in e for e in errors)
 
-    def test_validate_invalid_receive_id_type(self):
-        """测试验证无效的接收者 ID 类型"""
-        config = {
-            "version": "0.1.0",
-            "data_dir": "/data",
-            "feishu_receive_id_type": "invalid_type",
-        }
-        is_valid, errors = AppConfig.validate(config)
-        assert is_valid is False
-        assert any("feishu_receive_id_type 值错误" in e for e in errors)
-
-    def test_validate_valid_receive_id_types(self):
-        """测试验证有效的接收者 ID 类型"""
-        valid_types = ["user_id", "open_id", "union_id"]
-        for receive_type in valid_types:
-            config = {
-                "version": "0.1.0",
-                "data_dir": "/data",
-                "feishu_receive_id_type": receive_type,
-            }
-            is_valid, errors = AppConfig.validate(config)
-            assert is_valid is True, f"类型 {receive_type} 应该有效"
-
     def test_validate_wrong_field_type(self):
         """测试验证错误的字段类型"""
         config = {
@@ -87,10 +64,8 @@ class TestAppConfigValidate:
             "version": "0.1.0",
             "data_dir": "/data",
             "auto_push_feishu": True,
-            "feishu_app_id": "app123",
-            "feishu_app_secret": "secret123",
-            "feishu_receive_id": "user123",
-            "feishu_receive_id_type": "user_id",
+            "timezone": "Asia/Shanghai",
+            "user_id": "default_user",
         }
         is_valid, errors = AppConfig.validate(config)
         assert is_valid is True
@@ -139,8 +114,8 @@ class TestAppConfigFromDict:
         }
         app_config = AppConfig.from_dict(config)
         assert app_config.auto_push_feishu is False
-        assert app_config.feishu_receive_id_type == "user_id"
-        assert app_config.feishu_app_id is None
+        assert app_config.timezone == "Asia/Shanghai"
+        assert app_config.user_id == "default_user"
 
     def test_from_dict_filters_unknown_fields(self):
         """测试从字典创建配置过滤未知字段"""
@@ -163,13 +138,11 @@ class TestAppConfigToDict:
             version="0.1.0",
             data_dir="/data",
             auto_push_feishu=True,
-            feishu_app_id="app123",
         )
         config_dict = app_config.to_dict()
         assert config_dict["version"] == "0.1.0"
         assert config_dict["data_dir"] == "/data"
         assert config_dict["auto_push_feishu"] is True
-        assert config_dict["feishu_app_id"] == "app123"
 
     def test_to_dict_with_all_fields(self):
         """测试配置转字典包含所有字段"""
@@ -177,15 +150,13 @@ class TestAppConfigToDict:
             version="0.1.0",
             data_dir="/data",
             auto_push_feishu=True,
-            feishu_app_id="app123",
-            feishu_app_secret="secret123",
-            feishu_receive_id="user123",
-            feishu_receive_id_type="open_id",
+            timezone="UTC",
+            user_id="my_user",
         )
         config_dict = app_config.to_dict()
-        assert len(config_dict) == 16
-        assert config_dict["feishu_receive_id_type"] == "open_id"
-        assert config_dict["timezone"] == "Asia/Shanghai"
+        assert len(config_dict) == 5
+        assert config_dict["timezone"] == "UTC"
+        assert config_dict["user_id"] == "my_user"
 
 
 class TestAppConfigInit:
@@ -203,14 +174,13 @@ class TestAppConfigInit:
             version="0.2.0",
             data_dir="/test/data",
             auto_push_feishu=True,
-            feishu_app_id="app456",
-            feishu_app_secret="secret456",
-            feishu_receive_id="user456",
-            feishu_receive_id_type="union_id",
+            timezone="UTC",
+            user_id="test_user",
         )
         assert app_config.version == "0.2.0"
         assert app_config.auto_push_feishu is True
-        assert app_config.feishu_receive_id_type == "union_id"
+        assert app_config.timezone == "UTC"
+        assert app_config.user_id == "test_user"
 
     def test_init_invalid_version(self):
         """测试无效版本号初始化"""
@@ -244,4 +214,55 @@ class TestAppConfigConstants:
         assert AppConfig.FIELD_TYPES["version"] == str
         assert AppConfig.FIELD_TYPES["data_dir"] == str
         assert AppConfig.FIELD_TYPES["auto_push_feishu"] == bool
-        assert AppConfig.FIELD_TYPES["feishu_receive_id_type"] == str
+        assert AppConfig.FIELD_TYPES["user_id"] == str
+
+
+class TestAppConfigSlimSchema:
+    """测试 v0.32.0 精简后 AppConfig Schema"""
+
+    def test_slim_config_valid(self):
+        """精简后仅含 Runner 专有字段的配置应验证通过"""
+        config = {
+            "version": "0.32.0",
+            "data_dir": "/data",
+            "timezone": "Asia/Shanghai",
+            "auto_push_feishu": True,
+            "user_id": "default_user",
+        }
+        is_valid, errors = AppConfig.validate(config)
+        assert is_valid is True
+        assert len(errors) == 0
+
+    def test_legacy_llm_fields_ignored(self):
+        """旧版 llm 字段不应导致验证失败（向后兼容）"""
+        config = {
+            "version": "0.32.0",
+            "data_dir": "/data",
+            "llm_provider": "openai",
+            "llm_model": "gpt-4o-mini",
+        }
+        is_valid, errors = AppConfig.validate(config)
+        assert is_valid is True
+
+    def test_user_id_field_accepted(self):
+        """user_id 字段应被接受"""
+        config = {
+            "version": "0.32.0",
+            "data_dir": "/data",
+            "user_id": "my_user",
+        }
+        is_valid, _ = AppConfig.validate(config)
+        assert is_valid is True
+
+    def test_from_dict_slim(self):
+        """from_dict 应能创建精简后的 AppConfig 实例"""
+        config = {
+            "version": "0.32.0",
+            "data_dir": "/data",
+            "timezone": "Asia/Shanghai",
+            "auto_push_feishu": False,
+            "user_id": "default_user",
+        }
+        app_config = AppConfig.from_dict(config)
+        assert app_config.version == "0.32.0"
+        assert app_config.user_id == "default_user"
