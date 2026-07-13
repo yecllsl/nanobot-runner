@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v11.0.0 | **更新日期**: 2026-07-11
-> **当前基线**: v0.31.0
+> **版本**: v12.0.0 | **更新日期**: 2026-07-13
+> **当前基线**: v0.32.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -26,7 +26,7 @@
 - 云端存储
 - 实时流处理
 
-> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互。v0.28.0 新增 WebUI 数据可视化，提供 6 大跑步数据页面。
+> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互。v0.28.0 新增 WebUI 数据可视化，提供 6 大跑步数据页面。v0.32.0 升级 nanobot-ai 至 0.2.2，移除 monkey-patch 技术债，新增 SDK 编程式调用、运行时事件总线、自定义 Provider、语音转录配置。
 
 ---
 
@@ -34,7 +34,7 @@
 
 | 类别 | 技术 | 版本要求 |
 |------|------|----------|
-| **核心底座** | nanobot-ai | Latest |
+| **核心底座** | nanobot-ai | 0.2.2 |
 | **开发语言** | Python | 3.11+ |
 | **CLI框架** | Typer + Rich | Latest |
 | **数据存储** | Apache Parquet | via pyarrow |
@@ -110,7 +110,11 @@ src/
 │           ├── body_signal.py  # 身体信号API
 │           ├── evolution.py    # 进化引擎API (v0.29.0)
 │           ├── plan.py         # 训练计划API (v0.29.0)
-│           └── settings.py     # 设置中心API (v0.29.0)
+│           ├── settings.py     # 设置中心API (v0.29.0)
+│           └── runtime_events.py # 运行时事件SSE API (v0.32.0)
+│   ├── config_injector.py      # 配置注入器 - 替代 monkey-patch (v0.32.0)
+│   ├── sdk_adapter.py          # SDK 编程式调用适配器 (v0.32.0)
+│   └── provider_adapter.py     # Provider 适配器 + DynamicProviderRegistry (v0.32.0)
 ├── agents/
 │   ├── tools.py                # Agent 工具集
 │   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
@@ -142,11 +146,29 @@ AppContext
     ├── profile: ProfileEngine
     ├── session_repo: SessionRepository
     ├── config: ConfigManager
+    ├── config_injector: ConfigInjector  # v0.32.0 - 替代 monkey-patch
+    ├── sdk_adapter: SDKAdapter          # v0.32.0 - SDK 编程式调用
     ├── plan_manager: PlanManager
     ├── evolution_engine: EvolutionEngine  # v0.23.0-v0.25.0
     └── ... (其他组件)
     ↓
 CLI Handlers / Agent Tools
+```
+
+### 3.4 nanobot-ai 0.2.2 集成架构 (v0.32.0)
+
+```
+RunFlowAgent 配置 (~/.nanobot-runner/config.json)
+    ↓
+ConfigInjector.build_nanobot_config()
+    ↓
+nanobot Config 对象 (Pydantic 模型)
+    ↓
+Nanobot.from_config() / AgentLoop
+    ↓
+RuntimeEventHook (订阅运行时事件) → WebUI SSE 端点
+DynamicProviderRegistry (自定义 Provider 注册)
+SDKAdapter (编程式 Agent 调用)
 ```
 
 > 详细模块设计见：[架构设计说明书](docs/architecture/架构设计说明书.md)

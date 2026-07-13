@@ -330,6 +330,78 @@ uv run bandit -r src/ -s B101,B601
 uv run pytest tests/unit/ --cov=src --cov-fail-under=80
 ```
 
+## 9. SDK 编程式调用指南（v0.32.0 新增）
+
+nanobot-ai 0.2.2 提供了正式的 SDK API，通过 `SDKAdapter` 封装使用。
+
+### 9.1 基本用法
+
+```python
+from src.core.sdk_adapter import SDKAdapter
+
+# 创建适配器
+adapter = SDKAdapter(config_path=Path("~/.nanobot-runner/config.json"))
+
+# 非流式调用
+result = await adapter.run(
+    message="分析今日训练负荷",
+    session_key="session-001",
+)
+print(result.content)
+
+# 流式调用
+async for event in adapter.stream(
+    message="生成本周报告",
+    session_key="session-001",
+):
+    if event.delta:
+        print(event.delta, end="", flush=True)
+```
+
+### 9.2 配置注入
+
+```python
+from src.core.config_injector import ConfigInjector
+
+injector = ConfigInjector(config_path=Path("~/.nanobot-runner/config.json"))
+nanobot_config = injector.build_nanobot_config(runner_config)
+# nanobot_config 是 nanobot Config Pydantic 模型，传给 Nanobot.from_config()
+```
+
+## 10. 运行时事件订阅指南（v0.32.0 新增）
+
+通过 `RuntimeEventHook` 订阅 nanobot 运行时事件总线，事件通过 WebUI SSE 端点推送。
+
+### 10.1 事件类型
+
+| 事件 | 方法 | 触发时机 |
+|------|------|---------|
+| turn_completed | RuntimeEventPublisher.turn_completed | Agent turn 完成 |
+| session_turn_started | RuntimeEventPublisher.session_turn_started | 会话 turn 开始 |
+| run_status_changed | RuntimeEventPublisher.run_status_changed | 运行状态变更 |
+
+### 10.2 WebUI SSE 订阅
+
+```bash
+# 通过 SSE 端点订阅运行时事件
+curl -N -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:8766/api/runtime-events
+```
+
+### 10.3 自定义 Provider 注册
+
+```python
+from src.core.provider_adapter import DynamicProviderRegistry
+
+# 注册自定义 Provider
+DynamicProviderRegistry.register_custom_provider(
+    name="my-provider",
+    api_base="https://api.example.com/v1",
+    api_key="sk-xxx",
+    default_model="example-model",
+)
+```
+
 ---
 
-*文档版本: v0.30.0 | 更新日期: 2026-06-22*
+*文档版本: v0.32.0 | 更新日期: 2026-07-13*
