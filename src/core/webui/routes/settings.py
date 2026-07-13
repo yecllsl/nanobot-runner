@@ -101,3 +101,52 @@ async def get_system_config(
     """获取系统配置（只读）"""
     context = request.app.state.context
     return await run_in_threadpool(_get_system_config, context)
+
+
+class CustomProviderCreate(BaseModel):
+    """自定义 Provider 创建请求体"""
+
+    name: str = Field(..., min_length=1, max_length=64)
+    api_base: str = Field(..., min_length=1)
+    api_key: str = Field(..., min_length=1)
+    default_model: str = Field(..., min_length=1)
+
+
+@router.get("/settings/custom-providers")
+async def list_custom_providers(
+    request: Request,
+    user: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """列出自定义 Provider"""
+    from src.core.provider_adapter import DynamicProviderRegistry
+
+    return {"providers": DynamicProviderRegistry.list_custom_providers()}
+
+
+@router.post("/settings/custom-providers")
+async def add_custom_provider(
+    request: Request,
+    payload: CustomProviderCreate,
+    user: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """添加自定义 OpenAI 兼容 Provider
+
+    名称与内置 Provider 冲突时返回 success=False（不抛异常）。
+    """
+    from src.core.provider_adapter import DynamicProviderRegistry
+
+    DynamicProviderRegistry.register_custom_provider(
+        name=payload.name,
+        api_base=payload.api_base,
+        api_key=payload.api_key,
+        default_model=payload.default_model,
+    )
+    # register_custom_provider 名称冲突时会 warning + return（不抛异常）
+    # 通过检查是否真的注册成功来判断
+    registered = payload.name in DynamicProviderRegistry.list_custom_providers()
+    if not registered:
+        return {
+            "success": False,
+            "message": f"Provider 名称 '{payload.name}' 与内置冲突",
+        }
+    return {"success": True, "message": f"Provider '{payload.name}' 注册成功"}

@@ -113,3 +113,103 @@ class TestSystemConfigEndpoint:
     def test_system_config_requires_auth(self, client: TestClient) -> None:
         response = client.get("/api/settings/system")
         assert response.status_code == 401
+
+
+class TestCustomProviderEndpoint:
+    """GET/POST /api/settings/custom-providers"""
+
+    @pytest.fixture(autouse=True)
+    def _clear_custom_providers(self):
+        """每个测试前后清理 DynamicProviderRegistry 类级状态"""
+        from src.core.provider_adapter import DynamicProviderRegistry
+
+        DynamicProviderRegistry._custom_providers.clear()
+        DynamicProviderRegistry._provider_metadata.clear()
+        yield
+        DynamicProviderRegistry._custom_providers.clear()
+        DynamicProviderRegistry._provider_metadata.clear()
+
+    def test_list_empty_returns_200(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        response = client.get("/api/settings/custom-providers", headers=auth_headers)
+        assert response.status_code == 200
+        assert "providers" in response.json()
+
+    def test_add_provider_returns_success(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        response = client.post(
+            "/api/settings/custom-providers",
+            json={
+                "name": "test-custom-provider",
+                "api_base": "https://api.example.com/v1",
+                "api_key": "sk-test",
+                "default_model": "gpt-4",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+
+    def test_add_provider_appears_in_list(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        client.post(
+            "/api/settings/custom-providers",
+            json={
+                "name": "test-list-provider",
+                "api_base": "https://api.example.com/v1",
+                "api_key": "sk-test",
+                "default_model": "gpt-4",
+            },
+            headers=auth_headers,
+        )
+        response = client.get("/api/settings/custom-providers", headers=auth_headers)
+        assert "test-list-provider" in response.json()["providers"]
+
+    def test_add_builtin_name_conflict_returns_failure(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """名称与内置 Provider 冲突时返回 success=False"""
+        response = client.post(
+            "/api/settings/custom-providers",
+            json={
+                "name": "openai",  # 内置名称
+                "api_base": "https://api.example.com/v1",
+                "api_key": "sk-test",
+                "default_model": "gpt-4",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+
+    def test_add_invalid_payload_returns_422(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """缺少必填字段时返回 422"""
+        response = client.post(
+            "/api/settings/custom-providers",
+            json={"name": "incomplete"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 422
+
+    def test_list_requires_auth(self, client: TestClient) -> None:
+        response = client.get("/api/settings/custom-providers")
+        assert response.status_code == 401
+
+    def test_add_requires_auth(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/settings/custom-providers",
+            json={
+                "name": "no-auth",
+                "api_base": "https://api.example.com/v1",
+                "api_key": "sk-test",
+                "default_model": "gpt-4",
+            },
+        )
+        assert response.status_code == 401
