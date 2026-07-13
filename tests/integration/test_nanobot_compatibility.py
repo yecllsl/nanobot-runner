@@ -319,3 +319,85 @@ class TestNanobotCronServiceCompatibility:
         cron = CronService(store_path=store_path)
 
         assert cron is not None
+
+
+class TestNanobot022BreakingChanges:
+    """验证 nanobot-ai 0.2.2 破坏性变更已正确适配
+
+    基于 0.2.2 升级公告的 7 项破坏性变更，验证 RunFlowAgent 不受影响
+    或已完成适配。
+    """
+
+    def test_base_class_available(self):
+        """验证 Base 类可从 config.schema 导入
+
+        0.2.2 公告：Base 类迁移到 config_base.py。
+        实际调研：config.schema 仍可导入 Base，无需 fallback。
+        """
+        from nanobot.config.schema import Base
+
+        assert Base is not None
+
+    def test_context_window_tokens_default(self):
+        """验证 context_window_tokens 默认值
+
+        0.2.2 公告：context_window_tokens 默认值变更。
+        RunFlowAgent 显式控制此值，不受默认值影响。
+        """
+        from nanobot.config.schema import AgentDefaults
+
+        defaults = AgentDefaults()
+        assert defaults.context_window_tokens in [65536, 200000], (
+            f"意外的默认值: {defaults.context_window_tokens}"
+        )
+
+    def test_webui_modules_importable(self):
+        """验证 webui 模块重构后仍可导入
+
+        0.2.2 公告：websocket.py 重构。
+        实际调研：settings_api/mcp_presets_api/cli_apps_api 模块仍存在。
+        RunFlowAgent 移除 monkey-patch 后不再依赖这些模块的本地引用。
+        """
+        import nanobot.webui.cli_apps_api  # noqa: F401
+        import nanobot.webui.mcp_presets_api  # noqa: F401
+        import nanobot.webui.settings_api  # noqa: F401
+
+    def test_dream_class_removed(self):
+        """验证 Dream 类已删除
+
+        0.2.2 公告：Dream 类移除，改为 cron + process_direct 模式。
+        RunFlowAgent 的 DreamIntegration 已适配此变更。
+        """
+        try:
+            from nanobot.agent.memory import Dream  # noqa: F401
+
+            raise AssertionError("Dream 类应已删除")
+        except ImportError:
+            pass  # 预期行为：Dream 类已移除
+
+    def test_agent_loop_has_submit_cron_turn(self):
+        """验证 AgentLoop 新增 submit_cron_turn 公开方法
+
+        0.2.2 新增：submit_cron_turn 替代私有 cron 调用。
+        AgentLoopAdapter 已封装此方法。
+        """
+        from nanobot.agent.loop import AgentLoop
+
+        assert hasattr(AgentLoop, "submit_cron_turn"), (
+            "AgentLoop 应包含 submit_cron_turn 方法（0.2.2 新增）"
+        )
+
+    def test_agent_hook_has_run_level_methods(self):
+        """验证 AgentHook 新增 run-level hook
+
+        0.2.2 新增：before_run/after_run 方法。
+        DecisionLogHook 已接入这两个方法。
+        """
+        from nanobot.agent.hook import AgentHook
+
+        assert hasattr(AgentHook, "before_run"), (
+            "AgentHook 应包含 before_run 方法（0.2.2 新增）"
+        )
+        assert hasattr(AgentHook, "after_run"), (
+            "AgentHook 应包含 after_run 方法（0.2.2 新增）"
+        )
