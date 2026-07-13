@@ -322,6 +322,21 @@ class RunnerProviderAdapter:
 
         return self._build_nanobot_config_from_runner()
 
+    def save_nanobot_config(self, path: Path) -> None:
+        """将构建好的 nanobot 兼容配置写入文件
+
+        避免 nanobot 直接加载 Runner 配置（含 extra_forbidden 字段）而失败，
+        同时让 nanobot 运行时数据仍落在 Runner 目录下。
+
+        Args:
+            path: 要写入的配置文件路径
+        """
+        from nanobot.config.loader import save_config
+
+        config = self._get_or_create_nanobot_config()
+        save_config(config, path)
+        logger.debug(f"nanobot 兼容配置已写入: {path}")
+
     def _build_nanobot_config_from_runner(self) -> Any:
         """从项目配置构建nanobot配置对象
 
@@ -330,26 +345,51 @@ class RunnerProviderAdapter:
         """
         try:
             from nanobot.config.loader import Config
-            from nanobot.config.schema import AgentsConfig, ProvidersConfig
+            from nanobot.config.schema import (
+                AgentsConfig,
+                ProviderConfig,
+                ProvidersConfig,
+            )
 
             llm_dict = self._runner_config.get_llm_config()
             provider_name = llm_dict.get("provider", "openai")
+            runner_config = self._runner_config.load_config()
 
             providers = ProvidersConfig(
                 default=provider_name,
             )
+            # 使用 nanobot 标准的 ProviderConfig 对象，避免序列化后字段名不匹配
+            # api_key 由 Runner 在运行时从环境变量读取并注入 provider 实例，
+            # 生成的配置文件不保留密钥，仅用于 WebUI 展示等场景。
             setattr(
                 providers,
                 provider_name,
-                {
-                    "api_key_env": "NANOBOT_LLM_API_KEY",
-                    **(
-                        {"base_url": llm_dict["base_url"]}
-                        if llm_dict.get("base_url")
-                        else {}
-                    ),
-                },
+                ProviderConfig(
+                    api_key=None,
+                    api_base=llm_dict.get("base_url") or None,
+                ),
             )
+
+            # 同步 model_presets 中涉及的 provider 配置，
+            # 使 fallback / 运行时模型切换能正确定位 API 端点。
+            # 仅当该 provider 尚无有效 api_base 时才写入，避免覆盖 default。
+            for preset_data in runner_config.get("model_presets", {}).values():
+                if not isinstance(preset_data, dict):
+                    continue
+                preset_provider = preset_data.get("provider")
+                preset_base_url = preset_data.get("base_url")
+                if not preset_provider or not preset_base_url:
+                    continue
+                existing = getattr(providers, preset_provider, None)
+                if existing is None or getattr(existing, "api_base", None) is None:
+                    setattr(
+                        providers,
+                        preset_provider,
+                        ProviderConfig(
+                            api_key=None,
+                            api_base=preset_base_url,
+                        ),
+                    )
 
             # 从 config.json 读取 WebSocket 配置节，支持环境变量覆盖
             ws_config = self._runner_config.get_websocket_config()
@@ -383,7 +423,6 @@ class RunnerProviderAdapter:
             self._build_websocket_channel_config(channels, ws_config)
 
             # 注入 fallback_models 到 nanobot Config
-            runner_config = self._runner_config.load_config()
             fallback_names = runner_config.get("fallback_models", [])
             if fallback_names:
                 try:

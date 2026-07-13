@@ -257,18 +257,21 @@ def _init_gateway_context(
 
     try:
         context = get_context()
-        # 覆盖 nanobot-ai 默认配置路径，使所有运行时数据（media/cron/logs/webui）
-        # 写入项目目录 ~/.nanobot-runner/ 而非 ~/.nanobot/
-        from nanobot.config.loader import set_config_path
-
-        set_config_path(context.config.config_file)
-
         workspace = context.config.base_dir
         runner_tools = RunnerTools(context)
 
         if context.config.has_llm_config():
             # v0.27.0: 传入 webui_enabled 标志，启用 WebSocket 通道
             adapter = RunnerProviderAdapter(context.config, webui_enabled=webui)
+            # 先让 adapter 生成 nanobot 兼容配置并写入 Runner 目录，
+            # 再覆盖 nanobot-ai 默认配置路径。这样运行时数据仍写入
+            # ~/.nanobot-runner/，而 nanobot 不会直接加载含 Runner 私有字段的
+            # config.json，避免 extra_forbidden 校验失败。
+            from nanobot.config.loader import set_config_path
+
+            nanobot_config_path = context.config.base_dir / "nanobot_config.json"
+            adapter.save_nanobot_config(nanobot_config_path)
+            set_config_path(nanobot_config_path)
     except NanobotRunnerError:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
         workspace = Path.home() / ".nanobot-runner"
