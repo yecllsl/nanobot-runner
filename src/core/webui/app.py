@@ -99,6 +99,11 @@ def create_app(context: AppContext) -> FastAPI:
     app.state.webui_secret = token_secret
     app.state.webui_config = webui_config
 
+    # 初始化运行时事件 Hook（v0.32.0）
+    from src.core.transparency.runtime_event_hook import RuntimeEventHook
+
+    app.state.runtime_event_hook = RuntimeEventHook(event_publisher=None)
+
     # 健康检查端点（无需认证）
     @app.get("/api/health", tags=["system"])
     async def health_check() -> HealthCheckResponse:
@@ -117,6 +122,7 @@ def create_app(context: AppContext) -> FastAPI:
     from src.core.webui.routes.dashboard import router as dashboard_router
     from src.core.webui.routes.evolution import router as evolution_router
     from src.core.webui.routes.plan import router as plan_router
+    from src.core.webui.routes.runtime_events import router as runtime_events_router
     from src.core.webui.routes.settings import router as settings_router
     from src.core.webui.routes.training_load import router as training_load_router
     from src.core.webui.routes.vdot import router as vdot_router
@@ -130,6 +136,8 @@ def create_app(context: AppContext) -> FastAPI:
     app.include_router(plan_router, prefix="/api", tags=["plan"])
     app.include_router(evolution_router, prefix="/api", tags=["evolution"])
     app.include_router(settings_router, prefix="/api", tags=["settings"])
+    # v0.32.0 运行时事件 SSE 端点
+    app.include_router(runtime_events_router, prefix="/api", tags=["runtime-events"])
 
     # 挂载前端静态文件（SPA 模式）
     # 优先查找项目 webui/dist 目录，回退到 nanobot 内置目录
