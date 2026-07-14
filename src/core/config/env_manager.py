@@ -7,20 +7,7 @@ from src.core.base.logger import get_logger
 logger = get_logger(__name__)
 
 _ENV_TEMPLATE = """# Nanobot Runner 环境变量
-# === 仅保存敏感凭证 ===
-# 非敏感配置请放入 ~/.nanobot-runner/config.json
-
-# LLM API Key（敏感数据）
-NANOBOT_LLM_API_KEY=your-api-key-here
-
-# 飞书应用凭证（敏感数据）
-NANOBOT_FEISHU_APP_ID=
-NANOBOT_FEISHU_APP_SECRET=
-
-# WebSocket/WebUI 静态令牌（敏感数据）
-NANOBOT_WS_TOKEN=
-NANOBOT_WS_TOKEN_SECRET=
-NANOBOT_WEBUI_TOKEN_SECRET=
+# v0.32.0: LLM/飞书凭证已迁移至 nanobot_config.json，此文件保留用于自定义环境变量
 """
 
 
@@ -184,7 +171,7 @@ class EnvManager:
         """
         self.load_env(env_file)
 
-        # ponytail: 仅加载敏感的 API Key，非敏感配置由 config.json 管理
+        # ponytail: 仅加载敏感的 API Key，v0.32.0: 凭证已迁移至 nanobot_config.json
         llm_keys = [
             "NANOBOT_LLM_API_KEY",
         ]

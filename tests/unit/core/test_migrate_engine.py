@@ -5,9 +5,11 @@ from unittest.mock import patch
 
 import pytest
 
+from src import __version__
 from src.core.base.exceptions import StorageError
 from src.core.config.backup_manager import BackupManager
 from src.core.config.manager import ConfigManager
+from src.core.init.migrate import build_nanobot_config_from_legacy, migrate_config
 from src.core.migrate.engine import MigrationEngine
 from src.core.migrate.models import (
     BackupInfo,
@@ -545,3 +547,145 @@ class TestMigrationEngine:
                 engine = MigrationEngine(config=config)
                 result = engine.verify_migration()
                 assert isinstance(result, MigrationResult)
+
+
+class TestMigrateConfigToNanobot:
+    """测试旧版 config.json → nanobot_config.json 迁移"""
+
+    def test_build_nanobot_config_from_legacy_full(self):
+        """完整字段映射测试"""
+        legacy_config = {
+            "version": "0.31.0",
+            "data_dir": "/data",
+            "timezone": "Asia/Shanghai",
+            "llm_provider": "custom",
+            "llm_model": "agnes-2.0-flash",
+            "llm_base_url": "https://api.test.com/v1",
+            "fallback_models": ["nvidia-backup"],
+            "model_presets": {
+                "nvidia-backup": {
+                    "provider": "nvidia",
+                    "model": "deepseek-v4-flash",
+                    "base_url": "https://integrate.api.nvidia.com/v1",
+                }
+            },
+            "tools": {
+                "mcp_servers": {
+                    "weather": {
+                        "type": "stdio",
+                        "command": "npx",
+                        "args": ["-y", "@dangahagan/weather-mcp"],
+                    }
+                }
+            },
+        }
+        env_keys = {"NANOBOT_LLM_API_KEY": "sk-test-key"}
+
+        result = build_nanobot_config_from_legacy(legacy_config, env_keys)
+
+        # 验证 providers
+        assert result["providers"]["default"] == "custom"
+        assert result["providers"]["custom"]["apiKey"] == "sk-test-key"
+        assert result["providers"]["custom"]["apiBase"] == "https://api.test.com/v1"
+
+        # 验证 agents.defaults
+        assert result["agents"]["defaults"]["model"] == "agnes-2.0-flash"
+        assert result["agents"]["defaults"]["timezone"] == "Asia/Shanghai"
+        assert result["agents"]["defaults"]["fallbackModels"] == [
+            {"model": "deepseek-v4-flash", "provider": "nvidia"}
+        ]
+
+        # 验证 model_presets
+        assert "nvidia-backup" in result["model_presets"]
+
+        # 验证 tools.mcpServers
+        assert "weather" in result["tools"]["mcpServers"]
+
+    def test_build_nanobot_config_minimal(self):
+        """最小配置（无 fallback、无 tools）"""
+        legacy_config = {
+            "llm_provider": "openai",
+            "llm_model": "gpt-4o-mini",
+        }
+        env_keys = {}
+
+        result = build_nanobot_config_from_legacy(legacy_config, env_keys)
+
+        assert result["providers"]["default"] == "openai"
+        assert result["agents"]["defaults"]["model"] == "gpt-4o-mini"
+
+    def test_build_nanobot_config_no_llm(self):
+        """无 LLM 配置时返回空 providers"""
+        legacy_config = {"version": "0.31.0"}
+        result = build_nanobot_config_from_legacy(legacy_config, {})
+        assert "providers" in result
+        assert result["providers"].get("default", "") == ""
+
+    def test_migrate_config_full_flow(self, tmp_path: Path) -> None:
+        """测试 migrate_config 完整迁移流程"""
+        # 准备旧版 config.json
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir()
+        config_path = config_dir / "config.json"
+        legacy_config = {
+            "version": "0.31.0",
+            "data_dir": str(tmp_path / "data"),
+            "timezone": "Asia/Shanghai",
+            "llm_provider": "openai",
+            "llm_model": "gpt-4o-mini",
+            "llm_base_url": "https://api.openai.com/v1",
+            "auto_push_feishu": False,
+        }
+        config_path.write_text(json.dumps(legacy_config), encoding="utf-8")
+
+        # 准备 .env.local
+        env_path = config_dir / ".env.local"
+        env_path.write_text("NANOBOT_LLM_API_KEY=sk-test\n", encoding="utf-8")
+
+        # 使用真实的 ConfigManager（mock Path.home）
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            result = migrate_config(config)
+
+        # 验证迁移成功
+        assert result.success is True
+        assert "llm_provider" in result.migrated_fields
+        assert "llm_model" in result.migrated_fields
+
+        # 验证 nanobot_config.json 已生成
+        nano_path = config_dir / "nanobot_config.json"
+        assert nano_path.exists()
+        nano_config = json.loads(nano_path.read_text(encoding="utf-8"))
+        assert nano_config["providers"]["default"] == "openai"
+        assert nano_config["providers"]["openai"]["apiKey"] == "sk-test"
+        assert nano_config["agents"]["defaults"]["model"] == "gpt-4o-mini"
+
+        # 验证 config.json 已精简（不再含 llm 字段）
+        new_config = json.loads(config_path.read_text(encoding="utf-8"))
+        assert "llm_provider" not in new_config
+        assert "llm_model" not in new_config
+        assert new_config["version"] == __version__
+        assert new_config["data_dir"] == str(tmp_path / "data")
+
+        # 验证备份已创建
+        backup_path = config_dir / "config.json.bak"
+        assert backup_path.exists()
+        backup_config = json.loads(backup_path.read_text(encoding="utf-8"))
+        assert backup_config["llm_provider"] == "openai"
+
+    def test_migrate_config_no_legacy_fields(self, tmp_path: Path) -> None:
+        """测试 config.json 不含旧版字段时返回失败"""
+        config_dir = tmp_path / ".nanobot-runner"
+        config_dir.mkdir()
+        config_path = config_dir / "config.json"
+        config_path.write_text(
+            json.dumps({"version": "0.32.0", "data_dir": "/data"}),
+            encoding="utf-8",
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            config = ConfigManager(allow_default=True)
+            result = migrate_config(config)
+
+        assert result.success is False
+        assert any("不含旧版" in err for err in result.errors)

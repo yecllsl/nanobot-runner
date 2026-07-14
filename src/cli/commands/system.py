@@ -215,3 +215,42 @@ def validate(
 
     if not report.is_valid:
         raise typer.Exit(code=1)
+
+
+@app.command(name="migrate-config")
+def migrate_config_cmd(
+    auto: bool = typer.Option(False, "--auto", "-a", help="自动模式，跳过确认"),
+) -> None:
+    """将旧版 config.json 的 nanobot 字段迁移到 nanobot_config.json
+
+    v0.32.0 配置物理分离迁移工具。将 config.json 中的 llm_provider、
+    llm_model、model_presets、tools 等字段迁移到 nanobot_config.json，
+    并精简 config.json 为仅含 Runner 专有字段。
+    """
+    from src.core.config.manager import ConfigManager
+    from src.core.init.migrate import migrate_config
+
+    config = ConfigManager(allow_default=True)
+
+    if not auto:
+        confirm = typer.confirm(
+            "将迁移 config.json 中的 nanobot 字段到 nanobot_config.json，继续？"
+        )
+        if not confirm:
+            console.print("[dim]迁移已取消[/dim]")
+            return
+
+    result = migrate_config(config)
+
+    if result.success:
+        console.print("\n[bold green]✓ 迁移完成[/bold green]")
+        if result.config_path:
+            console.print(f"  nanobot 配置: [cyan]{result.config_path}[/cyan]")
+        console.print(f"  迁移字段: {', '.join(result.migrated_fields)}")
+        for w in result.warnings:
+            console.print(f"  [yellow]![/yellow] {w}")
+    else:
+        console.print("\n[bold red]✗ 迁移失败[/bold red]")
+        for err in result.errors:
+            console.print(f"  [red]✗[/red] {err}")
+        raise typer.Exit(code=1)

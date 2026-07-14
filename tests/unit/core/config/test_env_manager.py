@@ -110,5 +110,6 @@ class TestEnvManager:
         manager = EnvManager()
         template = manager.generate_env_template()
 
-        assert "NANOBOT_LLM_API_KEY" in template
-        assert "NANOBOT_FEISHU_APP_ID" in template
+        # v0.32.0: 模板已简化，凭证迁移至 nanobot_config.json
+        assert "nanobot_config.json" in template
+        assert "Nanobot Runner" in template

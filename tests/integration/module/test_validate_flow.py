@@ -83,7 +83,8 @@ class TestValidateFlowIntegration:
         manager = EnvManager(env_file=env_file)
 
         template = manager.generate_env_template()
-        assert "NANOBOT_LLM_API_KEY" in template
+        # v0.32.0: 模板已简化，凭证迁移至 nanobot_config.json
+        assert "nanobot_config.json" in template
 
         env_vars = {"NANOBOT_LLM_API_KEY": "sk-test"}
         manager.save_env_file(env_vars)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,211 @@ class MigrationResult:
     migrated_fields: list[str] = field(default_factory=list)
     config_path: Path | None = None
     env_path: Path | None = None
+
+
+def build_nanobot_config_from_legacy(
+    legacy_config: dict[str, Any],
+    env_keys: dict[str, str],
+) -> dict[str, Any]:
+    """将旧版 config.json 的 nanobot 字段迁移为 nanobot_config.json 格式
+
+    独立实现字段映射，不复用 RunnerProviderAdapter 私有方法。
+    字段映射参考规格说明书第 3.8 节。
+
+    Args:
+        legacy_config: 旧版 config.json 字典
+        env_keys: 从 .env.local 读取的环境变量字典
+
+    Returns:
+        dict[str, Any]: nanobot 原生格式配置字典
+    """
+    nanobot_config: dict[str, Any] = {}
+
+    # --- providers ---
+    provider_name = legacy_config.get("llm_provider", "")
+    providers: dict[str, Any] = {}
+
+    if provider_name:
+        providers["default"] = provider_name
+        provider_cfg: dict[str, Any] = {
+            "apiKey": env_keys.get("NANOBOT_LLM_API_KEY", ""),
+            "apiType": "auto",
+        }
+        base_url = legacy_config.get("llm_base_url")
+        if base_url:
+            provider_cfg["apiBase"] = base_url
+        providers[provider_name] = provider_cfg
+
+    # 备选供应商的 apiKey 和 apiBase
+    presets = legacy_config.get("model_presets", {})
+    fallback_names = legacy_config.get("fallback_models", [])
+    for name in fallback_names:
+        preset = presets.get(name, {})
+        fb_provider = preset.get("provider", "")
+        if not fb_provider or fb_provider in providers:
+            continue
+        fb_api_key = env_keys.get(f"NANOBOT_LLM_API_KEY_{fb_provider.upper()}", "")
+        fb_base_url = preset.get("base_url")
+        fb_cfg: dict[str, Any] = {"apiKey": fb_api_key, "apiType": "auto"}
+        if fb_base_url:
+            fb_cfg["apiBase"] = fb_base_url
+        providers[fb_provider] = fb_cfg
+
+    nanobot_config["providers"] = providers
+
+    # --- agents.defaults ---
+    agents_defaults: dict[str, Any] = {
+        "model": legacy_config.get("llm_model", ""),
+        "provider": "auto",
+        "timezone": legacy_config.get("timezone", "UTC"),
+        "workspace": "~/.nanobot-runner",
+        "botName": "nanobot-runner",
+        "botIcon": "🍀",
+    }
+
+    # fallbackModels
+    fb_list: list[dict[str, Any]] = []
+    for name in fallback_names:
+        preset = presets.get(name, {})
+        fb_provider = preset.get("provider", "")
+        fb_model = preset.get("model", "")
+        if fb_provider and fb_model:
+            fb_list.append({"model": fb_model, "provider": fb_provider})
+    if fb_list:
+        agents_defaults["fallbackModels"] = fb_list
+
+    nanobot_config["agents"] = {"defaults": agents_defaults}
+
+    # --- model_presets ---
+    nano_presets: dict[str, Any] = {}
+    for name, preset in presets.items():
+        if not isinstance(preset, dict):
+            continue
+        nano_presets[name] = {
+            "model": preset.get("model", ""),
+            "provider": preset.get("provider", "auto"),
+        }
+    nanobot_config["model_presets"] = nano_presets
+
+    # --- tools.mcpServers ---
+    tools_section = legacy_config.get("tools", {})
+    mcp_servers = tools_section.get("mcp_servers", {})
+    nanobot_config["tools"] = {"mcpServers": mcp_servers}
+
+    # --- channels（从环境变量迁移飞书凭证）---
+    channels: dict[str, Any] = {}
+    feishu_app_id = env_keys.get("NANOBOT_FEISHU_APP_ID", "")
+    feishu_app_secret = env_keys.get("NANOBOT_FEISHU_APP_SECRET", "")
+    if feishu_app_id and feishu_app_secret:
+        channels["feishu"] = {
+            "enabled": True,
+            "app_id": feishu_app_id,
+            "app_secret": feishu_app_secret,
+            "receive_id": env_keys.get("NANOBOT_FEISHU_RECEIVE_ID", ""),
+            "receive_id_type": "user_id",
+            "allowFrom": ["*"],
+        }
+    nanobot_config["channels"] = channels
+
+    return nanobot_config
+
+
+def migrate_config(
+    config_manager: ConfigManager,
+) -> MigrationResult:
+    """将旧版 config.json 的 nanobot 字段迁移到 nanobot_config.json
+
+    迁移流程：
+    1. 读取旧 config.json
+    2. 读取 .env.local 获取 API Key
+    3. 构建 nanobot_config.json
+    4. 备份旧 config.json 为 config.json.bak
+    5. 写入 nanobot_config.json
+    6. 精简 config.json（仅保留 Runner 专有字段）
+    7. 更新 .gitignore 排除 nanobot_config.json
+
+    Args:
+        config_manager: 配置管理器实例
+
+    Returns:
+        MigrationResult: 迁移结果
+    """
+    try:
+        legacy_config = config_manager.load_config()
+    except (OSError, ValueError, NanobotRunnerError) as e:
+        return MigrationResult(success=False, errors=[f"读取 config.json 失败: {e}"])
+
+    # 检查是否含旧版字段
+    has_legacy_fields = any(
+        key in legacy_config
+        for key in ("llm_provider", "llm_model", "llm_base_url", "fallback_models")
+    )
+    if not has_legacy_fields:
+        return MigrationResult(
+            success=False,
+            errors=["config.json 不含旧版 nanobot 字段，无需迁移"],
+        )
+
+    # 读取 .env.local
+    env_keys: dict[str, str] = {}
+    env_path = config_manager.base_dir / ".env.local"
+    if env_path.exists():
+        from src.core.config.env_manager import EnvManager
+
+        env_manager = EnvManager(env_file=env_path)
+        env_keys = env_manager.load_env()
+
+    # 构建 nanobot_config.json
+    nanobot_config = build_nanobot_config_from_legacy(legacy_config, env_keys)
+
+    # 备份旧 config.json
+    config_path = config_manager.config_file
+    backup_path = config_path.with_suffix(".json.bak")
+    shutil.copy2(config_path, backup_path)
+    logger.info(f"已备份旧配置: {backup_path}")
+
+    # 写入 nanobot_config.json
+    nano_path = config_manager.get_nanobot_config_path()
+    nano_path.write_text(
+        json.dumps(nanobot_config, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # 精简 config.json
+    runner_config = {
+        "version": __version__,
+        "data_dir": legacy_config.get("data_dir", str(config_manager.data_dir)),
+        "timezone": legacy_config.get("timezone", "Asia/Shanghai"),
+        "auto_push_feishu": legacy_config.get("auto_push_feishu", False),
+        "user_id": legacy_config.get("user_id", "default_user"),
+    }
+    try:
+        config_manager.save_config(runner_config)
+    except (ValueError, OSError) as e:
+        return MigrationResult(
+            success=False,
+            errors=[f"精简 config.json 失败（nanobot_config.json 已生成）: {e}"],
+            config_path=nano_path,
+        )
+
+    # 更新 .gitignore
+    from src.core.init.generator import ConfigGenerator
+
+    ConfigGenerator.ensure_gitignore_excludes_nanobot_config(config_manager.base_dir)
+
+    migrated_fields = [
+        k for k in ("llm_provider", "llm_model", "llm_base_url") if k in legacy_config
+    ]
+
+    return MigrationResult(
+        success=True,
+        migrated_fields=migrated_fields,
+        config_path=nano_path,
+        warnings=[
+            f"旧配置已备份至: {backup_path}",
+            "nanobot_config.json 已加入 .gitignore",
+        ],
+    )
 
 
 class ConfigMigrator:

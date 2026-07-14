@@ -8,6 +8,7 @@ class TestConfigGeneratorEnvLocal:
         return ConfigGenerator(env_manager=None)
 
     def test_fallback_api_keys_included(self):
+        """v0.32.0: 所有 env_vars 原样写入，含备选供应商 API Key"""
         gen = self._make_generator()
         env_vars = {
             "NANOBOT_LLM_PROVIDER": "siliconflow",
@@ -20,9 +21,9 @@ class TestConfigGeneratorEnvLocal:
         result = gen.generate_env_local(env_vars)
         assert "NANOBOT_LLM_API_KEY_NVIDIA=nvapi-test" in result
         assert "NANOBOT_LLM_API_KEY_OPENROUTER=sk-or-test" in result
-        assert "备选供应商" in result
 
-    def test_no_fallback_keys_omits_section(self):
+    def test_env_local_writes_all_vars(self):
+        """v0.32.0: 无备选 key 时仅写入传入的变量"""
         gen = self._make_generator()
         env_vars = {
             "NANOBOT_LLM_PROVIDER": "openai",
@@ -30,4 +31,4 @@ class TestConfigGeneratorEnvLocal:
             "NANOBOT_LLM_API_KEY": "sk-test",
         }
         result = gen.generate_env_local(env_vars)
-        assert "备选供应商" not in result
+        assert "NANOBOT_LLM_API_KEY=sk-test" in result

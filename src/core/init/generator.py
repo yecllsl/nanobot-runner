@@ -107,9 +107,9 @@ class ConfigGenerator:
         return json.dumps(config, indent=2, ensure_ascii=False)
 
     def generate_env_local(self, env_vars: dict[str, str]) -> str:
-        """生成 .env.local 文件内容（仅敏感凭证）
+        """生成 .env.local 文件内容
 
-        非敏感配置由 config.json 管理，.env.local 只保存 API Key、Token 等敏感数据。
+        v0.32.0: 凭证已写入 nanobot_config.json，.env.local 仅保留兼容性。
 
         Args:
             env_vars: 环境变量字典
@@ -117,35 +117,12 @@ class ConfigGenerator:
         Returns:
             str: .env.local 文件内容
         """
-        # ponytail: 移除了 NANOBOT_LLM_PROVIDER/MODEL/BASE_URL、NANOBOT_AUTO_PUSH_FEISHU
-        # 等非敏感字段，仅保留敏感凭证
+        if not env_vars:
+            return "# Nanobot Runner 环境变量\n# v0.32.0: 凭证已迁移至 nanobot_config.json\n"
+
         lines: list[str] = ["# Nanobot Runner 环境变量配置\n"]
-
-        if env_vars.get("NANOBOT_LLM_API_KEY"):
-            lines.append("# LLM API Key（敏感数据）\n")
-            lines.append(f"NANOBOT_LLM_API_KEY={env_vars['NANOBOT_LLM_API_KEY']}\n")
-
-        feishu_keys = [
-            "NANOBOT_FEISHU_APP_ID",
-            "NANOBOT_FEISHU_APP_SECRET",
-            "NANOBOT_FEISHU_RECEIVE_ID",
-        ]
-        has_feishu = any(env_vars.get(k) for k in feishu_keys)
-        if has_feishu:
-            lines.append("\n# 飞书通知凭证（敏感数据）\n")
-            for key in feishu_keys:
-                if env_vars.get(key):
-                    lines.append(f"{key}={env_vars[key]}\n")
-
-        fallback_prefix = "NANOBOT_LLM_API_KEY_"
-        fallback_keys = [
-            k for k in env_vars if k.startswith(fallback_prefix) and env_vars.get(k)
-        ]
-        if fallback_keys:
-            lines.append("\n# 备选供应商 API Key\n")
-            for key in fallback_keys:
-                lines.append(f"{key}={env_vars[key]}\n")
-
+        for k, v in env_vars.items():
+            lines.append(f"{k}={v}\n")
         return "".join(lines)
 
     def _copy_template_files(self, workspace_dir: Path) -> list[Path]:
@@ -345,7 +322,7 @@ class ConfigGenerator:
                 self._init_git_repo(workspace_dir)
 
             # 在 git 初始化写入白名单 .gitignore 之后，追加显式排除条目
-            self._ensure_gitignore_excludes_nanobot_config(workspace_dir)
+            self.ensure_gitignore_excludes_nanobot_config(workspace_dir)
 
             logger.info(f"配置文件已写入: {list(written.keys())}")
             return written
@@ -357,7 +334,7 @@ class ConfigGenerator:
             ) from e
 
     @staticmethod
-    def _ensure_gitignore_excludes_nanobot_config(workspace_dir: Path) -> None:
+    def ensure_gitignore_excludes_nanobot_config(workspace_dir: Path) -> None:
         """确保 .gitignore 排除 nanobot_config.json
 
         nanobot_config.json 包含 apiKey 等明文敏感凭证，
