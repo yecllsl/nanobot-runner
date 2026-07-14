@@ -11,7 +11,6 @@ from src.core.base.exceptions import LLMError, NanobotRunnerError
 from src.core.base.logger import get_logger
 from src.core.config.llm_config import LLMConfig
 from src.core.config.manager import ConfigManager
-from src.core.config_injector import ConfigInjector
 
 logger = get_logger(__name__)
 
@@ -101,9 +100,7 @@ class RunnerProviderAdapter:
         """
         self._runner_config = runner_config
         self._webui_enabled = webui_enabled
-        self._nanobot_config: Any | None = None
         self._provider_instance: Any | None = None
-        self._config_injector: ConfigInjector | None = None
 
     def get_llm_config(self) -> LLMConfig:
         """获取LLM配置
@@ -299,14 +296,6 @@ class RunnerProviderAdapter:
     def close(self) -> None:
         """关闭Provider连接，释放资源"""
         self._provider_instance = None
-
-    def set_config_injector(self, injector: ConfigInjector) -> None:
-        """注入 ConfigInjector 实例
-
-        Args:
-            injector: ConfigInjector 实例，用于替代 monkey-patch 机制
-        """
-        self._config_injector = injector
 
     def _get_or_create_nanobot_config(self) -> Any:
         """获取或创建nanobot配置对象

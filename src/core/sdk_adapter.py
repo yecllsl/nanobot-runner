@@ -14,7 +14,6 @@
 import logging
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
 
 from nanobot.nanobot import Nanobot
 
@@ -34,17 +33,13 @@ class SDKAdapter:
     - 训练计划自动生成（嵌入业务流程）
     """
 
-    def __init__(
-        self, workspace: str | Path | None = None, config_injector: Any = None
-    ):
+    def __init__(self, workspace: str | Path | None = None):
         """初始化 SDKAdapter
 
         Args:
             workspace: nanobot 工作区路径
-            config_injector: ConfigInjector 实例（预留，当前版本未使用）
         """
         self._workspace = workspace
-        self._injector = config_injector
 
     async def create_session(self, session_key: str = "sdk:default") -> Nanobot:
         """创建 SDK 会话
