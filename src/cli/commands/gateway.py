@@ -261,17 +261,14 @@ def _init_gateway_context(
         runner_tools = RunnerTools(context)
 
         if context.config.has_llm_config():
-            # v0.27.0: 传入 webui_enabled 标志，启用 WebSocket 通道
             adapter = RunnerProviderAdapter(context.config, webui_enabled=webui)
-            # 先让 adapter 生成 nanobot 兼容配置并写入 Runner 目录，
-            # 再覆盖 nanobot-ai 默认配置路径。这样运行时数据仍写入
-            # ~/.nanobot-runner/，而 nanobot 不会直接加载含 Runner 私有字段的
-            # config.json，避免 extra_forbidden 校验失败。
+            # v0.32.0: 直接指向用户维护的 nanobot_config.json，
+            # 不再调用 save_nanobot_config() 自动生成
             from nanobot.config.loader import set_config_path
 
-            nanobot_config_path = context.config.base_dir / "nanobot_config.json"
-            adapter.save_nanobot_config(nanobot_config_path)
-            set_config_path(nanobot_config_path)
+            nanobot_config_path = context.config.get_nanobot_config_path()
+            if nanobot_config_path.exists():
+                set_config_path(nanobot_config_path)
     except NanobotRunnerError:
         console.print("[yellow]警告: 无法初始化存储管理器[/yellow]")
         workspace = Path.home() / ".nanobot-runner"
@@ -355,7 +352,11 @@ def _setup_fastapi_server(context: Any, webui: bool) -> Any:
     if not webui or context is None:
         return None
 
-    webui_config = context.config.get_webui_config()
+    # v0.32.0: WebUI REST API 配置使用默认值（nanobot_config.json 无 webui 节）
+    webui_config = {
+        "host": "127.0.0.1",
+        "port": 8766,
+    }
     from src.core.webui.app import create_server
 
     fastapi_server = create_server(context)
@@ -431,7 +432,11 @@ def _display_channel_status(channels: Any, context: Any) -> None:
     )
     # v0.27.0: WebSocket 通道启用时，显示 WebUI 访问地址与安全提示
     if "websocket" in channels.enabled_channels and context is not None:
-        ws_config = context.config.get_websocket_config()
+        ws_config = (
+            context.config.load_nanobot_config()
+            .get("channels", {})
+            .get("websocket", {})
+        )
         ws_host = ws_config.get("host", "127.0.0.1")
         ws_port = ws_config.get("port", 8765)
         console.print(f"[green][OK][/green] WebUI 访问地址: http://{ws_host}:{ws_port}")
@@ -491,7 +496,9 @@ def _display_webui_info(
     ):
         return
 
-    ws_config = context.config.get_websocket_config()
+    ws_config = (
+        context.config.load_nanobot_config().get("channels", {}).get("websocket", {})
+    )
     ws_host = ws_config.get("host", "127.0.0.1")
     ws_port = ws_config.get("port", 8765)
     token_path = ws_config.get("token_issue_path") or "/token"
@@ -503,7 +510,7 @@ def _display_webui_info(
 
     # v0.28.0: WebUI API 文档
     if fastapi_server is not None:
-        webui_config = context.config.get_webui_config()
+        webui_config = {"host": "127.0.0.1", "port": 8766}
         api_host = webui_config.get("host", "127.0.0.1")
         api_port = webui_config.get("port", 8766)
         console.print(f"  - API文档: http://{api_host}:{api_port}/api/docs")
@@ -629,7 +636,7 @@ def start(
     if context:
         from src.core.tools.mcp_connector import load_mcp_servers_config
 
-        mcp_servers = load_mcp_servers_config(context.config.config_file)
+        mcp_servers = load_mcp_servers_config(context.config.get_nanobot_config_path())
 
     agent = _create_gateway_agent(
         bus, provider, agent_defaults, workspace, runner_tools, mcp_servers
@@ -650,8 +657,17 @@ def start(
     session_manager = SessionManager(workspace=workspace)
     get_runtime_model_name = _create_runtime_model_callback(adapter, agent)
 
+    # v0.32.0: ChannelManager 直接从 nanobot_config.json 加载 Config 对象
+    from nanobot.config.loader import load_config as load_nanobot_config_obj
+
+    nanobot_config_path = context.config.get_nanobot_config_path()
+    try:
+        nanobot_cfg = load_nanobot_config_obj(nanobot_config_path)
+    except ValueError as e:
+        console.print(f"[red]错误: nanobot_config.json 格式无效: {e}[/red]")
+        raise typer.Exit(1)
     channels = ChannelManager(
-        config=adapter._get_or_create_nanobot_config(),
+        config=nanobot_cfg,
         bus=bus,
         session_manager=session_manager,
         webui_runtime_model_name=get_runtime_model_name,
