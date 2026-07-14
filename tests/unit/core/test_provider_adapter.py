@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -13,17 +12,25 @@ from src.core.provider_adapter import AgentDefaults, RunnerProviderAdapter
 
 @pytest.fixture
 def mock_runner_config():
+    """模拟带 nanobot_config.json 的 ConfigManager（v0.32.0 配置物理分离）"""
     config = MagicMock(spec=ConfigManager)
     config.has_llm_config.return_value = True
-    config.get_llm_config.return_value = {
-        "provider": "openai",
-        "model": "gpt-4o-mini",
-        "api_key": "test-key",
-        "base_url": "https://api.openai.com",
-        "max_iterations": 10,
-        "context_window_tokens": 128000,
-        "context_block_limit": 10,
-        "max_tool_result_chars": 32000,
+    config.load_nanobot_config.return_value = {
+        "providers": {
+            "default": "openai",
+            "openai": {
+                "apiKey": "test-key",
+                "apiBase": "https://api.openai.com",
+                "apiType": "auto",
+            },
+        },
+        "agents": {
+            "defaults": {
+                "model": "gpt-4o-mini",
+                "maxToolIterations": 10,
+                "contextWindowTokens": 128000,
+            }
+        },
     }
 
     def _mock_get(key: str, default: Any = None) -> Any:
@@ -32,9 +39,6 @@ def mock_runner_config():
         return default
 
     config.get.side_effect = _mock_get
-    # 默认返回空的 WebSocket 配置，表示未启用
-    config.get_websocket_config.return_value = {}
-    # 添加 base_dir 属性，避免 _build_nanobot_config_from_runner 失败
     config.base_dir = Path("/test/runner")
     return config
 
@@ -114,18 +118,20 @@ class TestRunnerProviderAdapterGetAgentDefaults:
         """未配置 timezone 时，AgentDefaults 应回退到默认值"""
         config = MagicMock(spec=ConfigManager)
         config.has_llm_config.return_value = True
-        config.get_llm_config.return_value = {
-            "provider": "openai",
-            "model": "gpt-4o-mini",
-            "api_key": "test-key",
-            "max_iterations": 10,
-            "context_window_tokens": 128000,
-            "context_block_limit": 10,
-            "max_tool_result_chars": 32000,
+        config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {"apiKey": "test-key"},
+            },
+            "agents": {
+                "defaults": {
+                    "model": "gpt-4o-mini",
+                    "maxToolIterations": 10,
+                    "contextWindowTokens": 128000,
+                }
+            },
         }
         config.get.return_value = None
-        config.get_websocket_config.return_value = {}
-        config.base_dir = Path("/test/runner")
 
         adapter = RunnerProviderAdapter(config)
         defaults = adapter.get_agent_defaults()
@@ -168,485 +174,16 @@ class TestRunnerProviderAdapterHasRunnerLlmConfig:
         assert adapter._has_runner_llm_config() is False
 
 
-class TestRunnerProviderAdapterFromRunnerConfig:
-    def test_from_runner_config(self, mock_runner_config):
+class TestFromNanobotConfig:
+    """测试 _from_nanobot_config 方法（v0.32.0 重命名自 _from_runner_config）"""
+
+    def test_from_nanobot_config(self, mock_runner_config):
         adapter = RunnerProviderAdapter(mock_runner_config)
-        llm_config = adapter._from_runner_config()
+        llm_config = adapter._from_nanobot_config()
         assert llm_config.provider == "openai"
         assert llm_config.model == "gpt-4o-mini"
         assert llm_config.api_key == "test-key"
         assert llm_config.base_url == "https://api.openai.com"
-
-
-class TestParseEnvFile:
-    def test_parse_env_file(self, tmp_path: Path):
-        env_file = tmp_path / ".env"
-        env_file.write_text(
-            "KEY1=value1\nKEY2=value2\n# comment\n\nKEY3='quoted'\n",
-            encoding="utf-8",
-        )
-        result = RunnerProviderAdapter._parse_env_file(env_file)
-        assert result["KEY1"] == "value1"
-        assert result["KEY2"] == "value2"
-        assert result["KEY3"] == "quoted"
-
-    def test_parse_env_file_no_equals(self, tmp_path: Path):
-        env_file = tmp_path / ".env"
-        env_file.write_text("NOEQUALS\nKEY=val\n", encoding="utf-8")
-        result = RunnerProviderAdapter._parse_env_file(env_file)
-        assert "NOEQUALS" not in result
-        assert result["KEY"] == "val"
-
-    def test_parse_env_file_nonexistent(self, tmp_path: Path):
-        result = RunnerProviderAdapter._parse_env_file(tmp_path / "missing.env")
-        assert result == {}
-
-    def test_parse_env_file_empty_value(self, tmp_path: Path):
-        env_file = tmp_path / ".env"
-        env_file.write_text("EMPTY=\nKEY=val\n", encoding="utf-8")
-        result = RunnerProviderAdapter._parse_env_file(env_file)
-        assert "EMPTY" not in result
-        assert result["KEY"] == "val"
-
-
-# ============================================================
-# WebSocket 配置构建单元测试
-# ============================================================
-
-
-class TestBuildWebsocketChannelConfig:
-    """测试 _build_websocket_channel_config 方法的 WebSocket 通道配置构建逻辑"""
-
-    def test_webui_enabled_with_empty_config(self, mock_runner_config):
-        """webui_enabled=True 且 ws_config 为空时，应构建 WebSocket 通道配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config: dict[str, Any] = {}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        assert "websocket" in channels
-        ws = channels["websocket"]
-        assert ws["enabled"] is True
-        # 验证默认值
-        assert ws["host"] == "127.0.0.1"
-        assert ws["port"] == 8765
-        assert ws["path"] == "/"
-        assert ws["streaming"] is True
-
-    def test_webui_disabled_config_not_enabled(self, mock_runner_config):
-        """webui_enabled=False 且 config 中 enabled=False 时，不应构建 WebSocket 配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        channels: dict[str, Any] = {}
-        ws_config = {"enabled": False}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        assert "websocket" not in channels
-
-    def test_webui_disabled_but_config_enabled(self, mock_runner_config):
-        """webui_enabled=False 但 config 中 enabled=True 时，应构建 WebSocket 配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        channels: dict[str, Any] = {}
-        ws_config = {"enabled": True}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        assert "websocket" in channels
-        assert channels["websocket"]["enabled"] is True
-
-    def test_webui_enabled_and_config_enabled(self, mock_runner_config):
-        """webui_enabled=True 且 config 中 enabled=True 时，应构建 WebSocket 配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config = {"enabled": True}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        assert "websocket" in channels
-        assert channels["websocket"]["enabled"] is True
-
-    def test_custom_ws_config_values(self, mock_runner_config):
-        """自定义 WebSocket 配置值应正确写入通道配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config = {
-            "host": "0.0.0.0",
-            "port": 9999,
-            "path": "/ws",
-            "streaming": False,
-            "max_message_bytes": 1048576,
-            "ping_interval_s": 30.0,
-            "ping_timeout_s": 10.0,
-        }
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        ws = channels["websocket"]
-        assert ws["host"] == "0.0.0.0"
-        assert ws["port"] == 9999
-        assert ws["path"] == "/ws"
-        assert ws["streaming"] is False
-        assert ws["max_message_bytes"] == 1048576
-        assert ws["ping_interval_s"] == 30.0
-        assert ws["ping_timeout_s"] == 10.0
-
-    def test_security_config_defaults(self, mock_runner_config):
-        """安全配置默认值：token 为空，websocket_requires_token 为 True"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config: dict[str, Any] = {}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        ws = channels["websocket"]
-        assert ws["token"] == ""
-        assert ws["websocket_requires_token"] is True
-        assert ws["token_issue_path"] == ""
-        assert ws["token_issue_secret"] == ""
-        assert ws["token_ttl_s"] == 300
-
-    def test_security_config_custom_token(self, mock_runner_config):
-        """自定义安全配置：token 和 websocket_requires_token 正确传递"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config = {
-            "token": "my-secret-token",
-            "websocket_requires_token": False,
-            "token_issue_path": "/api/token",
-            "token_issue_secret": "issue-secret",
-            "token_ttl_s": 600,
-        }
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        ws = channels["websocket"]
-        assert ws["token"] == "my-secret-token"
-        assert ws["websocket_requires_token"] is False
-        assert ws["token_issue_path"] == "/api/token"
-        assert ws["token_issue_secret"] == "issue-secret"
-        assert ws["token_ttl_s"] == 600
-
-    def test_ssl_config_defaults(self, mock_runner_config):
-        """SSL 配置默认值为空字符串"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config: dict[str, Any] = {}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        ws = channels["websocket"]
-        assert ws["ssl_certfile"] == ""
-        assert ws["ssl_keyfile"] == ""
-
-    def test_allow_from_default(self, mock_runner_config):
-        """allow_from 默认值为 ['*']"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {}
-        ws_config: dict[str, Any] = {}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        ws = channels["websocket"]
-        assert ws["allow_from"] == ["*"]
-
-    def test_does_not_affect_existing_channels(self, mock_runner_config):
-        """构建 WebSocket 配置不应影响已有的其他通道配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        channels: dict[str, Any] = {
-            "feishu": {
-                "enabled": True,
-                "app_id": "test-app-id",
-                "app_secret": "test-secret",
-            }
-        }
-        ws_config: dict[str, Any] = {}
-
-        adapter._build_websocket_channel_config(channels, ws_config)
-
-        # 飞书通道应保持不变
-        assert "feishu" in channels
-        assert channels["feishu"]["app_id"] == "test-app-id"
-        assert channels["feishu"]["app_secret"] == "test-secret"
-        # WebSocket 通道应被添加
-        assert "websocket" in channels
-
-
-@pytest.fixture
-def mock_nanobot_modules():
-    """模拟 nanobot-ai 的配置模块，使 _build_nanobot_config_from_runner 可运行"""
-    mock_config_cls = MagicMock()
-    mock_agents_config_cls = MagicMock()
-    mock_providers_config_cls = MagicMock()
-
-    # 让 Config() 返回一个可设置属性的对象
-    mock_config_instance = MagicMock()
-    mock_config_cls.return_value = mock_config_instance
-    # 让 AgentsConfig() 返回一个可设置属性的对象
-    mock_agents_instance = MagicMock()
-    mock_agents_config_cls.return_value = mock_agents_instance
-    # 让 ProvidersConfig() 返回一个可设置属性的对象
-    mock_providers_instance = MagicMock()
-    mock_providers_config_cls.return_value = mock_providers_instance
-
-    mock_modules = {
-        "nanobot": MagicMock(),
-        "nanobot.config": MagicMock(),
-        "nanobot.config.loader": MagicMock(Config=mock_config_cls),
-        "nanobot.config.schema": MagicMock(
-            AgentsConfig=mock_agents_config_cls,
-            ProvidersConfig=mock_providers_config_cls,
-        ),
-        "nanobot.channels": MagicMock(),
-        "nanobot.channels.websocket": MagicMock(
-            WebSocketChannel=MagicMock(),
-        ),
-        # v0.30.0: nanobot-ai 0.2.1 将 http_error/parse_request_path 迁移至此
-        "nanobot.webui": MagicMock(),
-        "nanobot.webui.http_utils": MagicMock(
-            http_error=MagicMock(return_value=MagicMock(status=403)),
-            parse_request_path=MagicMock(return_value=("/", {})),
-        ),
-    }
-
-    with patch.dict("sys.modules", mock_modules):
-        yield {
-            "Config": mock_config_cls,
-            "AgentsConfig": mock_agents_config_cls,
-            "ProvidersConfig": mock_providers_config_cls,
-            "config_instance": mock_config_instance,
-            "agents_instance": mock_agents_instance,
-            "providers_instance": mock_providers_instance,
-        }
-
-
-class TestBuildNanobotConfigWebsocket:
-    """测试 _build_nanobot_config_from_runner 中 WebSocket 相关的配置构建逻辑
-
-    需要模拟 nanobot-ai 的导入，因为该方法内部依赖 nanobot.config.loader 和
-    nanobot.config.schema 模块。
-    """
-
-    def test_brand_fields_default_values(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """品牌字段（bot_name/bot_icon/unified_session）在 ws_config 为空时使用默认值"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        # ws_config 为空，使用默认值
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        adapter._build_nanobot_config_from_runner()
-
-        # 验证 AgentsConfig 被调用时 defaults 包含品牌字段
-        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
-        agents_config_cls.assert_called_once()
-        call_kwargs = agents_config_cls.call_args[1]
-        defaults = call_kwargs["defaults"]
-        assert defaults["bot_name"] == "Nanobot-Runner"
-        assert defaults["bot_icon"] == "🏃‍♂️"
-        assert defaults["unified_session"] is False
-
-    def test_brand_fields_custom_values(self, mock_runner_config, mock_nanobot_modules):
-        """品牌字段从 ws_config 中读取自定义值"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {
-            "bot_name": "MyBot",
-            "bot_icon": "🤖",
-            "unified_session": True,
-        }
-
-        adapter._build_nanobot_config_from_runner()
-
-        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
-        agents_config_cls.assert_called_once()
-        call_kwargs = agents_config_cls.call_args[1]
-        defaults = call_kwargs["defaults"]
-        assert defaults["bot_name"] == "MyBot"
-        assert defaults["bot_icon"] == "🤖"
-        assert defaults["unified_session"] is True
-
-    def test_timezone_from_runner_config_passed_to_agents_defaults(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """回归测试: 项目配置的 timezone 应注入到 nanobot AgentsConfig.defaults
-
-        根因: config.json 配置了 "timezone": "Asia/Shanghai"，但
-        _build_nanobot_config_from_runner 未将其传给 AgentsConfig，
-        导致 WebUI 和 AgentLoop 默认使用 UTC。
-        """
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        adapter._build_nanobot_config_from_runner()
-
-        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
-        agents_config_cls.assert_called_once()
-        call_kwargs = agents_config_cls.call_args[1]
-        defaults = call_kwargs["defaults"]
-        assert defaults["timezone"] == "Asia/Shanghai"
-
-    def test_timezone_defaults_to_utc_when_not_configured(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """未配置 timezone 时，应使用 nanobot 默认 UTC（向后兼容）"""
-        mock_runner_config.get.side_effect = lambda key, default=None: default
-
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        adapter._build_nanobot_config_from_runner()
-
-        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
-        call_kwargs = agents_config_cls.call_args[1]
-        defaults = call_kwargs["defaults"]
-        assert defaults.get("timezone") is None
-
-    def test_websocket_channel_built_when_webui_enabled(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """webui_enabled=True 时，Config 的 channels 参数应包含 websocket 键"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        adapter._build_nanobot_config_from_runner()
-
-        config_cls = mock_nanobot_modules["Config"]
-        config_cls.assert_called_once()
-        call_kwargs = config_cls.call_args[1]
-        channels = call_kwargs["channels"]
-        assert "websocket" in channels
-        assert channels["websocket"]["enabled"] is True
-
-    def test_no_websocket_channel_when_disabled(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """webui_enabled=False 且 config 未启用时，Config 的 channels 不包含 websocket"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {"enabled": False}
-
-        adapter._build_nanobot_config_from_runner()
-
-        config_cls = mock_nanobot_modules["Config"]
-        config_cls.assert_called_once()
-        call_kwargs = config_cls.call_args[1]
-        channels = call_kwargs["channels"]
-        assert "websocket" not in channels
-
-    def test_websocket_channel_when_config_enabled(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """webui_enabled=False 但 config 中 enabled=True 时，应构建 WebSocket 通道"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {
-            "enabled": True,
-            "host": "0.0.0.0",
-            "port": 9090,
-        }
-
-        adapter._build_nanobot_config_from_runner()
-
-        config_cls = mock_nanobot_modules["Config"]
-        call_kwargs = config_cls.call_args[1]
-        channels = call_kwargs["channels"]
-        assert "websocket" in channels
-        assert channels["websocket"]["host"] == "0.0.0.0"
-        assert channels["websocket"]["port"] == 9090
-
-    def test_security_config_passed_to_websocket_channel(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """安全配置（token/requires_token）正确传递到 WebSocket 通道"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        mock_runner_config.get_websocket_config.return_value = {
-            "token": "secure-token-123",
-            "websocket_requires_token": False,
-        }
-
-        adapter._build_nanobot_config_from_runner()
-
-        config_cls = mock_nanobot_modules["Config"]
-        call_kwargs = config_cls.call_args[1]
-        channels = call_kwargs["channels"]
-        ws = channels["websocket"]
-        assert ws["token"] == "secure-token-123"
-        assert ws["websocket_requires_token"] is False
-
-    def test_feishu_channel_not_affected_by_websocket(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """WebSocket 配置不影响飞书通道的构建"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        # 模拟飞书环境变量，使飞书通道被构建
-        with patch.dict(
-            os.environ,
-            {
-                "NANOBOT_FEISHU_APP_ID": "feishu-app-id",
-                "NANOBOT_FEISHU_APP_SECRET": "feishu-app-secret",
-            },
-        ):
-            adapter._build_nanobot_config_from_runner()
-
-        config_cls = mock_nanobot_modules["Config"]
-        call_kwargs = config_cls.call_args[1]
-        channels = call_kwargs["channels"]
-
-        # 两个通道都应存在且互不影响
-        assert "feishu" in channels
-        assert "websocket" in channels
-        assert channels["feishu"]["app_id"] == "feishu-app-id"
-        assert channels["feishu"]["app_secret"] == "feishu-app-secret"
-        assert channels["websocket"]["enabled"] is True
-
-    def test_model_field_in_agents_defaults(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """agents.defaults 中 model 字段仍正确设置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        adapter._build_nanobot_config_from_runner()
-
-        agents_config_cls = mock_nanobot_modules["AgentsConfig"]
-        call_kwargs = agents_config_cls.call_args[1]
-        defaults = call_kwargs["defaults"]
-        assert defaults["model"] == "gpt-4o-mini"
-
-    def test_nanobot_config_cached_after_build(
-        self, mock_runner_config, mock_nanobot_modules
-    ):
-        """构建后的 nanobot 配置应被缓存到 _nanobot_config"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=True)
-        mock_runner_config.get_websocket_config.return_value = {}
-
-        result = adapter._build_nanobot_config_from_runner()
-
-        assert adapter._nanobot_config is not None
-        assert adapter._nanobot_config is result
-
-
-# ============================================================
-# ConfigInjector 注入单元测试
-# ============================================================
-
-
-class TestConfigInjectorInjection:
-    """测试 ConfigInjector 注入"""
-
-    def test_set_config_injector(self, mock_runner_config):
-        """测试设置 ConfigInjector"""
-        from src.core.config_injector import ConfigInjector
-
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        injector = ConfigInjector(config_path=Path("/test/config.json"))
-        adapter.set_config_injector(injector)
-        assert adapter._config_injector is injector
-
-    def test_config_injector_default_none(self, mock_runner_config):
-        """测试 ConfigInjector 默认为 None"""
-        adapter = RunnerProviderAdapter(mock_runner_config)
-        assert adapter._config_injector is None
 
 
 class TestRunnerProviderAdapterFallback:
@@ -655,28 +192,37 @@ class TestRunnerProviderAdapterFallback:
     def _make_mock_config_with_fallback(self):
         config = MagicMock(spec=ConfigManager)
         config.has_llm_config.return_value = True
-        config.get_llm_config.return_value = {
-            "provider": "siliconflow",
-            "model": "Qwen/Qwen3-235B-A22B",
-            "api_key": "sk-sf-test",
-            "base_url": "https://api.siliconflow.cn/v1",
+        config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "siliconflow",
+                "siliconflow": {
+                    "apiKey": "sk-sf-test",
+                    "apiBase": "https://api.siliconflow.cn/v1",
+                },
+                "nvidia": {
+                    "apiKey": "nvapi-test",
+                    "apiBase": "https://integrate.api.nvidia.com/v1",
+                },
+            },
+            "agents": {
+                "defaults": {
+                    "model": "Qwen/Qwen3-235B-A22B",
+                    "maxToolIterations": 200,
+                    "contextWindowTokens": 200000,
+                    "fallbackModels": [
+                        {
+                            "provider": "nvidia",
+                            "model": "meta/llama-4-maverick-17b-128e-instruct-maas",
+                        },
+                    ],
+                }
+            },
         }
         config.get.return_value = None
-        config.get_websocket_config.return_value = {}
-        config.get_fallback_models.return_value = [
-            {
-                "provider": "nvidia",
-                "model": "meta/llama-4-maverick-17b-128e-instruct-maas",
-                "base_url": "https://integrate.api.nvidia.com/v1",
-                "api_key": "nvapi-test",
-            },
-        ]
-        config.get_fallback_api_key.return_value = "nvapi-test"
         config.base_dir = Path("/test/runner")
         return config
 
     def test_no_fallback_returns_plain_provider(self, mock_runner_config):
-        mock_runner_config.get_fallback_models.return_value = []
         adapter = RunnerProviderAdapter(mock_runner_config)
         with patch.object(adapter, "_create_primary_provider") as mock_create:
             mock_provider = MagicMock()
@@ -722,47 +268,23 @@ class TestRunnerProviderAdapterFallback:
         assert presets[0].model == "meta/llama-4-maverick-17b-128e-instruct-maas"
         assert presets[0].provider == "nvidia"
 
-    def test_resolve_fallback_presets_skips_missing_api_key(self):
+    def test_resolve_fallback_presets_skips_missing_model_or_provider(self):
+        """model 或 provider 缺失的 fallback 条目应被跳过"""
         config = self._make_mock_config_with_fallback()
-        config.get_fallback_models.return_value = [
-            {
-                "provider": "nvidia",
-                "model": "meta/llama-4-maverick-17b-128e-instruct-maas",
-                "base_url": "https://integrate.api.nvidia.com/v1",
-                "api_key": None,
-            },
-        ]
-        adapter = RunnerProviderAdapter(config)
-        presets = adapter._resolve_fallback_presets()
-        assert len(presets) == 0
-
-    def test_build_nanobot_config_includes_fallback(self):
-        """_build_nanobot_config_from_runner 应注入 fallback_models 到 nanobot Config"""
-        config = self._make_mock_config_with_fallback()
-        config.load_config.return_value = {
-            "version": "0.9.5",
-            "data_dir": "/data",
-            "llm_provider": "siliconflow",
-            "llm_model": "Qwen/Qwen3-235B-A22B",
-            "llm_base_url": "https://api.siliconflow.cn/v1",
-            "fallback_models": ["nvidia-llama4"],
-            "model_presets": {
-                "nvidia-llama4": {
-                    "provider": "nvidia",
-                    "model": "meta/llama-4-maverick-17b-128e-instruct-maas",
-                    "base_url": "https://integrate.api.nvidia.com/v1",
-                },
+        config.load_nanobot_config.return_value = {
+            "providers": {"default": "openai"},
+            "agents": {
+                "defaults": {
+                    "fallbackModels": [
+                        {"provider": "nvidia"},  # 缺少 model
+                        {"model": "llama-4"},  # 缺少 provider
+                    ],
+                }
             },
         }
         adapter = RunnerProviderAdapter(config)
-        with patch.dict(os.environ, {"NANOBOT_LLM_API_KEY": "sk-test"}, clear=False):
-            with patch.dict(
-                os.environ, {"NANOBOT_LLM_API_KEY_NVIDIA": "nvapi-test"}, clear=False
-            ):
-                nb_config = adapter._get_or_create_nanobot_config()
-                defaults = nb_config.agents.defaults
-                assert hasattr(defaults, "fallback_models")
-                assert len(defaults.fallback_models) == 1
+        presets = adapter._resolve_fallback_presets()
+        assert len(presets) == 0
 
 
 class TestProviderAdapterBranchCoverage:
@@ -770,9 +292,6 @@ class TestProviderAdapterBranchCoverage:
 
     def test_resolve_fallback_presets_import_error(self, mock_runner_config):
         """测试 _resolve_fallback_presets 在 ImportError 时返回空列表"""
-        mock_runner_config.get_fallback_models.return_value = [
-            {"provider": "test", "model": "test-model", "api_key": "key"}
-        ]
         adapter = RunnerProviderAdapter(mock_runner_config)
         with patch.dict("sys.modules", {"nanobot.config.schema": None}):
             with patch("builtins.__import__", side_effect=ImportError("no schema")):
@@ -781,8 +300,6 @@ class TestProviderAdapterBranchCoverage:
 
     def test_create_primary_provider_import_error(self, mock_runner_config):
         """测试 _create_primary_provider 在 ImportError 时抛出 LLMError"""
-        from src.core.config.llm_config import LLMConfig
-
         adapter = RunnerProviderAdapter(mock_runner_config)
         llm_config = LLMConfig(
             provider="openai",
@@ -796,8 +313,6 @@ class TestProviderAdapterBranchCoverage:
 
     def test_create_primary_provider_value_error(self, mock_runner_config):
         """测试 _create_primary_provider 在 ValueError 时抛出 LLMError"""
-        from src.core.config.llm_config import LLMConfig
-
         adapter = RunnerProviderAdapter(mock_runner_config)
         llm_config = LLMConfig(
             provider="openai",
@@ -821,22 +336,24 @@ class TestProviderAdapterBranchCoverage:
         """测试 _create_fallback_provider 构造 fallback Provider 实例"""
         config = MagicMock(spec=ConfigManager)
         config.has_llm_config.return_value = True
-        config.get_llm_config.return_value = {
-            "provider": "openai",
-            "model": "gpt-4o-mini",
-            "api_key": "test-key",
-            "base_url": "https://api.openai.com",
-        }
-        config.get_websocket_config.return_value = {}
-        config.get_fallback_models.return_value = [
-            {
-                "provider": "nvidia",
-                "model": "llama-4",
-                "base_url": "https://api.nvidia.com",
-                "api_key": "nvapi-test",
+        config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {
+                    "apiKey": "test-key",
+                    "apiBase": "https://api.openai.com",
+                },
+                "nvidia": {
+                    "apiKey": "nvapi-test",
+                    "apiBase": "https://api.nvidia.com",
+                },
             },
-        ]
-        config.get_fallback_api_key.return_value = "nvapi-test"
+            "agents": {
+                "defaults": {
+                    "model": "gpt-4o-mini",
+                }
+            },
+        }
         config.base_dir = Path("/test")
 
         adapter = RunnerProviderAdapter(config)
@@ -857,106 +374,76 @@ class TestProviderAdapterBranchCoverage:
                 mock_provider_cls.assert_called_once()
                 assert result is mock_provider_cls.return_value
 
-    def test_get_or_create_nanobot_config_caches(self, mock_runner_config):
-        """测试 _get_or_create_nanobot_config 缓存 nanobot 配置"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
 
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot": MagicMock(),
-                "nanobot.config": MagicMock(),
-                "nanobot.config.loader": MagicMock(Config=MagicMock()),
-                "nanobot.config.schema": MagicMock(
-                    AgentsConfig=MagicMock(),
-                    ProvidersConfig=MagicMock(),
-                ),
+class TestRunnerProviderAdapterFromNanobotConfig:
+    """测试从 nanobot_config.json 读取配置（v0.32.0）"""
+
+    @pytest.fixture
+    def mock_config_with_nanobot(self):
+        """模拟带 nanobot_config.json 的 ConfigManager"""
+        config = MagicMock(spec=ConfigManager)
+        config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "custom",
+                "custom": {
+                    "apiKey": "sk-test-key",
+                    "apiBase": "https://api.test.com/v1",
+                    "apiType": "auto",
+                },
             },
-        ):
-            result1 = adapter._get_or_create_nanobot_config()
-            # 第二次调用应返回缓存
-            result2 = adapter._get_or_create_nanobot_config()
-            assert result1 is result2
-
-    def test_build_nanobot_config_skips_non_dict_preset(self, mock_runner_config):
-        """测试 _build_nanobot_config_from_runner 跳过非 dict 的 model_preset"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
-        mock_runner_config.load_config.return_value = {
-            "model_presets": {
-                "valid_preset": {"provider": "openai", "model": "gpt-4"},
-                "invalid_preset": "not a dict",  # 应被跳过
-            }
-        }
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot": MagicMock(),
-                "nanobot.config": MagicMock(),
-                "nanobot.config.loader": MagicMock(Config=MagicMock()),
-                "nanobot.config.schema": MagicMock(
-                    AgentsConfig=MagicMock(),
-                    ProvidersConfig=MagicMock(),
-                    ModelPresetConfig=MagicMock(),
-                ),
-            },
-        ):
-            # 应正常构建，跳过非 dict 的 preset
-            adapter._build_nanobot_config_from_runner()
-
-    def test_build_nanobot_config_skips_non_dict_mcp_server(self, mock_runner_config):
-        """测试 _build_nanobot_config_from_runner 跳过非 dict 的 mcp_server"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
-        mock_runner_config.load_config.return_value = {
-            "tools": {
-                "mcp_servers": {
-                    "valid_server": {"command": "test", "args": []},
-                    "invalid_server": "not a dict",  # 应被跳过
+            "agents": {
+                "defaults": {
+                    "model": "test-model",
+                    "maxToolIterations": 200,
+                    "contextWindowTokens": 200000,
                 }
-            }
+            },
         }
+        config.has_llm_config.return_value = True
 
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot": MagicMock(),
-                "nanobot.config": MagicMock(),
-                "nanobot.config.loader": MagicMock(Config=MagicMock()),
-                "nanobot.config.schema": MagicMock(
-                    AgentsConfig=MagicMock(),
-                    ProvidersConfig=MagicMock(),
-                    CliAppsToolConfig=MagicMock(),
-                    MCPServerConfig=MagicMock(),
-                    ToolsConfig=MagicMock(),
-                ),
-            },
-        ):
-            # 应正常构建，跳过非 dict 的 mcp_server
-            adapter._build_nanobot_config_from_runner()
+        def _mock_get(key: str, default: Any = None) -> Any:
+            if key == "timezone":
+                return "Asia/Shanghai"
+            return default
 
-    def test_build_nanobot_config_llm_error_on_failure(self, mock_runner_config):
-        """测试 _build_nanobot_config_from_runner 失败时抛出 LLMError"""
-        adapter = RunnerProviderAdapter(mock_runner_config, webui_enabled=False)
-        mock_runner_config.get_websocket_config.return_value = {}
-        # 让 get_llm_config 抛出异常
-        mock_runner_config.get_llm_config.side_effect = NanobotRunnerError(
-            "config error"
-        )
+        config.get.side_effect = _mock_get
+        config.base_dir = Path("/test/runner")
+        return config
 
-        with patch.dict(
-            "sys.modules",
-            {
-                "nanobot": MagicMock(),
-                "nanobot.config": MagicMock(),
-                "nanobot.config.loader": MagicMock(Config=MagicMock()),
-                "nanobot.config.schema": MagicMock(
-                    AgentsConfig=MagicMock(),
-                    ProvidersConfig=MagicMock(),
-                ),
-            },
-        ):
-            with pytest.raises(LLMError, match="无法构建nanobot配置"):
-                adapter._build_nanobot_config_from_runner()
+    def test_get_llm_config_from_nanobot(self, mock_config_with_nanobot):
+        """从 nanobot_config.json 读取 LLM 配置"""
+        adapter = RunnerProviderAdapter(mock_config_with_nanobot)
+        llm_config = adapter.get_llm_config()
+        assert llm_config.provider == "custom"
+        assert llm_config.model == "test-model"
+        assert llm_config.api_key == "sk-test-key"
+        assert llm_config.base_url == "https://api.test.com/v1"
+
+    def test_get_agent_defaults_from_nanobot(self, mock_config_with_nanobot):
+        """从 nanobot_config.json 读取 Agent 默认配置"""
+        adapter = RunnerProviderAdapter(mock_config_with_nanobot)
+        defaults = adapter.get_agent_defaults()
+        assert defaults.model == "test-model"
+        assert defaults.max_tool_iterations == 200
+        assert defaults.context_window_tokens == 200000
+        assert defaults.timezone == "Asia/Shanghai"
+
+    def test_is_available_true(self, mock_config_with_nanobot):
+        """nanobot_config.json 有效时 is_available 返回 True"""
+        adapter = RunnerProviderAdapter(mock_config_with_nanobot)
+        assert adapter.is_available() is True
+
+    def test_is_available_false_no_nanobot_config(self):
+        """nanobot_config.json 无效时 is_available 返回 False"""
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = False
+        adapter = RunnerProviderAdapter(config)
+        assert adapter.is_available() is False
+
+    def test_get_llm_config_raises_when_no_config(self):
+        """无 nanobot_config.json 时 get_llm_config 抛出 LLMError"""
+        config = MagicMock(spec=ConfigManager)
+        config.has_llm_config.return_value = False
+        adapter = RunnerProviderAdapter(config)
+        with pytest.raises(LLMError, match="未配置LLM"):
+            adapter.get_llm_config()

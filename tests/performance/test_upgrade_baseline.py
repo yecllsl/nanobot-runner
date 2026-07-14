@@ -8,15 +8,12 @@
 
 import os
 import time
-import tracemalloc
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import psutil
 import pytest
 from fastapi.testclient import TestClient
 
-from src.core.config_injector import ConfigInjector
 from src.core.provider_adapter import DynamicProviderRegistry
 from src.core.webui.app import create_app
 from src.core.webui.auth import create_access_token
@@ -34,63 +31,6 @@ def _make_mock_context() -> MagicMock:
         "token_ttl_s": 86400,
     }
     return context
-
-
-class TestConfigInjectorPerformance:
-    """ConfigInjector 构建性能基线"""
-
-    def test_build_nanobot_config_latency(self, tmp_path: Path) -> None:
-        """ConfigInjector.build_nanobot_config 应在 200ms 内完成
-
-        基线实测：~5ms（后续调用），首次含 Schema 导入约 110ms
-        阈值：200ms（含首次模块导入开销）
-        """
-        injector = ConfigInjector(config_path=tmp_path / "config.json")
-        runner_config = {
-            "agents": {"defaults": {"model": "gpt-4", "provider": "openai"}},
-            "providers": {
-                "openai": {
-                    "api_key": "sk-test",
-                    "api_base": "https://api.openai.com/v1",
-                },
-            },
-            "transcription": {"enabled": False, "provider": "assemblyai"},
-        }
-
-        start = time.perf_counter()
-        config = injector.build_nanobot_config(runner_config)
-        elapsed = time.perf_counter() - start
-
-        assert config is not None
-        assert elapsed < 0.200, (
-            f"ConfigInjector 构建退化: {elapsed * 1000:.1f}ms > 200ms"
-        )
-
-    def test_build_config_with_many_providers(self, tmp_path: Path) -> None:
-        """构建含 20 个 Provider 的配置应在 200ms 内完成
-
-        基线实测：~15ms
-        阈值：200ms
-        """
-        injector = ConfigInjector(config_path=tmp_path / "config.json")
-        providers = {
-            f"custom_{i}": {
-                "api_key": f"sk-{i}",
-                "api_base": f"https://api.custom{i}.com/v1",
-            }
-            for i in range(20)
-        }
-        runner_config = {
-            "agents": {"defaults": {"model": "gpt-4", "provider": "openai"}},
-            "providers": providers,
-        }
-
-        start = time.perf_counter()
-        config = injector.build_nanobot_config(runner_config)
-        elapsed = time.perf_counter() - start
-
-        assert config is not None
-        assert elapsed < 0.200, f"多 Provider 构建退化: {elapsed * 1000:.1f}ms > 200ms"
 
 
 class TestDynamicProviderRegistryPerformance:
@@ -208,32 +148,6 @@ class TestWebUIRoutePerformance:
 
 class TestMemoryUsage:
     """内存占用基线"""
-
-    def test_config_injection_memory_footprint(self, tmp_path: Path) -> None:
-        """ConfigInjector 构建配置的内存分配应在 2MB 内
-
-        使用 tracemalloc 测量 Python 内存分配（非 RSS）。
-        基线实测：~200KB
-        阈值：2MB
-        """
-        injector = ConfigInjector(config_path=tmp_path / "config.json")
-        runner_config = {
-            "agents": {"defaults": {"model": "gpt-4", "provider": "openai"}},
-            "providers": {
-                "openai": {
-                    "api_key": "sk-test",
-                    "api_base": "https://api.openai.com/v1",
-                }
-            },
-        }
-
-        tracemalloc.start()
-        config = injector.build_nanobot_config(runner_config)
-        current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-
-        assert config is not None
-        assert peak < 2 * 1024 * 1024, f"内存分配退化: {peak / 1024:.1f}KB > 2MB"
 
     def test_process_rss_within_reasonable_range(self) -> None:
         """Python 进程 RSS 应在 1200MB 内

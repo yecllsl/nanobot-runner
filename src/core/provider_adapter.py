@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, replace
-from pathlib import Path
 from typing import Any, Protocol
 
 from nanobot.providers.registry import PROVIDERS, ProviderSpec, create_dynamic_spec
@@ -96,16 +94,15 @@ class RunnerProviderAdapter:
 
         Args:
             runner_config: 项目配置管理器实例
-            webui_enabled: 是否启用 WebUI，启用时自动激活 WebSocket 通道
+            webui_enabled: 已废弃，保留兼容性，Task 5+ 清理
         """
         self._runner_config = runner_config
-        self._webui_enabled = webui_enabled
         self._provider_instance: Any | None = None
 
     def get_llm_config(self) -> LLMConfig:
         """获取LLM配置
 
-        从项目配置读取，未配置时抛出异常。
+        从 nanobot_config.json 读取 providers 和 agents.defaults.model。
 
         Returns:
             LLMConfig: LLM配置数据类实例
@@ -113,12 +110,12 @@ class RunnerProviderAdapter:
         Raises:
             LLMError: 未配置LLM时抛出
         """
-        if self._has_runner_llm_config():
-            return self._from_runner_config()
-        raise LLMError(
-            "未配置LLM，请运行 'nanobotrun system init' 完成配置",
-            recovery_suggestion="运行 nanobotrun system init 配置LLM",
-        )
+        if not self._has_runner_llm_config():
+            raise LLMError(
+                "未配置LLM，请运行 'nanobotrun system init' 完成配置",
+                recovery_suggestion="运行 nanobotrun system init 配置LLM",
+            )
+        return self._from_nanobot_config()
 
     def get_provider_instance(self) -> Any:
         """获取Provider实例
@@ -199,9 +196,7 @@ class RunnerProviderAdapter:
     def _resolve_fallback_presets(self) -> list[Any]:
         """解析 fallback 预设列表
 
-        从 ConfigManager 读取 fallback_models 配置，
-        转换为底座 ModelPresetConfig 格式。
-        跳过 API Key 缺失的条目。
+        从 nanobot_config.json 的 agents.defaults.fallbackModels 读取。
 
         Returns:
             list[Any]: ModelPresetConfig 列表
@@ -212,30 +207,28 @@ class RunnerProviderAdapter:
             logger.warning("nanobot-ai 不支持 ModelPresetConfig，跳过 fallback 配置")
             return []
 
-        fallback_list = self._runner_config.get_fallback_models()
+        nano_cfg = self._runner_config.load_nanobot_config()
+        fallback_list = (
+            nano_cfg.get("agents", {}).get("defaults", {}).get("fallbackModels", [])
+        )
         if not fallback_list:
             return []
 
         presets: list[Any] = []
         for fb in fallback_list:
-            api_key = fb.get("api_key")
-            if not api_key:
-                logger.warning(
-                    "备选供应商 '%s' API Key 缺失，跳过",
-                    fb.get("provider", "unknown"),
-                )
+            model = fb.get("model", "")
+            provider = fb.get("provider", "")
+            if not model or not provider:
                 continue
-
-            preset = ModelPresetConfig(
-                model=fb["model"],
-                provider=fb["provider"],
-            )
+            preset = ModelPresetConfig(model=model, provider=provider)
             presets.append(preset)
 
         return presets
 
     def _create_fallback_provider(self, preset: Any) -> Any:
         """为 fallback 预设创建 Provider 实例
+
+        从 nanobot_config.json 的 providers 读取对应 provider 的 apiKey 和 apiBase。
 
         Args:
             preset: ModelPresetConfig 实例
@@ -246,18 +239,13 @@ class RunnerProviderAdapter:
         from nanobot.providers.openai_compat_provider import OpenAICompatProvider
         from nanobot.providers.registry import find_by_name
 
-        api_key = self._runner_config.get_fallback_api_key(preset.provider)
-        spec = find_by_name(preset.provider)
+        nano_cfg = self._runner_config.load_nanobot_config()
+        providers = nano_cfg.get("providers", {})
+        provider_cfg = providers.get(preset.provider, {})
 
-        fb_config = self._runner_config.get_fallback_models()
-        base_url: str | None = None
-        for fb in fb_config:
-            if (
-                fb.get("provider") == preset.provider
-                and fb.get("model") == preset.model
-            ):
-                base_url = fb.get("base_url")
-                break
+        api_key = provider_cfg.get("apiKey", "")
+        base_url = provider_cfg.get("apiBase")
+        spec = find_by_name(preset.provider)
 
         return OpenAICompatProvider(
             api_key=api_key,
@@ -269,19 +257,21 @@ class RunnerProviderAdapter:
     def get_agent_defaults(self) -> AgentDefaults:
         """获取Agent默认配置
 
+        从 nanobot_config.json 的 agents.defaults 读取。
+
         Returns:
             AgentDefaults: Agent默认配置实例
         """
-        llm_config = self.get_llm_config()
-        # 从项目配置读取时区，未配置或类型异常时回退到 UTC
+        nano_cfg = self._runner_config.load_nanobot_config()
+        defaults = nano_cfg.get("agents", {}).get("defaults", {})
+
         raw_timezone = self._runner_config.get("timezone")
         timezone = raw_timezone if isinstance(raw_timezone, str) else "UTC"
+
         return AgentDefaults(
-            model=llm_config.model,
-            max_tool_iterations=llm_config.max_iterations,
-            context_window_tokens=llm_config.context_window_tokens,
-            context_block_limit=llm_config.context_block_limit,
-            max_tool_result_chars=llm_config.max_tool_result_chars,
+            model=defaults.get("model", ""),
+            max_tool_iterations=defaults.get("maxToolIterations", 200),
+            context_window_tokens=defaults.get("contextWindowTokens", 200000),
             timezone=timezone,
         )
 
@@ -297,359 +287,10 @@ class RunnerProviderAdapter:
         """关闭Provider连接，释放资源"""
         self._provider_instance = None
 
-    def _get_or_create_nanobot_config(self) -> Any:
-        """获取或创建nanobot配置对象
-
-        用于ChannelManager等需要nanobot配置对象的场景。
-        始终从项目配置构建，确保包含飞书通道配置。
-
-        Returns:
-            Any: nanobot配置对象
-        """
-        if self._nanobot_config is not None:
-            return self._nanobot_config
-
-        return self._build_nanobot_config_from_runner()
-
-    def save_nanobot_config(self, path: Path) -> None:
-        """将构建好的 nanobot 兼容配置写入文件
-
-        避免 nanobot 直接加载 Runner 配置（含 extra_forbidden 字段）而失败，
-        同时让 nanobot 运行时数据仍落在 Runner 目录下。
-
-        Args:
-            path: 要写入的配置文件路径
-        """
-        from nanobot.config.loader import save_config
-
-        config = self._get_or_create_nanobot_config()
-        save_config(config, path)
-        logger.debug(f"nanobot 兼容配置已写入: {path}")
-
-    def _build_nanobot_config_from_runner(self) -> Any:
-        """从项目配置构建nanobot配置对象
-
-        Returns:
-            Any: nanobot配置对象
-        """
-        try:
-            from nanobot.config.loader import Config
-            from nanobot.config.schema import (
-                AgentsConfig,
-                ProviderConfig,
-                ProvidersConfig,
-            )
-
-            llm_dict = self._runner_config.get_llm_config()
-            provider_name = llm_dict.get("provider", "openai")
-            runner_config = self._runner_config.load_config()
-
-            providers = ProvidersConfig(
-                default=provider_name,
-            )
-            # 使用 nanobot 标准的 ProviderConfig 对象，避免序列化后字段名不匹配
-            # api_key 由 Runner 在运行时从环境变量读取并注入 provider 实例，
-            # 生成的配置文件不保留密钥，仅用于 WebUI 展示等场景。
-            setattr(
-                providers,
-                provider_name,
-                ProviderConfig(
-                    api_key=None,
-                    api_base=llm_dict.get("base_url") or None,
-                ),
-            )
-
-            # 同步 model_presets 中涉及的 provider 配置，
-            # 使 fallback / 运行时模型切换能正确定位 API 端点。
-            # 仅当该 provider 尚无有效 api_base 时才写入，避免覆盖 default。
-            for preset_data in runner_config.get("model_presets", {}).values():
-                if not isinstance(preset_data, dict):
-                    continue
-                preset_provider = preset_data.get("provider")
-                preset_base_url = preset_data.get("base_url")
-                if not preset_provider or not preset_base_url:
-                    continue
-                existing = getattr(providers, preset_provider, None)
-                if existing is None or getattr(existing, "api_base", None) is None:
-                    setattr(
-                        providers,
-                        preset_provider,
-                        ProviderConfig(
-                            api_key=None,
-                            api_base=preset_base_url,
-                        ),
-                    )
-
-            # 从 config.json 读取 WebSocket 配置节，支持环境变量覆盖
-            ws_config = self._runner_config.get_websocket_config()
-
-            # 品牌字段：从 config.json websocket 配置节读取，缺失时使用默认值
-            bot_name = ws_config.get("bot_name", "Nanobot-Runner")
-            bot_icon = ws_config.get("bot_icon", "🏃‍♂️")
-            # unified_session: 启用后 CLI/飞书/WebUI 共享同一会话，默认关闭
-            unified_session = ws_config.get("unified_session", False)
-
-            # v0.27.0: 设置 workspace 为项目目录，避免使用默认的 ~/.nanobot
-            workspace_path = str(self._runner_config.base_dir)
-
-            # 从项目配置读取时区，仅当为有效字符串时才覆盖 nanobot 默认 UTC
-            timezone = self._runner_config.get("timezone")
-            timezone_kwarg = {"timezone": timezone} if isinstance(timezone, str) else {}
-
-            agents = AgentsConfig(
-                defaults={
-                    "model": llm_dict.get("model", "gpt-4o-mini"),
-                    "bot_name": bot_name,
-                    "bot_icon": bot_icon,
-                    "unified_session": unified_session,
-                    "workspace": workspace_path,
-                    **timezone_kwarg,
-                },
-            )
-
-            channels: dict[str, Any] = {}
-            self._build_feishu_channel_config(channels)
-            self._build_websocket_channel_config(channels, ws_config)
-
-            # 注入 fallback_models 到 nanobot Config
-            fallback_names = runner_config.get("fallback_models", [])
-            if fallback_names:
-                try:
-                    from nanobot.config.schema import InlineFallbackConfig
-
-                    presets_raw = runner_config.get("model_presets", {})
-                    fallback_candidates: list[Any] = []
-                    for name in fallback_names:
-                        preset_data = presets_raw.get(name, {})
-                        provider = preset_data.get("provider", "")
-                        model = preset_data.get("model", "")
-                        if provider and model:
-                            fallback_candidates.append(
-                                InlineFallbackConfig(
-                                    model=model,
-                                    provider=provider,
-                                )
-                            )
-                    if fallback_candidates:
-                        agents.defaults.fallback_models = fallback_candidates
-                except ImportError:
-                    logger.debug(
-                        "nanobot-ai 不支持 InlineFallbackConfig，跳过 fallback 注入"
-                    )
-
-            # 注入 model_presets 到 nanobot Config（v0.30.0: nanobot-ai 0.2.1 运行时模型切换）
-            model_presets_dict: dict[str, Any] = {}
-            try:
-                from nanobot.config.schema import ModelPresetConfig as _MPC
-
-                presets_raw = runner_config.get("model_presets", {})
-                for preset_name, preset_data in presets_raw.items():
-                    if not isinstance(preset_data, dict):
-                        continue
-                    # config.json 使用 snake_case，ModelPresetConfig 使用 camelCase
-                    model_presets_dict[preset_name] = _MPC(
-                        model=preset_data.get("model", ""),
-                        provider=preset_data.get("provider", "auto"),
-                        maxTokens=preset_data.get(
-                            "maxTokens",
-                            preset_data.get("max_tokens", 8192),
-                        ),
-                        contextWindowTokens=preset_data.get(
-                            "contextWindowTokens",
-                            preset_data.get("context_window_tokens", 65536),
-                        ),
-                        temperature=preset_data.get("temperature", 0.1),
-                        reasoningEffort=preset_data.get(
-                            "reasoningEffort",
-                            preset_data.get("reasoning_effort", None),
-                        ),
-                        label=preset_data.get("label", None),
-                    )
-            except ImportError:
-                logger.debug(
-                    "nanobot-ai 不支持 ModelPresetConfig，跳过 model_presets 注入"
-                )
-
-            # 注入 tools 配置到 nanobot Config（v0.30.0: nanobot-ai 0.2.1 CLI Apps + MCP）
-            tools_config_obj: Any = None
-            try:
-                from nanobot.config.schema import (
-                    CliAppsToolConfig as _CliAppsCfg,
-                )
-                from nanobot.config.schema import (
-                    MCPServerConfig as _MCPServerCfg,
-                )
-                from nanobot.config.schema import (
-                    ToolsConfig as _ToolsCfg,
-                )
-
-                tools_section = runner_config.get("tools", {})
-
-                # 构建 cli_apps 配置
-                cli_apps_raw = tools_section.get("cli_apps", {})
-                cli_apps_cfg = _CliAppsCfg(
-                    enable=cli_apps_raw.get("enable", True),
-                    installTimeout=cli_apps_raw.get(
-                        "installTimeout",
-                        cli_apps_raw.get("install_timeout", 300),
-                    ),
-                    runTimeout=cli_apps_raw.get(
-                        "runTimeout",
-                        cli_apps_raw.get("run_timeout", 60),
-                    ),
-                    catalogTtlSeconds=cli_apps_raw.get(
-                        "catalogTtlSeconds",
-                        cli_apps_raw.get("catalog_ttl_seconds", 3600),
-                    ),
-                )
-
-                # 构建 mcp_servers 配置
-                mcp_servers_raw = tools_section.get("mcp_servers", {})
-                mcp_servers_dict: dict[str, Any] = {}
-                for server_name, server_data in mcp_servers_raw.items():
-                    if not isinstance(server_data, dict):
-                        continue
-                    mcp_servers_dict[server_name] = _MCPServerCfg(
-                        type=server_data.get("type", None),
-                        command=server_data.get("command", ""),
-                        args=server_data.get("args", []),
-                        env=server_data.get("env", {}),
-                        cwd=server_data.get("cwd", ""),
-                        url=server_data.get("url", ""),
-                        headers=server_data.get("headers", {}),
-                        toolTimeout=server_data.get(
-                            "toolTimeout",
-                            server_data.get("tool_timeout", 30),
-                        ),
-                        enabledTools=server_data.get(
-                            "enabledTools",
-                            server_data.get("enabled_tools", []),
-                        ),
-                    )
-
-                tools_config_obj = _ToolsCfg(
-                    cliApps=cli_apps_cfg,
-                    mcpServers=mcp_servers_dict,
-                )
-            except ImportError:
-                logger.debug("nanobot-ai 不支持 ToolsConfig，跳过 tools 配置注入")
-
-            config = Config(
-                providers=providers,
-                agents=agents,
-                channels=channels,
-                model_presets=model_presets_dict,
-                **({"tools": tools_config_obj} if tools_config_obj is not None else {}),
-            )
-
-            self._nanobot_config = config
-            return config
-        except (ImportError, NanobotRunnerError) as e:
-            logger.debug(f"从项目配置构建nanobot配置失败: {e}")
-            raise LLMError(
-                f"无法构建nanobot配置: {e}",
-                recovery_suggestion="请确认已安装nanobot-ai",
-            ) from e
-
-    def _build_feishu_channel_config(self, channels: dict[str, Any]) -> None:
-        """构建飞书通道配置
-
-        从环境变量和 .env.local 文件读取飞书凭据，
-        配置有效时写入 channels["feishu"]。
-
-        Args:
-            channels: 通道配置字典，本方法会向其中写入 feishu 键
-        """
-        feishu_app_id = os.getenv("NANOBOT_FEISHU_APP_ID")
-        feishu_app_secret = os.getenv("NANOBOT_FEISHU_APP_SECRET")
-        feishu_receive_id = os.getenv("NANOBOT_FEISHU_RECEIVE_ID")
-
-        if not (feishu_app_id and feishu_app_secret):
-            env_file = Path.home() / ".nanobot-runner" / ".env.local"
-            if env_file.exists():
-                env_vars = self._parse_env_file(env_file)
-                feishu_app_id = feishu_app_id or env_vars.get("NANOBOT_FEISHU_APP_ID")
-                feishu_app_secret = feishu_app_secret or env_vars.get(
-                    "NANOBOT_FEISHU_APP_SECRET"
-                )
-                feishu_receive_id = feishu_receive_id or env_vars.get(
-                    "NANOBOT_FEISHU_RECEIVE_ID"
-                )
-
-        if feishu_app_id and feishu_app_secret:
-            channels["feishu"] = {
-                "enabled": True,
-                "app_id": feishu_app_id,
-                "app_secret": feishu_app_secret,
-                "receive_id": feishu_receive_id or "",
-                "receive_id_type": os.getenv(
-                    "NANOBOT_FEISHU_RECEIVE_ID_TYPE", "user_id"
-                ),
-                "allowFrom": ["*"],
-            }
-
-    def _build_websocket_channel_config(
-        self, channels: dict[str, Any], ws_config: dict[str, Any]
-    ) -> None:
-        """构建WebSocket通道配置
-
-        当 webui_enabled=True 或 config.json 中 websocket.enabled=True 时激活，
-        将配置写入 channels["websocket"]。
-
-        Args:
-            channels: 通道配置字典，本方法会向其中写入 websocket 键
-            ws_config: 从 config.json websocket 配置节读取的字典
-        """
-        ws_enabled_in_config = ws_config.get("enabled", False)
-        if self._webui_enabled or ws_enabled_in_config:
-            channels["websocket"] = {
-                "enabled": True,
-                "host": ws_config.get("host", "127.0.0.1"),
-                "port": ws_config.get("port", 8765),
-                "path": ws_config.get("path", "/"),
-                "token": ws_config.get("token", ""),
-                "token_issue_path": ws_config.get("token_issue_path", ""),
-                "token_issue_secret": ws_config.get("token_issue_secret", ""),
-                "token_ttl_s": ws_config.get("token_ttl_s", 300),
-                "websocket_requires_token": ws_config.get(
-                    "websocket_requires_token", True
-                ),
-                "allow_from": ws_config.get("allow_from", ["*"]),
-                "streaming": ws_config.get("streaming", True),
-                "max_message_bytes": ws_config.get("max_message_bytes", 37748736),
-                "ping_interval_s": ws_config.get("ping_interval_s", 20.0),
-                "ping_timeout_s": ws_config.get("ping_timeout_s", 20.0),
-                "ssl_certfile": ws_config.get("ssl_certfile", ""),
-                "ssl_keyfile": ws_config.get("ssl_keyfile", ""),
-            }
-
-    @staticmethod
-    def _parse_env_file(env_file: Path) -> dict[str, str]:
-        """解析 .env 文件
-
-        Args:
-            env_file: .env 文件路径
-
-        Returns:
-            dict[str, str]: 环境变量字典
-        """
-        env_vars: dict[str, str] = {}
-        try:
-            with open(env_file, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" not in line:
-                        continue
-                    key, _, value = line.partition("=")
-                    key = key.strip()
-                    value = value.strip().strip("\"'")
-                    if key and value:
-                        env_vars[key] = value
-        except (NanobotRunnerError, OSError) as e:
-            logger.debug(f"解析 .env 文件失败: {e}")
-        return env_vars
+    # ponytail: 移除了 _get_or_create_nanobot_config / save_nanobot_config /
+    # _build_nanobot_config_from_runner / _build_feishu_channel_config /
+    # _build_websocket_channel_config / _parse_env_file（v0.32.0 配置物理分离，
+    # nanobot_config.json 由 ConfigManager 直接管理）
 
     def _has_runner_llm_config(self) -> bool:
         """检查项目配置中是否有LLM配置
@@ -659,21 +300,25 @@ class RunnerProviderAdapter:
         """
         try:
             return self._runner_config.has_llm_config()
-        except (NanobotRunnerError, Exception):
+        except Exception:
             return False
 
-    def _from_runner_config(self) -> LLMConfig:
-        """从项目配置提取LLM配置
+    def _from_nanobot_config(self) -> LLMConfig:
+        """从 nanobot_config.json 提取 LLM 配置
 
         Returns:
             LLMConfig: LLM配置数据类实例
         """
-        llm_dict = self._runner_config.get_llm_config()
+        nano_cfg = self._runner_config.load_nanobot_config()
+        providers = nano_cfg.get("providers", {})
+        default_provider = providers.get("default", "")
+        provider_cfg = providers.get(default_provider, {})
+
         return LLMConfig(
-            provider=llm_dict.get("provider", "openai"),
-            model=llm_dict.get("model", "gpt-4o-mini"),
-            api_key=llm_dict.get("api_key"),
-            base_url=llm_dict.get("base_url"),
+            provider=default_provider,
+            model=nano_cfg.get("agents", {}).get("defaults", {}).get("model", ""),
+            api_key=provider_cfg.get("apiKey", ""),
+            base_url=provider_cfg.get("apiBase"),
         )
 
 
