@@ -11,7 +11,7 @@ from __future__ import annotations
 import importlib.metadata
 import secrets
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import uvicorn
 from fastapi import FastAPI
@@ -67,7 +67,7 @@ def create_app(context: AppContext) -> FastAPI:
     """
     global _app_instance
 
-    webui_config = context.config.get_webui_config()
+    webui_config: dict[str, Any] = {"host": "127.0.0.1", "port": 8766}
 
     # 动态读取包版本号
     try:
@@ -210,9 +210,8 @@ def create_server(context: AppContext) -> uvicorn.Server:
     Returns:
         uvicorn.Server: 配置好的 Server 实例
     """
-    webui_config = context.config.get_webui_config()
-    host = webui_config.get("host", "127.0.0.1")
-    port = webui_config.get("port", 8766)
+    host = "127.0.0.1"
+    port = 8766
 
     app = create_app(context=context)
 

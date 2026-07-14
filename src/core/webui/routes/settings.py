@@ -78,7 +78,6 @@ async def update_profile(
 
 def _get_system_config(context: AppContext) -> dict[str, Any]:
     """同步获取系统配置（只读）"""
-    webui_config = context.config.get_webui_config()
     # 动态读取包版本号，避免硬编码
     try:
         version = importlib.metadata.version("nanobot-runner")
@@ -87,8 +86,8 @@ def _get_system_config(context: AppContext) -> dict[str, Any]:
     return {
         "data_dir": str(context.config.data_dir),
         "version": version,
-        "webui_enabled": webui_config.get("enabled", True),
-        "webui_port": webui_config.get("port", 8766),
+        "webui_enabled": True,
+        "webui_port": 8766,
         "gateway_status": "unknown",
     }
 

@@ -8,17 +8,8 @@ from src.core.webui.app import create_server
 
 
 def _make_mock_context() -> MagicMock:
-    """创建带 webui 配置的 Mock 上下文"""
-    context = MagicMock()
-    context.config.get_webui_config.return_value = {
-        "enabled": True,
-        "host": "127.0.0.1",
-        "port": 8766,
-        "cors_origins": ["http://localhost:8765"],
-        "token_secret": "test-secret",
-        "token_ttl_s": 86400,
-    }
-    return context
+    """创建 Mock 上下文"""
+    return MagicMock()
 
 
 class TestCreateServer:
@@ -28,33 +19,18 @@ class TestCreateServer:
         server = create_server(mock_context)
         assert isinstance(server, uvicorn.Server)
 
-    def test_server_config_host_from_webui_config(self) -> None:
-        """Server 配置使用 webui_config 中的 host"""
-        mock_context = _make_mock_context()
-        mock_context.config.get_webui_config.return_value["host"] = "0.0.0.0"
-        server = create_server(mock_context)
-        assert server.config.host == "0.0.0.0"
-
-    def test_server_config_port_from_webui_config(self) -> None:
-        """Server 配置使用 webui_config 中的 port"""
-        mock_context = _make_mock_context()
-        mock_context.config.get_webui_config.return_value["port"] = 9999
-        server = create_server(mock_context)
-        assert server.config.port == 9999
+    # ponytail: 移除了 test_server_config_host/port_from_webui_config
+    # get_webui_config() 已删除，host/port 固定为默认值，由 default 测试覆盖
 
     def test_server_config_default_host(self) -> None:
-        """host 缺失时使用默认值 127.0.0.1"""
+        """host 固定为默认值 127.0.0.1"""
         mock_context = _make_mock_context()
-        webui_config = mock_context.config.get_webui_config.return_value
-        del webui_config["host"]
         server = create_server(mock_context)
         assert server.config.host == "127.0.0.1"
 
     def test_server_config_default_port(self) -> None:
-        """port 缺失时使用默认值 8766"""
+        """port 固定为默认值 8766"""
         mock_context = _make_mock_context()
-        webui_config = mock_context.config.get_webui_config.return_value
-        del webui_config["port"]
         server = create_server(mock_context)
         assert server.config.port == 8766
 
