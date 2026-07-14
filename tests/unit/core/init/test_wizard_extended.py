@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src import __version__
+from src.core.init.generator import ConfigGenerator
 from src.core.init.migrate import ConfigMigrator, MigrationResult
 from src.core.init.models import InitMode
 from src.core.init.wizard import InitWizard
@@ -194,23 +195,23 @@ class TestInitWizardAgentMode:
     @patch.object(InitWizard, "_is_already_initialized", return_value=False)
     @patch.object(InitWizard, "guide_config")
     @patch.object(InitWizard, "validate_config")
-    @patch.object(InitWizard, "generate_config_files")
+    @patch.object(ConfigGenerator, "write_config_files")
     @patch.object(InitWizard, "detect_environment")
     def test_data_mode_no_llm(
         self,
         mock_detect: MagicMock,
-        mock_generate: MagicMock,
+        mock_write: MagicMock,
         mock_validate: MagicMock,
         mock_guide: MagicMock,
         mock_init: MagicMock,
     ) -> None:
         mock_detect.return_value = MagicMock(missing_dependencies=[])
         mock_guide.return_value = {
-            "config": {"version": __version__, "data_dir": "/tmp/data"},
-            "env_vars": {},
+            "runner_config": {"version": __version__, "data_dir": "/tmp/data"},
+            "nanobot_config": None,
         }
         mock_validate.return_value = MagicMock(is_valid=True, errors=[], warnings=[])
-        mock_generate.return_value = {
+        mock_write.return_value = {
             "config": Path("/tmp/config.json"),
         }
 
@@ -224,28 +225,29 @@ class TestInitWizardAgentMode:
     @patch.object(InitWizard, "_is_already_initialized", return_value=False)
     @patch.object(InitWizard, "guide_config")
     @patch.object(InitWizard, "validate_config")
-    @patch.object(InitWizard, "generate_config_files")
+    @patch.object(ConfigGenerator, "write_config_files")
     @patch.object(InitWizard, "detect_environment")
     def test_agent_mode_with_llm(
         self,
         mock_detect: MagicMock,
-        mock_generate: MagicMock,
+        mock_write: MagicMock,
         mock_validate: MagicMock,
         mock_guide: MagicMock,
         mock_init: MagicMock,
     ) -> None:
         mock_detect.return_value = MagicMock(missing_dependencies=[])
         mock_guide.return_value = {
-            "config": {
+            "runner_config": {
                 "version": __version__,
                 "data_dir": "/tmp/data",
-                "llm_provider": "openai",
-                "llm_model": "gpt-4o-mini",
             },
-            "env_vars": {"NANOBOT_LLM_API_KEY": "sk-test"},
+            "nanobot_config": {
+                "providers": {"default": "openai"},
+                "agents": {"defaults": {"model": "gpt-4o-mini"}},
+            },
         }
         mock_validate.return_value = MagicMock(is_valid=True, errors=[], warnings=[])
-        mock_generate.return_value = {
+        mock_write.return_value = {
             "config": Path("/tmp/config.json"),
         }
 

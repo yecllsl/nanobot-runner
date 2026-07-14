@@ -81,12 +81,12 @@ class InitWizard:
                 skip_optional=skip_optional,
                 agent_mode=agent_mode,
             )
-            user_config = wizard_result.get("config", {})
-            env_vars = wizard_result.get("env_vars", {})
+            runner_config = wizard_result.get("runner_config", {})
+            nanobot_config = wizard_result.get("nanobot_config")
 
-            user_config["data_dir"] = str(target_dir / "data")
+            runner_config["data_dir"] = str(target_dir / "data")
 
-            validation = self.validate_config(user_config)
+            validation = self.validate_config(runner_config)
             if not validation.is_valid:
                 return InitResult(
                     success=False,
@@ -94,19 +94,22 @@ class InitWizard:
                     warnings=validation.warnings,
                 )
 
-            written = self.generate_config_files(target_dir, user_config, env_vars)
+            written = self.config_generator.write_config_files(
+                target_dir,
+                runner_config,
+                nanobot_config=nanobot_config,
+            )
 
             next_steps = [
                 "导入数据: nanobotrun data import <FIT文件路径>",
                 "查看统计: nanobotrun data stats",
             ]
-            if agent_mode and user_config.get("llm_provider"):
+            if agent_mode and nanobot_config:
                 next_steps.append("Agent聊天: nanobotrun agent chat")
 
             return InitResult(
                 success=True,
                 config_path=written.get("config"),
-                env_path=written.get("env"),
                 warnings=validation.warnings,
                 next_steps=next_steps,
             )
@@ -261,7 +264,7 @@ class InitWizard:
         """验证配置
 
         Args:
-            config: 配置字典
+            config: Runner 专有配置字典
 
         Returns:
             ValidationResult: 验证结果
@@ -279,32 +282,11 @@ class InitWizard:
         if data_path.exists() and not data_path.is_dir():
             errors.append(f"数据路径已存在且不是目录: {data_path}")
 
-        if not config.get("llm_provider"):
-            warnings.append("未配置 LLM Provider，Agent 功能将不可用")
-
         return ValidationResult(
             is_valid=len(errors) == 0,
             errors=errors,
             warnings=warnings,
         )
-
-    def generate_config_files(
-        self,
-        workspace_dir: Path,
-        config: dict[str, Any],
-        env_vars: dict[str, str] | None = None,
-    ) -> dict[str, Path]:
-        """生成配置文件
-
-        Args:
-            workspace_dir: workspace 目录路径
-            config: 配置字典
-            env_vars: 环境变量字典
-
-        Returns:
-            dict[str, Path]: 写入的文件路径字典
-        """
-        return self.config_generator.write_config_files(workspace_dir, config, env_vars)
 
     @staticmethod
     def _is_already_initialized(workspace_dir: Path) -> bool:

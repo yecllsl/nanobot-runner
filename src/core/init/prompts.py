@@ -146,48 +146,115 @@ class InitPrompts:
     ) -> dict[str, Any]:
         """运行完整的配置向导
 
+        v0.32.0: 返回 runner_config 和 nanobot_config 双文件结构。
+
         Args:
             skip_optional: 是否跳过可选项
             agent_mode: 是否配置LLM（True=Agent模式，False=数据模式）
 
         Returns:
-            dict[str, Any]: 完整配置字典，包含 config（非敏感）和 env_vars（敏感凭证）
+            dict[str, Any]: 包含 runner_config、nanobot_config 的字典
         """
-        config: dict[str, Any] = {"version": __version__}
-        env_vars: dict[str, str] = {}
+        runner_config: dict[str, Any] = {"version": __version__}
+        nanobot_config: dict[str, Any] = {}
 
         if agent_mode:
             llm_result = InitPrompts.run_llm_provider_wizard()
-            config["llm_provider"] = llm_result["config"].get("llm_provider", "openai")
-            config["llm_model"] = llm_result["config"].get("llm_model", "gpt-4o-mini")
-            base_url = llm_result["config"].get("llm_base_url")
-            if base_url:
-                config["llm_base_url"] = base_url
-            env_vars.update(llm_result.get("env_vars", {}))
 
-            # 注入 fallback 配置到 config.json
+            # 构建 nanobot_config.json 的 providers 节
+            provider_name = llm_result["config"].get("llm_provider", "openai")
+            model = llm_result["config"].get("llm_model", "gpt-4o-mini")
+            base_url = llm_result["config"].get("llm_base_url")
+            api_key = llm_result.get("env_vars", {}).get("NANOBOT_LLM_API_KEY", "")
+
+            providers: dict[str, Any] = {"default": provider_name}
+            provider_cfg: dict[str, Any] = {"apiKey": api_key, "apiType": "auto"}
+            if base_url:
+                provider_cfg["apiBase"] = base_url
+            providers[provider_name] = provider_cfg
+
+            # 备选供应商的 apiKey 写入 providers
+            for k, v in llm_result.get("env_vars", {}).items():
+                if k.startswith("NANOBOT_LLM_API_KEY_") and v:
+                    fb_provider = k.replace("NANOBOT_LLM_API_KEY_", "").lower()
+                    if fb_provider not in providers:
+                        providers[fb_provider] = {"apiKey": v, "apiType": "auto"}
+
+            nanobot_config["providers"] = providers
+
+            # 构建 agents.defaults 节
+            business_config = InitPrompts.run_business_config_wizard()
+            timezone = business_config.get("timezone", "Asia/Shanghai")
+
+            agents_defaults: dict[str, Any] = {
+                "model": model,
+                "provider": "auto",
+                "timezone": timezone,
+                "workspace": "~/.nanobot-runner",
+                "botName": "nanobot-runner",
+                "botIcon": "🍀",
+            }
+
+            # fallbackModels
             fallback_models = llm_result.get("_fallback_models", [])
             model_presets = llm_result.get("_model_presets", {})
             if fallback_models:
-                config["fallback_models"] = fallback_models
-            if model_presets:
-                config["model_presets"] = model_presets
+                fb_list: list[dict[str, Any]] = []
+                for name in fallback_models:
+                    preset = model_presets.get(name, {})
+                    if preset.get("provider") and preset.get("model"):
+                        fb_list.append(
+                            {"model": preset["model"], "provider": preset["provider"]}
+                        )
+                if fb_list:
+                    agents_defaults["fallbackModels"] = fb_list
 
-            config["tools"] = InitPrompts._default_tools_config()
+            nanobot_config["agents"] = {"defaults": agents_defaults}
 
-        business_config = InitPrompts.run_business_config_wizard()
-        config.update(business_config)
+            # model_presets（nanobot 原生格式）
+            nano_presets: dict[str, Any] = {}
+            for name, preset in model_presets.items():
+                nano_presets[name] = {
+                    "model": preset.get("model", ""),
+                    "provider": preset.get("provider", "auto"),
+                }
+            nanobot_config["model_presets"] = nano_presets
 
+            # tools（MCP 配置）
+            nanobot_config["tools"] = InitPrompts._default_tools_config_nanobot()
+
+            # channels（飞书可选）
+            nanobot_config["channels"] = {}
+
+            runner_config["timezone"] = timezone
+        else:
+            business_config = InitPrompts.run_business_config_wizard()
+            runner_config["timezone"] = business_config.get("timezone", "Asia/Shanghai")
+
+        # 飞书配置
         if not skip_optional:
             feishu_result = InitPrompts.run_feishu_config_wizard()
-            config["auto_push_feishu"] = feishu_result["config"].get(
+            runner_config["auto_push_feishu"] = feishu_result["config"].get(
                 "auto_push_feishu", False
             )
-            env_vars.update(feishu_result.get("env_vars", {}))
+            # 飞书凭证写入 nanobot_config.json 的 channels.feishu
+            if runner_config["auto_push_feishu"]:
+                env_vars = feishu_result.get("env_vars", {})
+                nanobot_config.setdefault("channels", {})["feishu"] = {
+                    "enabled": True,
+                    "app_id": env_vars.get("NANOBOT_FEISHU_APP_ID", ""),
+                    "app_secret": env_vars.get("NANOBOT_FEISHU_APP_SECRET", ""),
+                    "receive_id": env_vars.get("NANOBOT_FEISHU_RECEIVE_ID", ""),
+                    "receive_id_type": "user_id",
+                    "allowFrom": ["*"],
+                }
         else:
-            config["auto_push_feishu"] = False
+            runner_config["auto_push_feishu"] = False
 
-        return {"config": config, "env_vars": env_vars}
+        return {
+            "runner_config": runner_config,
+            "nanobot_config": nanobot_config if agent_mode else None,
+        }
 
     @staticmethod
     def _default_llm_config() -> dict[str, Any]:
@@ -343,16 +410,14 @@ class InitPrompts:
         return result
 
     @staticmethod
-    def _default_tools_config() -> dict[str, Any]:
-        """获取默认工具生态配置
-
-        包含四个默认MCP服务器：Chrome DevTools、天气、地图、COROS数据同步。
+    def _default_tools_config_nanobot() -> dict[str, Any]:
+        """获取默认工具生态配置（nanobot 原生 camelCase 格式）
 
         Returns:
             dict[str, Any]: 默认工具配置字典
         """
         return {
-            "mcp_servers": {
+            "mcpServers": {
                 "Chrome DevTools MCP": {
                     "command": "npx",
                     "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect"],
@@ -362,22 +427,22 @@ class InitPrompts:
                     "type": "stdio",
                     "command": "npx",
                     "args": ["-y", "@dangahagan/weather-mcp"],
-                    "tool_timeout": 30,
-                    "enabled_tools": ["*"],
+                    "toolTimeout": 30,
+                    "enabledTools": ["*"],
                 },
                 "osm": {
                     "type": "stdio",
                     "command": "uvx",
                     "args": ["osm-mcp-server"],
-                    "tool_timeout": 30,
-                    "enabled_tools": ["*"],
+                    "toolTimeout": 30,
+                    "enabledTools": ["*"],
                 },
                 "coros": {
                     "type": "stdio",
                     "command": "npx",
                     "args": ["-y", "coros-cli", "mcp"],
-                    "tool_timeout": 30,
-                    "enabled_tools": ["*"],
+                    "toolTimeout": 30,
+                    "enabledTools": ["*"],
                 },
-            },
+            }
         }

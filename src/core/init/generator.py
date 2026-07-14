@@ -32,7 +32,6 @@ _TRACKED_FILES = [
     "TOOLS.md",
     "USER.md",
     "config.json",
-    ".env.local",
 ]
 
 
@@ -284,14 +283,18 @@ class ConfigGenerator:
         workspace_dir: Path,
         config: dict[str, Any],
         env_vars: dict[str, str] | None = None,
+        nanobot_config: dict[str, Any] | None = None,
         init_git: bool = True,
     ) -> dict[str, Path]:
         """写入所有配置文件
 
+        v0.32.0: 同时写入 config.json 和 nanobot_config.json。
+
         Args:
             workspace_dir: workspace 目录路径
-            config: 配置字典
-            env_vars: 环境变量字典（可选）
+            config: Runner 专有配置字典（写入 config.json）
+            env_vars: 环境变量字典（可选，v0.32.0 后通常为空）
+            nanobot_config: nanobot 配置字典（写入 nanobot_config.json）
             init_git: 是否初始化 Git 仓库
 
         Returns:
@@ -305,15 +308,29 @@ class ConfigGenerator:
         try:
             workspace_dir.mkdir(parents=True, exist_ok=True)
 
+            # 1. 写 config.json（Runner 专有字段）
             config_path = workspace_dir / "config.json"
             config_path.write_text(self.generate_config_json(config), encoding="utf-8")
             written["config"] = config_path
 
+            # 2. 写 nanobot_config.json（nanobot 原生格式）
+            if nanobot_config:
+                nano_path = workspace_dir / "nanobot_config.json"
+                nano_path.write_text(
+                    json.dumps(nanobot_config, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                written["nanobot_config"] = nano_path
+
+            # 3. 写 .env.local（v0.32.0 后通常为空，仅保留兼容）
             if env_vars:
                 env_path = workspace_dir / ".env.local"
                 env_path.write_text(self.generate_env_local(env_vars), encoding="utf-8")
                 written["env"] = env_path
 
+            # 4. 更新 .gitignore，排除 nanobot_config.json（含敏感凭证）
+            # 注意：必须在 _init_git_repo 之后调用，否则追加的显式排除条目
+            # 会被 _init_git_repo 中的白名单 _build_gitignore 覆盖
             for path in self._copy_template_files(workspace_dir):
                 written[path.name] = path
 
@@ -327,6 +344,9 @@ class ConfigGenerator:
             if init_git:
                 self._init_git_repo(workspace_dir)
 
+            # 在 git 初始化写入白名单 .gitignore 之后，追加显式排除条目
+            self._ensure_gitignore_excludes_nanobot_config(workspace_dir)
+
             logger.info(f"配置文件已写入: {list(written.keys())}")
             return written
 
@@ -335,3 +355,24 @@ class ConfigGenerator:
                 f"写入配置文件失败: {e}",
                 recovery_suggestion="请检查目录权限和磁盘空间",
             ) from e
+
+    @staticmethod
+    def _ensure_gitignore_excludes_nanobot_config(workspace_dir: Path) -> None:
+        """确保 .gitignore 排除 nanobot_config.json
+
+        nanobot_config.json 包含 apiKey 等明文敏感凭证，
+        必须加入 .gitignore 防止泄露。
+
+        Args:
+            workspace_dir: 工作区目录路径
+        """
+        gitignore_path = workspace_dir / ".gitignore"
+        entry = "nanobot_config.json"
+
+        existing_content = ""
+        if gitignore_path.exists():
+            existing_content = gitignore_path.read_text(encoding="utf-8")
+
+        if entry not in existing_content:
+            with open(gitignore_path, "a", encoding="utf-8") as f:
+                f.write(f"\n# 敏感凭证配置，禁止提交\n{entry}\n")

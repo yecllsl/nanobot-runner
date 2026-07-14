@@ -118,10 +118,9 @@ class TestInitPrompts:
                 return_value={"timezone": "Asia/Shanghai"},
             ):
                 result = InitPrompts.run_full_wizard(skip_optional=True)
-                assert "config" in result
-                assert "env_vars" in result
-                assert result["config"]["version"] == __version__
-                assert result["config"]["auto_push_feishu"] is False
+                assert "runner_config" in result
+                assert result["runner_config"]["version"] == __version__
+                assert result["runner_config"]["auto_push_feishu"] is False
 
     def test_run_full_wizard_with_optional(self) -> None:
         with patch.object(
@@ -147,8 +146,10 @@ class TestInitPrompts:
                     },
                 ):
                     result = InitPrompts.run_full_wizard(skip_optional=False)
-                    assert result["config"]["auto_push_feishu"] is True
-                    assert "NANOBOT_FEISHU_APP_ID" in result["env_vars"]
+                    assert result["runner_config"]["auto_push_feishu"] is True
+                    # 飞书凭证写入 nanobot_config.channels.feishu
+                    nano_cfg = result["nanobot_config"]
+                    assert nano_cfg["channels"]["feishu"]["app_id"] == "test_id"
 
 
 class TestInitPromptsFallback:
@@ -192,3 +193,38 @@ class TestInitPromptsFallback:
     def test_generate_preset_name_short_model(self):
         name = InitPrompts._generate_preset_name("zhipu", "glm-4.7-flash")
         assert name == "zhipu-glm-4.7-flash"
+
+
+class TestInitPromptsNanobotFormat:
+    """测试向导返回 nanobot 原生格式（v0.32.0）"""
+
+    def test_run_full_wizard_data_mode(self):
+        """数据模式不生成 nanobot_config"""
+        with patch.dict("sys.modules", {"questionary": None}):
+            result = InitPrompts.run_full_wizard(agent_mode=False)
+            assert result["nanobot_config"] is None
+            assert "runner_config" in result
+
+    def test_run_full_wizard_agent_mode_structure(self):
+        """Agent 模式返回包含 runner_config 和 nanobot_config"""
+        mock_questionary = MagicMock()
+        mock_questionary.select.return_value.ask.return_value = "openai"
+        mock_questionary.text.return_value.ask.return_value = "gpt-4o-mini"
+        mock_questionary.password.return_value.ask.return_value = "sk-test"
+        mock_questionary.confirm.return_value.ask.return_value = False
+
+        with patch.dict("sys.modules", {"questionary": mock_questionary}):
+            with patch.object(
+                InitPrompts,
+                "run_fallback_wizard",
+                return_value={"_model_presets": {}, "_fallback_models": []},
+            ):
+                result = InitPrompts.run_full_wizard(agent_mode=True)
+                # 验证返回结构包含 nanobot_config
+                assert "nanobot_config" in result
+                nano_cfg = result["nanobot_config"]
+                assert "providers" in nano_cfg
+                assert nano_cfg["providers"]["default"] == "openai"
+                assert "apiKey" in nano_cfg["providers"]["openai"]
+                assert "agents" in nano_cfg
+                assert "model" in nano_cfg["agents"]["defaults"]

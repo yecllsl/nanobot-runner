@@ -21,8 +21,8 @@ class TestInitFlowIntegration:
                 wizard,
                 "guide_config",
                 return_value={
-                    "config": {"version": "0.9.4"},
-                    "env_vars": {},
+                    "runner_config": {"version": "0.9.4"},
+                    "nanobot_config": None,
                 },
             ):
                 result = wizard.run(
@@ -54,8 +54,8 @@ class TestInitFlowIntegration:
                 wizard,
                 "guide_config",
                 return_value={
-                    "config": {"version": "0.9.4"},
-                    "env_vars": {},
+                    "runner_config": {"version": "0.9.4"},
+                    "nanobot_config": None,
                 },
             ):
                 result = wizard.run(
