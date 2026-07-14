@@ -30,6 +30,15 @@ class TestToolsConfigIntegration:
             ),
             patch.object(
                 InitPrompts,
+                "run_websocket_config_wizard",
+                return_value={
+                    "enabled": True,
+                    "port": 8765,
+                    "tokenIssueSecret": "test-secret",
+                },
+            ),
+            patch.object(
+                InitPrompts,
                 "run_feishu_config_wizard",
                 return_value={
                     "config": {"auto_push_feishu": False},

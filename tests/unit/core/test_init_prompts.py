@@ -117,10 +117,19 @@ class TestInitPrompts:
                 "run_business_config_wizard",
                 return_value={"timezone": "Asia/Shanghai"},
             ):
-                result = InitPrompts.run_full_wizard(skip_optional=True)
-                assert "runner_config" in result
-                assert result["runner_config"]["version"] == __version__
-                assert result["runner_config"]["auto_push_feishu"] is False
+                with patch.object(
+                    InitPrompts,
+                    "run_websocket_config_wizard",
+                    return_value={
+                        "enabled": True,
+                        "port": 8765,
+                        "tokenIssueSecret": "test-secret",
+                    },
+                ):
+                    result = InitPrompts.run_full_wizard(skip_optional=True)
+                    assert "runner_config" in result
+                    assert result["runner_config"]["version"] == __version__
+                    assert result["runner_config"]["auto_push_feishu"] is False
 
     def test_run_full_wizard_with_optional(self) -> None:
         with patch.object(
@@ -135,21 +144,30 @@ class TestInitPrompts:
             ):
                 with patch.object(
                     InitPrompts,
-                    "run_feishu_config_wizard",
+                    "run_websocket_config_wizard",
                     return_value={
-                        "config": {"auto_push_feishu": True},
-                        "env_vars": {
-                            "NANOBOT_FEISHU_APP_ID": "test_id",
-                            "NANOBOT_FEISHU_APP_SECRET": "test_secret",
-                            "NANOBOT_FEISHU_RECEIVE_ID": "test_receive",
-                        },
+                        "enabled": True,
+                        "port": 8765,
+                        "tokenIssueSecret": "test-secret",
                     },
                 ):
-                    result = InitPrompts.run_full_wizard(skip_optional=False)
-                    assert result["runner_config"]["auto_push_feishu"] is True
-                    # 飞书凭证写入 nanobot_config.channels.feishu
-                    nano_cfg = result["nanobot_config"]
-                    assert nano_cfg["channels"]["feishu"]["app_id"] == "test_id"
+                    with patch.object(
+                        InitPrompts,
+                        "run_feishu_config_wizard",
+                        return_value={
+                            "config": {"auto_push_feishu": True},
+                            "env_vars": {
+                                "NANOBOT_FEISHU_APP_ID": "test_id",
+                                "NANOBOT_FEISHU_APP_SECRET": "test_secret",
+                                "NANOBOT_FEISHU_RECEIVE_ID": "test_receive",
+                            },
+                        },
+                    ):
+                        result = InitPrompts.run_full_wizard(skip_optional=False)
+                        assert result["runner_config"]["auto_push_feishu"] is True
+                        # 飞书凭证写入 nanobot_config.channels.feishu
+                        nano_cfg = result["nanobot_config"]
+                        assert nano_cfg["channels"]["feishu"]["app_id"] == "test_id"
 
 
 class TestInitPromptsFallback:
