@@ -2,8 +2,8 @@
 
 本文档描述 Nanobot Runner 的核心 API 接口。
 
-> **文档版本**: v0.30.0 | **更新日期**: 2026-06-22
-> **当前基线**: v0.30.0 | **规划版本**: v1.0.0
+> **文档版本**: v0.32.0 | **更新日期**: 2026-07-15
+> **当前基线**: v0.32.0 | **规划版本**: v1.0.0
 > **提示**: 详细参数说明和完整代码示例参见 [docs/api/api_reference_detailed.md](api_reference_detailed.md)
 > **v0.19.0 重要变更**: 新增身体信号分析模块(HRV/疲劳度/恢复评估)
 > **v0.20.0 重要变更**: 新增ML增强预测模块(VDOT/比赛成绩/伤病风险预测)
@@ -12,6 +12,7 @@
 > **v0.24.0 重要变更**: 完成测试验证体系升级，全量测试3937 cases通过，覆盖率81%
 > **v0.28.0 重要变更**: 新增WebUI数据可视化后端，10个FastAPI端点，6大页面
 > **v0.29.0 重要变更**: 新增WebUI管理控制台，13个FastAPI端点，训练计划管理/进化引擎控制台/设置中心
+> **v0.32.0 重要变更**: nanobot-ai 0.2.2 升级，配置分离（nanobot_config.json），新增 ConfigInjector/SDKAdapter/RuntimeEventHook/DynamicProviderRegistry
 
 ---
 

@@ -31,15 +31,19 @@
 
 ### 2.2 配置分离原则
 
+**v0.32.0 更新**: 引入配置物理分离，nanobot 相关配置独立到 `nanobot_config.json`。
+
 | 类型 | 位置 | 说明 |
 |------|------|------|
-| LLM Provider | `~/.nanobot/config.json` | 框架级配置 |
-| 飞书通道 | `~/.nanobot/config.json` | 框架级配置 |
+| **nanobot 配置** | `~/.nanobot-runner/nanobot_config.json` | LLM/WebSocket/MCP/Provider 等 nanobot 框架配置（v0.32.0 新增） |
+| 应用配置 | `~/.nanobot-runner/config.json` | data_dir、timezone 等应用级配置 |
 | Agent行为 | `~/.nanobot-runner/AGENTS.md` | 业务配置 |
 | 人格设定 | `~/.nanobot-runner/SOUL.md` | 业务配置 |
 | 用户画像 | `~/.nanobot-runner/USER.md` | 业务配置 |
 | 环境变量 | `~/.nanobot-runner/.env.local` | 敏感配置（v0.9.4 新增） |
 | 配置备份 | `~/.nanobot-runner/backups/` | 自动备份（v0.9.4 新增） |
+
+**配置迁移**: 从 v0.31.0 升级到 v0.32.0 时，运行 `uv run nanobotrun system migrate-config` 自动迁移配置。
 
 ## 3. 核心配置文件
 
@@ -112,15 +116,15 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 
 **v0.9.4 更新**: 配置结构已扩展，支持更多配置项。
 **v0.16.0 更新**: 配置管理已迁移至 `src.core.config` 模块。
+**v0.32.0 更新**: 配置物理分离，nanobot 相关配置迁移到 `nanobot_config.json`。
 
+**config.json**（应用配置）:
 ```json
 {
-  "version": "0.16.0",
+  "version": "0.32.0",
   "data_dir": "~/.nanobot-runner/data",
   "default_year": 2024,
   "timezone": "Asia/Shanghai",
-  "llm_provider": "anthropic",
-  "llm_model": "claude-3-5-sonnet-20241022",
   "enable_feishu": false,
   "user_profile": {
     "height_cm": 175,
@@ -132,7 +136,29 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 }
 ```
 
+**nanobot_config.json**（nanobot 框架配置，v0.32.0 新增）:
+```json
+{
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "api_key": "sk-xxx"
+  },
+  "websocket": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "tools": {
+    "mcpServers": {}
+  },
+  "providers": {}
+}
+```
+
 ### 4.2 配置项说明
+
+**config.json 配置项**:
 
 | 配置项 | 类型 | 说明 | 版本 |
 |--------|------|------|------|
@@ -140,10 +166,21 @@ Python 3.11+, nanobot-ai, Typer+Rich CLI, Polars, Parquet, fitparse
 | `data_dir` | string | 数据存储目录 | - |
 | `default_year` | int | 默认查询年份 | - |
 | `timezone` | string | 时区设置 | - |
-| `llm_provider` | string | LLM提供商 | v0.9.4 |
-| `llm_model` | string | LLM模型 | v0.9.4 |
 | `enable_feishu` | bool | 启用飞书集成 | v0.9.4 |
 | `user_profile` | object | 用户身体参数 | v0.9.4 |
+
+**nanobot_config.json 配置项**（v0.32.0 新增）:
+
+| 配置项 | 类型 | 说明 |
+|--------|------|------|
+| `llm.provider` | string | LLM 提供商（anthropic/openai/deepseek 等） |
+| `llm.model` | string | LLM 模型名称 |
+| `llm.api_key` | string | LLM API 密钥 |
+| `websocket.enabled` | bool | 是否启用 WebSocket 服务 |
+| `websocket.host` | string | WebSocket 监听地址 |
+| `websocket.port` | int | WebSocket 监听端口 |
+| `tools.mcpServers` | object | MCP 工具服务器配置 |
+| `providers` | object | 自定义 Provider 配置 |
 
 ### 4.3 环境变量配置 (.env.local)
 
@@ -294,6 +331,6 @@ uv run nanobotrun system restore --backup-id backup_20260418_120000
 
 ---
 
-**文档版本**: v0.16.0  
-**最后更新**: 2026-04-29  
+**文档版本**: v0.32.0  
+**最后更新**: 2026-07-15  
 **关联文档**: [CLI使用指南](./cli_usage.md)

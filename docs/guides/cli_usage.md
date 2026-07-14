@@ -1,7 +1,7 @@
 # CLI 使用指南
 
-> **文档版本**: v0.30.0 | **更新日期**: 2026-06-22
-> **当前基线**: v0.30.0 | **规划版本**: v1.0.0
+> **文档版本**: v0.32.0 | **更新日期**: 2026-07-15
+> **当前基线**: v0.32.0 | **规划版本**: v1.0.0
 
 ## 1. 概述
 
@@ -512,6 +512,27 @@ uv run nanobotrun system migrate
 # 查看备份列表（v0.9.4 新增）
 uv run nanobotrun system backup --list
 ```
+
+#### 配置迁移命令 (v0.32.0)
+
+**v0.32.0 新增**: 配置分离迁移专用命令，将旧版 `config.json` 中的 nanobot 配置迁移到独立的 `nanobot_config.json`。
+
+```bash
+# 迁移配置到 nanobot_config.json
+uv run nanobotrun system migrate-config
+
+# 强制覆盖已存在的 nanobot_config.json
+uv run nanobotrun system migrate-config --force
+
+# 预览迁移内容（不实际写入）
+uv run nanobotrun system migrate-config --dry-run
+```
+
+**迁移说明**：
+- v0.32.0 引入配置分离，nanobot 相关配置独立到 `nanobot_config.json`
+- 迁移命令自动提取 `config.json` 中的 LLM、WebSocket、MCP 等配置
+- 迁移完成后 `config.json` 仅保留应用级配置（data_dir、timezone 等）
+- 首次运行 `gateway start` 时如检测到旧配置格式会自动提示迁移
 
 ### 3.11 透明化命令 (transparency)
 
@@ -1320,6 +1341,6 @@ uv run nanobotrun d i /path/to/file.fit
 
 ---
 
-**文档版本**: v0.30.0
-**最后更新**: 2026-06-22
+**文档版本**: v0.32.0
+**最后更新**: 2026-07-15
 **关联文档**: [Agent配置指南](./agent_config_guide.md) | [更新日志](../../CHANGELOG.md)
