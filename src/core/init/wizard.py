@@ -99,7 +99,9 @@ class InitWizard:
                     if not typer.confirm("是否跳过迁移继续初始化？", default=False):
                         return InitResult(
                             success=False,
-                            errors=["请先运行 nanobotrun system migrate-config 完成迁移"],
+                            errors=[
+                                "请先运行 nanobotrun system migrate-config 完成迁移"
+                            ],
                         )
 
             wizard_result = self.guide_config(

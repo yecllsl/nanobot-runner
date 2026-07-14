@@ -1,4 +1,5 @@
 """WebUI 测试共享 fixtures"""
+
 import pytest
 from fastapi.testclient import TestClient
 
