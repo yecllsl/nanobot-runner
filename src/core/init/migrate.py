@@ -10,6 +10,7 @@ from typing import Any
 from src import __version__
 from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
+from src.core.config.legacy import LEGACY_NANOBOT_FIELDS
 from src.core.config.manager import ConfigManager
 
 logger = get_logger(__name__)
@@ -169,10 +170,7 @@ def migrate_config(
         return MigrationResult(success=False, errors=[f"读取 config.json 失败: {e}"])
 
     # 检查是否含旧版字段
-    has_legacy_fields = any(
-        key in legacy_config
-        for key in ("llm_provider", "llm_model", "llm_base_url", "fallback_models")
-    )
+    has_legacy_fields = any(key in legacy_config for key in LEGACY_NANOBOT_FIELDS)
     if not has_legacy_fields:
         return MigrationResult(
             success=False,
@@ -226,9 +224,7 @@ def migrate_config(
 
     ConfigGenerator.ensure_gitignore_excludes_nanobot_config(config_manager.base_dir)
 
-    migrated_fields = [
-        k for k in ("llm_provider", "llm_model", "llm_base_url") if k in legacy_config
-    ]
+    migrated_fields = [k for k in LEGACY_NANOBOT_FIELDS if k in legacy_config]
 
     return MigrationResult(
         success=True,

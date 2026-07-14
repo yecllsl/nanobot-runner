@@ -77,6 +77,31 @@ class InitWizard:
 
             self.create_directories(target_dir)
 
+            # 规格 7.1: 检测旧版 config.json，提示迁移
+            nano_path = target_dir / "nanobot_config.json"
+            if (target_dir / "config.json").exists() and not nano_path.exists():
+                try:
+                    legacy_fields = self.config.check_legacy_fields()
+                except (ValueError, OSError):
+                    legacy_fields = []
+
+                if legacy_fields:
+                    import typer
+
+                    from src.cli.common import console
+
+                    console.print(
+                        f"[yellow]检测到旧版配置格式（config.json 含 {legacy_fields[0]} 等字段）。[/yellow]"
+                    )
+                    console.print(
+                        "建议先运行 [cyan]nanobotrun system migrate-config[/cyan] 迁移到 nanobot_config.json。"
+                    )
+                    if not typer.confirm("是否跳过迁移继续初始化？", default=False):
+                        return InitResult(
+                            success=False,
+                            errors=["请先运行 nanobotrun system migrate-config 完成迁移"],
+                        )
+
             wizard_result = self.guide_config(
                 skip_optional=skip_optional,
                 agent_mode=agent_mode,

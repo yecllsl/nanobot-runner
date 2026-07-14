@@ -368,3 +368,42 @@ class TestNanobotConfigLoading:
             cm = ConfigManager(allow_default=True)
             result = cm.resolve_webui_dist()
             assert result is None or isinstance(result, Path)
+
+
+class TestLegacyFieldsWarning:
+    """测试旧版 config.json 字段检测（规格 7.3 向后兼容）"""
+
+    def test_check_legacy_fields_returns_list(self, tmp_path):
+        """config.json 含 llm_provider 等旧字段时返回字段列表"""
+        config_data = {
+            "version": "0.32.0",
+            "data_dir": str(tmp_path / "data"),
+            "llm_provider": "openai",
+            "llm_model": "gpt-4o-mini",
+        }
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+        (tmp_path / "data").mkdir()
+
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            legacy = cm.check_legacy_fields()
+
+        assert "llm_provider" in legacy
+        assert "llm_model" in legacy
+
+    def test_check_legacy_fields_empty_when_clean(self, tmp_path):
+        """config.json 无旧字段时返回空列表"""
+        config_data = {
+            "version": "0.32.0",
+            "data_dir": str(tmp_path / "data"),
+        }
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+        (tmp_path / "data").mkdir()
+
+        with patch.dict(os.environ, {"NANOBOT_CONFIG_DIR": str(tmp_path)}):
+            ConfigManager.reset_cache()
+            cm = ConfigManager(allow_default=True)
+            assert cm.check_legacy_fields() == []

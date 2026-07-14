@@ -11,7 +11,6 @@ from starlette.testclient import TestClient
 
 from src.core.transparency.runtime_event_hook import RuntimeEvent
 from src.core.webui.app import create_app
-from src.core.webui.auth import create_access_token
 
 
 @pytest.fixture
@@ -36,12 +35,6 @@ def app(mock_context: MagicMock):
 @pytest.fixture
 def client(app) -> TestClient:
     return TestClient(app)
-
-
-@pytest.fixture
-def auth_headers() -> dict[str, str]:
-    token = create_access_token(secret="test-secret", ttl_seconds=3600)
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _make_scope(

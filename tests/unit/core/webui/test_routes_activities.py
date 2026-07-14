@@ -7,7 +7,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.core.webui.app import create_app
-from src.core.webui.auth import create_access_token
 
 
 def _compute_session_id(timestamp: str) -> str:
@@ -59,12 +58,6 @@ def mock_context() -> MagicMock:
 def client(mock_context: MagicMock) -> TestClient:
     app = create_app(context=mock_context)
     return TestClient(app)
-
-
-@pytest.fixture
-def auth_headers() -> dict[str, str]:
-    token = create_access_token(secret="test-secret", ttl_seconds=3600)
-    return {"Authorization": f"Bearer {token}"}
 
 
 class TestActivitiesListEndpoint:

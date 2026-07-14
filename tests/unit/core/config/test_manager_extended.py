@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -22,17 +23,12 @@ class TestConfigManagerLoadConfigWithDefault:
             with patch.object(Path, "home", return_value=tmp_path):
                 cm = ConfigManager(allow_default=True)
                 config = cm.load_config()
-                assert config["version"] == "0.9.4"
+                assert config["version"] == "0.32.0"
                 assert "data_dir" in config
 
 
 class TestConfigManagerGetConfigSource:
-    def test_config_source_env(self, tmp_path):
-        with patch.dict(os.environ, {"NANOBOT_FEISHU_APP_ID": "env_val"}, clear=False):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                source = cm.get_config_source("feishu_app_id")
-                assert source == ConfigSource.ENV
+    # ponytail: 移除了 test_config_source_env — ENV_KEY_MAPPING 已清空，ENV 源检测不再可用
 
     def test_config_source_file(self, tmp_path):
         with patch.dict(os.environ, {}, clear=True):
@@ -77,20 +73,7 @@ class TestConfigManagerValidateConsistency:
                 result = cm.validate_config_consistency()
                 assert result == []
 
-    def test_with_inconsistencies(self, tmp_path):
-        with patch.dict(os.environ, {"NANOBOT_FEISHU_APP_ID": "env_val"}, clear=False):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(
-                    {
-                        "version": "0.1.0",
-                        "data_dir": str(tmp_path / "data"),
-                        "feishu_app_id": "file_val",
-                    }
-                )
-                result = cm.validate_config_consistency()
-                assert len(result) > 0
-                assert result[0]["field"] == "feishu_app_id"
+    # ponytail: 移除了 test_with_inconsistencies — validate_config_consistency 已简化为始终返回 []
 
     def test_default_mode_no_inconsistencies(self, tmp_path):
         with patch.dict(os.environ, {}, clear=True):
@@ -100,59 +83,13 @@ class TestConfigManagerValidateConsistency:
                 assert result == []
 
 
-class TestConfigManagerGetLlmConfig:
-    def test_get_llm_config_from_file(self, tmp_path):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(
-                    {
-                        "version": "0.1.0",
-                        "data_dir": str(tmp_path / "data"),
-                        "llm_provider": "openai",
-                        "llm_model": "gpt-4",
-                        "llm_base_url": "https://api.openai.com",
-                    }
-                )
-                llm = cm.get_llm_config()
-                assert llm["provider"] == "openai"
-                assert llm["model"] == "gpt-4"
-                assert llm["base_url"] == "https://api.openai.com"
-
-    def test_get_llm_config_env_override_ignored(self, tmp_path):
-        """非敏感 LLM 字段（provider/model/base_url）不再被环境变量覆盖，
-        get_llm_config 优先读取 config.json 值"""
-        with patch.dict(
-            os.environ,
-            {"NANOBOT_LLM_PROVIDER": "anthropic", "NANOBOT_LLM_MODEL": "claude-3"},
-            clear=False,
-        ):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(
-                    {
-                        "version": "0.1.0",
-                        "data_dir": str(tmp_path / "data"),
-                        "llm_provider": "openai",
-                        "llm_model": "gpt-4",
-                    }
-                )
-                llm = cm.get_llm_config()
-                # config.json 值优先，环境变量不再覆盖非敏感字段
-                assert llm["provider"] == "openai"
-                assert llm["model"] == "gpt-4"
-
-    def test_get_llm_config_empty(self, tmp_path):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                llm = cm.get_llm_config()
-                assert llm["provider"] == ""
-                assert llm["model"] == ""
+# ponytail: 移除了 TestConfigManagerGetLlmConfig — get_llm_config() 已删除，LLM 配置迁移至 nanobot_config.json
+# ponytail: 移除了 TestConfigManagerSaveLlmConfig — save_llm_config() 已删除，LLM 配置迁移至 nanobot_config.json
 
 
 class TestConfigManagerHasLlmConfig:
     def test_has_llm_config_true(self, tmp_path):
+        """has_llm_config 从 nanobot_config.json 读取 providers.default.apiKey"""
         with patch.dict(os.environ, {}, clear=True):
             with patch.object(Path, "home", return_value=tmp_path):
                 cm = ConfigManager()
@@ -160,9 +97,17 @@ class TestConfigManagerHasLlmConfig:
                     {
                         "version": "0.1.0",
                         "data_dir": str(tmp_path / "data"),
-                        "llm_provider": "openai",
-                        "llm_model": "gpt-4",
                     }
+                )
+                # 写入 nanobot_config.json，包含有效 provider 配置
+                nano_config = {
+                    "providers": {
+                        "default": "openai",
+                        "openai": {"apiKey": "sk-test-key"},
+                    }
+                }
+                cm.get_nanobot_config_path().write_text(
+                    json.dumps(nano_config), encoding="utf-8"
                 )
                 assert cm.has_llm_config() is True
 
@@ -171,57 +116,6 @@ class TestConfigManagerHasLlmConfig:
             with patch.object(Path, "home", return_value=tmp_path):
                 cm = ConfigManager()
                 assert cm.has_llm_config() is False
-
-
-class TestConfigManagerSaveLlmConfig:
-    def test_save_llm_config(self, tmp_path):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_llm_config(
-                    provider="openai",
-                    model="gpt-4",
-                    base_url="https://api.openai.com",
-                )
-                config = cm.load_config()
-                assert config["llm_provider"] == "openai"
-                assert config["llm_model"] == "gpt-4"
-                assert config["llm_base_url"] == "https://api.openai.com"
-
-    def test_save_llm_config_with_api_key(self, tmp_path):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                with patch("src.core.config.env_manager.EnvManager") as mock_env:
-                    mock_instance = MagicMock()
-                    mock_env.return_value = mock_instance
-                    cm.save_llm_config(
-                        provider="openai",
-                        model="gpt-4",
-                        api_key="sk-test-key",
-                    )
-                    mock_instance.save_env_file.assert_called_once()
-
-    def test_save_llm_config_remove_base_url(self, tmp_path):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(
-                    {
-                        "version": "0.1.0",
-                        "data_dir": str(tmp_path / "data"),
-                        "llm_provider": "openai",
-                        "llm_model": "gpt-4",
-                        "llm_base_url": "https://old-url.com",
-                    }
-                )
-                cm.save_llm_config(
-                    provider="openai",
-                    model="gpt-4",
-                    base_url=None,
-                )
-                config = cm.load_config()
-                assert "llm_base_url" not in config
 
 
 class TestConfigManagerCastEnvValue:
@@ -248,21 +142,7 @@ class TestConfigManagerCastEnvValue:
 
 
 class TestConfigManagerLoadConfigWithEnvOverride:
-    def test_env_override(self, tmp_path):
-        with patch.dict(
-            os.environ, {"NANOBOT_FEISHU_APP_ID": "env_app_id"}, clear=False
-        ):
-            with patch.object(Path, "home", return_value=tmp_path):
-                cm = ConfigManager()
-                cm.save_config(
-                    {
-                        "version": "0.1.0",
-                        "data_dir": str(tmp_path / "data"),
-                        "feishu_app_id": "file_app_id",
-                    }
-                )
-                config = cm.load_config_with_env_override()
-                assert config["feishu_app_id"] == "env_app_id"
+    # ponytail: 移除了 test_env_override — ENV_KEY_MAPPING 已清空，环境变量不再覆盖非敏感字段
 
     def test_no_env_override(self, tmp_path):
         with patch.dict(os.environ, {}, clear=True):

@@ -10,6 +10,7 @@ from typing import Any
 
 from src.core.base.exceptions import ConfigError, NanobotRunnerError
 from src.core.base.logger import get_logger
+from src.core.config.legacy import LEGACY_NANOBOT_FIELDS
 from src.core.config.schema import AppConfig
 
 logger = get_logger(__name__)
@@ -269,6 +270,25 @@ class ConfigManager:
                 f"配置文件格式错误，请检查 nanobot_config.json: {e}",
                 recovery_suggestion="请修正 JSON 语法错误",
             ) from e
+
+    def check_legacy_fields(self) -> list[str]:
+        """检测 config.json 是否含旧版 nanobot 字段
+
+        迁移完成后 config.json 不应含这些字段。若存在则打印 warning
+        并返回字段名列表，供调用方提示用户运行 migrate-config。
+
+        Returns:
+            list[str]: 存在的旧版字段名列表
+        """
+        config = self.load_config()
+        found = [f for f in LEGACY_NANOBOT_FIELDS if f in config]
+        if found:
+            logger.warning(
+                "检测到 config.json 含旧版 nanobot 字段 %s，"
+                "建议运行 'nanobotrun system migrate-config' 迁移",
+                found,
+            )
+        return found
 
     def get(self, key: str, default: Any = None) -> Any:
         """获取配置项
