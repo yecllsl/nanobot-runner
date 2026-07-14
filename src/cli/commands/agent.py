@@ -90,7 +90,7 @@ async def _run_chat() -> None:
         workspace = context.config.base_dir
         from src.core.tools.mcp_connector import load_mcp_servers_config
 
-        mcp_config = load_mcp_servers_config(context.config.config_file)
+        mcp_config = load_mcp_servers_config(context.config.get_nanobot_config_path())
 
         runner_tools = RunnerTools(context)
 
