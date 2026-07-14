@@ -25,6 +25,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import json
+import logging
 import os
 import pickle
 import subprocess
@@ -35,6 +36,11 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+# ponytail: pre-commit-check 只需要 logging，不 import src 包
+# 避免 src.core.base.__init__ 级联加载整个项目依赖树（polars/pyarrow/sklearn...）
+# 单进程内存从 ~10GB 降至 ~50MB
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -70,12 +76,6 @@ if sys.platform == "win32":
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     os.environ["PYTHONUTF8"] = "1"
     os.environ["PYTHONIOENCODING"] = "utf-8"
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src.core.base.logger import get_logger
-
-logger = get_logger(__name__)
 
 
 class CheckStatus(Enum):
