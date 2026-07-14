@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-4191%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.31.0 - Ponytail 审查修复与重构，删除死代码 + 移除未使用依赖 + 内联转发层，遵循 YAGNI 原则优化代码库
+> **最新版本**: v0.32.0 - nanobot-ai 0.2.2 升级与配置分离，移除 monkey-patch 技术债，新增 SDK 编程式调用、运行时事件总线、自定义 Provider、语音转录配置
 
 ## 项目简介
 

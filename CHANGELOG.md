@@ -9,6 +9,74 @@
 
 ---
 
+## [0.32.0] - 2026-07-14
+
+### 版本主题
+**nanobot-ai 0.2.2 升级与配置分离** —— 移除 monkey-patch 技术债，实现配置分离，新增 SDK 编程式调用、运行时事件总线、自定义 Provider、语音转录配置
+
+> v0.32.0 是 Phase D（交互升级）的第七个版本，核心工作包括：nanobot-ai 底座升级至 0.2.2、配置分离（config.json → nanobot_config.json）、移除 4 项 monkey-patch 技术债、新增 SDK 编程式调用和运行时事件总线。
+
+**本版本已实现**:
+- ✅ 底座升级：nanobot-ai 0.2.1 → 0.2.2
+- ✅ 配置分离：config.json → nanobot_config.json，消除运行时转换层
+- ✅ 技术债清偿：移除 4 项 monkey-patch（ConfigInjector 替代）
+- ✅ 新增组件：ConfigInjector、AgentLoopAdapter、SDKAdapter、RuntimeEventHook、DynamicProviderRegistry
+- ✅ 新功能：SDK 编程式调用、运行时事件 SSE、自定义 Provider、语音转录配置
+- ✅ 全量测试通过率 99.93%（单元测试），集成测试 100%
+- ✅ 核心模块覆盖率 83%
+
+### Added
+- **SDK 编程式调用**: `src/core/sdk_adapter.py`
+  - SDKAdapter 提供编程式 Agent 调用接口
+  - 支持同步/异步调用模式
+- **运行时事件总线**: `src/core/transparency/runtime_event_hook.py`
+  - RuntimeEventHook 订阅 nanobot 运行时事件
+  - WebUI SSE 端点实时推送
+- **自定义 Provider**: `src/core/provider_adapter.py`
+  - DynamicProviderRegistry 支持运行时注册自定义 Provider
+- **语音转录配置**: WebUI 设置中心
+  - 支持配置语音转录模型和参数
+- **配置注入器**: `src/core/config_injector.py`
+  - ConfigInjector 替代 monkey-patch，构建 nanobot 原生配置
+
+### Changed
+- **底座升级**: nanobot-ai 0.2.1 → 0.2.2
+  - 支持 ProviderConfig 对象（apiBase 字段）
+  - 运行时事件总线集成
+- **配置分离**: config.json → nanobot_config.json
+  - nanobot_config.json 作为 nanobot 配置唯一来源
+  - 移除运行时转换层，消除配置重复定义
+- **技术债清偿**: 移除 4 项 monkey-patch
+  - 移除 `_patch_nanobot_config()`
+  - 移除 `_patch_nanobot_provider_registry()`
+  - 移除 `_patch_nanobot_agent_loop()`
+  - 移除 `_patch_nanobot_memory()`
+
+### Fixed
+- **测试修复**: 13 个集成测试因配置分离变更而失败，已修复
+  - `test_config_injection.py`: 更新 `_make_mock_config` 添加 nanobot 格式配置
+  - `test_webui_v0290_routes.py`: 修复 `app.py:71` 从 context 读取 WebUI 配置
+  - `test_dual_path_coexistence.py`: 同上
+
+### 测试验证
+- 单元测试：4375 passed, 3 failed, 1 skipped（99.93% 通过率）
+- 集成测试：403 passed, 0 failed, 1 skipped（100% 通过率）
+- 性能测试：26 passed, 0 failed
+- 代码覆盖率：83%（核心模块 80%+）
+- ruff check：0 errors, 0 warnings
+- mypy 类型检查：Success: no issues found
+
+### 文档产出
+- `docs/test/strategy_v0.32.0.md` - 测试策略
+- `docs/test/reports/测试报告_v0.32.0.md` - 测试报告
+- `docs/test/reports/Bug清单_v0.32.0.md` - Bug 清单
+
+### 已知问题
+- 3 个单元测试失败为 `prompt_toolkit` 在 CI/非交互式终端环境下的已知限制，与 v0.32.0 代码变更无关
+- 配置管理模块覆盖率 43% 低于基线 80%（后续版本补充）
+
+---
+
 ## [0.31.0] - 2026-07-11
 
 ### 版本主题
