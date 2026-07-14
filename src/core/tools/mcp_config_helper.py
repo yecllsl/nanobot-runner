@@ -33,10 +33,12 @@ class MCPConfigHelper:
     def load_tools_config(self) -> ToolsConfig:
         """加载工具配置
 
-        从config.json中读取tools字段，解析为ToolsConfig实例。
+        从配置文件中读取 tools 字段，解析为 ToolsConfig 实例。
+        支持 nanobot 原生格式（tools.mcpServers，camelCase）和
+        旧版格式（tools.mcp_servers，snake_case）。
 
         Returns:
-            ToolsConfig: 工具配置实例，配置文件不存在或无tools字段时返回空配置
+            ToolsConfig: 工具配置实例，配置文件不存在或无 tools 字段时返回空配置
         """
         if not self.config_path.exists():
             logger.debug(f"配置文件不存在: {self.config_path}")
@@ -54,7 +56,16 @@ class MCPConfigHelper:
             logger.warning("配置文件中tools字段格式错误，应为字典类型")
             return ToolsConfig()
 
-        return ToolsConfig.from_config_dict(tools_section)
+        # 兼容 nanobot 原生格式（mcpServers）和旧版格式（mcp_servers）
+        mcp_servers_raw = tools_section.get("mcpServers")
+        if mcp_servers_raw is None:
+            mcp_servers_raw = tools_section.get("mcp_servers", {})
+
+        # 转换为旧版格式以复用 ToolsConfig.from_config_dict
+        adapted_section = dict(tools_section)
+        adapted_section["mcp_servers"] = mcp_servers_raw
+
+        return ToolsConfig.from_config_dict(adapted_section)
 
     def save_tools_config(self, tools_config: ToolsConfig) -> bool:
         """保存工具配置到config.json

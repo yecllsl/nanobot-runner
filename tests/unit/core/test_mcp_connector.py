@@ -206,3 +206,48 @@ class TestConnectMcpToolsFromConfig:
 
             assert result["connected_servers"] == []
             assert "weather" in result["failed_servers"]
+
+
+@pytest.fixture
+def nanobot_config_with_mcp(tmp_path: Path) -> Path:
+    """创建包含 MCP 配置的 nanobot_config.json"""
+    config_path = tmp_path / "nanobot_config.json"
+    config = {
+        "providers": {"default": "custom"},
+        "agents": {"defaults": {"model": "test"}},
+        "tools": {
+            "mcpServers": {
+                "weather": {
+                    "type": "stdio",
+                    "command": "npx",
+                    "args": ["-y", "@dangahagan/weather-mcp"],
+                    "toolTimeout": 30,
+                    "enabledTools": ["*"],
+                }
+            }
+        },
+    }
+    config_path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+    return config_path
+
+
+class TestLoadMcpFromNanobotConfig:
+    """测试从 nanobot_config.json 读取 MCP 配置"""
+
+    def test_load_mcp_servers_from_nanobot_config(self, nanobot_config_with_mcp):
+        """从 nanobot_config.json 的 tools.mcpServers 加载 MCP 配置"""
+        result = load_mcp_servers_config(nanobot_config_with_mcp)
+        assert "weather" in result
+        assert result["weather"].command == "npx"
+
+    def test_load_mcp_servers_empty_config(self, tmp_path):
+        """nanobot_config.json 无 tools.mcpServers 时返回空 dict"""
+        config_path = tmp_path / "nanobot_config.json"
+        config_path.write_text(json.dumps({"providers": {}}), encoding="utf-8")
+        result = load_mcp_servers_config(config_path)
+        assert result == {}
+
+    def test_load_mcp_servers_file_not_exists(self, tmp_path):
+        """文件不存在时返回空 dict"""
+        result = load_mcp_servers_config(tmp_path / "nonexistent.json")
+        assert result == {}
