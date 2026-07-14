@@ -57,8 +57,8 @@
 > **v0.9.0 新增**
 
 ```python
-from src.core.base import AppContextFactory
-# 或: from src.core.base.context import AppContextFactory
+from src.core.base.context import AppContextFactory
+
 
 # 创建默认上下文
 ctx = AppContextFactory.create()
@@ -114,8 +114,8 @@ vdot_sessions = repo.get_sessions_for_vdot(limit=50)
 数据分析引擎，提供跑步数据的统计和分析功能。
 
 ```python
-from src.core.base import AppContextFactory
-# 或: from src.core.base.context import AppContextFactory
+from src.core.base.context import AppContextFactory
+
 
 ctx = AppContextFactory.create()
 engine = ctx.analytics
@@ -155,8 +155,8 @@ drift = engine.analyze_hr_drift(records)
 Parquet 存储管理器，负责数据的读写和查询。
 
 ```python
-from src.core.base import AppContextFactory
-# 或: from src.core.base.context import AppContextFactory
+from src.core.base.context import AppContextFactory
+
 
 ctx = AppContextFactory.create()
 storage = ctx.storage
@@ -197,8 +197,8 @@ activities = parser.parse_directory("path/to/fit/files/")
 数据导入服务，协调解析、去重和存储。
 
 ```python
-from src.core.base import AppContextFactory
-# 或: from src.core.base.context import AppContextFactory
+from src.core.base.context import AppContextFactory
+
 
 ctx = AppContextFactory.create()
 importer = ctx.importer
@@ -223,8 +223,8 @@ Agent 工具集，封装为 nanobot-ai 可识别的工具格式。
 
 ```python
 from src.agents.tools import RunnerTools
-from src.core.base import AppContextFactory
-# 或: from src.core.base.context import AppContextFactory
+from src.core.base.context import AppContextFactory
+
 
 ctx = AppContextFactory.create()
 tools = RunnerTools(ctx)
@@ -732,7 +732,7 @@ pairs = store.get_decision_outcome_pairs(days=30)
 
 ```python
 from src.core.evolution import EvolutionEngine
-from src.core.base import get_context
+from src.core.base.context import get_context
 
 # 通过依赖注入获取
 context = get_context()
