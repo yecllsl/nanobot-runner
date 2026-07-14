@@ -139,6 +139,21 @@ def build_nanobot_config_from_legacy(
             "receive_id_type": "user_id",
             "allowFrom": ["*"],
         }
+
+    # 迁移 websocket 配置
+    ws_config = legacy_config.get("websocket", {})
+    if ws_config:
+        channels["websocket"] = {
+            "enabled": ws_config.get("enabled", True),
+            "host": ws_config.get("host", "127.0.0.1"),
+            "port": ws_config.get("port", 8765),
+            "token": ws_config.get("token", ""),
+            "websocket_requires_token": ws_config.get("websocket_requires_token", True),
+            "allowFrom": ["*"],
+            "streaming": True,
+            "max_message_bytes": ws_config.get("max_message_bytes", 37748736),
+        }
+
     nanobot_config["channels"] = channels
 
     return nanobot_config

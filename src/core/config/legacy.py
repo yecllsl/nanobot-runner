@@ -11,4 +11,7 @@ LEGACY_NANOBOT_FIELDS: list[str] = [
     "llm_base_url",
     "fallback_models",
     "model_presets",
+    "tools",
+    "websocket",
+    "webui",
 ]

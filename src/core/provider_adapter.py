@@ -300,7 +300,7 @@ class RunnerProviderAdapter:
         """
         try:
             return self._runner_config.has_llm_config()
-        except Exception:
+        except (OSError, ValueError, NanobotRunnerError):
             return False
 
     def _from_nanobot_config(self) -> LLMConfig:

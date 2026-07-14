@@ -271,6 +271,43 @@ class ConfigManager:
                 recovery_suggestion="请修正 JSON 语法错误",
             ) from e
 
+    def get_webui_config(self) -> dict[str, Any]:
+        """获取 WebUI 配置
+
+        从 nanobot_config.json 的 channels.websocket 读取 WebUI 相关配置，
+        不存在时返回默认值。
+
+        Returns:
+            dict[str, Any]: WebUI 配置字典，包含 host、port、token_secret、
+                           token_ttl_s、cors_origins 等字段
+        """
+        defaults: dict[str, Any] = {
+            "host": "127.0.0.1",
+            "port": 8766,
+            "token_secret": "",
+            "token_ttl_s": 86400,
+            "cors_origins": ["http://127.0.0.1:8765"],
+        }
+
+        nanobot_config = self.load_nanobot_config()
+        channels = nanobot_config.get("channels", {})
+        ws_config = channels.get("websocket", {})
+
+        if not ws_config:
+            return defaults
+
+        result = {**defaults}
+        if "host" in ws_config:
+            result["host"] = ws_config["host"]
+        if "port" in ws_config:
+            result["port"] = ws_config["port"]
+        if "tokenIssueSecret" in ws_config:
+            result["token_secret"] = ws_config["tokenIssueSecret"]
+        if "token_ttl_s" in ws_config:
+            result["token_ttl_s"] = ws_config["token_ttl_s"]
+
+        return result
+
     def check_legacy_fields(self) -> list[str]:
         """检测 config.json 是否含旧版 nanobot 字段
 

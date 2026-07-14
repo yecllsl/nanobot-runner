@@ -131,7 +131,7 @@ if PYDANTIC_AVAILABLE:
         bandit: CheckConfig = Field(default_factory=lambda: CheckConfig(timeout=120))
         pytest: CheckConfig = Field(
             default_factory=lambda: CheckConfig(
-                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n auto"
+                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n 4"
             )
         )
         schema_check: CheckConfig = Field(default_factory=CheckConfig)
@@ -216,7 +216,7 @@ else:
             self.mypy = CheckConfig(timeout=120)
             self.bandit = CheckConfig(timeout=120)
             self.pytest = CheckConfig(
-                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n auto"
+                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n 4"
             )
             self.schema_check = CheckConfig()
             self.parallel_execution = True
@@ -708,7 +708,7 @@ class PreCommitChecker:
         sorted_dirs = sorted(test_dirs)
         dirs_str = " ".join(sorted_dirs)
         logger.info(f"增量测试目录: {dirs_str}")
-        return f"uv run pytest {dirs_str} -v --timeout=60 -n auto"
+        return f"uv run pytest {dirs_str} -v --timeout=60 -n 4"
 
     def check_pytest_tests(self) -> CheckResult:
         """运行单元测试（支持增量测试）"""
@@ -723,7 +723,7 @@ class PreCommitChecker:
 
         command = (
             self.config.pytest.command
-            or "uv run pytest tests/unit/ -v --timeout=60 -n auto"
+            or "uv run pytest tests/unit/ -v --timeout=60 -n 4"
         )
 
         if self.config.incremental_check:

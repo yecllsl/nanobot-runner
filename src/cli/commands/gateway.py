@@ -210,8 +210,48 @@ def _register_runner_commands(agent, runner_tools):
             metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
         )
 
+    async def cmd_restart(ctx: CommandContext) -> OutboundMessage:
+        """重启 Runner Gateway 服务
+
+        覆盖 nanobot 默认的 /restart 命令，使用正确的启动命令。
+        """
+        import asyncio
+        import os
+        import sys
+
+        from nanobot.utils.restart import set_restart_notice_to_env
+
+        # 保存重启通知，以便重启后恢复会话
+        set_restart_notice_to_env(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            metadata=dict(ctx.msg.metadata or {}),
+        )
+
+        async def _do_restart():
+            await asyncio.sleep(1)
+            # Runner 的正确启动命令：uv run nanobotrun gateway start --webui
+            # 重启时保留原有参数
+            new_argv = [
+                sys.executable,
+                "-m",
+                "src.cli.app",
+                "gateway",
+                "start",
+                "--webui",
+            ]
+            os.execv(sys.executable, new_argv)
+
+        asyncio.create_task(_do_restart())
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content="正在重启 Runner Gateway...",
+            metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        )
+
+    # 注册业务命令
     agent.commands.exact("/stats", cmd_stats)
-    agent.commands.exact("/recent", cmd_recent)
     agent.commands.prefix("/recent ", cmd_recent)
     agent.commands.exact("/vd", cmd_vdot)
     agent.commands.prefix("/vd ", cmd_vdot)
@@ -221,6 +261,9 @@ def _register_runner_commands(agent, runner_tools):
     agent.commands.prefix("/hr_drift ", cmd_hr_drift)
     agent.commands.exact("/load", cmd_load)
     agent.commands.prefix("/load ", cmd_load)
+
+    # 注册重启命令（覆盖 nanobot 默认）
+    agent.commands.priority("/restart", cmd_restart)
 
 
 def _setup_gateway_logging(verbose: bool, logs: bool) -> None:

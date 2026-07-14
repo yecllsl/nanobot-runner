@@ -67,7 +67,8 @@ def create_app(context: AppContext) -> FastAPI:
     """
     global _app_instance
 
-    webui_config: dict[str, Any] = {"host": "127.0.0.1", "port": 8766}
+    # v0.32.0: 从 context 读取 WebUI 配置
+    webui_config: dict[str, Any] = context.config.get_webui_config()
 
     # 动态读取包版本号
     try:

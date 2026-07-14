@@ -140,6 +140,52 @@ class InitPrompts:
             return {"config": {"auto_push_feishu": False}, "env_vars": {}}
 
     @staticmethod
+    def run_websocket_config_wizard() -> dict[str, Any]:
+        """运行 WebSocket WebUI 配置向导（可选）
+
+        Returns:
+            dict[str, Any]: WebSocket 配置字典，包含 enabled、port、tokenIssueSecret
+        """
+        try:
+            import secrets
+
+            import questionary
+
+            enable = questionary.confirm(
+                "是否启用 WebUI 浏览器交互？（推荐）",
+                default=True,
+            ).ask()
+
+            if not enable:
+                return {"enabled": False}
+
+            port = questionary.text(
+                "WebSocket 端口:",
+                default="8765",
+            ).ask()
+
+            # 自动生成安全的 token secret
+            token_secret = secrets.token_urlsafe(32)
+
+            logger.info("WebUI Token Secret 已自动生成，请妥善保管")
+
+            return {
+                "enabled": True,
+                "port": int(port) if port else 8765,
+                "tokenIssueSecret": token_secret,
+            }
+
+        except ImportError:
+            # 默认启用 websocket，使用自动生成的 secret
+            import secrets
+
+            return {
+                "enabled": True,
+                "port": 8765,
+                "tokenIssueSecret": secrets.token_urlsafe(32),
+            }
+
+    @staticmethod
     def run_full_wizard(
         skip_optional: bool = False,
         agent_mode: bool = True,
@@ -223,8 +269,17 @@ class InitPrompts:
             # tools（MCP 配置）
             nanobot_config["tools"] = InitPrompts._default_tools_config_nanobot()
 
-            # channels（飞书可选）
+            # channels（WebSocket 默认启用，飞书可选）
             nanobot_config["channels"] = {}
+
+            # WebSocket 配置（agent_mode 时默认启用）
+            websocket_cfg = InitPrompts.run_websocket_config_wizard()
+            if websocket_cfg.get("enabled"):
+                nanobot_config["channels"]["websocket"] = {
+                    "enabled": True,
+                    "port": websocket_cfg.get("port", 8765),
+                    "tokenIssueSecret": websocket_cfg.get("tokenIssueSecret", ""),
+                }
 
             runner_config["timezone"] = timezone
         else:

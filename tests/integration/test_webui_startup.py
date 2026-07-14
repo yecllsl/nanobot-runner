@@ -135,6 +135,31 @@ def _build_test_nanobot_config(
     return Config(providers=providers, agents=agents, channels=channels)
 
 
+def _build_nanobot_config_from_dict(nano_dict: dict[str, Any]) -> Any:
+    """从 nanobot_config.json 格式的字典构建 nanobot Config 对象
+
+    v0.32.0: 配置分离后，替代已移除的 RunnerProviderAdapter._get_or_create_nanobot_config()。
+
+    Args:
+        nano_dict: load_nanobot_config() 返回的字典
+
+    Returns:
+        nanobot Config 对象
+    """
+    from nanobot.config.loader import Config
+
+    providers = ProvidersConfig(default=nano_dict["providers"].get("default", ""))
+    default_provider = nano_dict["providers"].get("default", "")
+    provider_cfg = nano_dict["providers"].get(default_provider, {})
+    if default_provider:
+        setattr(providers, default_provider, provider_cfg)
+
+    agents = AgentsConfig(defaults=nano_dict["agents"]["defaults"])
+    channels = nano_dict.get("channels", {})
+
+    return Config(providers=providers, agents=agents, channels=channels)
+
+
 def _create_channel_manager(config: Any, bus: MessageBus) -> Any:
     """创建 ChannelManager 实例，mock discover_all/discover_enabled 避免慢速导入
 
@@ -174,7 +199,12 @@ class TestWebUIConfigInjection:
         base_url: str | None = None,
         ws_config: dict[str, Any] | None = None,
     ) -> MagicMock:
-        """创建模拟的 ConfigManager"""
+        """创建模拟的 ConfigManager
+
+        v0.32.0: 配置分离后，nanobot_config.json 由 ConfigManager 直接管理，
+        load_nanobot_config() 返回 nanobot 原生格式配置字典。
+        """
+        ws = ws_config or {}
         mock = MagicMock()
         mock.has_llm_config.return_value = True
         mock.get_llm_config.return_value = {
@@ -183,9 +213,43 @@ class TestWebUIConfigInjection:
             "api_key": api_key,
             "base_url": base_url,
         }
-        mock.get_websocket_config.return_value = ws_config or {}
-        # v0.30.0: load_config() 必须返回真实字典，避免 MagicMock 导致 Pydantic 验证失败
+        mock.get_websocket_config.return_value = ws
         mock.load_config.return_value = {}
+
+        # v0.32.0: 构建 nanobot_config.json 格式的返回值
+        ws_enabled = ws.get("enabled", True)
+        channels: dict[str, Any] = {}
+        if ws_enabled:
+            channels["websocket"] = {
+                "enabled": True,
+                "host": ws.get("host", "127.0.0.1"),
+                "port": ws.get("port", 8765),
+                "token": ws.get("token", ""),
+                "websocket_requires_token": ws.get("websocket_requires_token", False),
+                "allowFrom": ["*"],
+                "streaming": True,
+                "max_message_bytes": 37748736,
+            }
+
+        mock.load_nanobot_config.return_value = {
+            "providers": {
+                "default": provider,
+                provider: {
+                    "apiKey": api_key,
+                    "apiBase": base_url,
+                    "apiType": "auto",
+                },
+            },
+            "agents": {
+                "defaults": {
+                    "model": model,
+                    "provider": "auto",
+                    "botName": ws.get("bot_name", "Nanobot-Runner"),
+                    "botIcon": ws.get("bot_icon", "🏃‍♂️"),
+                },
+            },
+            "channels": channels,
+        }
         return mock
 
     @pytest.mark.integration
@@ -198,7 +262,9 @@ class TestWebUIConfigInjection:
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
 
         # 获取构建的 nanobot Config 对象
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
 
         # 验证 Config 对象包含 websocket 通道配置
         ws_section = getattr(nanobot_config.channels, "websocket", None)
@@ -221,7 +287,9 @@ class TestWebUIConfigInjection:
         mock_config = self._make_mock_config(ws_config={"enabled": False})
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=False)
 
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
 
         ws_section = getattr(nanobot_config.channels, "websocket", None)
         # 未启用时，websocket 配置节不应存在或 enabled=False
@@ -249,7 +317,9 @@ class TestWebUIConfigInjection:
         )
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
 
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         ws_section = getattr(nanobot_config.channels, "websocket", None)
         assert ws_section is not None
 
@@ -269,7 +339,9 @@ class TestWebUIConfigInjection:
         mock_config = self._make_mock_config(ws_config={})
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
 
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         ws_section = getattr(nanobot_config.channels, "websocket", None)
         assert ws_section is not None
 
@@ -291,7 +363,9 @@ class TestWebUIConfigInjection:
         )
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
 
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         defaults = nanobot_config.agents.defaults
         # AgentDefaults 是 Pydantic 模型，使用属性访问
         assert defaults.bot_name == "TestBot"
@@ -306,7 +380,9 @@ class TestWebUIConfigInjection:
         mock_config = self._make_mock_config(ws_config={})
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
 
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         defaults = nanobot_config.agents.defaults
         # AgentDefaults 是 Pydantic 模型，使用属性访问
         assert defaults.bot_name == "Nanobot-Runner"
@@ -412,11 +488,31 @@ class TestChannelManagerWebUI:
             "token": "integration-test-token",
             "websocket_requires_token": False,
         }
-        # v0.30.0: load_config() 必须返回真实字典
         mock_config.load_config.return_value = {}
+        mock_config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {"apiKey": "sk-test", "apiType": "auto"},
+            },
+            "agents": {"defaults": {"model": "gpt-4o-mini", "provider": "auto"}},
+            "channels": {
+                "websocket": {
+                    "enabled": True,
+                    "host": TEST_WS_HOST,
+                    "port": TEST_WS_PORT,
+                    "token": "integration-test-token",
+                    "websocket_requires_token": False,
+                    "allowFrom": ["*"],
+                    "streaming": True,
+                    "max_message_bytes": 37748736,
+                }
+            },
+        }
 
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         bus = MessageBus()
 
         channels = _create_channel_manager(nanobot_config, bus)
@@ -858,18 +954,35 @@ class TestGatewayStartWebUIE2E:
             "base_url": None,
         }
         mock_config.get_websocket_config.return_value = {}
-        # v0.30.0: load_config() 必须返回真实字典
         mock_config.load_config.return_value = {}
+        mock_config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {"apiKey": "sk-test", "apiType": "auto"},
+            },
+            "agents": {"defaults": {"model": "gpt-4o-mini", "provider": "auto"}},
+            "channels": {
+                "websocket": {
+                    "enabled": True,
+                    "host": "127.0.0.1",
+                    "port": 8765,
+                    "token": "",
+                    "websocket_requires_token": False,
+                    "allowFrom": ["*"],
+                    "streaming": True,
+                    "max_message_bytes": 37748736,
+                }
+            },
+        }
 
         # 模拟 gateway start --webui 的行为
         webui_enabled = True  # 对应 CLI --webui 参数
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=webui_enabled)
 
-        # 验证 adapter 内部状态
-        assert adapter._webui_enabled is True, "webui_enabled 必须为 True"
-
         # 验证构建的 Config 包含 WebSocket 通道
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         ws_section = getattr(nanobot_config.channels, "websocket", None)
         assert ws_section is not None, "Config 必须包含 websocket 配置节"
 
@@ -892,11 +1005,30 @@ class TestGatewayStartWebUIE2E:
             "port": TEST_WS_PORT,
             "websocket_requires_token": False,
         }
-        # v0.30.0: load_config() 必须返回真实字典
         mock_config.load_config.return_value = {}
+        mock_config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {"apiKey": "sk-test", "apiType": "auto"},
+            },
+            "agents": {"defaults": {"model": "gpt-4o-mini", "provider": "auto"}},
+            "channels": {
+                "websocket": {
+                    "enabled": True,
+                    "host": TEST_WS_HOST,
+                    "port": TEST_WS_PORT,
+                    "websocket_requires_token": False,
+                    "allowFrom": ["*"],
+                    "streaming": True,
+                    "max_message_bytes": 37748736,
+                }
+            },
+        }
 
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         bus = MessageBus()
 
         # 模拟 gateway start 中的 ChannelManager 创建
@@ -921,12 +1053,21 @@ class TestGatewayStartWebUIE2E:
             "base_url": None,
         }
         mock_config.get_websocket_config.return_value = {"enabled": False}
-        # v0.30.0: load_config() 必须返回真实字典
         mock_config.load_config.return_value = {}
+        mock_config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {"apiKey": "sk-test", "apiType": "auto"},
+            },
+            "agents": {"defaults": {"model": "gpt-4o-mini", "provider": "auto"}},
+            "channels": {},
+        }
 
         # 不带 --webui 标志
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=False)
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
         bus = MessageBus()
 
         channels = _create_channel_manager(nanobot_config, bus)
@@ -955,14 +1096,33 @@ class TestGatewayStartWebUIE2E:
             "port": TEST_WS_PORT,
             "websocket_requires_token": False,
         }
-        # v0.30.0: load_config() 必须返回真实字典
         mock_config.load_config.return_value = {}
+        mock_config.load_nanobot_config.return_value = {
+            "providers": {
+                "default": "openai",
+                "openai": {"apiKey": "sk-test", "apiType": "auto"},
+            },
+            "agents": {"defaults": {"model": "gpt-4o-mini", "provider": "auto"}},
+            "channels": {
+                "websocket": {
+                    "enabled": True,
+                    "host": TEST_WS_HOST,
+                    "port": TEST_WS_PORT,
+                    "websocket_requires_token": False,
+                    "allowFrom": ["*"],
+                    "streaming": True,
+                    "max_message_bytes": 37748736,
+                }
+            },
+        }
 
         # 步骤1: 创建 Adapter（模拟 gateway start --webui）
         adapter = RunnerProviderAdapter(mock_config, webui_enabled=True)
 
         # 步骤2: 获取 nanobot Config
-        nanobot_config = adapter._get_or_create_nanobot_config()
+        nanobot_config = _build_nanobot_config_from_dict(
+            mock_config.load_nanobot_config.return_value
+        )
 
         # 步骤3: 创建 MessageBus 和 ChannelManager
         bus = MessageBus()

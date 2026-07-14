@@ -28,6 +28,25 @@ class TestConfigInjectionIntegration:
             "api_key": api_key,
             "base_url": base_url,
         }
+        # v0.32.0: 配置分离后，RunnerProviderAdapter 从 load_nanobot_config() 读取
+        provider_cfg: dict = {"apiKey": api_key or "", "apiType": "auto"}
+        if base_url:
+            provider_cfg["apiBase"] = base_url
+        providers: dict = {"default": provider}
+        if provider:
+            providers[provider] = provider_cfg
+        mock.load_nanobot_config.return_value = {
+            "providers": providers,
+            "agents": {
+                "defaults": {
+                    "model": model,
+                    "provider": "auto",
+                    "maxToolIterations": 10,
+                    "contextWindowTokens": 128000,
+                },
+            },
+            "channels": {},
+        }
         return mock
 
     def test_full_injection_chain(self) -> None:
@@ -82,14 +101,11 @@ class TestConfigInjectionIntegration:
 
     def test_injection_chain_env_override(self) -> None:
         """验证环境变量覆盖配置的链路"""
-        mock_config = MagicMock()
-        mock_config.has_llm_config.return_value = True
-        mock_config.get_llm_config.return_value = {
-            "provider": "anthropic",
-            "model": "claude-3-haiku",
-            "api_key": "sk-override",
-            "base_url": None,
-        }
+        mock_config = self._make_mock_config(
+            provider="anthropic",
+            model="claude-3-haiku",
+            api_key="sk-override",
+        )
 
         adapter = RunnerProviderAdapter(mock_config)
         llm_config = adapter.get_llm_config()
@@ -135,7 +151,7 @@ class TestConfigInjectionIntegration:
         llm_config = adapter.get_llm_config()
 
         assert llm_config.provider == "ollama"
-        assert llm_config.api_key is None
+        assert not llm_config.api_key  # None 或空字符串均视为无 key
         assert llm_config.base_url == "http://localhost:11434"
 
     def test_injection_chain_no_runner_config(self) -> None:
