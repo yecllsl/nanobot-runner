@@ -124,9 +124,11 @@ docs/archive/
 
 ### v0.32.0 (2026-07-15)
 
-**归档内容**（共5个文档）：
+**归档内容**（共10个文档）：
 - **测试文档**（3个）：测试报告_v0.32.0.md、Bug清单_v0.32.0.md、strategy_v0.32.0.md
 - **运维文档**（2个）：发布报告_v0.32.0.md、流水线执行报告_v0.32.0.md
+- **架构文档**（3个）：nanobot-ai_0.2.2_升级投入产出比分析.md、2026-07-13-nanobot-ai-0.2.2-upgrade-design.md、2026-07-14-config-separation-design.md
+- **规划文档**（2个）：2026-07-13-nanobot-ai-0.2.2-upgrade.md、2026-07-14-config-separation.md
 
 **版本特性 - nanobot-ai 0.2.2 升级 v0.32.0**：
 - 升级 nanobot-ai 至 0.2.2，移除 monkey-patch 技术债
