@@ -1,7 +1,7 @@
 # Nanobot Runner 文档中心
 
-> **文档版本**: v0.23.0 | **更新日期**: 2026-05-20
-> **当前基线**: v0.23.0
+> **文档版本**: v0.32.0 | **更新日期**: 2026-07-15
+> **当前基线**: v0.32.0
 
 欢迎来到 Nanobot Runner 项目文档中心。本文档系统采用分层归档策略，为您提供清晰、高效的文档导航体验。
 
@@ -16,7 +16,7 @@ docs/
 │   ├── runner_tools.md         # Agent 工具 API
 │   └── storage_manager.md      # 存储管理器 API
 ├── architecture/               # 架构设计文档
-│   └── 架构设计说明书.md        # 系统整体架构设计 (v9.2.0)
+│   └── 架构设计说明书.md        # 系统整体架构设计
 ├── devops/                     # 运维与发布文档
 │   ├── release_checklist.md    # 发布检查清单
 │   └── 分支管理与发布流程规范.md # Git 工作流程
@@ -28,37 +28,35 @@ docs/
 │   ├── testing_guide.md        # 测试指南
 │   └── troubleshooting.md      # 故障排查指南
 ├── product/                    # 产品规划文档
-│   └── 产品规划方案.md          # 产品路线图与规划 (v9.2)
+│   └── 产品规划方案.md          # 产品路线图与规划
 ├── requirements/               # 需求文档
-│   └── REQ_需求规格说明书.md    # 产品需求规格 (v8.6)
+│   └── REQ_需求规格说明书.md    # 产品需求规格
 ├── test/                       # 测试文档
 │   ├── 用户验收测试指南.md      # UAT测试指南
 │   ├── uat_test_cases/         # UAT测试用例
 │   └── test_templates/         # 测试模板
-├── review/                     # 评审报告
-│   └── code-review-report-*.md # 代码评审报告
 └── archive/                    # 版本归档（压缩存储）
     └── README.md               # 归档索引
 ```
 
 ## 🚀 快速导航
 
-### 📖 当前版本文档 (v0.23.0)
+### 📖 当前版本文档 (v0.32.0)
 
 #### 架构设计
-- [架构设计说明书](./architecture/架构设计说明书.md) - 系统整体架构设计（v9.2.0）
+- [架构设计说明书](./architecture/架构设计说明书.md) - 系统整体架构设计
 
 #### 产品规划
-- [产品规划方案](./product/产品规划方案.md) - 产品路线图与版本规划（v9.2）
+- [产品规划方案](./product/产品规划方案.md) - 产品路线图与版本规划
 
 #### API 文档
-- [API 参考文档](./api/api_reference.md) - 完整的 API 接口说明（v0.22.0）
+- [API 参考文档](./api/api_reference.md) - 完整的 API 接口说明
 - [数据分析引擎](./api/analytics_engine.md) - Analytics Engine API
 - [Runner 工具集](./api/runner_tools.md) - Agent 工具 API
 - [存储管理器](./api/storage_manager.md) - Storage Manager API
 
 #### 使用指南
-- [CLI 使用指南](./guides/cli_usage.md) - 命令行工具使用说明（v0.22.0）
+- [CLI 使用指南](./guides/cli_usage.md) - 命令行工具使用说明
 - [Agent 配置指南](./guides/agent_config_guide.md) - Agent 配置方法
 - [Agent 工具扩展指南](./guides/agent_tools_guide.md) - 新增工具步骤
 - [开发指南](./guides/development_guide.md) - Polars 规范、异常处理、类型注解
@@ -70,7 +68,7 @@ docs/
 - [发布检查清单](./devops/release_checklist.md) - 版本发布检查项
 
 #### 需求文档
-- [需求规格说明书](./requirements/REQ_需求规格说明书.md) - 产品需求规格（v8.6）
+- [需求规格说明书](./requirements/REQ_需求规格说明书.md) - 产品需求规格
 
 #### 测试文档
 - [用户验收测试指南](./test/用户验收测试指南.md) - UAT测试指南
@@ -88,9 +86,9 @@ docs/
 ### 按角色分类
 
 #### 开发者
-- [架构设计说明书](./architecture/架构设计说明书.md) - 系统架构设计（v9.2.0）
-- [产品规划方案](./product/产品规划方案.md) - 产品路线图（v9.2）
-- [API 参考文档](./api/api_reference.md) - API 接口说明（v0.22.0）
+- [架构设计说明书](./architecture/架构设计说明书.md) - 系统架构设计
+- [产品规划方案](./product/产品规划方案.md) - 产品路线图
+- [API 参考文档](./api/api_reference.md) - API 接口说明
 - [开发指南](./guides/development_guide.md) - 开发规范
 - [测试指南](./guides/testing_guide.md) - 测试策略
 - [分支管理与发布流程规范](./devops/分支管理与发布流程规范.md) - Git 工作流程
@@ -101,13 +99,13 @@ docs/
 - [故障排查指南](./guides/troubleshooting.md) - 故障排查
 
 #### 产品经理
-- [需求规格说明书](./requirements/REQ_需求规格说明书.md) - 产品需求（v8.6）
-- [产品规划方案](./product/产品规划方案.md) - 产品路线图（v9.2）
+- [需求规格说明书](./requirements/REQ_需求规格说明书.md) - 产品需求
+- [产品规划方案](./product/产品规划方案.md) - 产品路线图
 - [用户验收测试指南](./test/用户验收测试指南.md) - UAT测试指南
 - [归档索引](./archive/README.md) - 版本历史
 
 #### 用户
-- [CLI 使用指南](./guides/cli_usage.md) - CLI 使用说明（v0.22.0）
+- [CLI 使用指南](./guides/cli_usage.md) - CLI 使用说明
 - [Agent 配置指南](./guides/agent_config_guide.md) - Agent 配置
 - [故障排查指南](./guides/troubleshooting.md) - 常见问题
 
@@ -131,9 +129,9 @@ docs/
 
 ## 📊 文档统计
 
-- **当前基线**: v0.22.0
+- **当前基线**: v0.32.0
 - **核心文档**: 18 个
-- **UAT测试用例**: 12 个模块
+- **UAT测试用例**: 17 个模块
 - **指南文档**: 6 个
 - **API 文档**: 4 个
 
@@ -145,10 +143,17 @@ docs/
 | v0.19 | 身体信号分析(HRV/疲劳度/恢复) | ✅ 已完成 |
 | v0.20 | ML增强预测(VDOT/比赛/伤病) | ✅ 已完成 |
 | v0.21 | 数字孪生引擎(What-If推演) | ✅ 已完成 |
-| v0.22 | 多视角验证(条件性)/质量收口 | ✅ 当前基线 |
-| v0.23 | 决策追踪与结果回填 | 📋 规划中 |
-| v0.24 | 个性化学习 | 📋 规划中 |
-| v0.25 | 自适应进化引擎 | 📋 规划中 |
+| v0.22 | 多视角验证(条件性)/质量收口 | ✅ 已完成 |
+| v0.23 | 决策追踪与结果回填 | ✅ 已完成 |
+| v0.24 | 个性化学习 | ✅ 已完成 |
+| v0.25 | 自适应进化引擎 | ✅ 已完成 |
+| v0.26 | nanobot-ai 0.2.0 升级 | ✅ 已完成 |
+| v0.27 | WebUI 基础 | ✅ 已完成 |
+| v0.28 | WebUI 数据可视化 | ✅ 已完成 |
+| v0.29 | 训练计划与进化引擎 WebUI | ✅ 已完成 |
+| v0.30 | 飞书 Gateway 增强 | ✅ 已完成 |
+| v0.31 | 系统健壮性提升 | ✅ 已完成 |
+| v0.32 | nanobot-ai 0.2.2 升级与配置分离 | ✅ 当前基线 |
 
 ## 🔗 外部资源
 
@@ -189,6 +194,9 @@ docs/
 
 ## 📅 文档更新记录
 
+- **2026-07-15**: v0.32.0 版本文档更新，nanobot-ai 0.2.2 升级与配置分离
+- **2026-06-15**: v0.31.0 版本文档更新，系统健壮性提升
+- **2026-05-20**: v0.30.0 版本文档更新，飞书 Gateway 增强
 - **2026-04-09**: v0.9.0 版本文档更新，架构重构、依赖注入、CLI分层
 - **2026-03-15**: v0.8.0 版本文档更新，训练计划、飞书日历
 - **2026-03-10**: v0.6.0 版本文档更新，训练计划基础功能
@@ -198,5 +206,5 @@ docs/
 ---
 
 **文档维护团队**: Nanobot Runner 项目组  
-**最后更新**: 2026-04-09  
-**文档版本**: v3.0
+**最后更新**: 2026-07-15  
+**文档版本**: v4.0
