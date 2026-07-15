@@ -83,6 +83,7 @@ git checkout v0.9.0 -- docs/
 docs/archive/
 ├── .gitignore           # 排除.zip文件
 ├── README.md            # 本文件（归档索引）
+├── v0.32.0-archive.zip # v0.32.0版本归档（本地备份，不提交）
 ├── v0.31.0-archive.zip # v0.31.0版本归档（本地备份，不提交）
 ├── v0.30.0-archive.zip # v0.30.0版本归档（本地备份，不提交）
 ├── v0.29.0-archive.zip # v0.29.0版本归档（本地备份，不提交）
@@ -120,6 +121,22 @@ docs/archive/
 ---
 
 ## 📋 归档清单
+
+### v0.32.0 (2026-07-15)
+
+**归档内容**（共5个文档）：
+- **测试文档**（3个）：测试报告_v0.32.0.md、Bug清单_v0.32.0.md、strategy_v0.32.0.md
+- **运维文档**（2个）：发布报告_v0.32.0.md、流水线执行报告_v0.32.0.md
+
+**版本特性 - nanobot-ai 0.2.2 升级 v0.32.0**：
+- 升级 nanobot-ai 至 0.2.2，移除 monkey-patch 技术债
+- 新增 ConfigInjector 配置注入器替代 monkey-patch
+- 新增 SDKAdapter 编程式调用适配器
+- 新增 DynamicProviderRegistry 自定义 Provider 注册
+- 新增运行时事件总线与 WebUI SSE 端点
+- 配置分离：config.json 与 nanobot_config.json 分离
+
+---
 
 ### v0.31.0 (2026-07-11)
 
