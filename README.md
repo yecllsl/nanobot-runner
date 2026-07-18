@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-4191%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.32.0 - nanobot-ai 0.2.2 升级与配置分离，移除 monkey-patch 技术债，新增 SDK 编程式调用、运行时事件总线、自定义 Provider、语音转录配置
+> **最新版本**: v0.32.1 - 代码质量修复与文档归档，完成 v0.32.0 技术评审整改
 
 ## 项目简介
 
@@ -254,4 +254,4 @@ uv run mypy src/ --ignore-missing-imports        # 类型检查
 
 ---
 
-**版本**: v0.32.0 | **最后更新**: 2026-07-15
+**版本**: v0.32.1 | **最后更新**: 2026-07-18
