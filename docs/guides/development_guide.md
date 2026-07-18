@@ -211,7 +211,7 @@ def calculate_vdot(distance_m: float, time_s: float) -> float:
 ### 6.1 正确示例
 
 ```python
-from src.core.context import get_context
+from src.core.base.context import get_context
 
 def some_function():
     # ✅ 正确：通过上下文获取依赖
@@ -238,7 +238,7 @@ def some_function():
 
 ```python
 from unittest.mock import Mock
-from src.core.context import set_context, reset_context, AppContext
+from src.core.base.context import set_context, reset_context, AppContext
 
 def test_with_mock():
     # 创建Mock对象
@@ -270,7 +270,7 @@ def test_with_mock():
 ### 7.1 正确示例
 
 ```python
-from src.core.context import get_context
+from src.core.base.context import get_context
 
 context = get_context()
 session_repo = context.session_repo

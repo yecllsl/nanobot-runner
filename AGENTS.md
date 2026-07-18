@@ -112,9 +112,8 @@ src/
 │           ├── plan.py         # 训练计划API (v0.29.0)
 │           ├── settings.py     # 设置中心API (v0.29.0)
 │           └── runtime_events.py # 运行时事件SSE API (v0.32.0)
-│   ├── config_injector.py      # 配置注入器 - 替代 monkey-patch (v0.32.0)
 │   ├── sdk_adapter.py          # SDK 编程式调用适配器 (v0.32.0)
-│   └── provider_adapter.py     # Provider 适配器 + DynamicProviderRegistry (v0.32.0)
+│   └── provider_adapter.py     # Provider 适配器 + DynamicProviderRegistry + 配置注入 (v0.32.0)
 ├── agents/
 │   ├── tools.py                # Agent 工具集
 │   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
@@ -246,7 +245,7 @@ SDKAdapter (编程式 Agent 调用)
 ### 5.3 依赖注入规范
 
 ```python
-from src.core.context import get_context
+from src.core.base.context import get_context
 
 def some_function():
     context = get_context()

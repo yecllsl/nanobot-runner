@@ -378,8 +378,8 @@ class BackupManager:
                         for chunk in iter(lambda: f.read(8192), b""):
                             hasher.update(chunk)
                     checksums.append(hasher.hexdigest())
-                except OSError:
-                    pass
+                except OSError as e:
+                    logger.warning(f"计算文件校验和失败，跳过: {item} - {e}")
 
         return file_count, total_size, checksums
 

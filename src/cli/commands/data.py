@@ -24,7 +24,8 @@ def import_data(
         path: FIT 文件或目录路径
         force: 是否强制导入，跳过重复检查
     """
-    path_obj = Path(path)
+    # 路径规范化：resolve() 解析符号链接和 ..，防止路径穿越
+    path_obj = Path(path).resolve()
 
     if not path_obj.exists():
         print_error(CLIError.path_not_found(path))

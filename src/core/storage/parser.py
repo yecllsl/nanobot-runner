@@ -122,6 +122,18 @@ class FitParser:
                 recovery_suggestion="请确认文件路径是否正确",
             )
 
+        # 文件大小校验：防止超大文件导致 DoS（50MB 上限）
+        max_fit_size_bytes = 50 * 1024 * 1024
+        file_size = filepath.stat().st_size
+        if file_size > max_fit_size_bytes:
+            logger.error(
+                f"文件过大（{file_size // 1024 // 1024}MB 超过50MB限制）: {filepath}"
+            )
+            raise ValidationError(
+                message=f"文件过大（{file_size // 1024 // 1024}MB），超过50MB限制: {filepath}",
+                recovery_suggestion="请检查文件是否损坏，或使用较小的FIT文件",
+            )
+
         if filepath.suffix.lower() != ".fit":
             logger.error(f"文件格式无效: {filepath}")
             raise ValidationError(

@@ -341,7 +341,8 @@ class ProfileEngine:
             # 检查是否有数据
             df = lf.collect()
             return df.is_empty()
-        except Exception:
+        except (pl.exceptions.PolarsError, OSError) as e:
+            logger.warning(f"检查 LazyFrame 是否为空时失败，视为空: {e}")
             return True
 
     def _create_empty_profile(self, user_id: str, days: int) -> RunnerProfile:

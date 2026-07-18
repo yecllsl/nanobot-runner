@@ -192,11 +192,18 @@ def _mount_frontend(app: FastAPI) -> None:
     @app.get("/{path:path}", include_in_schema=False)
     async def serve_spa(path: str) -> FileResponse:
         """SPA fallback 路由，所有非 API 路径返回 index.html"""
+        # 路径穿越防护：resolve 后校验仍在 dist_dir 子树内
+        resolved_dist = dist_dir.resolve()
+        candidate = (resolved_dist / path).resolve()
+        try:
+            candidate.relative_to(resolved_dist)
+        except ValueError:
+            # 路径逃逸 dist_dir，回退到 index.html
+            return FileResponse(str(resolved_dist / "index.html"))
         # 尝试匹配 dist 中的实际文件（如 favicon.ico）
-        candidate = dist_dir / path
         if path and candidate.is_file():
             return FileResponse(str(candidate))
-        return FileResponse(str(dist_dir / "index.html"))
+        return FileResponse(str(resolved_dist / "index.html"))
 
 
 def create_server(context: AppContext) -> uvicorn.Server:
