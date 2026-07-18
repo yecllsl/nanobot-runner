@@ -9,6 +9,41 @@
 
 ---
 
+## [0.32.1] - 2026-07-18
+
+### 版本主题
+**代码质量修复与文档归档** —— 完成 v0.32.0 技术评审整改，归档 v0.32.0 版本文档并更新导航结构
+
+> v0.32.1 是 v0.32.0 的补丁版本，不包含新增功能。核心工作包括：修复代码质量与安全问题（技术评审整改）、归档 v0.32.0 版本文档、简化导航文档结构。
+
+**本版本已实现**:
+- ✅ 代码质量修复：技术评审整改全部完成（lint/security 问题清零）
+- ✅ 文档归档：v0.32.0 版本文档归档至 `docs/archive/`
+- ✅ 文档优化：简化三个导航文档，更新 docs/README.md
+- ✅ 全量测试通过率 100%（单元测试 4378/4378），集成测试 100%（403/403）
+- ✅ 代码覆盖率 83.77%（核心模块 80%+）
+
+### Fixed
+- **代码质量修复**: `src/core/storage/parser.py`、`src/core/base/profile.py`、`src/core/config/backup_manager.py`、`src/core/webui/app.py`、`src/cli/commands/data.py`
+  - 修复 lint 和 security 问题，完成 v0.32.0 技术评审整改
+
+### Changed
+- **文档归档**: 将 v0.32.0 版本文档移至 `docs/archive/`，更新索引
+- **文档导航**: 简化三个导航文档（AGENTS.md、docs/README.md 等），提升可读性
+- **发布报告**: 添加 v0.32.0 发布报告
+
+### 测试验证
+- 单元测试：4378 passed, 0 failed, 1 skipped（100% 通过率）
+- 集成测试：403 passed, 0 failed, 1 skipped（100% 通过率）
+- 代码覆盖率：83.77%（核心模块 80%+）
+- ruff check：0 errors, 0 warnings
+- mypy 类型检查：Success: no issues found
+
+### 已知问题
+- 与 v0.32.0 一致，无新增已知问题
+
+---
+
 ## [0.32.0] - 2026-07-14
 
 ### 版本主题
