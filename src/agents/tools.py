@@ -2946,9 +2946,9 @@ TOOL_DESCRIPTIONS = {
         },
     },
     "spawn_subagent": {
-        "description": "调用Subagent执行专项任务。支持数据分析(data_analyst)和报告撰写(report_writer)两种Subagent。主Agent会自动预查询相关数据并传入Subagent。当用户需要深度数据分析、生成训练周报/月报时使用此工具。返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}",
+        "description": "调用Subagent执行专项任务。支持教练(coach)、伤病预防师(injury_prevention)、数据分析(data_analyst)、报告撰写(report_writer)四种Subagent。主Agent会自动预查询相关数据并传入Subagent。当用户需要训练建议、伤病风险评估、深度数据分析、生成训练周报/月报时使用此工具。返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}",
         "parameters": {
-            "subagent_type": "Subagent类型: data_analyst(数据分析) / report_writer(报告撰写)",
+            "subagent_type": "Subagent类型: coach(教练) / injury_prevention(伤病预防师) / data_analyst(数据分析) / report_writer(报告撰写)",
             "user_request": "用户的原始请求描述",
             "date_range": "日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）",
             "report_type": "报告类型（可选，仅report_writer使用）：weekly/monthly/summary",
