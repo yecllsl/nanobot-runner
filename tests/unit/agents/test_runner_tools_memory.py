@@ -79,3 +79,29 @@ class TestGetPlanStatusSafe:
             tools._context.plan_manager.list_plans.side_effect = Exception("db error")
             result = tools._get_plan_status_safe()
         assert result is None
+
+
+class TestGetInjuryRiskSafe:
+    """_get_injury_risk_safe 方法测试（spec 验收标准 #4）"""
+
+    def test_get_injury_risk_safe_success(self):
+        """predictor 正常时返回预测结果"""
+        with patch.object(RunnerTools, "__init__", lambda self, ctx=None: None):
+            tools = RunnerTools()
+            tools.predict_injury_risk = MagicMock(
+                return_value={
+                    "success": True,
+                    "data": {"risk_level": "low", "score": 0.2},
+                }
+            )
+            result = tools._get_injury_risk_safe(days=21)
+        assert result == {"success": True, "data": {"risk_level": "low", "score": 0.2}}
+
+    def test_get_injury_risk_safe_fallback(self):
+        """predictor 抛异常时返回 error dict 而非抛异常（spec §6 / 验收标准 #4）"""
+        with patch.object(RunnerTools, "__init__", lambda self, ctx=None: None):
+            tools = RunnerTools()
+            tools.predict_injury_risk = MagicMock(side_effect=Exception("model error"))
+            result = tools._get_injury_risk_safe(days=21)
+        assert "error" in result
+        assert result["fallback"] == "rule_baseline"

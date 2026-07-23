@@ -1496,6 +1496,24 @@ class RunnerTools:
             logger.warning("查询计划状态失败: %s", e)
             return None
 
+    def _get_injury_risk_safe(self, days: int = 21) -> dict[str, Any]:
+        """安全查询伤病风险预测
+
+        复用 InjuryPredictor，predictor 失败时返回 error dict 而非抛异常（spec §6）。
+        与 _get_plan_status_safe 同为容错包装器，隔离单字段失败。
+
+        Args:
+            days: 预测窗口天数
+
+        Returns:
+            dict: 风险预测结果，失败时返回 {"error": ..., "fallback": "rule_baseline"}
+        """
+        try:
+            return self.predict_injury_risk(days=days)
+        except Exception as e:
+            logger.warning("伤病风险预测失败 days=%s: %s", days, e)
+            return {"error": str(e), "fallback": "rule_baseline"}
+
     def _update_subagent_memory(
         self, role: str, key: str, value: Any
     ) -> dict[str, Any]:
@@ -1658,7 +1676,7 @@ class RunnerTools:
 
             elif subagent_type == "injury_prevention":
                 # 伤病预防师 Subagent：预查询伤病风险、HRV、疲劳、恢复、心率漂移、负荷、记忆
-                context["injury_risk"] = self.predict_injury_risk(days=21)
+                context["injury_risk"] = self._get_injury_risk_safe(days=21)
                 context["hrv_analysis"] = self.get_hrv_analysis(days=30)
                 context["fatigue"] = self.get_fatigue_score()
                 context["recovery"] = self.get_recovery_status()
