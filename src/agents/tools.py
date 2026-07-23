@@ -135,6 +135,9 @@ class RunnerTools:
         self.storage = context.storage
         self.analytics = context.analytics
         self.profile_storage = context.profile_storage
+        # v0.33.0 新增：subagent 记忆与计划状态查询所需引用
+        self._context = context
+        self._runner_config = context.config
 
     # ----------------------------------------------------------------
     # 统计/分析方法
@@ -1440,6 +1443,113 @@ class RunnerTools:
         return self._trace_logger
 
     # ----------------------------------------------------------------
+    # Subagent 记忆与上下文辅助方法（v0.33.0 新增）
+    # ----------------------------------------------------------------
+
+    def _load_subagent_memory(self, role: str) -> dict[str, Any]:
+        """加载 subagent 记忆文档
+
+        从 ~/.nanobot-runner/memory/subagents/{role}.json 读取。
+        文件不存在或 JSON 损坏时返回空 dict（宽容读取，不抛异常）。
+
+        Args:
+            role: 角色名（如 "coach" / "injury_prevention"）
+
+        Returns:
+            dict: 记忆数据，失败时返回 {}
+        """
+        try:
+            memory_path = (
+                self._runner_config.base_dir / "memory" / "subagents" / f"{role}.json"
+            )
+            if not memory_path.exists():
+                return {}
+            return json.loads(memory_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as e:
+            logger.warning("加载 subagent 记忆失败 role=%s: %s", role, e)
+            return {}
+
+    def _get_plan_status_safe(self) -> dict[str, Any] | None:
+        """安全查询当前训练计划状态
+
+        通过 plan_manager 查询最近的计划。无计划或查询失败时返回 None。
+
+        Returns:
+            dict | None: 计划状态，失败时返回 None
+        """
+        try:
+            plan_manager = getattr(self._context, "plan_manager", None)
+            if plan_manager is None:
+                return None
+            # 尝试获取计划列表（plan_manager 接口可能因版本而异，宽容处理）
+            plans = (
+                plan_manager.list_plans() if hasattr(plan_manager, "list_plans") else []
+            )
+            if not plans:
+                return None
+            # 取最近一条计划的状态摘要
+            latest = plans[-1] if isinstance(plans, list) else None
+            if latest is None:
+                return None
+            return {"plan_id": getattr(latest, "plan_id", str(latest))}
+        except Exception as e:
+            logger.warning("查询计划状态失败: %s", e)
+            return None
+
+    def _get_injury_risk_safe(self, days: int = 21) -> dict[str, Any]:
+        """安全查询伤病风险预测
+
+        复用 InjuryPredictor，predictor 失败时返回 error dict 而非抛异常（spec §6）。
+        与 _get_plan_status_safe 同为容错包装器，隔离单字段失败。
+
+        Args:
+            days: 预测窗口天数
+
+        Returns:
+            dict: 风险预测结果，失败时返回 {"error": ..., "fallback": "rule_baseline"}
+        """
+        try:
+            return self.predict_injury_risk(days=days)
+        except Exception as e:
+            logger.warning("伤病风险预测失败 days=%s: %s", days, e)
+            return {"error": str(e), "fallback": "rule_baseline"}
+
+    def _update_subagent_memory(
+        self, role: str, key: str, value: Any
+    ) -> dict[str, Any]:
+        """更新 subagent 记忆文档的单个字段
+
+        读取现有记忆 → 合并新字段 → 写回文件。惰性创建目录。
+
+        Args:
+            role: 角色名
+            key: 记忆字段名
+            value: 字段值
+
+        Returns:
+            dict: {"success": True, "role": role, "key": key}
+        """
+        try:
+            memory_dir = self._runner_config.base_dir / "memory" / "subagents"
+            memory_dir.mkdir(parents=True, exist_ok=True)
+            memory_path = memory_dir / f"{role}.json"
+
+            # 读取现有记忆（复用宽容读取逻辑）
+            memory = self._load_subagent_memory(role)
+            memory[key] = value
+            memory["last_updated"] = datetime.now().isoformat()
+
+            memory_path.write_text(
+                json.dumps(memory, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
+            logger.info("更新 subagent 记忆 role=%s key=%s", role, key)
+            return {"success": True, "role": role, "key": key}
+        except (OSError, ValueError, TypeError) as e:
+            logger.error("更新 subagent 记忆失败 role=%s: %s", role, e)
+            return {"success": False, "error": str(e)}
+
+    # ----------------------------------------------------------------
     # Subagent 方法
     # ----------------------------------------------------------------
 
@@ -1476,11 +1586,18 @@ class RunnerTools:
                 report_type=report_type,
             )
 
-            # 2. 组装task参数（数据上下文格式）
-            task = self._build_subagent_task(
-                user_request=user_request,
-                context_data=context_data,
-            )
+            # 2. 组装task参数
+            # 新角色（coach/injury_prevention）使用 ROLES[type].build_task 注入角色 prompt
+            # 旧角色（data_analyst/report_writer）保持原 _build_subagent_task 行为
+            from src.agents.subagent_roles import ROLES
+
+            if subagent_type in ROLES:
+                task = ROLES[subagent_type].build_task(user_request, context_data)
+            else:
+                task = self._build_subagent_task(
+                    user_request=user_request,
+                    context_data=context_data,
+                )
 
             # 3. 检查数据上下文大小
             context_size = len(task)
@@ -1548,7 +1665,27 @@ class RunnerTools:
         context: dict[str, Any] = {}
 
         try:
-            if subagent_type == "data_analyst":
+            if subagent_type == "coach":
+                # 教练 Subagent：预查询 VDOT、训练负荷、近期跑步、计划状态、记忆
+                context["vdot_trend"] = self.get_vdot_trend(limit=20)
+                context["training_load"] = self.get_training_load(days=42)
+                context["recent_runs"] = self.get_recent_runs(limit=10)
+                context["plan_status"] = self._get_plan_status_safe()
+                context["memory"] = self._load_subagent_memory("coach")
+                context["user_request"] = user_request
+
+            elif subagent_type == "injury_prevention":
+                # 伤病预防师 Subagent：预查询伤病风险、HRV、疲劳、恢复、心率漂移、负荷、记忆
+                context["injury_risk"] = self._get_injury_risk_safe(days=21)
+                context["hrv_analysis"] = self.get_hrv_analysis(days=30)
+                context["fatigue"] = self.get_fatigue_score()
+                context["recovery"] = self.get_recovery_status()
+                context["hr_drift"] = self.get_hr_drift_analysis()
+                context["training_load"] = self.get_training_load(days=42)
+                context["memory"] = self._load_subagent_memory("injury_prevention")
+                context["user_request"] = user_request
+
+            elif subagent_type == "data_analyst":
                 # 数据分析Subagent：预查询VDOT趋势、训练负荷、心率漂移
                 context["vdot_trend"] = self.get_vdot_trend(limit=20)
                 context["training_load"] = self.get_training_load(days=42)
@@ -1698,7 +1835,7 @@ class RunnerTools:
             dict: Subagent执行结果
         """
         # 验证Subagent类型
-        valid_types = ["data_analyst", "report_writer"]
+        valid_types = ["data_analyst", "report_writer", "coach", "injury_prevention"]
         if subagent_type not in valid_types:
             return {
                 "subagent_type": subagent_type,
@@ -2662,6 +2799,67 @@ from .tools_twin import (  # noqa: E402
 )
 
 # ============================================================================
+# 工具类定义（本文件特有）
+# ============================================================================
+
+
+class UpdateSubagentMemoryTool(BaseTool):
+    """更新 subagent 记忆工具 - v0.33.0 新增
+
+    允许主 Agent 在收到 subagent 结果后，将关键信息写入对应角色的记忆文档，
+    供下次 spawn 时作为上下文注入。
+
+    使用场景：
+    - 教练 subagent 返回建议后，记录 user_goal / preferred_training_style
+    - 伤病预防师标记风险等级后，记录 injury_history / last_alert_level
+    """
+
+    @property
+    def name(self) -> str:
+        return "update_subagent_memory"
+
+    @property
+    def description(self) -> str:
+        return (
+            "更新 subagent 记忆文档。当 subagent 返回结果后，将关键信息"
+            "（如用户目标、偏好、伤病史、风险阈值）写入对应角色记忆，"
+            "供下次调用时作为上下文。返回JSON: {success: true, role, key} 或 {success: false, error}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "description": "角色名: coach / injury_prevention",
+                    "enum": ["coach", "injury_prevention"],
+                },
+                "key": {
+                    "type": "string",
+                    "description": "记忆字段名（如 user_goal / injury_history / preferred_training_style）",
+                },
+                "value": {
+                    "description": "字段值（任意类型：字符串/数字/对象/数组）",
+                },
+            },
+            "required": ["role", "key", "value"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        role = kwargs.get("role", "")
+        key = kwargs.get("key", "")
+        value = kwargs.get("value")
+        return self._run_sync(
+            self.runner_tools._update_subagent_memory,
+            role=role,
+            key=key,
+            value=value,
+        )
+
+
+# ============================================================================
 # 工厂函数
 # ============================================================================
 
@@ -2689,6 +2887,7 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         GetSmartTrainingAdviceTool(runner_tools),
         GetWeatherTrainingAdviceTool(runner_tools),
         SpawnSubagentTool(runner_tools),
+        UpdateSubagentMemoryTool(runner_tools),
         AskUserConfirmTool(runner_tools),
         ParseUserConfirmTool(runner_tools),
         DiagnoseSuggestionTool(runner_tools),
@@ -2862,12 +3061,20 @@ TOOL_DESCRIPTIONS = {
         },
     },
     "spawn_subagent": {
-        "description": "调用Subagent执行专项任务。支持数据分析(data_analyst)和报告撰写(report_writer)两种Subagent。主Agent会自动预查询相关数据并传入Subagent。当用户需要深度数据分析、生成训练周报/月报时使用此工具。返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}",
+        "description": "调用Subagent执行专项任务。支持教练(coach)、伤病预防师(injury_prevention)、数据分析(data_analyst)、报告撰写(report_writer)四种Subagent。主Agent会自动预查询相关数据并传入Subagent。当用户需要训练建议、伤病风险评估、深度数据分析、生成训练周报/月报时使用此工具。返回JSON格式: {success: true, data: {subagent_type, result, context_size}} 或 {success: false, error: 错误信息, fallback_result: 降级结果}",
         "parameters": {
-            "subagent_type": "Subagent类型: data_analyst(数据分析) / report_writer(报告撰写)",
+            "subagent_type": "Subagent类型: coach(教练) / injury_prevention(伤病预防师) / data_analyst(数据分析) / report_writer(报告撰写)",
             "user_request": "用户的原始请求描述",
             "date_range": "日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）",
             "report_type": "报告类型（可选，仅report_writer使用）：weekly/monthly/summary",
+        },
+    },
+    "update_subagent_memory": {
+        "description": "更新 subagent 记忆文档。当 subagent 返回结果后，将关键信息（如用户目标、偏好、伤病史、风险阈值）写入对应角色记忆，供下次调用时作为上下文。返回JSON: {success: true, role, key} 或 {success: false, error}",
+        "parameters": {
+            "role": "角色名: coach / injury_prevention",
+            "key": "记忆字段名（如 user_goal / injury_history / preferred_training_style）",
+            "value": "字段值（任意类型）",
         },
     },
     "ask_user_confirm": {
@@ -3154,6 +3361,7 @@ __all__ = [
     "SimulateTwinTool",
     "CompareTwinPlansTool",
     "SpawnSubagentTool",
+    "UpdateSubagentMemoryTool",
     # 决策追踪工具
     "RecordDecisionFeedbackTool",
     "CheckPlanExecutionTool",
