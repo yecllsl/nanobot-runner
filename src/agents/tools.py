@@ -1605,7 +1605,27 @@ class RunnerTools:
         context: dict[str, Any] = {}
 
         try:
-            if subagent_type == "data_analyst":
+            if subagent_type == "coach":
+                # 教练 Subagent：预查询 VDOT、训练负荷、近期跑步、计划状态、记忆
+                context["vdot_trend"] = self.get_vdot_trend(limit=20)
+                context["training_load"] = self.get_training_load(days=42)
+                context["recent_runs"] = self.get_recent_runs(limit=10)
+                context["plan_status"] = self._get_plan_status_safe()
+                context["memory"] = self._load_subagent_memory("coach")
+                context["user_request"] = user_request
+
+            elif subagent_type == "injury_prevention":
+                # 伤病预防师 Subagent：预查询伤病风险、HRV、疲劳、恢复、心率漂移、负荷、记忆
+                context["injury_risk"] = self.predict_injury_risk(days=21)
+                context["hrv_analysis"] = self.get_hrv_analysis(days=30)
+                context["fatigue"] = self.get_fatigue_score()
+                context["recovery"] = self.get_recovery_status()
+                context["hr_drift"] = self.get_hr_drift_analysis()
+                context["training_load"] = self.get_training_load(days=42)
+                context["memory"] = self._load_subagent_memory("injury_prevention")
+                context["user_request"] = user_request
+
+            elif subagent_type == "data_analyst":
                 # 数据分析Subagent：预查询VDOT趋势、训练负荷、心率漂移
                 context["vdot_trend"] = self.get_vdot_trend(limit=20)
                 context["training_load"] = self.get_training_load(days=42)
