@@ -15,11 +15,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-# 复用 SpawnSubagentTool 的上下文分隔符常量（保持与 v0.17.0 模式一致）
-CONTEXT_SEPARATOR: str = "\n---数据上下文---\n"
-CONTEXT_END: str = "\n---数据上下文结束---"
-
-
 # 教练角色系统 prompt 片段
 COACH_PROMPT: str = """你是资深跑步教练，专精于基于 VDOT 和训练负荷数据的训练计划制定。
 你的职责：
@@ -66,12 +61,18 @@ class SubagentRole:
             str: 组装后的 task 字符串，格式：
                 {prompt}\n\n用户请求：{request}\n---数据上下文---\n{json}\n---数据上下文结束---
         """
+        # 延迟导入避免循环：从 tools（入口模块）取 SpawnSubagentTool 的常量。
+        # 不能直接 import tools_twin：subagent_roles 被单独导入时，tools_twin → tools
+        # → (line 2788) tools_twin 部分初始化 → ImportError。tools.py 是设计好的入口，
+        # 它在 BaseTool 定义后才 import tools_twin，故经 tools 取类是循环安全的。
+        from src.agents.tools import SpawnSubagentTool
+
         return (
             f"{self.prompt}\n\n"
             f"用户请求：{user_request}\n"
-            f"{CONTEXT_SEPARATOR}"
+            f"{SpawnSubagentTool.CONTEXT_SEPARATOR}"
             f"{json.dumps(context_data, ensure_ascii=False, default=str, indent=2)}"
-            f"{CONTEXT_END}"
+            f"{SpawnSubagentTool.CONTEXT_END}"
         )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -63,3 +64,25 @@ class TestUpdateSubagentMemoryTool:
         )
         assert result["success"] is True
         assert (tmp_path / "memory" / "subagents" / "custom_role.json").exists()
+
+
+class TestUpdateSubagentMemoryToolExecute:
+    """execute 入口路径测试（覆盖参数提取与角色校验，M3/M4）"""
+
+    def test_execute_valid_role_writes_memory(self, tool_and_tools, tmp_path: Path):
+        """execute 正常角色应写入记忆文件并返回 success"""
+        tool, _ = tool_and_tools
+        result_json = asyncio.run(
+            tool.execute(role="coach", key="user_goal", value="全马破4")
+        )
+        result = json.loads(result_json)
+        assert result["success"] is True
+        assert (tmp_path / "memory" / "subagents" / "coach.json").exists()
+
+    def test_execute_invalid_role_returns_error(self, tool_and_tools):
+        """execute 无效角色应返回 error（信任边界校验）"""
+        tool, _ = tool_and_tools
+        result_json = asyncio.run(tool.execute(role="hacker", key="k", value="v"))
+        result = json.loads(result_json)
+        assert result["success"] is False
+        assert "无效的角色" in result["error"]

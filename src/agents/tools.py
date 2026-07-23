@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 import polars as pl
 from nanobot.agent.tools.base import Tool
 
+from src.agents.subagent_roles import ROLES
 from src.core.base.context import AppContext, AppContextFactory
 from src.core.base.exceptions import NanobotRunnerError
 from src.core.tools.weather_training_coordinator import TrainingData
@@ -1493,6 +1494,7 @@ class RunnerTools:
                 return None
             return {"plan_id": getattr(latest, "plan_id", str(latest))}
         except Exception as e:
+            # 宽容捕获：safe wrapper 必须永不抛异常，plan_manager 接口可能因版本而异
             logger.warning("查询计划状态失败: %s", e)
             return None
 
@@ -1511,6 +1513,7 @@ class RunnerTools:
         try:
             return self.predict_injury_risk(days=days)
         except Exception as e:
+            # 宽容捕获：safe wrapper 必须永不抛异常，隔离单字段失败不影响其他预查询
             logger.warning("伤病风险预测失败 days=%s: %s", days, e)
             return {"error": str(e), "fallback": "rule_baseline"}
 
@@ -1589,8 +1592,6 @@ class RunnerTools:
             # 2. 组装task参数
             # 新角色（coach/injury_prevention）使用 ROLES[type].build_task 注入角色 prompt
             # 旧角色（data_analyst/report_writer）保持原 _build_subagent_task 行为
-            from src.agents.subagent_roles import ROLES
-
             if subagent_type in ROLES:
                 task = ROLES[subagent_type].build_task(user_request, context_data)
             else:
@@ -2851,6 +2852,16 @@ class UpdateSubagentMemoryTool(BaseTool):
         role = kwargs.get("role", "")
         key = kwargs.get("key", "")
         value = kwargs.get("value")
+        # 信任边界校验：工具入口限制角色枚举（与 parameters.enum 一致），
+        # 底层 _update_subagent_memory 保持宽容供内部调用
+        if role not in ("coach", "injury_prevention"):
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"无效的角色: {role}，支持: coach / injury_prevention",
+                },
+                ensure_ascii=False,
+            )
         return self._run_sync(
             self.runner_tools._update_subagent_memory,
             role=role,
