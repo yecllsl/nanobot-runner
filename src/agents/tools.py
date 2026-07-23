@@ -135,6 +135,9 @@ class RunnerTools:
         self.storage = context.storage
         self.analytics = context.analytics
         self.profile_storage = context.profile_storage
+        # v0.33.0 新增：subagent 记忆与计划状态查询所需引用
+        self._context = context
+        self._runner_config = context.config
 
     # ----------------------------------------------------------------
     # 统计/分析方法
@@ -1438,6 +1441,60 @@ class RunnerTools:
 
             self._trace_logger: Any = TraceLogger()
         return self._trace_logger
+
+    # ----------------------------------------------------------------
+    # Subagent 记忆与上下文辅助方法（v0.33.0 新增）
+    # ----------------------------------------------------------------
+
+    def _load_subagent_memory(self, role: str) -> dict[str, Any]:
+        """加载 subagent 记忆文档
+
+        从 ~/.nanobot-runner/memory/subagents/{role}.json 读取。
+        文件不存在或 JSON 损坏时返回空 dict（宽容读取，不抛异常）。
+
+        Args:
+            role: 角色名（如 "coach" / "injury_prevention"）
+
+        Returns:
+            dict: 记忆数据，失败时返回 {}
+        """
+        try:
+            memory_path = (
+                self._runner_config.base_dir / "memory" / "subagents" / f"{role}.json"
+            )
+            if not memory_path.exists():
+                return {}
+            return json.loads(memory_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as e:
+            logger.warning("加载 subagent 记忆失败 role=%s: %s", role, e)
+            return {}
+
+    def _get_plan_status_safe(self) -> dict[str, Any] | None:
+        """安全查询当前训练计划状态
+
+        通过 plan_manager 查询最近的计划。无计划或查询失败时返回 None。
+
+        Returns:
+            dict | None: 计划状态，失败时返回 None
+        """
+        try:
+            plan_manager = getattr(self._context, "plan_manager", None)
+            if plan_manager is None:
+                return None
+            # 尝试获取计划列表（plan_manager 接口可能因版本而异，宽容处理）
+            plans = (
+                plan_manager.list_plans() if hasattr(plan_manager, "list_plans") else []
+            )
+            if not plans:
+                return None
+            # 取最近一条计划的状态摘要
+            latest = plans[-1] if isinstance(plans, list) else None
+            if latest is None:
+                return None
+            return {"plan_id": getattr(latest, "plan_id", str(latest))}
+        except Exception as e:
+            logger.warning("查询计划状态失败: %s", e)
+            return None
 
     # ----------------------------------------------------------------
     # Subagent 方法
