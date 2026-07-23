@@ -116,7 +116,8 @@ src/
 │   └── provider_adapter.py     # Provider 适配器 + DynamicProviderRegistry + 配置注入 (v0.32.0)
 ├── agents/
 │   ├── tools.py                # Agent 工具集
-│   └── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
+│   ├── tools_evolution.py      # 进化模块Agent工具 (v0.23.0-v0.25.0)
+│   └── subagent_roles.py       # Subagent 角色定义 (v0.33.0)
 ├── notify/                     # 飞书通知
 └── cli/                        # CLI 模块
     ├── commands/               # 命令模块
@@ -395,6 +396,7 @@ uv run pytest tests/unit/
 | **OutcomeRecord** | 决策执行结果记录 | 包含忠实度、预测误差、用户反馈等 |
 | **Execution Fidelity** | 执行忠实度(0-1) | 衡量计划执行与AI建议的匹配程度 |
 | **Prediction MAE** | 预测平均绝对误差 | 衡量AI预测准确度 |
+| **Subagent 角色** | 专业 AI 代理，按领域划分 | coach(教练) / injury_prevention(伤病预防师) |
 
 > 完整术语表与数据结构定义见：[API文档](docs/api/api_reference.md) 和源码 Docstring
 
