@@ -1533,11 +1533,18 @@ class RunnerTools:
                 report_type=report_type,
             )
 
-            # 2. 组装task参数（数据上下文格式）
-            task = self._build_subagent_task(
-                user_request=user_request,
-                context_data=context_data,
-            )
+            # 2. 组装task参数
+            # 新角色（coach/injury_prevention）使用 ROLES[type].build_task 注入角色 prompt
+            # 旧角色（data_analyst/report_writer）保持原 _build_subagent_task 行为
+            from src.agents.subagent_roles import ROLES
+
+            if subagent_type in ROLES:
+                task = ROLES[subagent_type].build_task(user_request, context_data)
+            else:
+                task = self._build_subagent_task(
+                    user_request=user_request,
+                    context_data=context_data,
+                )
 
             # 3. 检查数据上下文大小
             context_size = len(task)
@@ -1775,7 +1782,7 @@ class RunnerTools:
             dict: Subagent执行结果
         """
         # 验证Subagent类型
-        valid_types = ["data_analyst", "report_writer"]
+        valid_types = ["data_analyst", "report_writer", "coach", "injury_prevention"]
         if subagent_type not in valid_types:
             return {
                 "subagent_type": subagent_type,
