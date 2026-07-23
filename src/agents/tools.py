@@ -1496,6 +1496,41 @@ class RunnerTools:
             logger.warning("查询计划状态失败: %s", e)
             return None
 
+    def _update_subagent_memory(
+        self, role: str, key: str, value: Any
+    ) -> dict[str, Any]:
+        """更新 subagent 记忆文档的单个字段
+
+        读取现有记忆 → 合并新字段 → 写回文件。惰性创建目录。
+
+        Args:
+            role: 角色名
+            key: 记忆字段名
+            value: 字段值
+
+        Returns:
+            dict: {"success": True, "role": role, "key": key}
+        """
+        try:
+            memory_dir = self._runner_config.base_dir / "memory" / "subagents"
+            memory_dir.mkdir(parents=True, exist_ok=True)
+            memory_path = memory_dir / f"{role}.json"
+
+            # 读取现有记忆（复用宽容读取逻辑）
+            memory = self._load_subagent_memory(role)
+            memory[key] = value
+            memory["last_updated"] = datetime.now().isoformat()
+
+            memory_path.write_text(
+                json.dumps(memory, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
+            logger.info("更新 subagent 记忆 role=%s key=%s", role, key)
+            return {"success": True, "role": role, "key": key}
+        except (OSError, ValueError, TypeError) as e:
+            logger.error("更新 subagent 记忆失败 role=%s: %s", role, e)
+            return {"success": False, "error": str(e)}
+
     # ----------------------------------------------------------------
     # Subagent 方法
     # ----------------------------------------------------------------
@@ -2746,6 +2781,67 @@ from .tools_twin import (  # noqa: E402
 )
 
 # ============================================================================
+# 工具类定义（本文件特有）
+# ============================================================================
+
+
+class UpdateSubagentMemoryTool(BaseTool):
+    """更新 subagent 记忆工具 - v0.33.0 新增
+
+    允许主 Agent 在收到 subagent 结果后，将关键信息写入对应角色的记忆文档，
+    供下次 spawn 时作为上下文注入。
+
+    使用场景：
+    - 教练 subagent 返回建议后，记录 user_goal / preferred_training_style
+    - 伤病预防师标记风险等级后，记录 injury_history / last_alert_level
+    """
+
+    @property
+    def name(self) -> str:
+        return "update_subagent_memory"
+
+    @property
+    def description(self) -> str:
+        return (
+            "更新 subagent 记忆文档。当 subagent 返回结果后，将关键信息"
+            "（如用户目标、偏好、伤病史、风险阈值）写入对应角色记忆，"
+            "供下次调用时作为上下文。返回JSON: {success: true, role, key} 或 {success: false, error}"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "description": "角色名: coach / injury_prevention",
+                    "enum": ["coach", "injury_prevention"],
+                },
+                "key": {
+                    "type": "string",
+                    "description": "记忆字段名（如 user_goal / injury_history / preferred_training_style）",
+                },
+                "value": {
+                    "description": "字段值（任意类型：字符串/数字/对象/数组）",
+                },
+            },
+            "required": ["role", "key", "value"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        role = kwargs.get("role", "")
+        key = kwargs.get("key", "")
+        value = kwargs.get("value")
+        return self._run_sync(
+            self.runner_tools._update_subagent_memory,
+            role=role,
+            key=key,
+            value=value,
+        )
+
+
+# ============================================================================
 # 工厂函数
 # ============================================================================
 
@@ -2773,6 +2869,7 @@ def create_tools(runner_tools: RunnerTools) -> list[BaseTool]:
         GetSmartTrainingAdviceTool(runner_tools),
         GetWeatherTrainingAdviceTool(runner_tools),
         SpawnSubagentTool(runner_tools),
+        UpdateSubagentMemoryTool(runner_tools),
         AskUserConfirmTool(runner_tools),
         ParseUserConfirmTool(runner_tools),
         DiagnoseSuggestionTool(runner_tools),
@@ -2952,6 +3049,14 @@ TOOL_DESCRIPTIONS = {
             "user_request": "用户的原始请求描述",
             "date_range": "日期范围（可选，格式：YYYY-MM-DD ~ YYYY-MM-DD）",
             "report_type": "报告类型（可选，仅report_writer使用）：weekly/monthly/summary",
+        },
+    },
+    "update_subagent_memory": {
+        "description": "更新 subagent 记忆文档。当 subagent 返回结果后，将关键信息（如用户目标、偏好、伤病史、风险阈值）写入对应角色记忆，供下次调用时作为上下文。返回JSON: {success: true, role, key} 或 {success: false, error}",
+        "parameters": {
+            "role": "角色名: coach / injury_prevention",
+            "key": "记忆字段名（如 user_goal / injury_history / preferred_training_style）",
+            "value": "字段值（任意类型）",
         },
     },
     "ask_user_confirm": {
@@ -3238,6 +3343,7 @@ __all__ = [
     "SimulateTwinTool",
     "CompareTwinPlansTool",
     "SpawnSubagentTool",
+    "UpdateSubagentMemoryTool",
     # 决策追踪工具
     "RecordDecisionFeedbackTool",
     "CheckPlanExecutionTool",
