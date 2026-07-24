@@ -9,6 +9,27 @@
 
 ---
 
+## [0.34.0] - 2026-07-24
+
+### 版本主题
+**WebUI 数据导入功能** —— 在可视化 WebUI（端口 8766）新增 FIT 文件导入页面，功能与 CLI `data import` 等价，复用同一 `ImportService.import_file`，支持多文件批量上传与强制重新导入。
+
+> v0.34.0 是 v0.33.0 的次要（minor）发布，新增 WebUI 数据导入能力，不改动核心导入逻辑。
+
+**本版本已实现**:
+- ✅ 后端路由 `POST /api/data/import`，接收 multipart 文件列表，写临时目录后调用 `ImportService.import_file(Path, force)`
+- ✅ 安全防护：路径穿越防护（`Path(filename).name`）、请求体大小限制 60MB（`MaxBodySizeMiddleware`）、Bearer token 认证、文件类型/数量校验
+- ✅ 性能：同步阻塞调用通过 `run_in_threadpool` 包装，不阻塞事件循环；纯 ASGI 中间件实现避免破坏 SSE 流式响应
+- ✅ 错误隔离：单文件导入失败不中断后续文件处理；临时文件 `try/finally` + `shutil.rmtree` 保证清理
+- ✅ 前端 ImportPage：文件选择、强制重新导入复选框、导入结果列表（added/skipped/error）、汇总统计
+- ✅ 三层测试覆盖：单元测试（11 例）+ 集成测试（4 例）+ E2E 测试（API 3 例 + UI 5 例）
+- ✅ 代码评审（REV-01）修复：assert→显式守卫、TypedDict 类型规范、前端总大小校验
+
+**技术栈变更**:
+- 新增依赖：`python-multipart>=0.0.9`（FastAPI UploadFile 支持）
+
+---
+
 ## [0.33.0] - 2026-07-24
 
 ### 版本主题

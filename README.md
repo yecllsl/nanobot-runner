@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-4191%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.33.0 - pre-commit-check.py 并发内存爆炸系统性修复
+> **最新版本**: v0.34.0 - WebUI 数据导入功能
 
 ## 项目简介
 
@@ -254,4 +254,4 @@ uv run mypy src/ --ignore-missing-imports        # 类型检查
 
 ---
 
-**版本**: v0.33.0 | **最后更新**: 2026-07-24
+**版本**: v0.34.0 | **最后更新**: 2026-07-24
