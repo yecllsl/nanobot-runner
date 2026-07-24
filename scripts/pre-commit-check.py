@@ -22,12 +22,14 @@
 """
 
 import argparse
+import atexit
 import concurrent.futures
 import hashlib
 import json
 import logging
 import os
 import pickle
+import shlex
 import subprocess
 import sys
 import time
@@ -48,7 +50,6 @@ if TYPE_CHECKING:
 try:
     from rich.console import Console
     from rich.panel import Panel
-    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
     from rich.table import Table
 
     RICH_AVAILABLE = True
@@ -85,6 +86,108 @@ class CheckStatus(Enum):
     FAILED = "❌"
     WARNING = "⚠️"
     SKIPPED = "⏭️"
+
+
+class SingleInstanceLock:
+    """文件级单实例锁 — 防止多个 pre-commit-check 进程同时运行
+
+    使用文件锁 + PID 记录机制，跨平台兼容。
+    - 锁文件：{lock_dir}/.pre-commit.lock
+    - 内容：PID\\nISO时间戳
+    - 超时：默认 300s（5分钟），超时后视为过期锁自动覆写
+    """
+
+    LOCK_FILENAME = ".pre-commit.lock"
+
+    def __init__(
+        self,
+        lock_dir: Path | None = None,
+        timeout_seconds: int = 300,
+    ):
+        self._lock_dir = lock_dir or (Path.home() / ".nanobot-runner")
+        self._timeout = timeout_seconds
+        self._lock_file = self._lock_dir / self.LOCK_FILENAME
+        self.is_locked = False
+
+    def acquire(self) -> bool:
+        """尝试获取锁
+
+        Returns:
+            True: 成功获取锁
+            False: 已有另一个有效实例在运行
+        """
+        self._lock_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._lock_file.exists():
+            try:
+                content = self._lock_file.read_text(encoding="utf-8").strip()
+                lines = content.split("\n")
+                old_pid = int(lines[0]) if lines else 0
+                old_time_str = lines[1] if len(lines) > 1 else ""
+
+                # 检查锁是否过期
+                if old_time_str:
+                    try:
+                        old_time = datetime.fromisoformat(old_time_str)
+                        age = (datetime.now() - old_time).total_seconds()
+                        if age > self._timeout:
+                            logger.warning(
+                                "锁文件已过期（%ds），PID=%d，覆写", age, old_pid
+                            )
+                            self._write_lock()
+                            self.is_locked = True
+                            return True
+                    except ValueError:
+                        pass  # 时间解析失败，继续检查PID
+
+                # 检查 PID 是否仍在运行
+                if self._is_pid_running(old_pid):
+                    logger.warning(
+                        "另一个 pre-commit-check 实例正在运行（PID=%d），跳过", old_pid
+                    )
+                    return False
+                else:
+                    logger.warning("锁文件 PID=%d 已不存在，覆写", old_pid)
+            except (ValueError, OSError) as e:
+                logger.warning("锁文件损坏，覆写: %s", e)
+
+        self._write_lock()
+        self.is_locked = True
+        return True
+
+    def release(self) -> None:
+        """释放锁"""
+        try:
+            if self._lock_file.exists():
+                self._lock_file.unlink()
+        except OSError as e:
+            logger.debug("释放锁文件失败: %s", e)
+        self.is_locked = False
+
+    def _write_lock(self) -> None:
+        """写入锁文件（PID + 时间戳）"""
+        self._lock_file.write_text(
+            f"{os.getpid()}\n{datetime.now().isoformat()}",
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _is_pid_running(pid: int) -> bool:
+        """检查指定 PID 的进程是否仍在运行"""
+        try:
+            import psutil  # noqa: F811
+
+            return psutil.pid_exists(pid)
+        except ImportError:
+            # 无 psutil 时使用 os.kill(pid, 0) 作为回退
+            # Windows 上 os.kill 不可用，保守假设 PID 仍在运行
+            if sys.platform == "win32":
+                return True  # 保守策略：Windows 无 psutil 时假设仍在运行
+            try:
+                os.kill(pid, 0)
+                return True
+            except OSError:
+                return False
 
 
 class OutputFormat(Enum):
@@ -131,7 +234,7 @@ if PYDANTIC_AVAILABLE:
         bandit: CheckConfig = Field(default_factory=lambda: CheckConfig(timeout=120))
         pytest: CheckConfig = Field(
             default_factory=lambda: CheckConfig(
-                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n 4"
+                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60"
             )
         )
         schema_check: CheckConfig = Field(default_factory=CheckConfig)
@@ -216,7 +319,7 @@ else:
             self.mypy = CheckConfig(timeout=120)
             self.bandit = CheckConfig(timeout=120)
             self.pytest = CheckConfig(
-                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60 -n 4"
+                timeout=600, command="uv run pytest tests/unit/ -v --timeout=60"
             )
             self.schema_check = CheckConfig()
             self.parallel_execution = True
@@ -464,9 +567,14 @@ class PreCommitChecker:
             logger.info(f"开始执行: {check_name}")
             logger.debug(f"命令: {command}")
 
+            # ponytail: shell=False 避免 cmd.exe 包装进程，减少进程树冗余
+            # DEBUG
+            import sys as _sys
+            print(f"DEBUG cmd={command!r}", file=_sys.stderr)
+            print(f"DEBUG argv[0]={_sys.argv!r}", file=_sys.stderr)
+            print(f"DEBUG cwd={_sys.path[0]!r}", file=_sys.stderr)
             result = subprocess.run(
-                command,
-                shell=True,
+                shlex.split(command),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -708,7 +816,7 @@ class PreCommitChecker:
         sorted_dirs = sorted(test_dirs)
         dirs_str = " ".join(sorted_dirs)
         logger.info(f"增量测试目录: {dirs_str}")
-        return f"uv run pytest {dirs_str} -v --timeout=60 -n 4"
+        return f"uv run pytest {dirs_str} -v --timeout=60"
 
     def check_pytest_tests(self) -> CheckResult:
         """运行单元测试（支持增量测试）"""
@@ -722,8 +830,7 @@ class PreCommitChecker:
             )
 
         command = (
-            self.config.pytest.command
-            or "uv run pytest tests/unit/ -v --timeout=60 -n 4"
+            self.config.pytest.command or "uv run pytest tests/unit/ -v --timeout=60"
         )
 
         if self.config.incremental_check:
@@ -902,6 +1009,31 @@ class PreCommitChecker:
                 output=str(e),
             )
 
+    def _record_result(self, result: CheckResult) -> None:
+        """记录并输出单个检查结果（供串行/并行调度复用）"""
+        self.results.append(result)
+
+        if RICH_AVAILABLE and self.console:
+            if result.status == CheckStatus.PASSED:
+                self.console.print(
+                    f"{result.status.value} {result.name}: {result.message}",
+                    style="green",
+                )
+            elif result.status == CheckStatus.FAILED:
+                self.console.print(
+                    f"{result.status.value} {result.name}: {result.message}",
+                    style="red",
+                )
+            else:
+                self.console.print(
+                    f"{result.status.value} {result.name}: {result.message}"
+                )
+        else:
+            print(f"{result.status.value} {result.name}: {result.message}")
+
+        if result.status == CheckStatus.FAILED and result.output:
+            print(f"   详细输出:\n{result.output}")
+
     def run_all_checks_sequential(self) -> bool:
         """串行运行所有检查"""
         logger.info("🔍 开始预提交检查（串行模式）...")
@@ -916,108 +1048,53 @@ class PreCommitChecker:
         ]
 
         for check_func in checks:
-            result = check_func()
-            self.results.append(result)
-
-            if RICH_AVAILABLE and self.console:
-                if result.status == CheckStatus.PASSED:
-                    self.console.print(
-                        f"{result.status.value} {result.name}: {result.message}",
-                        style="green",
-                    )
-                elif result.status == CheckStatus.FAILED:
-                    self.console.print(
-                        f"{result.status.value} {result.name}: {result.message}",
-                        style="red",
-                    )
-                else:
-                    self.console.print(
-                        f"{result.status.value} {result.name}: {result.message}"
-                    )
-            else:
-                print(f"{result.status.value} {result.name}: {result.message}")
-
-            if result.status == CheckStatus.FAILED and result.output:
-                print(f"   详细输出:\n{result.output}")
+            try:
+                result = check_func()
+                self._record_result(result)
+            except Exception as e:
+                logger.error(f"检查执行异常: {e}")
 
         return self.generate_report()
 
     def run_all_checks_parallel(self) -> bool:
-        """并行运行所有检查"""
-        logger.info("🔍 开始预提交检查（并行模式）...")
+        """并行运行所有检查（两阶段调度）
 
-        checks = [
+        ponytail: 两阶段调度避免进程爆炸。旧方案 ThreadPoolExecutor(4) + pytest -n 4
+        峰值 8-9 个重型进程，内存爆炸。轻量检查并行 + 重量级检查串行后，
+        峰值降至 max_workers 个轻量进程 + 1 个重型进程。
+        """
+        logger.info("🔍 开始预提交检查（两阶段并行模式）...")
+
+        # 轻量检查：内存占用小，可安全并行
+        light_checks = [
             self.check_ruff_format,
             self.check_ruff_lint,
+            self.check_schema_updates,
+        ]
+        # 重量级检查：各自启动重型 Python 进程，串行执行避免内存峰值
+        heavy_checks = [
             self.check_mypy_types,
             self.check_bandit_security,
             self.check_pytest_tests,
-            self.check_schema_updates,
         ]
 
-        if RICH_AVAILABLE and self.console:
-            with (
-                Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    BarColumn(),
-                    console=self.console,
-                ) as progress,
-                concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.config.max_workers
-                ) as executor,
-            ):
-                futures = {executor.submit(check): check for check in checks}
+        # 第一阶段：轻量检查并行
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.config.max_workers
+        ) as executor:
+            futures = {executor.submit(check): check for check in light_checks}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    self._record_result(future.result())
+                except Exception as e:
+                    logger.error(f"检查执行异常: {e}")
 
-                for future in concurrent.futures.as_completed(futures):
-                    check_func = futures[future]
-                    task = progress.add_task(
-                        f"执行 {check_func.__name__}...", total=None
-                    )
-
-                    try:
-                        result = future.result()
-                        self.results.append(result)
-                        progress.remove_task(task)
-
-                        if result.status == CheckStatus.PASSED:
-                            self.console.print(
-                                f"{result.status.value} {result.name}: {result.message}",
-                                style="green",
-                            )
-                        elif result.status == CheckStatus.FAILED:
-                            self.console.print(
-                                f"{result.status.value} {result.name}: {result.message}",
-                                style="red",
-                            )
-                        else:
-                            self.console.print(
-                                f"{result.status.value} {result.name}: {result.message}"
-                            )
-
-                        if result.status == CheckStatus.FAILED and result.output:
-                            self.console.print(
-                                f"   详细输出:\n{result.output}", style="dim"
-                            )
-                    except Exception as e:
-                        logger.error(f"检查执行异常: {e}")
-                        progress.remove_task(task)
-        else:
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=self.config.max_workers
-            ) as executor:
-                futures = {executor.submit(check): check for check in checks}
-
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        result = future.result()
-                        self.results.append(result)
-                        print(f"{result.status.value} {result.name}: {result.message}")
-
-                        if result.status == CheckStatus.FAILED and result.output:
-                            print(f"   详细输出:\n{result.output}")
-                    except Exception as e:
-                        logger.error(f"检查执行异常: {e}")
+        # 第二阶段：重量级检查串行
+        for check in heavy_checks:
+            try:
+                self._record_result(check())
+            except Exception as e:
+                logger.error(f"检查执行异常: {e}")
 
         return self.generate_report()
 
@@ -1315,7 +1392,7 @@ class PreCommitChecker:
             else:
                 print(f"执行: {command}")
 
-            result = subprocess.run(command, shell=True, cwd=self.project_root)
+            result = subprocess.run(shlex.split(command), cwd=self.project_root)
 
             if result.returncode != 0:
                 if RICH_AVAILABLE and self.console:
@@ -1411,6 +1488,14 @@ def _parse_args() -> argparse.Namespace:
 
 def main():
     """主函数"""
+    # 单实例锁：防止多个 pre-commit-check 进程同时运行
+    lock = SingleInstanceLock()
+    if not lock.acquire():
+        print("⚠️  另一个 pre-commit-check 实例正在运行，跳过本次检查。")
+        print(f"   锁文件: {lock._lock_file}")
+        sys.exit(0)
+    atexit.register(lock.release)
+
     args = _parse_args()
 
     config_file = Path(__file__).parent.parent / ".pre-commit-config.yaml"

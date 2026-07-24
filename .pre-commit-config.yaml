@@ -1,0 +1,21 @@
+# 预提交检查配置
+# 两阶段调度：轻量检查（ruff/schema）并行 + 重量级检查（mypy/bandit/pytest）串行
+# 避免 ThreadPoolExecutor + pytest-xdist 两层并行叠加导致的进程爆炸
+parallel_execution: true
+max_workers: 4
+incremental_check: true
+cache_enabled: true
+skip_doc_only_commits: true
+
+pytest:
+  enabled: true
+  timeout: 600
+  command: "uv run pytest tests/unit/ -v --timeout=60"
+
+mypy:
+  enabled: true
+  timeout: 120
+
+bandit:
+  enabled: true
+  timeout: 120
