@@ -36,11 +36,6 @@ test = [
 [project.scripts]
 nanobotrun = "src.cli.app:app"
 
-[[tool.uv.index]]
-name = "tsinghua"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -62,7 +62,7 @@ jobs:
     - name: Install dependencies
       run: |
         echo "正在使用uv安装依赖..."
-        uv sync --index-url https://pypi.org/simple --no-default-index
+        uv sync
         echo "依赖安装完成"
         
     - name: Build package

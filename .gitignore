@@ -149,6 +149,9 @@ logs/
 config.local.json
 secrets.json
 
+# uv 本地配置文件（Tsinghua 镜像等本地开发便利配置）
+uv.toml
+
 # ======================
 # 文档和构建
 # ======================
