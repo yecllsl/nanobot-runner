@@ -10,6 +10,7 @@ import PlanPage from './pages/PlanPage';
 import EvolutionPage from './pages/EvolutionPage';
 import EvolutionReportPage from './pages/EvolutionReportPage';
 import SettingsPage from './pages/SettingsPage';
+import ImportPage from './pages/ImportPage';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/evolution" element={<EvolutionPage />} />
           <Route path="/evolution/reports/:month" element={<EvolutionReportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/import" element={<ImportPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
