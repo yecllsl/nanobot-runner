@@ -1,0 +1,360 @@
+# WebUI 数据导入功能设计文档
+
+> **版本**: v0.34.0
+> **日期**: 2026-07-24
+> **状态**: 已批准，待编写实施计划
+> **对齐需求**: [REQ_需求规格说明书 §5.7](../../requirements/REQ_需求规格说明书.md)
+
+---
+
+## 1. 背景与目标
+
+### 1.1 背景
+
+当前 WebUI（端口 8766）仅支持数据查看，导入新运动数据必须切回 CLI 执行 `uv run nanobotrun data import`。v0.34.0 在 WebUI 提供等价导入能力，实现"查看+导入"一体化。
+
+### 1.2 目标
+
+- 功能与 CLI `data import` 完全等价，复用同一 `ImportService.import_file`
+- 支持多文件选择上传、强制重新导入、导入结果反馈
+- 不改动 `src/core/` 任何现有核心逻辑（薄封装）
+
+### 1.3 非目标
+
+- 目录上传（浏览器无法上传目录路径，以多文件选择等价替代）
+- 实时逐文件进度推送（SSE，列为 P2 远期）
+- 拖拽上传（P2 远期）
+
+---
+
+## 2. 架构概览
+
+```
+浏览器                          FastAPI (8766)                    ImportService
+  │  multipart/form-data            │  run_in_threadpool              │
+  │  files[] + force                │  写临时文件 → Path              │
+  ├────────────────────────────────>│  import_file(tmp, force) ──────>│
+  │                                 │  收集结果 + 清理临时文件        │
+  │  { results[], summary }         │<────────────────────────────────│
+  │<────────────────────────────────│
+```
+
+**核心原则**：WebUI 层只做"接收文件 → 转交 ImportService → 返回结果"，不引入任何导入业务逻辑。所有去重、解析、存储均由 `ImportService` 完成，与 CLI 走同一代码路径。
+
+---
+
+## 3. 后端 API 设计
+
+### 3.1 端点
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST /api/data/import` |
+| 认证 | `Depends(get_current_user)`（Bearer token，与现有路由一致） |
+| 阻塞包装 | `run_in_threadpool`（ImportService 是同步阻塞，与 activities.py 一致） |
+| 文件位置 | `src/core/webui/routes/import_data.py` |
+
+### 3.2 请求
+
+- **Content-Type**: `multipart/form-data`
+- **Form 字段**: `files: list[UploadFile]`（FastAPI 自动解析）
+- **Query 参数**: `force: bool = Query(default=False)`
+
+### 3.3 响应
+
+```json
+{
+  "results": [
+    {"filename": "activity1.fit", "status": "added", "message": "导入成功"},
+    {"filename": "activity2.fit", "status": "skipped", "message": "文件已存在"},
+    {"filename": "activity3.fit", "status": "error", "message": "解析元数据失败: ..."}
+  ],
+  "summary": {"total": 3, "added": 1, "skipped": 1, "errors": 1}
+}
+```
+
+- `status` 取值与 `ImportService.import_file` 返回值一致：`added` / `skipped` / `error`
+- 单个文件失败不影响其他文件（错误隔离，与 `import_directory` 一致）
+
+### 3.4 请求阶段校验（返回 400）
+
+| 校验项 | 条件 | 响应 |
+|--------|------|------|
+| 文件类型 | 扩展名必须为 `.fit`（不区分大小写） | 400 + 非法文件名列表 |
+| 单文件大小 | ≤ 50MB | 400 + 超限文件名 |
+| 文件数量 | ≤ 50 个 | 400 |
+
+校验在写入临时文件前执行，避免无效文件占用磁盘。
+
+**FastAPI multipart 大小限制配置（ISSUE-01 修复）**：
+
+FastAPI/Starlette 默认 `max_body_size` 为 1MB，无法接受 50MB 文件。需在路由中显式提升限制。通过 Starlette 中间件 `BaseHTTPMiddleware` 或直接在 uvicorn 配置中设置。推荐方案：在 `src/core/webui/app.py` 的 `create_app` 中添加中间件：
+
+```python
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    """限制请求体大小，防止超大上传耗尽内存（ISSUE-01）"""
+    async def dispatch(self, request: Request, call_next):
+        # 50MB + 10MB 余量（multipart 编码开销）
+        if request.headers.get("content-type", "").startswith("multipart/form-data"):
+            cl = int(request.headers.get("content-length", 0))
+            if cl > 60 * 1024 * 1024:  # 60MB 上限
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "请求体过大，单次上传总计不超过 60MB"}
+                )
+        return await call_next(request)
+
+app.add_middleware(MaxBodySizeMiddleware)
+```
+
+> 注：此中间件仅作用于 multipart 请求，不影响其他 API。Starlette 本身不强制 1MB 限制，但部分部署场景（反向代理）可能默认限制，需确认。
+
+### 3.5 临时文件策略
+
+```python
+import shutil
+import tempfile
+from pathlib import Path
+
+tmp_dir = Path(tempfile.mkdtemp(prefix="nanobot_import_"))
+try:
+    results = []
+    for upload in files:
+        # 安全：仅取 basename，防止客户端传入 ../../etc/passwd 等路径穿越
+        safe_name = Path(upload.filename).name
+        tmp_path = tmp_dir / safe_name
+        # 写入临时文件
+        # 调用 context.importer.import_file(tmp_path, force=force)
+        # 收集 result
+finally:
+    shutil.rmtree(tmp_dir, ignore_errors=True)  # 保证清理
+```
+
+- 用 `tempfile.mkdtemp()` 创建临时目录，每次请求一个独立目录
+- **路径穿越防护**：`Path(upload.filename).name` 取纯文件名，丢弃任何目录部分（客户端 filename 不可信）
+- 保留原文件名（fitparse 解析不依赖扩展名，但保留以保持一致性）
+- `try/finally` 保证异常时也清理
+
+### 3.6 错误处理
+
+| 场景 | 处理 |
+|------|------|
+| 请求阶段校验失败 | 400 + 错误明细 |
+| 单文件解析/存储失败 | 记入 results 的 `error` 项，继续处理后续文件 |
+| 临时文件写入失败 | 记入 results 的 `error` 项（message 含 IOError 信息） |
+| 未认证 | 401（由 `get_current_user` 抛出） |
+| 服务端异常 | 500 + 通用错误信息（不泄露内部细节） |
+
+### 3.7 路由注册
+
+在 `src/core/webui/app.py` 的 `create_app` 中新增：
+
+```python
+from src.core.webui.routes.import_data import router as import_data_router
+app.include_router(import_data_router, prefix="/api", tags=["import"])
+```
+
+---
+
+## 4. 前端设计
+
+### 4.1 新增文件
+
+| 文件 | 职责 |
+|------|------|
+| `webui/src/api/import.ts` | API 调用封装 |
+| `webui/src/pages/ImportPage.tsx` | 导入页面组件 |
+
+### 4.2 修改文件
+
+| 文件 | 改动 |
+|------|------|
+| `webui/src/App.tsx` | 新增 `<Route path="/import" element={<ImportPage />} />` |
+| `webui/src/components/layout/Sidebar.tsx` | navItems 新增 `{ path: '/import', label: '导入', icon: '📥' }` |
+
+### 4.3 API 封装 (`api/import.ts`)
+
+```typescript
+import apiClient from './client';
+
+export interface ImportResult {
+  filename: string;
+  status: 'added' | 'skipped' | 'error';
+  message: string;
+}
+
+export interface ImportResponse {
+  results: ImportResult[];
+  summary: { total: number; added: number; skipped: number; errors: number };
+}
+
+export async function importData(files: File[], force: boolean = false): Promise<ImportResponse> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+  const response = await apiClient.post<ImportResponse>('/data/import', formData, {
+    params: { force },
+    // SUG-03 修复：不手动设置 Content-Type，axios 发送 FormData 时会自动设置含 boundary 的正确 header
+    timeout: 300000, // 5 分钟，大批量导入需要更长时间
+  });
+  return response.data;
+}
+```
+
+### 4.4 ImportPage 布局
+
+```
+┌─────────────────────────────────────────┐
+│ 数据导入                                │
+│                                         │
+│  [选择 .fit 文件]  ☐ 强制重新导入       │
+│                                         │
+│  已选文件 (3):                          │
+│   • activity1.fit (1.2MB)               │
+│   • activity2.fit (0.8MB)                │
+│   • activity3.fit (2.1MB)               │
+│                                         │
+│  [开始导入]                             │
+│                                         │
+│  ─── 导入结果 ───                        │
+│  ✅ activity1.fit  导入成功              │
+│  ⏭️ activity2.fit  文件已存在            │
+│  ❌ activity3.fit  解析元数据失败: ...    │
+│                                         │
+│  汇总: 成功 1 | 跳过 1 | 错误 1         │
+│  [查看活动列表 →]                        │
+└─────────────────────────────────────────┘
+```
+
+**交互细节**：
+- file input: `accept=".fit"` `multiple`
+- 选择文件后显示文件列表（文件名 + 大小）
+- 点击「开始导入」按钮触发上传（SUG-01：采用手动触发，避免误选文件立即上传，更可控）
+- 导入中禁用按钮，显示 loading
+- 结果用颜色区分：绿(added) / 黄(skipped) / 红(error)
+- 「查看活动列表」链接跳转 `/activities`（`react-router-dom` 的 `Link`）
+
+**复用**：
+- `useApi` hook 管理 loading/error 状态
+- `apiClient` 自动注入 token（无需手动处理认证）
+- Tailwind CSS 样式（与现有页面一致）
+
+---
+
+## 5. 依赖变更
+
+| 依赖 | 类型 | 原因 |
+|------|------|------|
+| `python-multipart` | 新增（运行时） | FastAPI `UploadFile` 必需依赖，无替代方案 |
+
+在 `pyproject.toml` 的 `dependencies` 中新增：
+```toml
+"python-multipart>=0.0.9",
+```
+
+> 注：用户已在需求确认阶段授权添加此依赖。
+
+---
+
+## 6. 测试策略
+
+### 6.1 后端单元测试
+
+**文件**: `tests/unit/webui/test_import_data.py`
+
+| 测试用例 | 验证点 |
+|----------|--------|
+| 未认证请求返回 401 | 认证中间件 |
+| 非 .fit 文件返回 400 | 文件类型校验 |
+| 超过 50 个文件返回 400 | 数量限制 |
+| mock importer，验证正常导入返回正确结构 | 响应格式 |
+| mock importer 返回 skipped/added/error | 状态映射 |
+| 单文件失败不影响后续 | 错误隔离 |
+| force=true 透传给 importer | 参数传递 |
+
+用 `httpx.AsyncClient` + FastAPI `TestClient`，mock `context.importer.import_file`。
+
+### 6.2 后端集成测试
+
+**文件**: `tests/integration/webui/test_import_data.py`
+
+| 测试用例 | 验证点 |
+|----------|--------|
+| 上传真实 .fit 文件成功导入 | 端到端 |
+| 上传重复文件返回 skipped | 去重逻辑 |
+| force=true 重复文件重新导入 | 强制导入 |
+| 临时文件导入后清理 | NFR-D-26 |
+
+用真实 ImportService + 临时数据目录 + 测试 FIT 文件。
+
+### 6.3 E2E 测试
+
+**文件**: `tests/e2e/test_import.py`
+
+| 测试用例 | 验证点 |
+|----------|--------|
+| 导航到导入页 | 路由+侧边栏 |
+| 选择文件并导入，验证结果展示 | 完整流程 |
+| 勾选 force 复选框 | force 选项 |
+
+用 Playwright（用户偏好），headful 模式。
+
+---
+
+## 7. 改动清单
+
+| 类型 | 文件 | 改动说明 |
+|------|------|----------|
+| 修改 | `pyproject.toml` | +`python-multipart` 依赖 |
+| 新增 | `src/core/webui/routes/import_data.py` | 后端导入路由 |
+| 修改 | `src/core/webui/app.py` | 注册 import_data router + 新增 MaxBodySizeMiddleware（ISSUE-01） |
+| 新增 | `webui/src/api/import.ts` | 前端 API 封装 |
+| 新增 | `webui/src/pages/ImportPage.tsx` | 导入页面 |
+| 修改 | `webui/src/App.tsx` | 新增 /import 路由 |
+| 修改 | `webui/src/components/layout/Sidebar.tsx` | 新增导入导航项 |
+| 新增 | `tests/unit/webui/test_import_data.py` | 后端单元测试 |
+| 新增 | `tests/integration/webui/test_import_data.py` | 后端集成测试 |
+| 新增 | `tests/e2e/test_import.py` | E2E 测试 |
+
+**复用清单（零改造）**：
+- `src/core/storage/importer.py` 的 `ImportService.import_file`
+- `src/core/webui/auth.py` 的 `get_current_user`
+- `webui/src/api/client.ts` 的 `apiClient`
+- `webui/src/hooks/useApi.ts` 的 `useApi`
+
+---
+
+## 8. 验收标准对齐
+
+| 需求规格 §5.7.3 验收项 | 设计落点 |
+|------------------------|----------|
+| 1. 选择 1 个或多个 .fit 文件 | ImportPage file input multiple + accept=".fit" |
+| 2. 显示每个文件结果 | results 列表渲染 |
+| 3. 强制重新导入复选框 | force query param + checkbox |
+| 4. 汇总 N/M/K | summary 字段 |
+| 5. 与 CLI 等价 | 复用 ImportService.import_file |
+| 6. 非 .fit 拒绝 + 超限拒绝 | 请求阶段校验 400 |
+| 7. token 认证 | get_current_user |
+| 8. 不影响 CLI/飞书 | 零改动 src/core/，仅新增 WebUI 层 |
+
+| 非功能需求 | 设计落点 |
+|------------|----------|
+| NFR-D-24 单文件 <3s | ImportService 性能保证 + run_in_threadpool 不阻塞 |
+| NFR-D-25 不阻塞事件循环 | run_in_threadpool |
+| NFR-D-26 临时文件清理 | try/finally + shutil.rmtree |
+| NFR-D-27 安全认证 | get_current_user |
+| NFR-D-28 向后兼容 | 零改动核心模块 |
+
+---
+
+## 9. 风险与缓解
+
+| 风险 | 等级 | 缓解 |
+|------|------|------|
+| 大批量上传请求超时 | 中 | 前端 timeout 设 5 分钟；文件数限制 50 个 |
+| 临时文件磁盘占用 | 低 | 每请求独立 mkdtemp + finally 清理 |
+| ImportService 内部 rich.Console 无 TTY 输出 | 低 | 已验证不报错，返回值干净 |
+| 文件名冲突（同名文件） | 低 | 临时目录隔离，每请求独立目录 |
