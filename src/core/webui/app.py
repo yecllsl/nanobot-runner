@@ -43,6 +43,60 @@ class TokenResponse(TypedDict):
     token_type: str
 
 
+class MaxBodySizeMiddleware:
+    """请求体大小限制中间件 (v0.34.0, ISSUE-01)
+
+    FastAPI/Starlette 默认不限制请求体大小，超大上传会耗尽内存。
+    本中间件仅对 multipart/form-data 请求限制总大小，其他请求放行。
+
+    采用纯 ASGI 实现而非 BaseHTTPMiddleware，因为后者会缓冲整个响应体，
+    破坏 SSE/WebSocket 等流式响应（见 test_routes_runtime_events 回归）。
+
+    Args:
+        app: ASGI 应用
+        max_bytes: 请求体最大字节数
+    """
+
+    def __init__(self, app: Any, max_bytes: int = 60 * 1024 * 1024) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            headers = scope.get("headers", [])
+            content_type = ""
+            content_length = 0
+            for name, value in headers:
+                if name == b"content-type":
+                    content_type = value.decode("latin-1")
+                elif name == b"content-length":
+                    try:
+                        content_length = int(value)
+                    except ValueError:
+                        content_length = 0
+
+            if (
+                content_type.startswith("multipart/form-data")
+                and content_length > self.max_bytes
+            ):
+                # 直接构造 413 响应，不调用下游应用
+                body = b'{"detail":"\\u8bf7\\u6c42\\u4f53\\u8fc7\\u5927\\uff0c\\u5355\\u6b21\\u4e0a\\u4f20\\u603b\\u8ba1\\u4e0d\\u8d85\\u8fc7 60MB"}'
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 413,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode()),
+                        ],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
+
+        await self.app(scope, receive, send)
+
+
 # 全局应用实例（由 create_app 设置）
 _app_instance: FastAPI | None = None
 
@@ -93,6 +147,10 @@ def create_app(context: AppContext) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # v0.34.0: 请求体大小限制中间件（ISSUE-01 修复）
+    # FastAPI/Starlette 默认无强制限制，显式设置 60MB 上限防止超大上传耗尽内存
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=60 * 1024 * 1024)
 
     # 将 context 和配置注入 app.state
     app.state.context = context

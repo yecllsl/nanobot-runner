@@ -146,3 +146,43 @@ class TestImportEndpointSuccess:
         assert response.status_code == 200
         call_kwargs = mock_importer.import_file.call_args
         assert call_kwargs.kwargs.get("force", False) is True
+
+
+class TestMaxBodySizeMiddleware:
+    """ISSUE-01: 请求体大小限制测试"""
+
+    def test_reject_oversized_multipart(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """超过 60MB 的 multipart 请求返回 413"""
+        # 构造超大 Content-Length 头（不实际发送 60MB 数据）
+        huge_content = b"x" * (61 * 1024 * 1024)
+        response = client.post(
+            "/api/data/import",
+            headers={
+                **auth_headers,
+                "Content-Type": "multipart/form-data; boundary=----test",
+                "Content-Length": str(len(huge_content) + 200),
+            },
+            content=huge_content,
+        )
+        assert response.status_code == 413
+        assert response.json()["detail"]  # 错误消息非空
+
+    def test_allow_normal_size_multipart(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """正常大小的 multipart 请求不被拦截"""
+        response = client.post(
+            "/api/data/import",
+            headers=auth_headers,
+            files={"files": ("run1.fit", b"data", "application/octet-stream")},
+        )
+        assert response.status_code == 200
+
+    def test_non_multipart_request_unaffected(
+        self, client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """非 multipart 请求不受大小限制影响（如 GET /api/activities）"""
+        response = client.get("/api/activities", headers=auth_headers)
+        assert response.status_code == 200
