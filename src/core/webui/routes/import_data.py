@@ -9,7 +9,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import (
     APIRouter,
@@ -22,6 +22,7 @@ from fastapi import (
     status,
 )
 from starlette.concurrency import run_in_threadpool
+from typing_extensions import TypedDict
 
 from src.core.webui.auth import get_current_user
 
@@ -33,6 +34,30 @@ router = APIRouter()
 # 防御性限制常量
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 MAX_FILES = 50
+
+
+class ImportResultItem(TypedDict):
+    """单文件导入结果"""
+
+    filename: str
+    status: str  # 'added' | 'skipped' | 'error'
+    message: str
+
+
+class ImportSummary(TypedDict):
+    """导入汇总"""
+
+    total: int
+    added: int
+    skipped: int
+    errors: int
+
+
+class ImportResponse(TypedDict):
+    """导入接口响应"""
+
+    results: list[ImportResultItem]
+    summary: ImportSummary
 
 
 def _validate_files(files: list[UploadFile]) -> None:
@@ -64,7 +89,7 @@ def _validate_files(files: list[UploadFile]) -> None:
 
 def _import_files_sync(
     context: AppContext, files: list[UploadFile], force: bool
-) -> dict[str, Any]:
+) -> ImportResponse:
     """同步导入文件：写临时文件 → 调 ImportService → 收集结果
 
     Args:
@@ -73,20 +98,29 @@ def _import_files_sync(
         force: 是否强制重新导入
 
     Returns:
-        dict: {results: list, summary: dict}
+        ImportResponse: {results: list, summary: dict}
     """
     tmp_dir = Path(tempfile.mkdtemp(prefix="nanobot_import_"))
-    results: list[dict[str, Any]] = []
+    results: list[ImportResultItem] = []
     try:
         for upload in files:
-            # _validate_files 已保证 filename 非空且为 .fit，此处断言消除 mypy 可空类型
-            assert upload.filename is not None
+            # 防御性守卫：_validate_files 已保证非空，但显式检查避免 -O 模式下 assert 被跳过
+            if upload.filename is None:
+                results.append(
+                    {
+                        "filename": "<unknown>",
+                        "status": "error",
+                        "message": "上传文件名为空",
+                    }
+                )
+                continue
             # 路径穿越防护：仅取 basename，丢弃目录部分
             safe_name = Path(upload.filename).name
             tmp_path = tmp_dir / safe_name
             try:
+                content = upload.file.read()
                 with tmp_path.open("wb") as f:
-                    f.write(upload.file.read())
+                    f.write(content)
             except OSError as e:
                 results.append(
                     {
@@ -117,7 +151,7 @@ def _import_files_sync(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    summary = {
+    summary: ImportSummary = {
         "total": len(results),
         "added": sum(1 for r in results if r["status"] == "added"),
         "skipped": sum(1 for r in results if r["status"] == "skipped"),
@@ -132,7 +166,7 @@ async def import_data(
     files: list[UploadFile] = File(...),
     force: bool = Query(default=False, description="强制重新导入，跳过 SHA256 去重"),
     user: str = Depends(get_current_user),
-) -> dict[str, Any]:
+) -> ImportResponse:
     """导入 FIT 文件数据
 
     接收 multipart/form-data 上传的 .fit 文件，逐个调用 ImportService 导入。

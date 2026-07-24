@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_FILES = 50;
+const MAX_TOTAL_SIZE = 60 * 1024 * 1024; // 60MB，与后端 MaxBodySizeMiddleware 对齐
 
 export default function ImportPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -23,14 +24,19 @@ export default function ImportPage() {
       setFileError(`文件数量超过上限 ${MAX_FILES} 个`);
       return;
     }
-    const invalidType = files.find((f) => !f.name.toLowerCase().endsWith('.fit'));
-    if (invalidType) {
-      setFileError(`仅支持 .fit 文件: ${invalidType.name}`);
+    const invalidFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.fit'));
+    if (invalidFiles.length > 0) {
+      setFileError(`仅支持 .fit 文件，非法文件: ${invalidFiles.map((f) => f.name).join(', ')}`);
       return;
     }
-    const oversize = files.find((f) => f.size > MAX_FILE_SIZE);
-    if (oversize) {
-      setFileError(`文件过大（>50MB）: ${oversize.name}`);
+    const oversizeFiles = files.filter((f) => f.size > MAX_FILE_SIZE);
+    if (oversizeFiles.length > 0) {
+      setFileError(`文件过大（>50MB）: ${oversizeFiles.map((f) => f.name).join(', ')}`);
+      return;
+    }
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE) {
+      setFileError(`文件总大小超过 ${MAX_TOTAL_SIZE / 1024 / 1024}MB 上限`);
       return;
     }
     setSelectedFiles(files);

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import json
 import secrets
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -80,7 +81,10 @@ class MaxBodySizeMiddleware:
                 and content_length > self.max_bytes
             ):
                 # 直接构造 413 响应，不调用下游应用
-                body = b'{"detail":"\\u8bf7\\u6c42\\u4f53\\u8fc7\\u5927\\uff0c\\u5355\\u6b21\\u4e0a\\u4f20\\u603b\\u8ba1\\u4e0d\\u8d85\\u8fc7 60MB"}'
+                body = json.dumps(
+                    {"detail": "请求体过大，单次上传总计不超过 60MB"},
+                    ensure_ascii=False,
+                ).encode()
                 await send(
                     {
                         "type": "http.response.start",

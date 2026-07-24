@@ -186,3 +186,53 @@ class TestMaxBodySizeMiddleware:
         """非 multipart 请求不受大小限制影响（如 GET /api/activities）"""
         response = client.get("/api/activities", headers=auth_headers)
         assert response.status_code == 200
+
+
+class TestImportErrorIsolation:
+    """错误隔离测试：单文件失败不影响其他文件（REV-01 补充）"""
+
+    def test_oserror_on_write_isolated(self, mock_context: MagicMock) -> None:
+        """临时文件写入 OSError 被记为 error，不中断后续文件"""
+        from src.core.webui.routes.import_data import _import_files_sync
+
+        # 第一个文件 read 抛 OSError，第二个文件正常
+        broken = MagicMock()
+        broken.filename = "broken.fit"
+        broken.file.read.side_effect = OSError("disk full")
+
+        normal = MagicMock()
+        normal.filename = "normal.fit"
+        normal.file.read.return_value = b"fit-data"
+
+        results = _import_files_sync(mock_context, [broken, normal], force=False)
+
+        assert results["summary"]["total"] == 2
+        assert results["summary"]["errors"] == 1
+        assert results["summary"]["added"] == 1
+        # broken 文件记为 error 且消息精确
+        broken_result = next(
+            r for r in results["results"] if r["filename"] == "broken.fit"
+        )
+        assert broken_result["status"] == "error"
+        assert "临时文件写入失败" in broken_result["message"]
+
+    def test_none_filename_isolated(self, mock_context: MagicMock) -> None:
+        """filename 为 None 被记为 error，不中断后续文件（REV-01 Blocker 修复覆盖）"""
+        from src.core.webui.routes.import_data import _import_files_sync
+
+        no_name = MagicMock()
+        no_name.filename = None
+
+        normal = MagicMock()
+        normal.filename = "normal.fit"
+        normal.file.read.return_value = b"fit-data"
+
+        results = _import_files_sync(mock_context, [no_name, normal], force=False)
+
+        assert results["summary"]["errors"] == 1
+        assert results["summary"]["added"] == 1
+        none_result = next(
+            r for r in results["results"] if r["filename"] == "<unknown>"
+        )
+        assert none_result["status"] == "error"
+        assert "文件名为空" in none_result["message"]
