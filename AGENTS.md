@@ -1,7 +1,7 @@
 # AGENTS.md - Nanobot Runner AI开发快速参考
 
-> **版本**: v12.0.0 | **更新日期**: 2026-07-13
-> **当前基线**: v0.33.0
+> **版本**: v12.1.0 | **更新日期**: 2026-07-24
+> **当前基线**: v0.34.0
 > **说明**: 本文档为AI Agent快速参考，详细内容请查阅对应专门文档。
 
 ---
@@ -26,7 +26,7 @@
 - 云端存储
 - 实时流处理
 
-> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互。v0.28.0 新增 WebUI 数据可视化，提供 6 大跑步数据页面。v0.32.0 升级 nanobot-ai 至 0.2.2，移除 monkey-patch 技术债，新增 SDK 编程式调用、运行时事件总线、自定义 Provider、语音转录配置。
+> **注意**: v0.27.0 新增 WebUI 支持，支持浏览器端 AI 对话交互。v0.28.0 新增 WebUI 数据可视化，提供 6 大跑步数据页面。v0.32.0 升级 nanobot-ai 至 0.2.2，移除 monkey-patch 技术债，新增 SDK 编程式调用、运行时事件总线、自定义 Provider、语音转录配置。v0.34.0 新增 WebUI 数据导入功能（`POST /api/data/import`），复用 CLI 同一 `ImportService.import_file`，支持多文件批量上传与强制重新导入。
 
 ---
 
@@ -111,7 +111,8 @@ src/
 │           ├── evolution.py    # 进化引擎API (v0.29.0)
 │           ├── plan.py         # 训练计划API (v0.29.0)
 │           ├── settings.py     # 设置中心API (v0.29.0)
-│           └── runtime_events.py # 运行时事件SSE API (v0.32.0)
+│           ├── runtime_events.py # 运行时事件SSE API (v0.32.0)
+│           └── import_data.py  # 数据导入API (v0.34.0)
 │   ├── sdk_adapter.py          # SDK 编程式调用适配器 (v0.32.0)
 │   └── provider_adapter.py     # Provider 适配器 + DynamicProviderRegistry + 配置注入 (v0.32.0)
 ├── agents/
@@ -353,9 +354,10 @@ uv run nanobotrun gateway start --webui --port 18790 # 指定端口
 
 > WebUI 启用后：
 > - AI 对话: http://127.0.0.1:8765（默认启用 token 认证）
-> - 数据可视化: http://127.0.0.1:8766（10大页面，需 token 认证）
+> - 数据可视化: http://127.0.0.1:8766（11大页面，需 token 认证）
 >   - v0.28.0: Dashboard、VDOT趋势、训练负荷、活动列表、活动详情、身体信号
 >   - v0.29.0: 训练计划管理、进化引擎控制台、月度进化报告、设置中心
+>   - v0.34.0: 数据导入
 
 ### 代码质量
 
