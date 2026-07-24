@@ -97,14 +97,23 @@ def _import_files_sync(
                 )
                 continue
 
-            result = context.importer.import_file(tmp_path, force=force)
-            results.append(
-                {
-                    "filename": safe_name,
-                    "status": result.get("status", "error"),
-                    "message": result.get("message", ""),
-                }
-            )
+            try:
+                result = context.importer.import_file(tmp_path, force=force)
+                results.append(
+                    {
+                        "filename": safe_name,
+                        "status": result.get("status", "error"),
+                        "message": result.get("message", ""),
+                    }
+                )
+            except Exception as e:  # noqa: BLE001 - 错误隔离：单文件异常不中断后续
+                results.append(
+                    {
+                        "filename": safe_name,
+                        "status": "error",
+                        "message": f"导入过程异常: {e}",
+                    }
+                )
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
