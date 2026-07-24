@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/tests-4191%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **最新版本**: v0.32.1 - 代码质量修复与文档归档，完成 v0.32.0 技术评审整改
+> **最新版本**: v0.33.0 - pre-commit-check.py 并发内存爆炸系统性修复
 
 ## 项目简介
 
@@ -254,4 +254,4 @@ uv run mypy src/ --ignore-missing-imports        # 类型检查
 
 ---
 
-**版本**: v0.32.1 | **最后更新**: 2026-07-18
+**版本**: v0.33.0 | **最后更新**: 2026-07-24

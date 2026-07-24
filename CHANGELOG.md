@@ -9,6 +9,95 @@
 
 ---
 
+## [0.33.0] - 2026-07-24
+
+### 版本主题
+**pre-commit-check.py 并发内存爆炸系统性修复** —— 通过 systematic-debugging 方法论识别 4 大根因，采用两阶段调度 + 单实例锁 + Windows 路径处理 + shell=False 综合治理，将预提交检查的峰值内存从 18GB 降至 3.99GB（-78%），峰值 Python 进程数从 8-9 降至 ≤3。
+
+> v0.33.0 是 v0.32.1 的小版本（minor）发布，不引入新功能特性，专注于构建工具链的性能与稳定性改进。核心工作包括：消除嵌套并行导致的进程爆炸、引入文件级单实例锁防止双进程并发、修复 Windows 平台路径转义问题、固化预提交配置。
+
+**本版本已实现**:
+- ✅ 根因 1 修复：移除 pytest-xdist `-n 4` 嵌套并行（4 处），消除进程爆炸
+- ✅ 根因 2 修复：新增 `SingleInstanceLock` 文件级单实例锁，防止双进程并发
+- ✅ 根因 3 修复：`shell=True` → `shlex.split()` + `shell=False`，消除 cmd.exe 包装进程
+- ✅ 根因 4 修复：两阶段调度（轻量 ruff/schema 并行 + 重量级 mypy/bandit/pytest 串行）
+- ✅ 跨平台修复：Windows 路径用 `as_posix()` 强制正斜杠，避免 shlex 误解析转义
+- ✅ 配置固化：新增 `.pre-commit-config.yaml` 持久化两阶段调度参数
+- ✅ 监控工具：新增 `scripts/verify_memory_peak.py`（psutil 进程树内存峰值监控）
+- ✅ 诊断工具：新增 `scripts/diagnose_process_tree.py`（进程树结构追踪）
+- ✅ 测试覆盖：新增 15 个单元测试（两阶段调度/单实例锁/Shell/Windows 路径）
+- ✅ 文件清理：删除 `demo-experience.html`（691 行）与 `作品及正文.md`（532 行）临时文件
+- ✅ 依赖管理：新增 `psutil>=7.2.2` dev 依赖，锁定 uv 依赖
+- ✅ 全量测试通过率 100%（单元测试 4449/4449，集成测试 413/413）
+- ✅ 代码覆盖率 83%（核心模块 ≥80%）
+
+### Fixed
+- **进程爆炸**（scripts/pre-commit-check.py）：移除 pytest-xdist `-n 4` 嵌套并行，消除 ThreadPoolExecutor(4) + pytest worker ×4 的两层并行叠加，峰值 Python 进程从 8-9 降至 ≤3
+- **双进程并发**：新增 `SingleInstanceLock` 类，通过文件锁 + PID 记录 + 300s 超时过期机制，防止 `.git/hooks/pre-commit` 与手动调用同时触发导致的内存叠加
+- **Windows 路径解析**：在 `shlex.split` 前用 `command.replace("\\", "/")` 规范化路径，并在构造命令时用 `f.relative_to(self.project_root).as_posix()` 强制正斜杠，避免 shlex 把 `\d` 当作转义序列并吃掉反斜杠（导致 ruff 找不到 `scripts\diagnose_process_tree.py`）
+- **shell=True 冗余进程**：`subprocess.run` 从 `shell=True` 改为 `shlex.split()` + `shell=False`，消除 Windows 上每个检查额外启动的 `cmd.exe` 包装进程（6 个检查 → 6 个冗余进程）
+
+### Added
+- **SingleInstanceLock 类**（scripts/pre-commit-check.py）：文件级单实例锁
+  - 锁文件位置：`~/.nanobot-runner/.pre-commit.lock`
+  - 文件格式：`{PID}\n{ISO时间戳}`
+  - 行为：PID 仍存活时拒绝新实例，超时（默认 300s）后视为过期锁自动覆写
+- **两阶段调度**（scripts/pre-commit-check.py: `run_all_checks_parallel`）
+  - 第一阶段（并行）：ruff_format、ruff_lint、schema_updates（轻量，I/O 受限）
+  - 第二阶段（串行）：mypy_types、bandit_security、pytest_tests（重型，CPU/内存密集）
+- **配置固化**（.pre-commit-config.yaml）：持久化 `parallel_execution`、`max_workers`、`incremental_check`、`cache_enabled`、`skip_doc_only_commits` 等关键参数
+- **内存监控工具**（scripts/verify_memory_peak.py）：psutil 后台采样进程树，记录峰值内存/进程数/Python 进程数
+- **进程树诊断工具**（scripts/diagnose_process_tree.py）：递归遍历当前进程及其所有子进程，输出 PID/名称/命令行/内存/状态
+- **测试用例**（tests/unit/scripts/test_pre_commit_scheduler.py，15 个）：
+  - `TestTwoPhaseScheduling`（5 个）：轻量并行 / 重量级串行 / 顺序保证 / 全覆盖 / 峰值并发守护
+  - `TestNoXdistParallelism`（3 个）：默认配置/全量测试/增量测试三条路径验证 `-n 4` 全部移除
+  - `TestSingleInstanceLock`（5 个）：锁获取/拒绝/过期/PID 记录/释放清理
+  - `TestShellFalse`（2 个）：`run_command` 和 `auto_fix_issues` 均使用 `shell=False`
+
+### Changed
+- **subprocess 调用改造**（scripts/pre-commit-check.py: `run_command`, `auto_fix_issues`）：从 `subprocess.run(cmd_string, shell=True)` 改为 `subprocess.run(shlex.split(cmd), shell=False)`
+- **check_ruff_format / check_ruff_lint**（scripts/pre-commit-check.py）：增量检查时使用 `as_posix()` 强制正斜杠路径拼接
+- **依赖管理**（pyproject.toml）：`[dependency-groups].dev` 新增 `psutil>=7.2.2`，`uv.lock` 同步更新
+
+### Removed
+- **demo-experience.html**（691 行）：临时前端演示文件，确认无引用后清理
+- **作品及正文.md**（532 行）：临时内容文件，确认无引用后清理
+
+### 测试验证
+- 单元测试：4449 passed, 1 skipped, 0 failed（100% 通过率）
+- 集成测试：413 passed, 1 skipped, 0 failed（100% 通过率）
+- 代码覆盖率：83%（核心模块 ≥80%）
+- ruff check：0 errors, 0 warnings
+- ruff format：539 files already formatted
+- mypy 类型检查：Success: no issues found in 236 source files
+- bandit 安全扫描：0 High, 0 Medium, 7 Low（均为已知遗留，非本版本引入）
+- **内存峰值**：3.99 GB（旧方案 18 GB，**-78%**）
+- **进程并发峰值**：≤3 个 Python 进程（旧方案 8-9 个，**-66%**）
+- **单实例锁**：第二个 pre-commit-check 实例被正确拒绝并优雅退出
+
+### 性能对比
+
+| 指标 | v0.32.1 | v0.33.0 | 改善 |
+|------|---------|---------|------|
+| 峰值 Python 进程数 | 8-9 | ≤3 | -66% |
+| 峰值内存（监控） | 18 GB | 3.99 GB | -78% |
+| 嵌套并行 | ThreadPoolExecutor(4) + pytest-xdist(-n 4) | 轻量并行 + 重量级串行 | 消除 |
+| cmd.exe 包装进程 | 6 个 | 0 个 | -100% |
+
+### 已知问题
+无新增已知问题。与 v0.32.1 一致。
+
+### 升级说明
+- 本版本为兼容性升级，无需任何手动操作
+- psutil 仅作为 dev 依赖（`--group dev`），不影响生产构建
+- 升级后首次运行 pre-commit-check 可能创建 `~/.nanobot-runner/.pre-commit.lock` 锁文件目录
+
+### 关联文档
+- [回归报告](../test/reports/回归报告_v0.33.0.md)
+- [发布报告](../devops/发布报告_0.33.0.md)（待生成）
+
+---
+
 ## [0.32.1] - 2026-07-18
 
 ### 版本主题
