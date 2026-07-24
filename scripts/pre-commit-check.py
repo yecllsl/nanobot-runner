@@ -568,13 +568,9 @@ class PreCommitChecker:
             logger.debug(f"命令: {command}")
 
             # ponytail: shell=False 避免 cmd.exe 包装进程，减少进程树冗余
-            # DEBUG
-            import sys as _sys
-            print(f"DEBUG cmd={command!r}", file=_sys.stderr)
-            print(f"DEBUG argv[0]={_sys.argv!r}", file=_sys.stderr)
-            print(f"DEBUG cwd={_sys.path[0]!r}", file=_sys.stderr)
+            # as_posix 强制正斜杠，避免 Windows 路径 'a\\b.py' 被 shlex 当转义吃
             result = subprocess.run(
-                shlex.split(command),
+                shlex.split(command.replace("\\", "/")),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -638,8 +634,9 @@ class PreCommitChecker:
             changed_files = self.get_changed_files()
 
         if changed_files:
+            # ponytail: as_posix 强制正斜杠，避免 Windows 反斜杠被 shlex 当转义
             files_str = " ".join(
-                str(f.relative_to(self.project_root)) for f in changed_files
+                f.relative_to(self.project_root).as_posix() for f in changed_files
             )
             command = f"uv run ruff format --check {files_str}"
 
@@ -675,8 +672,9 @@ class PreCommitChecker:
             changed_files = self.get_changed_files()
 
         if changed_files:
+            # ponytail: as_posix 强制正斜杠，避免 Windows 反斜杠被 shlex 当转义
             files_str = " ".join(
-                str(f.relative_to(self.project_root)) for f in changed_files
+                f.relative_to(self.project_root).as_posix() for f in changed_files
             )
             command = f"uv run ruff check {files_str}"
 
@@ -1392,7 +1390,9 @@ class PreCommitChecker:
             else:
                 print(f"执行: {command}")
 
-            result = subprocess.run(shlex.split(command), cwd=self.project_root)
+            result = subprocess.run(
+                shlex.split(command.replace("\\", "/")), cwd=self.project_root
+            )
 
             if result.returncode != 0:
                 if RICH_AVAILABLE and self.console:

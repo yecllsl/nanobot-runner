@@ -359,3 +359,84 @@ class TestShellFalse:
             assert shell_arg is not True, (
                 f"auto_fix 中的 subprocess.run 不应使用 shell=True，实际 shell={shell_arg}"
             )
+
+
+class TestWindowsPathHandling:
+    """验证 Windows 路径处理（反斜杠被 shlex 误吃转义）"""
+
+    def test_shlex_does_not_eat_backslash_in_windows_path(self):
+        """shlex.split(posix=True) 会把 '\\d' 当作转义序列并吃掉 \\d 中的反斜杠
+
+        这是 pre-commit-check 在 Windows 上 ruff 找不到文件的根因。
+        修复策略：run_command 应在 shlex.split 后再次用 as_posix 规范化。
+        """
+        import shlex
+
+        # 单反斜杠 + 字母（shlex 会当转义序列处理）
+        cmd = "uv run ruff check scripts\\diagnose_process_tree.py"
+        args = shlex.split(cmd)
+        # 反斜杠被吃掉：`scripts\diagnose_process_tree.py` → `scriptsdiagnose_process_tree.py`
+        joined = " ".join(args)
+        assert "scriptsdiagnose" in joined, (
+            f"复现根因失败：shlex 应该有此问题，实际 args={args}"
+        )
+        # 验证：含反斜杠的路径被 shlex 处理后丢失了路径分隔符
+
+    def test_run_command_normalizes_windows_backslash_to_posix(self, checker):
+        """run_command 应在 shlex.split 后规范化路径分隔符
+
+        修复后：传 `scripts\\file.py` 时，subprocess 收到的应是 `scripts/file.py`
+        """
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = ""
+        mock_result.stderr = ""
+        with patch.object(pcm.subprocess, "run", return_value=mock_result) as mock_run:
+            # 传含单反斜杠的路径
+            checker.run_command(
+                "uv run ruff check scripts\\diagnose_process_tree.py", "test"
+            )
+            called_args = mock_run.call_args[0][0]
+            # 验证：subprocess 收到的参数不应该含被吃掉的路径
+            # 即不应该有 `scriptsdiagnose_process_tree.py` 这种合并
+            for arg in called_args:
+                assert "scriptsdiagnose" not in arg, (
+                    f"参数 {arg!r} 中反斜杠被 shlex 误吃（scriptsdiagnose 合并）"
+                )
+
+    def test_ruff_format_uses_posix_paths(self, checker, tmp_path: Path):
+        """check_ruff_format 增量模式下应使用 as_posix 路径
+
+        复现根因：f.relative_to(self.project_root) 在 Windows 上返回
+        'scripts\\pre-commit-check.py'，shlex.split 把反斜杠吃掉。
+        修复：构造命令时用 as_posix() 强制正斜杠。
+        """
+        # 构造 Windows 风格的变更文件路径
+        windows_path = tmp_path / "scripts" / "pre-commit-check.py"
+        windows_path.parent.mkdir(parents=True, exist_ok=True)
+        windows_path.write_text("# test", encoding="utf-8")
+
+        # 让 Path.relative_to 返回 Windows 反斜杠路径
+        checker.config.incremental_check = True
+        checker.config.cache_enabled = False
+
+        with patch.object(
+            pcm.PreCommitChecker, "get_changed_files", return_value=[windows_path]
+        ):
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = ""
+            mock_result.stderr = ""
+            with patch.object(
+                pcm.subprocess, "run", return_value=mock_result
+            ) as mock_run:
+                # 设置 project_root 为 tmp_path
+                checker.project_root = tmp_path
+                checker.check_ruff_format()
+                if mock_run.called:
+                    called_cmd = mock_run.call_args[0][0]
+                    # 验证：拼接到命令字符串时，不应出现单反斜杠
+                    cmd_str = " ".join(called_cmd)
+                    assert "scriptsdiagnose" not in cmd_str, (
+                        f"反斜杠被 shlex 误吃（scriptsdiagnose 合并），cmd: {cmd_str!r}"
+                    )
