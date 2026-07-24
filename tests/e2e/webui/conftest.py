@@ -166,6 +166,14 @@ def mock_context(webui_config: dict) -> MagicMock:
     context.evolution_engine._store = MagicMock()
     context.evolution_engine._store.data_dir = MagicMock()
 
+    # Importer (v0.34.0)
+    context.importer = MagicMock()
+    context.importer.import_file.return_value = {
+        "status": "added",
+        "message": "导入成功",
+        "fingerprint": "test-fingerprint",
+    }
+
     return context
 
 
@@ -364,6 +372,14 @@ def _create_e2e_mock_context() -> MagicMock:
 
     context.evolution_engine._store = MagicMock()
     context.evolution_engine._store.data_dir = MagicMock()
+
+    # Importer (v0.34.0)
+    context.importer = MagicMock()
+    context.importer.import_file.return_value = {
+        "status": "added",
+        "message": "导入成功",
+        "fingerprint": "e2e-test-fingerprint",
+    }
 
     return context
 
