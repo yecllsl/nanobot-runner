@@ -1169,7 +1169,7 @@ wheels = [
 
 [[package]]
 name = "nanobot-runner"
-version = "0.33.0"
+version = "0.34.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
